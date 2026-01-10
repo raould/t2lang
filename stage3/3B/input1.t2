@@ -1,0 +1,17 @@
+(program
+  (let*
+    ((getText (lambda () (return "the_text")))
+     (ident (object (getText getText)))
+     (identFn (lambda () (return ident)))
+     (ctx (object (identFn identFn)))
+     (name1 (. ctx "identFn"))
+     (name2 ((. ctx "identFn")))
+     (name3 (call (. console log) "name3"))
+     (name4 ((. console log) "name3"))
+     (params
+        ( ((. ((. ctx "fnSignature"))) "param")
+          (lambda ((p))
+            (return
+              ((. ((. p "IDENTIFIER"))) "getText")))))
+)))
+  

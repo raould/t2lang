@@ -1,0 +1,21 @@
+export { isEqual } from "./isEqual.js";
+export {
+	setIn,
+	setInMut,
+	updateIn,
+	updateInMut,
+	merge,
+	mergeMut,
+	set,
+	setMut,
+	push,
+	pushMut,
+	pop,
+	popMut,
+	sortBy,
+	sortByMut,
+	reverse,
+	reverseMut,
+	deleteKey,
+	deleteKeyMut,
+} from "./mutation.js";

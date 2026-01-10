@@ -1,0 +1,6 @@
+(program
+  ;; defmacro declaration (emitted as a comment by codegen)
+  (defmacro myMacro ((x) (y))
+    ((. console log) x)
+    ((. console log) y))
+  ((. console log) "macros declared"))

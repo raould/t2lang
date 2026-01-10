@@ -1,0 +1,601 @@
+;; file: phaseA/ast-types.t2
+;; AST type definitions for PhaseA in t2lang itself
+;; This demonstrates what the first bootstrap component would look like
+
+(program
+  ;; Source location tracking
+  (export 
+    (type-alias Location
+      (type-object
+        ((file :string)
+         (line :number)
+         (column :number)))))
+  
+  ;; All AST nodes have these base properties
+  (export
+    (type-alias BaseNode
+      (type-object
+        ((kind :string)
+         (loc :(type-union (type-ref Location) undefined))))))
+
+  ;; ===== Literals =====
+  
+  (export
+    (type-alias NumberLit
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "number"))
+           (value :number))))))
+  
+  (export
+    (type-alias StringLit
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "string"))
+           (value :string))))))
+  
+  (export
+    (type-alias BooleanLit
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "boolean"))
+           (value :boolean))))))
+  
+  (export
+    (type-alias NullLit
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "null")))))))
+  
+  (export
+    (type-alias UndefinedLit
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "undefined")))))))
+
+  ;; ===== Identifiers =====
+  
+  (export
+    (type-alias Identifier
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "identifier"))
+           (name :string))))))
+
+  ;; ===== Expressions =====
+  
+  (export
+    (type-alias CallExpr
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "call"))
+           (callee (type-ref ASTNode))
+           (args (type-array (type-ref ASTNode))))))))
+  
+  (export
+    (type-alias FunctionExpr
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "function"))
+           (params (type-array (type-ref Parameter)))
+           (returnType :(type-union (type-ref TypeExpr) null))
+           (body (type-ref ASTNode))
+           (isAsync :boolean)
+           (isGenerator :boolean))))))
+  
+  (export
+    (type-alias Parameter
+      (type-object
+        ((name :string)
+         (type :(type-union (type-ref TypeExpr) null))
+         (defaultValue :(type-union (type-ref ASTNode) null))
+         (isRest :boolean)))))
+  
+  (export
+    (type-alias PropExpr
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "prop"))
+           (object (type-ref ASTNode))
+           (property :string))))))
+  
+  (export
+    (type-alias IndexExpr
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "index"))
+           (object (type-ref ASTNode))
+           (index (type-ref ASTNode)))))))
+  
+  (export
+    (type-alias ArrayExpr
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "array"))
+           (elements (type-array (type-ref ASTNode))))))))
+  
+  (export
+    (type-alias ObjectExpr
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "object"))
+           (properties (type-array (type-ref ObjectProperty))))))))
+  
+  (export
+    (type-alias ObjectProperty
+      (type-object
+        ((key :(type-union :string (type-ref ASTNode)))
+         (value (type-ref ASTNode))
+         (computed :boolean)
+         (shorthand :boolean)))))
+  
+  (export
+    (type-alias TernaryExpr
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "ternary"))
+           (condition (type-ref ASTNode))
+           (consequent (type-ref ASTNode))
+           (alternate (type-ref ASTNode)))))))
+  
+  (export
+    (type-alias NewExpr
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "new"))
+           (callee (type-ref ASTNode))
+           (args (type-array (type-ref ASTNode))))))))
+
+  ;; ===== Statements =====
+  
+  (export
+    (type-alias BlockStmt
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "block"))
+           (statements (type-array (type-ref ASTNode))))))))
+  
+  (export
+    (type-alias IfStmt
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "if"))
+           (condition (type-ref ASTNode))
+           (consequent (type-ref ASTNode))
+           (alternate :(type-union (type-ref ASTNode) null)))))))
+  
+  (export
+    (type-alias WhileStmt
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "while"))
+           (condition (type-ref ASTNode))
+           (body (type-ref ASTNode)))))))
+  
+  (export
+    (type-alias ForClassicStmt
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "for-classic"))
+           (init :(type-union (type-ref ASTNode) null))
+           (condition :(type-union (type-ref ASTNode) null))
+           (update :(type-union (type-ref ASTNode) null))
+           (body (type-ref ASTNode)))))))
+  
+  (export
+    (type-alias ForOfStmt
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "for-of"))
+           (variable :string)
+           (iterable (type-ref ASTNode))
+           (body (type-ref ASTNode)))))))
+  
+  (export
+    (type-alias ForAwaitStmt
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "for-await"))
+           (variable :string)
+           (iterable (type-ref ASTNode))
+           (body (type-ref ASTNode)))))))
+  
+  (export
+    (type-alias SwitchStmt
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "switch"))
+           (discriminant (type-ref ASTNode))
+           (cases (type-array (type-ref SwitchCase))))))))
+  
+  (export
+    (type-alias SwitchCase
+      (type-object
+        ((test :(type-union (type-ref ASTNode) null))
+         (consequent (type-array (type-ref ASTNode)))))))
+  
+  (export
+    (type-alias ReturnStmt
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "return"))
+           (value :(type-union (type-ref ASTNode) null)))))))
+  
+  (export
+    (type-alias ThrowStmt
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "throw"))
+           (value (type-ref ASTNode)))))))
+  
+  (export
+    (type-alias TryStmt
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "try"))
+           (body (type-ref BlockStmt))
+           (handler :(type-union (type-ref CatchClause) null))
+           (finalizer :(type-union (type-ref BlockStmt) null)))))))
+  
+  (export
+    (type-alias CatchClause
+      (type-object
+        ((param :(type-union :string null))
+         (body (type-ref BlockStmt))))))
+  
+  (export
+    (type-alias BreakStmt
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "break"))
+           (label :(type-union :string null)))))))
+  
+  (export
+    (type-alias ContinueStmt
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "continue"))
+           (label :(type-union :string null)))))))
+
+  ;; ===== Bindings (PhaseA0 primitives) =====
+  
+  (export
+    (type-alias LetStarExpr
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "let*"))
+           (bindings (type-array (type-ref Binding)))
+           (body (type-ref ASTNode))
+           (isConst :boolean))))))
+  
+  (export
+    (type-alias Binding
+      (type-object
+        ((name :string)
+         (type :(type-union (type-ref TypeExpr) null))
+         (value (type-ref ASTNode))))))
+  
+  (export
+    (type-alias AssignExpr
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "assign"))
+           (target (type-ref ASTNode))
+           (value (type-ref ASTNode))
+           (operator :string))))))
+
+  ;; ===== Declarations =====
+  
+  (export
+    (type-alias FunctionDecl
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "function-decl"))
+           (name :string)
+           (params (type-array (type-ref Parameter)))
+           (returnType :(type-union (type-ref TypeExpr) null))
+           (body (type-ref ASTNode))
+           (isAsync :boolean)
+           (isGenerator :boolean)
+           (typeParams :(type-union (type-array (type-ref TypeParameter)) null)))))))
+  
+  (export
+    (type-alias ClassDecl
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "class"))
+           (name :string)
+           (superClass :(type-union (type-ref ASTNode) null))
+           (members (type-array (type-ref ClassMember)))
+           (typeParams :(type-union (type-array (type-ref TypeParameter)) null))
+           (implements (type-array (type-ref TypeExpr))))))))
+  
+  (export
+    (type-alias ClassMember
+      (type-union
+        (type-ref MethodMember)
+        (type-ref PropertyMember)
+        (type-ref ConstructorMember))))
+  
+  (export
+    (type-alias MethodMember
+      (type-object
+        ((kind (type-literal "method"))
+         (name :string)
+         (params (type-array (type-ref Parameter)))
+         (returnType :(type-union (type-ref TypeExpr) null))
+         (body (type-ref ASTNode))
+         (isStatic :boolean)
+         (isAsync :boolean)
+         (isAbstract :boolean)
+         (visibility :(type-union (type-literal "public") 
+                                  (type-literal "private") 
+                                  (type-literal "protected")))))))
+  
+  (export
+    (type-alias PropertyMember
+      (type-object
+        ((kind (type-literal "property"))
+         (name :string)
+         (type :(type-union (type-ref TypeExpr) null))
+         (initializer :(type-union (type-ref ASTNode) null))
+         (isStatic :boolean)
+         (isReadonly :boolean)
+         (visibility :(type-union (type-literal "public") 
+                                  (type-literal "private") 
+                                  (type-literal "protected")))))))
+  
+  (export
+    (type-alias ConstructorMember
+      (type-object
+        ((kind (type-literal "constructor"))
+         (params (type-array (type-ref Parameter)))
+         (body (type-ref ASTNode))))))
+  
+  (export
+    (type-alias TypeAliasDecl
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "type-alias"))
+           (name :string)
+           (typeParams :(type-union (type-array (type-ref TypeParameter)) null))
+           (type (type-ref TypeExpr)))))))
+  
+  (export
+    (type-alias InterfaceDecl
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "interface"))
+           (name :string)
+           (typeParams :(type-union (type-array (type-ref TypeParameter)) null))
+           (extends (type-array (type-ref TypeExpr)))
+           (members (type-array (type-ref TypeMember))))))))
+
+  ;; ===== Type Expressions =====
+  
+  (export
+    (type-alias TypeExpr
+      (type-union
+        (type-ref TypeRef)
+        (type-ref TypeLiteral)
+        (type-ref TypeArray)
+        (type-ref TypeObject)
+        (type-ref TypeFunction)
+        (type-ref TypeUnion)
+        (type-ref TypeIntersection)
+        (type-ref TypeIndexed)
+        (type-ref TypeConditional)
+        (type-ref TypeMapped))))
+  
+  (export
+    (type-alias TypeRef
+      (type-object
+        ((kind (type-literal "type-ref"))
+         (name :string)
+         (typeArgs :(type-union (type-array (type-ref TypeExpr)) null))))))
+  
+  (export
+    (type-alias TypeLiteral
+      (type-object
+        ((kind (type-literal "type-literal"))
+         (value :(type-union :string :number :boolean))))))
+  
+  (export
+    (type-alias TypeArray
+      (type-object
+        ((kind (type-literal "type-array"))
+         (element (type-ref TypeExpr))))))
+  
+  (export
+    (type-alias TypeObject
+      (type-object
+        ((kind (type-literal "type-object"))
+         (members (type-array (type-ref TypeMember)))))))
+  
+  (export
+    (type-alias TypeMember
+      (type-object
+        ((key :string)
+         (type (type-ref TypeExpr))
+         (optional :boolean)
+         (readonly :boolean)))))
+  
+  (export
+    (type-alias TypeFunction
+      (type-object
+        ((kind (type-literal "type-fn"))
+         (params (type-array (type-ref TypeFunctionParam)))
+         (returnType (type-ref TypeExpr))))))
+  
+  (export
+    (type-alias TypeFunctionParam
+      (type-object
+        ((name :(type-union :string null))
+         (type (type-ref TypeExpr))
+         (optional :boolean)))))
+  
+  (export
+    (type-alias TypeUnion
+      (type-object
+        ((kind (type-literal "type-union"))
+         (types (type-array (type-ref TypeExpr)))))))
+  
+  (export
+    (type-alias TypeIntersection
+      (type-object
+        ((kind (type-literal "type-intersection"))
+         (types (type-array (type-ref TypeExpr)))))))
+  
+  (export
+    (type-alias TypeIndexed
+      (type-object
+        ((kind (type-literal "type-indexed"))
+         (object (type-ref TypeExpr))
+         (index (type-ref TypeExpr))))))
+  
+  (export
+    (type-alias TypeConditional
+      (type-object
+        ((kind (type-literal "type-conditional"))
+         (checkType (type-ref TypeExpr))
+         (extendsType (type-ref TypeExpr))
+         (trueType (type-ref TypeExpr))
+         (falseType (type-ref TypeExpr))))))
+  
+  (export
+    (type-alias TypeMapped
+      (type-object
+        ((kind (type-literal "type-mapped"))
+         (typeParameter :string)
+         (constraint (type-ref TypeExpr))
+         (type (type-ref TypeExpr))
+         (optional :(type-union :boolean (type-literal "+") (type-literal "-")))
+         (readonly :(type-union :boolean (type-literal "+") (type-literal "-")))))))
+  
+  (export
+    (type-alias TypeParameter
+      (type-object
+        ((name :string)
+         (constraint :(type-union (type-ref TypeExpr) null))
+         (default :(type-union (type-ref TypeExpr) null))))))
+
+  ;; ===== Import/Export =====
+  
+  (export
+    (type-alias ImportDecl
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "import"))
+           (specifiers (type-array (type-ref ImportSpecifier)))
+           (source :string))))))
+  
+  (export
+    (type-alias ImportSpecifier
+      (type-object
+        ((imported :string)
+         (local :string)
+         (isDefault :boolean)
+         (isNamespace :boolean)))))
+  
+  (export
+    (type-alias ExportDecl
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "export"))
+           (declaration (type-ref ASTNode)))))))
+
+  ;; ===== Program (Root) =====
+  
+  (export
+    (type-alias Program
+      (type-intersection
+        (type-ref BaseNode)
+        (type-object
+          ((kind (type-literal "program"))
+           (statements (type-array (type-ref ASTNode))))))))
+
+  ;; ===== Union of all possible AST nodes =====
+  
+  (export
+    (type-alias ASTNode
+      (type-union
+        ;; Literals
+        (type-ref NumberLit)
+        (type-ref StringLit)
+        (type-ref BooleanLit)
+        (type-ref NullLit)
+        (type-ref UndefinedLit)
+        
+        ;; Identifiers
+        (type-ref Identifier)
+        
+        ;; Expressions
+        (type-ref CallExpr)
+        (type-ref FunctionExpr)
+        (type-ref PropExpr)
+        (type-ref IndexExpr)
+        (type-ref ArrayExpr)
+        (type-ref ObjectExpr)
+        (type-ref TernaryExpr)
+        (type-ref NewExpr)
+        (type-ref LetStarExpr)
+        (type-ref AssignExpr)
+        
+        ;; Statements
+        (type-ref BlockStmt)
+        (type-ref IfStmt)
+        (type-ref WhileStmt)
+        (type-ref ForClassicStmt)
+        (type-ref ForOfStmt)
+        (type-ref ForAwaitStmt)
+        (type-ref SwitchStmt)
+        (type-ref ReturnStmt)
+        (type-ref ThrowStmt)
+        (type-ref TryStmt)
+        (type-ref BreakStmt)
+        (type-ref ContinueStmt)
+        
+        ;; Declarations
+        (type-ref FunctionDecl)
+        (type-ref ClassDecl)
+        (type-ref TypeAliasDecl)
+        (type-ref InterfaceDecl)
+        (type-ref ImportDecl)
+        (type-ref ExportDecl)
+        
+        ;; Program
+        (type-ref Program)))))

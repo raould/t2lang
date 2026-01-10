@@ -1,0 +1,8 @@
+(program
+    (let* ((a "one")
+          (b "Two")
+          (ab (+ a b)))
+        (raw """console.assert(a+b === ab);""")
+        (console.log ab)
+    )
+)

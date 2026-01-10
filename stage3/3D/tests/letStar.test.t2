@@ -1,0 +1,11 @@
+(program
+  ;; let* with multiple bindings and body
+  (let* ((x 10)
+         (y 20)
+         (z (+ x y)))
+    ((. console log) z))
+
+  ;; let* with undefined init
+  (let* ((a undefined))
+    (set! a 42)
+    ((. console log) a)))

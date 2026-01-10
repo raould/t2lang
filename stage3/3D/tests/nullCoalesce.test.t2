@@ -1,0 +1,13 @@
+(program
+  (let* ((a null)
+         (b undefined)
+         (c "hello"))
+    ((. console log) (?? a "fallback"))
+    ((. console log) (?? b "fallback"))
+    ((. console log) (?? c "fallback"))
+    ((. console assert) (=== (?? a "fallback") "fallback"))
+    ((. console assert) (=== (?? b "fallback") "fallback"))
+    ((. console assert) (=== (?? c "fallback") "hello"))
+    ;; nested: opt-chain + null-coalesce
+    (let* ((user undefined))
+      ((. console assert) (=== (?? (.? user name) "guest") "guest")))))

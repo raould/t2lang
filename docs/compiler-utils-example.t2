@@ -1,0 +1,350 @@
+;; file: stdlib/compiler-utils.t2
+;; Utility functions for the compiler written in t2lang
+;; This demonstrates practical bootstrap code
+
+(program
+  ;; Import the AST types
+  (import ((ASTNode (type-only))) "./ast-types.t2")
+  
+  ;; ===== Symbol Generation (for macro hygiene) =====
+  
+  (export
+    (const* ((gensymCounter (object))))
+    
+    (fn gensym ((prefix :string)) :string
+      "Generate a unique symbol with the given prefix"
+      (let* ((count :(type-union :number undefined) 
+                    (index gensymCounter prefix))
+             (nextCount (ternary (call === count undefined) 
+                                0 
+                                (call + count 1))))
+        (block
+          (assign (index gensymCounter prefix) nextCount)
+          (call + prefix "$" (call toString nextCount))))))
+  
+  ;; ===== AST Utilities =====
+  
+  (export
+    (fn isIdentifier ((node :ASTNode)) :boolean
+      "Check if a node is an identifier"
+      (call === (prop node "kind") "identifier")))
+  
+  (export
+    (fn isLiteral ((node :ASTNode)) :boolean
+      "Check if a node is a literal value"
+      (let* ((kind (prop node "kind")))
+        (call || 
+          (call === kind "number")
+          (call === kind "string")
+          (call === kind "boolean")
+          (call === kind "null")
+          (call === kind "undefined")))))
+  
+  (export
+    (fn isExpression ((node :ASTNode)) :boolean
+      "Check if a node is an expression"
+      (call ! (call isStatement node))))
+  
+  (export
+    (fn isStatement ((node :ASTNode)) :boolean
+      "Check if a node is a statement"
+      (let* ((kind (prop node "kind")))
+        (call ||
+          (call === kind "block")
+          (call === kind "if")
+          (call === kind "while")
+          (call === kind "for-classic")
+          (call === kind "for-of")
+          (call === kind "for-await")
+          (call === kind "switch")
+          (call === kind "return")
+          (call === kind "throw")
+          (call === kind "try")
+          (call === kind "break")
+          (call === kind "continue")))))
+  
+  ;; ===== AST Constructors =====
+  
+  (export
+    (fn makeNumber ((value :number)) :ASTNode
+      "Create a number literal node"
+      (object
+        ((kind "number")
+         (value value)
+         (loc null)))))
+  
+  (export
+    (fn makeString ((value :string)) :ASTNode
+      "Create a string literal node"
+      (object
+        ((kind "string")
+         (value value)
+         (loc null)))))
+  
+  (export
+    (fn makeBoolean ((value :boolean)) :ASTNode
+      "Create a boolean literal node"
+      (object
+        ((kind "boolean")
+         (value value)
+         (loc null)))))
+  
+  (export
+    (fn makeIdentifier ((name :string)) :ASTNode
+      "Create an identifier node"
+      (object
+        ((kind "identifier")
+         (name name)
+         (loc null)))))
+  
+  (export
+    (fn makeCall ((callee :ASTNode) (args :(type-array ASTNode))) :ASTNode
+      "Create a call expression node"
+      (object
+        ((kind "call")
+         (callee callee)
+         (args args)
+         (loc null)))))
+  
+  (export
+    (fn makeProp ((object :ASTNode) (property :string)) :ASTNode
+      "Create a property access node"
+      (object
+        ((kind "prop")
+         (object object)
+         (property property)
+         (loc null)))))
+  
+  (export
+    (fn makeBlock ((statements :(type-array ASTNode))) :ASTNode
+      "Create a block statement"
+      (object
+        ((kind "block")
+         (statements statements)
+         (loc null)))))
+  
+  (export
+    (fn makeIf ((condition :ASTNode) 
+                (consequent :ASTNode) 
+                (alternate :(type-union ASTNode null))) 
+        :ASTNode
+      "Create an if statement"
+      (object
+        ((kind "if")
+         (condition condition)
+         (consequent consequent)
+         (alternate alternate)
+         (loc null)))))
+  
+  ;; ===== AST Walking =====
+  
+  (export
+    (fn walkAST ((node :ASTNode) 
+                 (visitor :(type-fn ((node :ASTNode)) void)))
+        :void
+      "Walk an AST tree depth-first, calling visitor on each node"
+      (block
+        ;; Visit this node
+        (call visitor node)
+        
+        ;; Visit children based on node kind
+        (const* ((kind (prop node "kind"))))
+        
+        (if (call === kind "call")
+          (block
+            (call walkAST (prop node "callee") visitor)
+            (call forEach 
+              (prop node "args") 
+              (fn ((arg :ASTNode)) (call walkAST arg visitor))))
+          (if (call === kind "block")
+            (call forEach 
+              (prop node "statements") 
+              (fn ((stmt :ASTNode)) (call walkAST stmt visitor)))
+            (if (call === kind "if")
+              (block
+                (call walkAST (prop node "condition") visitor)
+                (call walkAST (prop node "consequent") visitor)
+                (if (call !== (prop node "alternate") null)
+                  (call walkAST (prop node "alternate") visitor)
+                  null))
+              ;; ... handle other node kinds
+              null))))))
+  
+  (export
+    (fn mapAST ((node :ASTNode) 
+                (transform :(type-fn ((node :ASTNode)) ASTNode)))
+        :ASTNode
+      "Transform an AST tree by applying a function to each node"
+      (let* ((transformed (call transform node))
+             (kind (prop transformed "kind")))
+        (if (call === kind "call")
+          (object
+            ((kind "call")
+             (callee (call mapAST (prop transformed "callee") transform))
+             (args (call map 
+                     (prop transformed "args")
+                     (fn ((arg :ASTNode)) (call mapAST arg transform))))
+             (loc (prop transformed "loc"))))
+          (if (call === kind "block")
+            (object
+              ((kind "block")
+               (statements (call map 
+                            (prop transformed "statements")
+                            (fn ((stmt :ASTNode)) (call mapAST stmt transform))))
+               (loc (prop transformed "loc"))))
+            ;; ... handle other node kinds
+            transformed)))))
+  
+  ;; ===== String Utilities =====
+  
+  (export
+    (fn escapeString ((str :string)) :string
+      "Escape special characters in a string for code generation"
+      (call replace
+        (call replace
+          (call replace
+            (call replace str "\\" "\\\\")
+            "\"" "\\\"")
+          "\n" "\\n")
+        "\t" "\\t")))
+  
+  (export
+    (fn indent ((str :string) (level :number)) :string
+      "Indent a string by the given number of spaces"
+      (let* ((spaces (call repeat " " (call * level 2)))
+             (lines (call split str "\n")))
+        (call join
+          (call map lines (fn ((line :string)) (call + spaces line)))
+          "\n"))))
+  
+  ;; ===== Collection Utilities =====
+  
+  (export
+    (fn map ((arr :(type-array any)) (f :(type-fn ((x :any)) any)))
+        :(type-array any)
+      "Map a function over an array"
+      (let* ((result (array))
+             (i 0)
+             (len (prop arr "length")))
+        (block
+          (while (call < i len)
+            (block
+              (call push result (call f (index arr i)))
+              (assign i (call + i 1))))
+          result))))
+  
+  (export
+    (fn filter ((arr :(type-array any)) (pred :(type-fn ((x :any)) boolean)))
+        :(type-array any)
+      "Filter an array by a predicate"
+      (let* ((result (array))
+             (i 0)
+             (len (prop arr "length")))
+        (block
+          (while (call < i len)
+            (block
+              (const* ((elem (index arr i))))
+              (if (call pred elem)
+                (call push result elem)
+                null)
+              (assign i (call + i 1))))
+          result))))
+  
+  (export
+    (fn reduce ((arr :(type-array any)) 
+                (f :(type-fn ((acc :any) (val :any)) any))
+                (init :any))
+        :any
+      "Reduce an array with a function"
+      (let* ((acc init)
+             (i 0)
+             (len (prop arr "length")))
+        (block
+          (while (call < i len)
+            (block
+              (assign acc (call f acc (index arr i)))
+              (assign i (call + i 1))))
+          acc))))
+  
+  (export
+    (fn forEach ((arr :(type-array any)) (f :(type-fn ((x :any)) void)))
+        :void
+      "Call a function for each element in an array"
+      (let* ((i 0)
+             (len (prop arr "length")))
+        (while (call < i len)
+          (block
+            (call f (index arr i))
+            (assign i (call + i 1)))))))
+  
+  (export
+    (fn some ((arr :(type-array any)) (pred :(type-fn ((x :any)) boolean)))
+        :boolean
+      "Check if any element satisfies a predicate"
+      (let* ((i 0)
+             (len (prop arr "length"))
+             (found false))
+        (block
+          (while (call && (call < i len) (call ! found))
+            (block
+              (if (call pred (index arr i))
+                (assign found true)
+                null)
+              (assign i (call + i 1))))
+          found))))
+  
+  (export
+    (fn every ((arr :(type-array any)) (pred :(type-fn ((x :any)) boolean)))
+        :boolean
+      "Check if all elements satisfy a predicate"
+      (let* ((i 0)
+             (len (prop arr "length"))
+             (allMatch true))
+        (block
+          (while (call && (call < i len) allMatch)
+            (block
+              (if (call ! (call pred (index arr i)))
+                (assign allMatch false)
+                null)
+              (assign i (call + i 1))))
+          allMatch))))
+  
+  ;; ===== Error Handling =====
+  
+  (export
+    (fn makeCompilerError ((message :string) 
+                          (loc :(type-union Location null)))
+        :Error
+      "Create a compiler error with source location"
+      (let* ((error (new Error message)))
+        (block
+          (if (call !== loc null)
+            (block
+              (assign (prop error "file") (prop loc "file"))
+              (assign (prop error "line") (prop loc "line"))
+              (assign (prop error "column") (prop loc "column")))
+            null)
+          error))))
+  
+  ;; ===== Debugging =====
+  
+  (export
+    (fn dumpAST ((node :ASTNode) (depth :number)) :string
+      "Pretty-print an AST node for debugging"
+      (let* ((indent (call repeat "  " depth))
+             (kind (prop node "kind")))
+        (if (call isLiteral node)
+          (call + indent kind ": " (call JSON.stringify (prop node "value")))
+          (if (call === kind "identifier")
+            (call + indent "identifier: " (prop node "name"))
+            (if (call === kind "call")
+              (call +
+                indent "call:\n"
+                (call dumpAST (prop node "callee") (call + depth 1)) "\n"
+                (call join
+                  (call map 
+                    (prop node "args")
+                    (fn ((arg :ASTNode)) (call dumpAST arg (call + depth 1))))
+                  "\n"))
+              (call + indent kind)))))))
+)

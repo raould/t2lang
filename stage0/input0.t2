@@ -1,0 +1,10 @@
+(program
+  (let*
+    ((x 1)
+  ;; comment
+     (z (raw """
+  fred
+  """))
+     (main (lambda () (raw """42""") (raw """43""")))
+     (y (call add x 2)))
+    (call print y)))

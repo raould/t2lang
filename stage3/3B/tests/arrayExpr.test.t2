@@ -1,0 +1,12 @@
+(program
+  ;; array with elements
+  (let arr (array 1 2 3))
+  ((. console log) arr)
+
+  ;; array with mixed types
+  (let mixed (array "a" 1 true null))
+  ((. console log) mixed)
+
+  ;; empty array
+  (let empty (array))
+  ((. console log) empty))

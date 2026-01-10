@@ -1,0 +1,375 @@
+;; t2conduit/interop.t2
+;; Interoperability with Promise, Observable, Signal, and other async patterns
+
+(program
+
+  ;; ============================================================================
+  ;; PROMISE INTEROP
+  ;; ============================================================================
+
+  ;; fromPromise - convert promise to source (eager)
+  (fn async generator fromPromise ((promise (t:ref Promise (array (t:ref T)))))
+    : (t:ref Source (array (t:ref T)))
+    (block
+      (yield (await promise))))
+  (export (export-spec (named fromPromise)))
+
+  ;; fromPromises - convert multiple promises to source
+  (fn async generator fromPromises ((promises (t:ref Array (array (t:ref Promise (array (t:ref T)))))))
+    : (t:ref Source (array (t:ref T)))
+    (block
+      (for of ((promise) promises)
+        (yield (await promise)))))
+  (export (export-spec (named fromPromises)))
+
+  ;; toPromise - convert source to promise of first value
+  (fn toPromise ((source (t:ref Source (array (t:ref T)))))
+    : (t:ref Promise (array (t:union (t:ref T) type-undefined)))
+    (return
+      (call (fn async ()
+              (for await ((item) source)
+                (return item))
+              (return undefined)))))
+  (export (export-spec (named toPromise)))
+
+  ;; toPromiseAll - convert source to promise of all values
+  (fn toPromiseAll ((source (t:ref Source (array (t:ref T)))))
+    : (t:ref Promise (array (t:ref Array (array (t:ref T)))))
+    (return
+      (call (fn async ()
+              (const* ((items (array)))
+                (block
+                  (for await ((item) source)
+                    (call (prop items "push") item))
+                  (return items)))))))
+  (export (export-spec (named toPromiseAll)))
+
+  ;; ============================================================================
+  ;; RXJS OBSERVABLE INTEROP
+  ;; ============================================================================
+
+  ;; fromObservable - convert RxJS Observable to Source
+  (fn fromObservable ((obs (t:ref Observable (array (t:ref T)))))
+    : (t:ref Source (array (t:ref T)))
+    (return
+      (call (fn async generator ()
+              (let* ((queue (array))
+                     (done false)
+                     (error null)
+                     (resolve null)
+                     (sub null))
+                (block
+                  (assign sub
+                    (call (prop obs "subscribe")
+                      (object
+                        ("next" (lambda ((value))
+                                  (call (prop queue "push") value)
+                                  (if resolve
+                                    (block
+                                      (call resolve)
+                                      (assign resolve null)))))
+                        ("error" (lambda ((err))
+                                   (assign error err)
+                                   (if resolve
+                                     (block
+                                       (call resolve)
+                                       (assign resolve null)))))
+                        ("complete" (lambda ()
+                                      (assign done true)
+                                      (if resolve
+                                        (block
+                                          (call resolve)
+                                          (assign resolve null))))))))
+                  (try
+                    (while (! done)
+                      (if :(queue.length > 0)
+                        (yield (call (prop queue "shift")))
+                        (await (new Promise
+                                  (lambda ((res))
+                                    (assign resolve res)))))
+                      (if error
+                        (throw error)))
+                    (finally
+                      (if sub
+                        (call (prop sub "unsubscribe")))))))))))
+  (export (export-spec (named fromObservable)))
+
+  ;; toObservable - convert Source to RxJS Observable
+  (const* ((Observable (prop globalThis "Observable"))))
+  (fn toObservable ((source (t:ref Source (array (t:ref T)))))
+    : (t:ref Observable (array (t:ref T)))
+    (return
+      (new Observable
+           (lambda ((subscriber))
+             (block
+               (call (fn async ()
+                       (try
+                         (for await ((item) source)
+                           (call (prop subscriber "next") item))
+                         (call (prop subscriber "complete"))
+                         (catch err
+                           (call (prop subscriber "error") err)))))
+               (return (object)))))))
+  (export (export-spec (named toObservable)))
+
+  ;; ============================================================================
+  ;; ANGULAR SIGNAL INTEROP
+  ;; ============================================================================
+
+  ;; fromSignal - convert Angular Signal to Source (polling)
+  (fn fromSignal ((signal (t:ref Signal (array (t:ref T))))
+                  (opts (t:object ("interval" type-number))
+                        default (object ("interval" 100))))
+    : (t:ref Source (array (t:ref T)))
+    (const* ((interval (prop opts "interval")))
+      (return
+        (call (fn async generator ()
+                (let* ((lastValue (call signal))
+                       (running true))
+                  (block
+                    (yield lastValue)
+                    (while running
+                      (await (new Promise
+                                 (lambda ((resolve))
+                                   (call setTimeout resolve interval))))
+                      (const* ((currentValue (call signal)))
+                        (if (!== currentValue lastValue)
+                          (block
+                            (yield currentValue)
+                            (assign lastValue currentValue))))))))))))
+  (export (export-spec (named fromSignal)))
+
+  ;; toSignal - convert Source to Angular Signal (requires injection)
+  ;; Note: This is a simplified version - real implementation needs Angular DI
+  (fn toSignal ((source (t:ref Source (array (t:ref T))))
+                (initialValue (t:ref T)))
+    : (t:ref Signal (array (t:ref T)))
+    ;; Simplified - real version would use Angular's signal() and effect()
+    (let* ((value initialValue))
+      (block
+        ;; Start consuming source
+        (call (fn async ()
+                (for await ((item) source)
+                  (assign value item))))
+        ;; Return getter that acts like signal
+        (return (lambda () value)))))
+  (export (export-spec (named toSignal)))
+
+  ;; ============================================================================
+  ;; EVENT INTEROP
+  ;; ============================================================================
+
+  ;; fromEvent - create source from DOM events
+  (fn fromEvent ((target (t:ref EventTarget))
+                 (eventName type-string)
+                 (opts (t:ref EventListenerOptions)
+                       default (object)))
+    : (t:ref Source (array (t:ref Event)))
+    (return
+      (call (fn async generator ()
+              (let* ((queue (array))
+                     (resolve null)
+                     (handler (lambda ((event))
+                               (call (prop queue "push") event)
+                               (if resolve
+                                 (block
+                                   (call resolve)
+                                   (assign resolve null))))))
+                (block
+                  (call (prop target "addEventListener") eventName handler opts)
+                  (try
+                    (while true
+                      (if :(queue.length > 0)
+                        (yield (call (prop queue "shift")))
+                        (await (new Promise
+                                   (lambda ((res))
+                                     (assign resolve res))))))
+                    (finally
+                      (call (prop target "removeEventListener") eventName handler opts)))))))))
+  (export (export-spec (named fromEvent)))
+
+  ;; fromEventPattern - create source from custom event emitter
+  (fn fromEventPattern ((addHandler (t:fn (t:fn (t:ref T) type-undefined) type-undefined))
+                        (removeHandler (t:fn (t:fn (t:ref T) type-undefined) type-undefined)))
+    : (t:ref Source (array (t:ref T)))
+    (return
+      (call (fn async generator ()
+              (let* ((queue (array))
+                     (resolve null)
+                     (handler (lambda ((value))
+                               (call (prop queue "push") value)
+                               (if resolve
+                                 (block
+                                   (call resolve)
+                                   (assign resolve null))))))
+                (block
+                  (call addHandler handler)
+                  (try
+                    (while true
+                      (if :(queue.length > 0)
+                        (yield (call (prop queue "shift")))
+                        (await (new Promise
+                                   (lambda ((res))
+                                     (assign resolve res))))))
+                    (finally
+                      (call removeHandler handler)))))))))
+  (export (export-spec (named fromEventPattern)))
+
+  ;; ============================================================================
+  ;; WEB STREAMS INTEROP
+  ;; ============================================================================
+
+  ;; fromReadableStream - convert ReadableStream to Source
+  (fn async generator fromReadableStream ((stream (t:ref ReadableStream (array (t:ref T)))))
+    : (t:ref Source (array (t:ref T)))
+    (const* ((reader (call (prop stream "getReader"))))
+      (try
+        (while true
+          (const* (((object-pattern ("done" done) ("value" value))
+                    (await (call (prop reader "read")))))
+            (if done (break))
+            (yield value)))
+        (finally
+          (call (prop reader "releaseLock"))))))
+  (export (export-spec (named fromReadableStream)))
+
+  ;; toReadableStream - convert Source to ReadableStream
+  (fn toReadableStream ((source (t:ref Source (array (t:ref T)))))
+    : (t:ref ReadableStream (array (t:ref T)))
+    (return
+      (new ReadableStream
+           (object
+             ("start" (lambda ((controller))
+                        (call (fn async ()
+                                (try
+                                  (for await ((item) source)
+                                    (call (prop controller "enqueue") item))
+                                  (call (prop controller "close"))
+                                  (catch err
+                                    (call (prop controller "error") err)))))))))))
+  (export (export-spec (named toReadableStream)))
+
+  ;; ============================================================================
+  ;; NODE.JS STREAM INTEROP
+  ;; ============================================================================
+
+  ;; fromNodeStream - convert Node.js Readable to Source
+  (fn fromNodeStream ((stream (t:ref Readable)))
+    : (t:ref Source (array (t:ref any)))
+    (return
+      (call (fn async generator ()
+              (let* ((queue (array))
+                     (done false)
+                     (error null)
+                     (resolve null))
+                (block
+                  (call (prop stream "on") "data"
+                        (lambda ((chunk))
+                          (call (prop queue "push") chunk)
+                          (if resolve
+                            (block
+                              (call resolve)
+                              (assign resolve null)))))
+                  (call (prop stream "on") "end"
+                        (lambda ()
+                          (assign done true)
+                          (if resolve
+                            (block
+                              (call resolve)
+                              (assign resolve null)))))
+                  (call (prop stream "on") "error"
+                        (lambda ((err))
+                          (assign error err)
+                          (if resolve
+                            (block
+                              (call resolve)
+                              (assign resolve null)))))
+                  (while (! done)
+                    (if :(queue.length > 0)
+                      (yield (call (prop queue "shift")))
+                      (await (new Promise
+                                 (lambda ((res))
+                                   (assign resolve res)))))
+                    (if error
+                      (throw error))))))))))
+  (export (export-spec (named fromNodeStream)))
+
+  ;; toNodeStream - convert Source to Node.js Readable
+  (fn toNodeStream ((source (t:ref Source (array (t:ref T)))))
+    : (t:ref Readable)
+    (const* ((require (prop globalThis "require"))
+             (streamModule (call require "stream"))
+             (Readable (prop streamModule "Readable"))
+             (iterator source))
+      (return
+        (new Readable
+             (object
+               ("read" (lambda async ()
+                         (try
+                           (const* (((object-pattern ("done" done) ("value" value))
+                                     (await (call (prop iterator "next")))))
+                             (if done
+                               (call (prop this "push") null)
+                               (call (prop this "push") value)))
+                           (catch err
+                             (call (prop this "destroy") err))))))))))
+  (export (export-spec (named toNodeStream)))
+
+  ;; ============================================================================
+  ;; ASYNC GENERATOR INTEROP
+  ;; ============================================================================
+
+  ;; fromGenerator - convert generator function to source
+  (fn fromGenerator ((genFn (t:fn (t:ref AsyncGenerator (array (t:ref T))))))
+    : (t:ref Source (array (t:ref T)))
+    (return (call genFn)))
+  (export (export-spec (named fromGenerator)))
+
+  ;; toGenerator - identity (Source is already AsyncIterable)
+  (fn toGenerator ((source (t:ref Source (array (t:ref T)))))
+    : (t:ref AsyncGenerator (array (t:ref T)))
+    (return source))
+  (export (export-spec (named toGenerator)))
+
+  ;; ============================================================================
+  ;; CALLBACK PATTERN INTEROP
+  ;; ============================================================================
+
+  ;; fromCallback - convert callback-based API to source
+  (fn fromCallback ((fn (t:fn (t:fn (t:union (t:ref Error) type-null)
+                                    (t:ref T))
+                               type-undefined)))
+    : (t:ref Source (array (t:ref T)))
+    (return
+      (call (fn async generator ()
+              (const* ((result (await (new Promise
+                                         (lambda ((resolve))
+                                           (call fn
+                                                 (lambda ((err) (value))
+                                                   (call resolve (object ("err" err) ("value" value))))))))
+                               as any))
+                (const* ((err (prop result "err"))
+                         (value (prop result "value")))
+                  (if err
+                    (throw err)
+                    (yield value))))))))
+  (export (export-spec (named fromCallback)))
+
+  ;; fromNodeback - Node.js callback pattern helper
+  (const* ((fromNodeback fromCallback)))
+  (export (export-spec (named fromNodeback)))
+
+  ;; ============================================================================
+  ;; ITERATOR PROTOCOL HELPERS
+  ;; ============================================================================
+
+  ;; isSource - check if value is a Source
+  (fn isSource ((value (t:ref any)))
+    (return
+        (&& value
+          (!== (prop value "next") undefined))))
+  (export (export-spec (named isSource)))
+
+  ;; isAsyncIterable - check if value is async iterable
+  (const* ((isAsyncIterable isSource)))
+  (export (export-spec (named isAsyncIterable)))

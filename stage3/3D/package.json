@@ -1,0 +1,22 @@
+{
+  "name": "stage3D",
+  "version": "0.0.1",
+  "description": "",
+  "license": "CC0-1.0",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "build": "npm run build-grammar && npm run build-compiler",
+    "build-compiler": "npx tsx ../3C/index.ts Stage3D.s3c > index.ts",
+    "build-grammar": "antlr-ng -Dlanguage=TypeScript Stage3D.g4",
+      "test": "npm run build && npx tsx bin/test-runner.ts"
+  },
+  "dependencies": {
+    "antlr-ng": "^1.0.10"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "tsx": "^4.21.0"
+  }
+}

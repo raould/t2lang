@@ -1,0 +1,12 @@
+(program
+  ;; return with expression
+  (def getVal
+    (lambda ()
+      (return 42)))
+
+  ;; return without expression
+  (def doNothing
+    (lambda ()
+      (return)))
+
+  ((. console log) (getVal)))

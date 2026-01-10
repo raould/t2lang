@@ -1,0 +1,358 @@
+(program
+  (raw """import { CharStream, CommonTokenStream } from "antlr4ng";
+import { Stage1Lexer } from "./Stage1Lexer";
+import { BindingContext, ParamContext, Stage1Parser } from "./Stage1Parser";
+import fs from "node:fs";""")
+  (let*
+   (
+;;
+;; helpers
+
+      (dbg (lambda ((...msgs)) (raw """//console.error(...msgs);""")))
+
+      (parseString
+        (lambda ((tokenText))
+          (raw """const raw = tokenText;
+          if (raw.startsWith('\"\"\"')) {
+              return raw.slice(3, -3);
+          }
+          const inner = raw.slice(1, -1);
+          return JSON.parse('"' + inner.replace(/"/g, '\\"') + '"');"""))
+      )
+
+;;
+;; ========== CST -> AST ==========
+
+;;  
+;; ast program
+      (astProgram
+        (lambda ((ctx))
+;;          (raw """debugger;""")
+          (raw """dbg('+++astProgram', Object.keys(ctx), ctx.getText())""")
+          (raw """return {
+              tag: "program",
+              body: ctx.statement().map(astStatement),
+          };""")
+        )
+      )
+
+;;
+;; ast statement
+      (astStatement
+        (lambda ((ctx))
+          (raw """dbg('+++astStatement', Object.keys(ctx), ctx.getText());""")
+          (raw """dbg("letStar", !!ctx.letStar());""")
+          (raw """dbg("lambda", !!ctx.lambda());""")
+          (raw """dbg("raw", !!ctx.raw());""")
+          (raw """dbg("if", !!ctx.if());""")
+          (raw """dbg("while", !!ctx.while());""")
+          (raw """if (ctx.letStar()) {
+                return astLetStar(ctx.letStar()!);
+            }
+            if (ctx.lambda()) {
+                return astLambda(ctx.lambda()!);
+            }
+            if (ctx.raw()) {
+                return astRaw(ctx.raw()!);
+            }
+            if (ctx.if()) {
+                return astIf(ctx.if());
+            }
+            if (ctx.while()) {
+              return astWhile(ctx.while());
+            }
+            dbg("expression", ctx.expression());
+            return { tag: 'expr-stmt', expr: astExpression(ctx.expression()!) };"""
+          ) 
+        )
+      )
+
+;;
+;; ast if
+;; LPAREN IF expression statement statement? RPAREN
+
+      (astIf
+        (lambda ((ctx))
+          (raw """dbg('+++astIf', Object.keys(ctx), ctx.getText());""")
+          (raw """const test = astExpression(ctx.expression());
+            const ifthen = astStatement(ctx.statement(0));
+            const ctxElse = ctx.statement(1);
+            const ifelse = (ctxElse == undefined) ? undefined : astStatement(ctxElse);
+            return { tag: 'if', test, ifthen, ifelse };""")
+          )
+        )
+;;
+;; ast while
+
+      (astWhile
+        (lambda ((ctx))
+          (raw """dbg('+++astWhile', Object.keys(ctx), ctx.getText());""")
+          (raw """const test = astExpression(ctx.expression());
+            const body = astStatement(ctx.statement());
+            return { tag: 'while', test, body };""")
+          )
+        )
+
+;;  
+;; ast let*
+
+      (astLetStar
+        (lambda ((ctx))
+          (raw """dbg('+++astLetStar', Object.keys(ctx), ctx.getText());""")
+          (raw """const bindings = ctx
+          .binding()
+          .map((b: BindingContext) => {
+              const id = b.IDENTIFIER().getText();
+              const init = b.expression() ? astExpression(b.expression()!) : undefined;
+              return { name: id, init };
+          });
+          const body = ctx.statement().map(astStatement);
+          return { tag: 'let*', bindings, body };""")
+        )
+      )
+
+;;  
+;; ast lambda
+      (astLambda
+        (lambda ((ctx))
+          (raw """dbg('+++astLambda', Object.keys(ctx), ctx.getText());""")
+          (raw """const params = ctx
+          .fnSignature()
+          .param()
+          .map((p: ParamContext) => p.IDENTIFIER().getText());
+          const body = ctx.statement().map(astStatement);
+          return { tag: "lambda", params, body };""")
+        )
+      )
+
+;;
+;; ast expression
+      (astExpression
+        (lambda ((ctx))
+          (raw """dbg('+++astExpression', Object.keys(ctx), ctx.getText());""")
+          (raw """dbg('+++astExpression literal?', !!ctx.literal());""")
+          (raw """dbg('+++astExpression identifier?', !!ctx.IDENTIFIER());""")
+          (raw """dbg('+++astExpression call?', !!ctx.call());""")
+          (raw """dbg('+++astExpression lambda?', !!ctx.lambda());""")
+          (raw """dbg('+++astExpression raw?', !!ctx.raw());""")
+          (raw """if (ctx.literal()) {
+              return astLiteral(ctx.literal()!);
+          }
+          if (ctx.IDENTIFIER()) {
+              return { tag: "identifier", name: ctx.IDENTIFIER()!.getText() };
+          }
+          if (ctx.call()) {
+              return astCall(ctx.call()!);
+          }
+          if (ctx.lambda()) {
+              return astLambda(ctx.lambda()!); 
+          }
+          if (ctx.raw()) {
+              return astRaw(ctx.raw()!);
+          }
+          throw new Error("Unknown expression node");""")
+        )
+      )
+
+;;
+;; ast call
+      (astCall
+        (lambda ((ctx))
+          (raw """dbg('+++astCall', Object.keys(ctx), ctx.getText());""")
+          (raw """const exprs = ctx
+            .expression()
+            .map(astExpression);
+            return {
+                tag: "call",
+                fn: exprs[0],
+                args: exprs.slice(1)
+            };""")
+        )
+      )
+
+;;
+;; ast literal
+      (astLiteral
+        (lambda ((ctx))
+    (raw """dbg('+++astLiteral', Object.keys(ctx), ctx.getText());""")
+    (raw """if (ctx.NUMBER()) return { tag: "literal", value: Number(ctx.NUMBER()!.getText()) };
+    if (ctx.STRING()) return { tag: "literal", value: parseString(ctx.STRING()!.getText()) }; 
+    if (ctx.BOOLEAN()) return { tag: "literal", value: ctx.BOOLEAN()!.getText() === "true" }; 
+    if (ctx.NULL()) return { tag: "literal", value: null }; 
+    if (ctx.UNDEFINED()) return { tag: "literal", value: undefined };
+    throw new Error("Unknown literal");"""))
+      )
+
+;;
+;; ast raw
+      (astRaw
+        (lambda ((ctx))
+    (raw """dbg('+++astRaw', Object.keys(ctx), ctx.getText());""")
+    (raw """return {
+        tag: "raw",
+        code: parseString(ctx.STRING()!.getText())
+    };"""))
+      )
+
+;;
+;; ========== codegen ==========
+
+;;
+;; emit program
+      (emitProgram
+        (lambda ((node))
+          (raw """dbg('+++emitProgram', Object.keys(node));""")
+          (raw """return node.body.map(emitStmt).join('\n');""")
+        )
+      )
+
+;;
+;; emit if
+      (emitIf
+        (lambda ((node))    
+          (raw """dbg('+++if', Object.keys(node));""")
+          (raw """const lines=[];
+            lines.push(`if (${emitExpr(node.test)}) {`);
+            lines.push(indent(emitStmt(node.ifthen)));
+            lines.push("}");
+            if (node.ifelse != undefined) {
+              lines.push("else {");
+              lines.push(indent(emitStmt(node.ifelse)));
+              lines.push("}");
+            }
+            return lines.join('\n');"""
+          )
+        )
+      )
+;;
+;; emit while
+      (emitWhile
+        (lambda ((node))
+          (raw """dbg('+++while', Object.keys(node));""")
+          (raw """const lines=[];
+            lines.push(`while (${emitExpr(node.test)}) {`);
+            lines.push(indent(emitStmt(node.body)));
+            lines.push("}");
+            return lines.join('\n');"""
+          )
+        )
+      )
+
+;;
+;; emit let*
+      (emitLetStar
+        (lambda ((node))
+    (raw """dbg('+++emitStar', Object.keys(node));""")
+    (raw """const lines = [];
+      for (const b of node.bindings) {
+        if (b.init) {
+          lines.push(`let ${b.name} = ${emitExpr(b.init)};`);
+        } else {
+          lines.push(`let ${b.name};`);
+        }
+      }
+      for (const s of node.body) {
+        lines.push(emitStmt(s));
+      }
+      return lines.join('\n');"""))
+    )
+
+;;
+;; emit stmt
+      (emitStmt
+        (lambda ((stmt))
+          (raw """switch (stmt.tag) {
+            case 'let*':  		return emitLetStar(stmt);
+            case 'if':    		return emitIf(stmt);
+            case 'while': 		return emitWhile(stmt);
+            case 'expr-stmt': return emitExpr(stmt.expr) + ";";
+            default:      		throw new Error("unexpected " + stmt);
+          }"""))
+      )
+
+;;
+;; emit expr
+      (emitExpr
+        (lambda ((expr))
+          (raw """dbg('+++emitExpr', Object.keys(expr));""")
+          (raw """switch (expr.tag) {
+          case 'literal':     return JSON.stringify(expr.value);
+          case 'identifier':  return expr.name;
+          case 'call':        return emitCall(expr);
+          case 'lambda':      return emitLambda(expr);
+          case 'raw':         return expr.code;
+          case 'if':          throw new Error("if");
+          case 'while':       throw new Error("while");
+          default: throw new Error("Unhandled expr.tag >" + expr.tag + "<");
+        }""")
+        )
+      )
+
+;;
+;; emit lambda
+      (emitLambda
+        (lambda ((node))
+          (raw """dbg('+++emitLambda', Object.keys(node));""")
+          (raw """const params = node.params.join(', ');
+            const body = node.body.map(emitStmt).join('\n');
+            return `(${params}) => {\n${indent(body)}\n}`"""))
+      )
+
+;;
+;; emit call
+      (isOperator (lambda ((name)) (raw """return ["<", ">", "<=", ">=", "&&", "||", "!=", "==", "===", "+", "-", "*", "/", "%", "^"].includes(name);  """)))
+      (emitCall
+        (lambda ((node))
+          (raw """dbg('+++emitCall', Object.keys(node));""")
+          (raw """
+          //console.error("???", node.fn.name, node.fn.tag);
+          if (node.fn.tag === 'identifier' && isOperator(node.fn.name)) {
+            dbg("OPERATOR", node.fn.name);
+            const fn = emitExpr(node.fn);
+            const args = node.args.map(emitExpr);
+            if (args.length === 1) {
+              return `(${fn}${args})`;
+            } else {
+              return `(${args.join(fn)})`;
+            }
+          } else {
+            const fn = emitExpr(node.fn);
+            const args = node.args.map(emitExpr).join(', ');
+            return `${fn}(${args})`""")
+          }
+        )
+      )
+
+;;
+;; emit indent
+      (indent
+        (lambda ((text))
+          (raw """dbg('+++emitIndent', text);""")
+          (raw """return text.split('\n').map(line => '  ' + line).join('\n');"""))
+      )
+
+;;
+;; ========== main ==========
+
+      (main
+        (lambda ()
+          (raw """
+              const input = fs.readFileSync(process.argv[2], "utf-8");
+              const inputStream = CharStream.fromString(input);
+              const lexer = new Stage1Lexer(inputStream);
+              const tokenStream = new CommonTokenStream(lexer);
+              const parser = new Stage1Parser(tokenStream);
+              const tree = parser.program();
+              //console.error("???", tree.toStringTree(parser));
+              const ast = astProgram(tree);
+              console.log(emitProgram(ast));""")
+          )
+        )
+
+;; end of let*
+
+      )
+      (call main)
+  )
+)
+
