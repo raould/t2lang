@@ -1,0 +1,124 @@
+{
+  "name": "vscode-t2-compiler",
+  "displayName": "T2 Language Compiler",
+  "description": "Automatically compile .t2 files to TypeScript/JavaScript on save",
+  "version": "0.1.0",
+  "publisher": "t2lang",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:t2",
+    "workspaceContains:**/*.t2"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "t2",
+        "aliases": ["T2", "t2lang"],
+        "extensions": [".t2"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "t2",
+        "scopeName": "source.t2",
+        "path": "./syntaxes/t2.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "t2.compileFile",
+        "title": "T2: Compile Current File"
+      },
+      {
+        "command": "t2.compileFileToJS",
+        "title": "T2: Compile Current File to JavaScript"
+      },
+      {
+        "command": "t2.toggleCompileOnSave",
+        "title": "T2: Toggle Compile on Save"
+      }
+    ],
+    "configuration": {
+      "title": "T2 Language",
+      "properties": {
+        "t2.compileOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically compile .t2 files when saved"
+        },
+        "t2.compileToJS": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also compile to JavaScript (runs tsc after t2tc)"
+        },
+        "t2.showOutputOnError": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show output panel when compilation fails"
+        },
+        "t2.t2tcPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to t2tc CLI. Leave empty to auto-detect."
+        },
+        "t2.t2jcPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to t2jc CLI. Leave empty to auto-detect."
+        },
+        "t2.extraArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra arguments to pass to t2tc"
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "t2.compileFile",
+        "key": "ctrl+shift+b",
+        "mac": "cmd+shift+b",
+        "when": "editorLangId == t2"
+      }
+    ],
+    "problemMatchers": [
+      {
+        "name": "t2",
+        "owner": "t2",
+        "fileLocation": ["relative", "${workspaceFolder}"],
+        "pattern": {
+          "regexp": "^(.+):(\\d+):(\\d+):\\s+(error|warning):\\s+(.+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.74.0",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.0.0"
+  }
+}

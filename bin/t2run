@@ -1,0 +1,6 @@
+#!/bin/sh
+# Wrapper to invoke the ES module CLI using node so shell-based installers
+# and `npx` will run it reliably even when the target is an ESM .js file.
+# Resolve the script directory and execute the common/dist/t2run.js via node.
+DIR="$(cd "$(dirname "$0")" && pwd)"
+node "${DIR}/../common/dist/t2run.js" "$@"

@@ -1,0 +1,10 @@
+{
+  "errors": {
+    "T2:0001": {
+      "message": "The form 'let' is not supported in Phase A, use 'let*' for sequential bindings.",
+      "category": "parse",
+      "severity": "error",
+      "docs": "https://example.com/docs/errors/0001"
+    }
+  }
+}

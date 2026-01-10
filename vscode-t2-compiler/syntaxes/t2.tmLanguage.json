@@ -1,0 +1,167 @@
+{
+  "name": "T2",
+  "scopeName": "source.t2",
+  "fileTypes": ["t2"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#string" },
+    { "include": "#number" },
+    { "include": "#constant" },
+    { "include": "#keyword" },
+    { "include": "#operator" },
+    { "include": "#function-call" },
+    { "include": "#special-form" },
+    { "include": "#parentheses" }
+  ],
+  "repository": {
+    "comment": {
+      "patterns": [
+        {
+          "name": "comment.line.semicolon.t2",
+          "match": ";.*$"
+        }
+      ]
+    },
+    "string": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.t2",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.t2",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.t2",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.t2",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.template.t2",
+          "begin": "`",
+          "end": "`",
+          "patterns": [
+            {
+              "name": "constant.character.escape.t2",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "number": {
+      "patterns": [
+        {
+          "name": "constant.numeric.t2",
+          "match": "\\b-?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?\\b"
+        },
+        {
+          "name": "constant.numeric.hex.t2",
+          "match": "\\b0[xX][0-9a-fA-F]+\\b"
+        }
+      ]
+    },
+    "constant": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.t2",
+          "match": "\\b(true|false)\\b"
+        },
+        {
+          "name": "constant.language.null.t2",
+          "match": "\\b(null|undefined)\\b"
+        }
+      ]
+    },
+    "keyword": {
+      "patterns": [
+        {
+          "name": "keyword.control.t2",
+          "match": "(?<=\\()\\s*(if|while|for|return|throw|try|catch|finally|block)\\b"
+        },
+        {
+          "name": "keyword.declaration.t2",
+          "match": "(?<=\\()\\s*(const|let\\*|let|function|fn|class|defmacro)\\b"
+        },
+        {
+          "name": "keyword.other.t2",
+          "match": "(?<=\\()\\s*(program|import-default|import-named|import-all|export|export-default|type-alias|type-assert|new|assign|index|prop|array|obj)\\b"
+        },
+        {
+          "name": "keyword.operator.macro.t2",
+          "match": "(?<=\\()\\s*(quote|unquote|unquote-splice|gensym)\\b"
+        }
+      ]
+    },
+    "operator": {
+      "patterns": [
+        {
+          "name": "keyword.operator.arithmetic.t2",
+          "match": "(?<=\\()\\s*(\\+|-|\\*|/|%|\\*\\*)(?=\\s)"
+        },
+        {
+          "name": "keyword.operator.comparison.t2",
+          "match": "(?<=\\()\\s*(===|!==|==|!=|<=|>=|<|>)(?=\\s)"
+        },
+        {
+          "name": "keyword.operator.logical.t2",
+          "match": "(?<=\\()\\s*(&&|\\|\\||!|\\?\\?)(?=\\s)"
+        }
+      ]
+    },
+    "special-form": {
+      "patterns": [
+        {
+          "name": "entity.name.function.special.t2",
+          "match": "(?<=\\()\\s*(console\\.log|console\\.error|console\\.warn)\\b"
+        }
+      ]
+    },
+    "function-call": {
+      "patterns": [
+        {
+          "name": "entity.name.function.t2",
+          "match": "(?<=\\()\\s*([a-zA-Z_][a-zA-Z0-9_\\-\\?\\!]*)(?=\\s|\\))"
+        }
+      ]
+    },
+    "parentheses": {
+      "patterns": [
+        {
+          "name": "punctuation.parenthesis.open.t2",
+          "match": "\\("
+        },
+        {
+          "name": "punctuation.parenthesis.close.t2",
+          "match": "\\)"
+        },
+        {
+          "name": "punctuation.bracket.open.t2",
+          "match": "\\["
+        },
+        {
+          "name": "punctuation.bracket.close.t2",
+          "match": "\\]"
+        },
+        {
+          "name": "punctuation.brace.open.t2",
+          "match": "\\{"
+        },
+        {
+          "name": "punctuation.brace.close.t2",
+          "match": "\\}"
+        }
+      ]
+    }
+  }
+}
