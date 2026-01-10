@@ -1,0 +1,60 @@
+/**
+ * Test for boolean, null, and undefined literals
+ */
+
+import test from "node:test";
+import assert from "node:assert";
+import { compilePhase0 } from "../../../src/api";
+
+test("boolean literal true", async () => {
+  const result = await compilePhase0(`(program (function foo (x) x) (foo true))`, { enableTsc: false });
+  assert.strictEqual(result.errors.length, 0);
+  assert.ok(result.tsSource.includes("foo(true)"));
+});
+
+test("boolean literal false", async () => {
+  const result = await compilePhase0(`(program (function foo (x) x) (foo false))`, { enableTsc: false });
+  assert.strictEqual(result.errors.length, 0);
+  assert.ok(result.tsSource.includes("foo(false)"));
+});
+
+test("null literal", async () => {
+  const result = await compilePhase0(`(program (function foo (x) x) (foo null))`, { enableTsc: false });
+  assert.strictEqual(result.errors.length, 0);
+  assert.ok(result.tsSource.includes("foo(null)"));
+});
+
+test("undefined literal", async () => {
+  const result = await compilePhase0(`(program (function foo (x) x) (foo undefined))`, { enableTsc: false });
+  assert.strictEqual(result.errors.length, 0);
+  assert.ok(result.tsSource.includes("foo(undefined)"));
+});
+
+test("mixed literals in let binding", async () => {
+  const result = await compilePhase0(`
+    (program
+      (function foo (a b c d) a)
+      (let* ((a true)
+            (b false)
+            (c null)
+            (d undefined))
+        (foo a b c d)))
+  `, { enableTsc: false });
+  assert.strictEqual(result.errors.length, 0);
+  assert.ok(result.tsSource.includes("let a = true"));
+  assert.ok(result.tsSource.includes("let b = false"));
+  assert.ok(result.tsSource.includes("let c = null"));
+  assert.ok(result.tsSource.includes("let d = undefined"));
+});
+
+test("string literal escapes", async () => {
+  const result = await compilePhase0(String.raw`
+    (program
+      (function foo (x) x)
+      (foo "line1\n\"line2\"")
+    )
+  `, { enableTsc: false });
+  assert.strictEqual(result.errors.length, 0);
+  assert.ok(result.tsSource.includes("\\n"));
+  assert.ok(result.tsSource.includes("\\\"line2\\\""));
+});
