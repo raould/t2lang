@@ -1,0 +1,57 @@
+(program
+    (type-alias TypeA (type-object))
+    (type-alias TypeB (type-object))
+    (type-alias TypeC (type-object))
+    (type-alias TypeD (type-object))
+
+    (type-alias AllowedElements
+        (type-object
+            (.video: TypeA)
+            (.audio: TypeB)
+            (.canvas: TypeC)
+        )
+    )
+    (type-alias Languages
+        (type-object
+            (.de: TypeD)
+            (.en: TypeD)
+            (.pt: TypeD)
+            (.es: TypeD)
+            (.fr: TypeD)
+            (.ja: TypeD)
+        )
+    )
+
+    (fn isAvailable (obj key)
+        (return (call obj.hasOwnProperty key))
+    )
+    (fn isNotAvailable (obj key)
+        (return (not (obj.hasOwnProperty key)))
+    )
+
+    (fn loadLanguage (collection lang)
+        (if (call isAvailable collection lang)
+            (return (index collection lang))
+            (return null)
+        )
+    )
+
+    (fn selectElement (collection elem)
+        (if (call isAvailable collection elem)
+            (return (index collection elem))
+            (return null)
+        )
+    )
+
+    (console.log "hello world")
+)
+
+
+
+
+
+
+
+
+
+
