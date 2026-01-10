@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --prefix=phaseB test)",
+      "Bash(tee:*)",
+      "Bash(/tmp/extract_functions.py:*)",
+      "Bash(python3 /tmp/extract_functions.py)",
+      "Bash(python3:*)",
+      "Bash(git -C /home/superman/Dev/t2lang2 checkout HEAD -- stage3/3D/index.ts)",
+      "Bash(xargs -I {} basename {})",
+      "Bash(xxd)"
+    ],
+    "additionalDirectories": [
+      "/tmp",
+    ]
+  }
+}

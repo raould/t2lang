@@ -1,0 +1,9 @@
+(program
+  ;; Exported value and function from A.
+  (export (const ((VALUE 7))))
+
+  (export
+    (fn addValue (x: number)
+      : number
+      (return :(x + VALUE))))
+)

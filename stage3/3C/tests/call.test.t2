@@ -1,0 +1,16 @@
+(program
+  ;; call with operator (lowered to operator-expr)
+  ((. console log) (+ 1 2))
+  ((. console log) (- 10 3))
+  ((. console log) (* 4 5))
+
+  ;; call with named function
+  (def double (lambda ((x)) (return (* x 2))))
+  ((. console log) (double 21))
+
+  ;; call with no args
+  (def now (lambda () (return 0)))
+  ((. console log) (now))
+
+  ;; nested calls
+  ((. console log) (+ (double 3) (double 4))))

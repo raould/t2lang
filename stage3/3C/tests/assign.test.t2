@@ -1,0 +1,11 @@
+(program
+  (let x 1)
+
+  ;; set! mutates a binding
+  (set! x 99)
+  ((. console log) x)
+
+  ;; set! in nested context
+  (if true
+    (set! x 200))
+  ((. console log) x))

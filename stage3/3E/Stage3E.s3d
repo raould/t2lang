@@ -1,0 +1,28 @@
+(program
+  (import (object (:named (array (object (:name "CharStream")) (object (:name "CommonTokenStream"))))) "antlr4ng")
+  (import (object (:named (array (object (:name "Stage3ELexer"))))) "./Stage3ELexer")
+  (import (object (:named (array (object (:name "Stage3EParser"))))) "./Stage3EParser")
+  (import (object (:default "fs")) "node:fs")
+  (import (object (:named (array (object (:name "astProgram"))))) "./Stage3E-ast")
+  (import (object (:named (array (object (:name "lowerProgram"))))) "./Stage3E-lower")
+  (import (object (:named (array (object (:name "emitProgram"))))) "./Stage3E-codegen")
+
+  ;; ========== main ==========
+  (def main
+    (lambda ()
+      (let* ((filePath (index (. process argv) 2))
+             (input ((. fs readFileSync) (ternary (=== filePath '-') 0 filePath) 'utf-8'))
+             (inputStream ((. CharStream fromString) input))
+             (lexer (new Stage3ELexer inputStream))
+             (tokenStream (new CommonTokenStream lexer))
+             (parser (new Stage3EParser tokenStream))
+             (tree ((. parser "program")))
+             ;; Phase A: CST → surface AST
+             (surfaceAst (astProgram tree))
+             ;; Phase B: lowering → canonical AST
+             (canonicalAst (lowerProgram surfaceAst)))
+        ;; Phase C: codegen → TypeScript
+        ((. console log) (emitProgram canonicalAst)))))
+
+  (main)
+)

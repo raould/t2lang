@@ -1,0 +1,14 @@
+(program
+  ;; Import from A using a relative module specifier.
+  (import (import-spec "./A" (named addValue VALUE)))
+
+  (export
+    (fn useA (n: number)
+      : number
+      (return (call addValue n))))
+
+  (export
+    (const ((RESULT (call useA VALUE)))))
+
+  (call console.log "RESULT" RESULT)
+)

@@ -1,0 +1,27 @@
+{
+  "name": "t2lang",
+  "version": "0.0.1",
+  "description": "sexprs4typescript",
+  "homepage": "https://github.com/raould/t2lang#readme",
+  "bugs": {
+    "url": "https://github.com/raould/t2lang/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/raould/t2lang.git"
+  },
+  "license": "CC0-1.0",
+  "author": "",
+  "type": "module",
+  "main": "index.ts",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build": "npm --prefix stage6 build",
+    "test": "npm --prefix stage6 test"
+  },
+  "bin": {
+    "t2tc": "bin/t2tc.js"
+  }
+}

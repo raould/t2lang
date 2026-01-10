@@ -1,0 +1,30 @@
+{
+  "name": "stage5",
+  "version": "0.0.1",
+  "description": "",
+  "license": "CC0-1.0",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "build": "npm run build-grammar && npm run build-compiler",
+    "build-compiler": "npx tsx ../stage4/index.ts Stage5-ast.s4 > /tmp/_s5_ast.ts && mv /tmp/_s5_ast.ts Stage5-ast.ts && npx tsx ../stage4/index.ts Stage5-lower.s4 > /tmp/_s5_lower.ts && mv /tmp/_s5_lower.ts Stage5-lower.ts && npx tsx ../stage4/index.ts Stage5-codegen.s4 > /tmp/_s5_codegen.ts && mv /tmp/_s5_codegen.ts Stage5-codegen.ts && npx tsx ../stage4/index.ts Stage5-macro-env.s4 > /tmp/_s5_macro_env.ts && mv /tmp/_s5_macro_env.ts Stage5-macro-env.ts && npx tsx ../stage4/index.ts Stage5-macro-expand.s4 > /tmp/_s5_macro_expand.ts && mv /tmp/_s5_macro_expand.ts Stage5-macro-expand.ts && npx tsx ../stage4/index.ts Stage5-scope-resolve.s4 > /tmp/_s5_scope_resolve.ts && mv /tmp/_s5_scope_resolve.ts Stage5-scope-resolve.ts && npx tsx ../stage4/index.ts Stage5.s4 > /tmp/_s5_main.ts && mv /tmp/_s5_main.ts ./index.ts",
+    "build-grammar": "antlr-ng -Dlanguage=TypeScript Stage5.g4",
+    "test": "npm run build && npx vitest run",
+    "lint": "echo 'disabled on purpose'"
+  },
+  "dependencies": {
+    "antlr-ng": "^1.0.10"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.33",
+    "@vitest/ui": "^4.0.18",
+    "antlr4ng": "^3.0.16",
+    "eslint": "^10.0.1",
+    "lodash": "^4.17.23",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18",
+    "vitest-fail-on-console": "^0.10.1"
+  }
+}
