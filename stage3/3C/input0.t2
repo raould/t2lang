@@ -1,0 +1,7 @@
+(program
+  (let* ((a (array))
+         (b false))
+    ((. console log) (String 42))
+    ((. console log) (raw "foo"))
+    ((. console log) (cond a 1 :else 2))
+    ((. console log) (Symbol "42"))))

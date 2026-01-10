@@ -1,0 +1,20 @@
+{
+  "name": "stage3A",
+  "version": "0.0.1",
+  "description": "",
+  "license": "CC0-1.0",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "build-grammar": "antlr-ng -Dlanguage=TypeScript Stage3A.g4",
+    "test": "npx tsx bin/test-runner.ts"
+  },
+  "dependencies": {
+    "antlr-ng": "^1.0.10"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "tsx": "^4.21.0"
+  }
+}

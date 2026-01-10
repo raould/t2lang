@@ -1,0 +1,729 @@
+-*- mode: compilation; default-directory: "~/Dev/t2lang2/stage1/" -*-
+Compilation started at Sun Feb 15 13:08:33
+
+./build.sh && npx tsx ./index.ts input0.t2
++ npx tsx ../stage0/index.ts Stage1.s0
++ echo 'built index.ts'
+built index.ts
++ Done
++ set +x
+??? (program ( program (statement (letStar ( let* ( (binding ( x (expression (literal true)) )) (binding ( fnw (expression (lambda ( lambda (fnSignature ( )) (statement (while ( while (expression (literal false)) (statement (if ( if (expression x) (statement (expression (literal 1))) (statement (expression (literal 0))) ))) ))) ))) )) (binding ( fn (expression (lambda ( lambda (fnSignature ( (param ( z )) )) (statement (expression z)) ))) )) (binding ( y (expression (call ( call (expression add) (expression x) (expression (literal 2)) ))) )) ) (statement (expression (call ( call (expression fnw) )))) (statement (expression (call ( call (expression +) (expression (literal 1)) (expression (literal 2)) )))) (statement (if ( if (expression x) (statement (expression (literal 1))) (statement (expression (literal 0))) ))) ))) ))
++++astProgram [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (program(let*((xtrue)(fnw(lambda()(whilefalse(ifx10))))(fn(lambda((z))z))(y(calladdx2)))(callfnw)(call+12)(ifx10)))
++++astStatement [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (let*((xtrue)(fnw(lambda()(whilefalse(ifx10))))(fn(lambda((z))z))(y(calladdx2)))(callfnw)(call+12)(ifx10))
+letStar true
+lambda false
+raw false
+if false
+while false
++++astLetStar [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (let*((xtrue)(fnw(lambda()(whilefalse(ifx10))))(fn(lambda((z))z))(y(calladdx2)))(callfnw)(call+12)(ifx10))
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] true
++++astExpression literal? true
++++astExpression identifier? false
++++astExpression call? false
++++astExpression lambda? false
++++astExpression raw? false
++++astLiteral [ 'start', 'stop', 'children', 'invokingState', 'parent' ] true
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (lambda()(whilefalse(ifx10)))
++++astExpression literal? false
++++astExpression identifier? false
++++astExpression call? false
++++astExpression lambda? true
++++astExpression raw? false
++++astLambda [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (lambda()(whilefalse(ifx10)))
++++astStatement [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (whilefalse(ifx10))
+letStar false
+lambda false
+raw false
+if false
+while true
++++astWhile [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (whilefalse(ifx10))
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] false
++++astExpression literal? true
++++astExpression identifier? false
++++astExpression call? false
++++astExpression lambda? false
++++astExpression raw? false
++++astLiteral [ 'start', 'stop', 'children', 'invokingState', 'parent' ] false
++++astStatement [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (ifx10)
+letStar false
+lambda false
+raw false
+if true
+while false
++++astIf [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (ifx10)
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] x
++++astExpression literal? false
++++astExpression identifier? true
++++astExpression call? false
++++astExpression lambda? false
++++astExpression raw? false
++++astStatement [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 1
+letStar false
+lambda false
+raw false
+if false
+while false
+expression <ref *1> ExpressionContext {
+  start: CommonToken {
+    source: [ [Stage1Lexer], [CharStreamImpl] ],
+    tokenIndex: 21,
+    start: 71,
+    stop: 71,
+    type: 15,
+    line: 4,
+    column: 40,
+    channel: 0
+  },
+  stop: CommonToken {
+    source: [ [Stage1Lexer], [CharStreamImpl] ],
+    tokenIndex: 21,
+    start: 71,
+    stop: 71,
+    type: 15,
+    line: 4,
+    column: 40,
+    channel: 0
+  },
+  children: [
+    LiteralContext {
+      start: [CommonToken],
+      stop: [CommonToken],
+      children: [Array],
+      invokingState: 114,
+      parent: [Circular *1]
+    }
+  ],
+  invokingState: 36,
+  parent: StatementContext {
+    start: CommonToken {
+      source: [Array],
+      tokenIndex: 21,
+      start: 71,
+      stop: 71,
+      type: 15,
+      line: 4,
+      column: 40,
+      channel: 0
+    },
+    stop: CommonToken {
+      source: [Array],
+      tokenIndex: 21,
+      start: 71,
+      stop: 71,
+      type: 15,
+      line: 4,
+      column: 40,
+      channel: 0
+    },
+    children: [ [Circular *1] ],
+    invokingState: 47,
+    parent: IfContext {
+      start: [CommonToken],
+      stop: [CommonToken],
+      children: [Array],
+      invokingState: 40,
+      parent: [StatementContext]
+    }
+  }
+}
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 1
++++astExpression literal? true
++++astExpression identifier? false
++++astExpression call? false
++++astExpression lambda? false
++++astExpression raw? false
++++astLiteral [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 1
++++astStatement [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 0
+letStar false
+lambda false
+raw false
+if false
+while false
+expression <ref *1> ExpressionContext {
+  start: CommonToken {
+    source: [ [Stage1Lexer], [CharStreamImpl] ],
+    tokenIndex: 22,
+    start: 73,
+    stop: 73,
+    type: 15,
+    line: 4,
+    column: 42,
+    channel: 0
+  },
+  stop: CommonToken {
+    source: [ [Stage1Lexer], [CharStreamImpl] ],
+    tokenIndex: 22,
+    start: 73,
+    stop: 73,
+    type: 15,
+    line: 4,
+    column: 42,
+    channel: 0
+  },
+  children: [
+    LiteralContext {
+      start: [CommonToken],
+      stop: [CommonToken],
+      children: [Array],
+      invokingState: 114,
+      parent: [Circular *1]
+    }
+  ],
+  invokingState: 36,
+  parent: StatementContext {
+    start: CommonToken {
+      source: [Array],
+      tokenIndex: 22,
+      start: 73,
+      stop: 73,
+      type: 15,
+      line: 4,
+      column: 42,
+      channel: 0
+    },
+    stop: CommonToken {
+      source: [Array],
+      tokenIndex: 22,
+      start: 73,
+      stop: 73,
+      type: 15,
+      line: 4,
+      column: 42,
+      channel: 0
+    },
+    children: [ [Circular *1] ],
+    invokingState: 48,
+    parent: IfContext {
+      start: [CommonToken],
+      stop: [CommonToken],
+      children: [Array],
+      invokingState: 40,
+      parent: [StatementContext]
+    }
+  }
+}
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 0
++++astExpression literal? true
++++astExpression identifier? false
++++astExpression call? false
++++astExpression lambda? false
++++astExpression raw? false
++++astLiteral [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 0
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (lambda((z))z)
++++astExpression literal? false
++++astExpression identifier? false
++++astExpression call? false
++++astExpression lambda? true
++++astExpression raw? false
++++astLambda [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (lambda((z))z)
++++astStatement [ 'start', 'stop', 'children', 'invokingState', 'parent' ] z
+letStar false
+lambda false
+raw false
+if false
+while false
+expression <ref *1> ExpressionContext {
+  start: CommonToken {
+    source: [ [Stage1Lexer], [CharStreamImpl] ],
+    tokenIndex: 36,
+    start: 102,
+    stop: 102,
+    type: 18,
+    line: 5,
+    column: 23,
+    channel: 0
+  },
+  stop: CommonToken {
+    source: [ [Stage1Lexer], [CharStreamImpl] ],
+    tokenIndex: 36,
+    start: 102,
+    stop: 102,
+    type: 18,
+    line: 5,
+    column: 23,
+    channel: 0
+  },
+  children: [ TerminalNode { parent: [Circular *1], symbol: [CommonToken] } ],
+  invokingState: 36,
+  parent: StatementContext {
+    start: CommonToken {
+      source: [Array],
+      tokenIndex: 36,
+      start: 102,
+      stop: 102,
+      type: 18,
+      line: 5,
+      column: 23,
+      channel: 0
+    },
+    stop: CommonToken {
+      source: [Array],
+      tokenIndex: 36,
+      start: 102,
+      stop: 102,
+      type: 18,
+      line: 5,
+      column: 23,
+      channel: 0
+    },
+    children: [ [Circular *1] ],
+    invokingState: 87,
+    parent: LambdaContext {
+      start: [CommonToken],
+      stop: [CommonToken],
+      children: [Array],
+      invokingState: 117,
+      parent: [ExpressionContext]
+    }
+  }
+}
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] z
++++astExpression literal? false
++++astExpression identifier? true
++++astExpression call? false
++++astExpression lambda? false
++++astExpression raw? false
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (calladdx2)
++++astExpression literal? false
++++astExpression identifier? false
++++astExpression call? true
++++astExpression lambda? false
++++astExpression raw? false
++++astCall [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (calladdx2)
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] add
++++astExpression literal? false
++++astExpression identifier? true
++++astExpression call? false
++++astExpression lambda? false
++++astExpression raw? false
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] x
++++astExpression literal? false
++++astExpression identifier? true
++++astExpression call? false
++++astExpression lambda? false
++++astExpression raw? false
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 2
++++astExpression literal? true
++++astExpression identifier? false
++++astExpression call? false
++++astExpression lambda? false
++++astExpression raw? false
++++astLiteral [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 2
++++astStatement [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (callfnw)
+letStar false
+lambda false
+raw false
+if false
+while false
+expression <ref *1> ExpressionContext {
+  start: CommonToken {
+    source: [ [Stage1Lexer], [CharStreamImpl] ],
+    tokenIndex: 49,
+    start: 136,
+    stop: 136,
+    type: 2,
+    line: 7,
+    column: 3,
+    channel: 0
+  },
+  stop: CommonToken {
+    source: [ [Stage1Lexer], [CharStreamImpl] ],
+    tokenIndex: 52,
+    start: 145,
+    stop: 145,
+    type: 3,
+    line: 7,
+    column: 12,
+    channel: 0
+  },
+  children: [
+    CallContext {
+      start: [CommonToken],
+      stop: [CommonToken],
+      children: [Array],
+      invokingState: 116,
+      parent: [Circular *1]
+    }
+  ],
+  invokingState: 36,
+  parent: StatementContext {
+    start: CommonToken {
+      source: [Array],
+      tokenIndex: 49,
+      start: 136,
+      stop: 136,
+      type: 2,
+      line: 7,
+      column: 3,
+      channel: 0
+    },
+    stop: CommonToken {
+      source: [Array],
+      tokenIndex: 52,
+      start: 145,
+      stop: 145,
+      type: 3,
+      line: 7,
+      column: 12,
+      channel: 0
+    },
+    children: [ [Circular *1] ],
+    invokingState: 76,
+    parent: LetStarContext {
+      start: [CommonToken],
+      stop: [CommonToken],
+      children: [Array],
+      invokingState: 37,
+      parent: [StatementContext]
+    }
+  }
+}
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (callfnw)
++++astExpression literal? false
++++astExpression identifier? false
++++astExpression call? true
++++astExpression lambda? false
++++astExpression raw? false
++++astCall [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (callfnw)
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] fnw
++++astExpression literal? false
++++astExpression identifier? true
++++astExpression call? false
++++astExpression lambda? false
++++astExpression raw? false
++++astStatement [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (call+12)
+letStar false
+lambda false
+raw false
+if false
+while false
+expression <ref *1> ExpressionContext {
+  start: CommonToken {
+    source: [ [Stage1Lexer], [CharStreamImpl] ],
+    tokenIndex: 53,
+    start: 150,
+    stop: 150,
+    type: 2,
+    line: 8,
+    column: 3,
+    channel: 0
+  },
+  stop: CommonToken {
+    source: [ [Stage1Lexer], [CharStreamImpl] ],
+    tokenIndex: 58,
+    start: 161,
+    stop: 161,
+    type: 3,
+    line: 8,
+    column: 14,
+    channel: 0
+  },
+  children: [
+    CallContext {
+      start: [CommonToken],
+      stop: [CommonToken],
+      children: [Array],
+      invokingState: 116,
+      parent: [Circular *1]
+    }
+  ],
+  invokingState: 36,
+  parent: StatementContext {
+    start: CommonToken {
+      source: [Array],
+      tokenIndex: 53,
+      start: 150,
+      stop: 150,
+      type: 2,
+      line: 8,
+      column: 3,
+      channel: 0
+    },
+    stop: CommonToken {
+      source: [Array],
+      tokenIndex: 58,
+      start: 161,
+      stop: 161,
+      type: 3,
+      line: 8,
+      column: 14,
+      channel: 0
+    },
+    children: [ [Circular *1] ],
+    invokingState: 76,
+    parent: LetStarContext {
+      start: [CommonToken],
+      stop: [CommonToken],
+      children: [Array],
+      invokingState: 37,
+      parent: [StatementContext]
+    }
+  }
+}
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (call+12)
++++astExpression literal? false
++++astExpression identifier? false
++++astExpression call? true
++++astExpression lambda? false
++++astExpression raw? false
++++astCall [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (call+12)
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] +
++++astExpression literal? false
++++astExpression identifier? true
++++astExpression call? false
++++astExpression lambda? false
++++astExpression raw? false
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 1
++++astExpression literal? true
++++astExpression identifier? false
++++astExpression call? false
++++astExpression lambda? false
++++astExpression raw? false
++++astLiteral [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 1
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 2
++++astExpression literal? true
++++astExpression identifier? false
++++astExpression call? false
++++astExpression lambda? false
++++astExpression raw? false
++++astLiteral [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 2
++++astStatement [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (ifx10)
+letStar false
+lambda false
+raw false
+if true
+while false
++++astIf [ 'start', 'stop', 'children', 'invokingState', 'parent' ] (ifx10)
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] x
++++astExpression literal? false
++++astExpression identifier? true
++++astExpression call? false
++++astExpression lambda? false
++++astExpression raw? false
++++astStatement [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 1
+letStar false
+lambda false
+raw false
+if false
+while false
+expression <ref *1> ExpressionContext {
+  start: CommonToken {
+    source: [ [Stage1Lexer], [CharStreamImpl] ],
+    tokenIndex: 62,
+    start: 172,
+    stop: 172,
+    type: 15,
+    line: 9,
+    column: 9,
+    channel: 0
+  },
+  stop: CommonToken {
+    source: [ [Stage1Lexer], [CharStreamImpl] ],
+    tokenIndex: 62,
+    start: 172,
+    stop: 172,
+    type: 15,
+    line: 9,
+    column: 9,
+    channel: 0
+  },
+  children: [
+    LiteralContext {
+      start: [CommonToken],
+      stop: [CommonToken],
+      children: [Array],
+      invokingState: 114,
+      parent: [Circular *1]
+    }
+  ],
+  invokingState: 36,
+  parent: StatementContext {
+    start: CommonToken {
+      source: [Array],
+      tokenIndex: 62,
+      start: 172,
+      stop: 172,
+      type: 15,
+      line: 9,
+      column: 9,
+      channel: 0
+    },
+    stop: CommonToken {
+      source: [Array],
+      tokenIndex: 62,
+      start: 172,
+      stop: 172,
+      type: 15,
+      line: 9,
+      column: 9,
+      channel: 0
+    },
+    children: [ [Circular *1] ],
+    invokingState: 47,
+    parent: IfContext {
+      start: [CommonToken],
+      stop: [CommonToken],
+      children: [Array],
+      invokingState: 40,
+      parent: [StatementContext]
+    }
+  }
+}
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 1
++++astExpression literal? true
++++astExpression identifier? false
++++astExpression call? false
++++astExpression lambda? false
++++astExpression raw? false
++++astLiteral [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 1
++++astStatement [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 0
+letStar false
+lambda false
+raw false
+if false
+while false
+expression <ref *1> ExpressionContext {
+  start: CommonToken {
+    source: [ [Stage1Lexer], [CharStreamImpl] ],
+    tokenIndex: 63,
+    start: 174,
+    stop: 174,
+    type: 15,
+    line: 9,
+    column: 11,
+    channel: 0
+  },
+  stop: CommonToken {
+    source: [ [Stage1Lexer], [CharStreamImpl] ],
+    tokenIndex: 63,
+    start: 174,
+    stop: 174,
+    type: 15,
+    line: 9,
+    column: 11,
+    channel: 0
+  },
+  children: [
+    LiteralContext {
+      start: [CommonToken],
+      stop: [CommonToken],
+      children: [Array],
+      invokingState: 114,
+      parent: [Circular *1]
+    }
+  ],
+  invokingState: 36,
+  parent: StatementContext {
+    start: CommonToken {
+      source: [Array],
+      tokenIndex: 63,
+      start: 174,
+      stop: 174,
+      type: 15,
+      line: 9,
+      column: 11,
+      channel: 0
+    },
+    stop: CommonToken {
+      source: [Array],
+      tokenIndex: 63,
+      start: 174,
+      stop: 174,
+      type: 15,
+      line: 9,
+      column: 11,
+      channel: 0
+    },
+    children: [ [Circular *1] ],
+    invokingState: 48,
+    parent: IfContext {
+      start: [CommonToken],
+      stop: [CommonToken],
+      children: [Array],
+      invokingState: 40,
+      parent: [StatementContext]
+    }
+  }
+}
++++astExpression [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 0
++++astExpression literal? true
++++astExpression identifier? false
++++astExpression call? false
++++astExpression lambda? false
++++astExpression raw? false
++++astLiteral [ 'start', 'stop', 'children', 'invokingState', 'parent' ] 0
++++emitProgram [ 'tag', 'body' ]
++++emitStar [ 'tag', 'bindings', 'body' ]
++++emitExpr [ 'tag', 'value' ]
++++emitExpr [ 'tag', 'params', 'body' ]
++++emitLambda [ 'tag', 'params', 'body' ]
++++emitExpr [ 'tag', 'test', 'body' ]
++++while [ 'tag', 'test', 'body' ]
++++emitExpr [ 'tag', 'value' ]
++++emitExpr [ 'tag', 'test', 'ifthen', 'ifelse' ]
++++if [ 'tag', 'test', 'ifthen', 'ifelse' ]
++++emitExpr [ 'tag', 'name' ]
++++emitExpr [ 'tag', 'value' ]
++++emitIndent 1;
++++emitExpr [ 'tag', 'value' ]
++++emitIndent 0;
++++emitIndent if (x) {
+  1;
+}
+else {
+  0;
+};
++++emitIndent while (false) {
+  if (x) {
+    1;
+  }
+  else {
+    0;
+  };
+};
++++emitExpr [ 'tag', 'params', 'body' ]
++++emitLambda [ 'tag', 'params', 'body' ]
++++emitExpr [ 'tag', 'name' ]
++++emitIndent z;
++++emitExpr [ 'tag', 'fn', 'args' ]
++++emitExpr [ 'tag', 'name' ]
++++emitExpr [ 'tag', 'name' ]
++++emitExpr [ 'tag', 'value' ]
++++emitExpr [ 'tag', 'fn', 'args' ]
++++emitExpr [ 'tag', 'name' ]
++++emitExpr [ 'tag', 'fn', 'args' ]
++++emitExpr [ 'tag', 'name' ]
++++emitExpr [ 'tag', 'value' ]
++++emitExpr [ 'tag', 'value' ]
++++emitExpr [ 'tag', 'test', 'ifthen', 'ifelse' ]
++++if [ 'tag', 'test', 'ifthen', 'ifelse' ]
++++emitExpr [ 'tag', 'name' ]
++++emitExpr [ 'tag', 'value' ]
++++emitIndent 1;
++++emitExpr [ 'tag', 'value' ]
++++emitIndent 0;
+let x = true;
+let fnw = () => {
+  while (false) {
+    if (x) {
+      1;
+    }
+    else {
+      0;
+    };
+  };
+};
+let fn = (z) => {
+  z;
+};
+let y = add(x, 2);
+fnw();
++(1, 2);
+if (x) {
+  1;
+}
+else {
+  0;
+};
+
+Compilation finished at Sun Feb 15 13:08:35

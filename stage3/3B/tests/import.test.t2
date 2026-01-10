@@ -1,0 +1,36 @@
+(program
+  ;; side-effect only import
+  (import "node:fs")
+
+  ;; default import
+  (import (object (:default "FS")) "node:fs")
+
+  ;; namespace import
+  (import (object (:namespace "path")) "node:path")
+
+  ;; named imports
+  (import (object (:named (array
+    (object (:name "close"))
+    (object (:name "copy"))
+  ))) "node:fs")
+
+  ;; named with alias
+  (import (object (:named (array
+    (object (:name "readFile") (:as "read"))
+  ))) "node:fs")
+
+  ;; default + named
+  (import (object
+    (:default "FS")
+    (:named (array
+      (object (:name "close"))
+      (object (:name "copy"))
+    ))
+  ) "node:fs")
+
+  ;; default + namespace
+  (import (object
+    (:default "fs")
+    (:namespace "fsAll")
+  ) "node:fs")
+)

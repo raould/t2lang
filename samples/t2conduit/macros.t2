@@ -1,0 +1,246 @@
+;; t2conduit/macros.t2
+;; Macros for ergonomic pipeline composition and validation
+
+;; Reader macro setup (top-level only)
+;; Usage: #> source (map inc) (filter even?) (collect)
+
+(defreadermacro "#>" run)
+
+(program
+
+  ;; ============================================================================
+  ;; PIPELINE MACRO
+  ;; ============================================================================
+  
+  ;; The 'run' macro provides pipeline composition with compile-time validation
+  ;; Usage: (run source op1 op2 ... sink)
+  ;; Expands to: (await (pipe source op1 op2 ... sink))
+  
+  (defmacro run (source rest ops)
+    `(await (pipe ~source ~@ops)))
+  
+  ;; ============================================================================
+  ;; CONDUIT THREADING MACRO
+  ;; ============================================================================
+  
+  ;; Thread-first for pipelines (like Clojure's ->)
+  ;; Usage: (-> source (map inc) (filter even?) (collect))
+  ;; Expands to: (pipe source (map inc) (filter even?) (collect))
+  
+  (defmacro -> (expr rest forms)
+    (if (== (length forms) 0)
+      expr
+      (let* ((first-form (index forms 0))
+             (rest-forms (call (prop forms "slice") 1)))
+        `(-> (pipe ~expr ~first-form) ~@rest-forms))))
+  
+  ;; ============================================================================
+  ;; SOURCE CREATION SUGAR
+  ;; ============================================================================
+  
+  ;; Array literal to source
+  ;; Usage: (source 1 2 3 4 5)
+  ;; Expands to: (fromArray (array 1 2 3 4 5))
+  
+  (defmacro source (rest items)
+    `(fromArray (array ~@items)))
+  
+  ;; ============================================================================
+  ;; OPERATOR COMPOSITION SUGAR
+  ;; ============================================================================
+  
+  ;; Compose multiple pipes into one
+  ;; Usage: (compose (map inc) (filter even?) (take 10))
+  ;; Returns a single Pipe<A, B>
+  
+  (defmacro compose (rest ops)
+    (if (== (length ops) 1)
+      (index ops 0)
+      `(fn async generator ((source))
+        (for await ((item (pipe source ~@ops)))
+           (call yield item)))))
+  
+  ;; ============================================================================
+  ;; CONDITIONAL OPERATORS
+  ;; ============================================================================
+  
+  ;; Conditional pipe application
+  ;; Usage: (when-pipe condition (map inc))
+  
+  (defmacro when-pipe (condition op)
+    `(if ~condition
+       ~op
+       (fn async generator ((source))
+         (for await ((item source))
+           (call yield item)))))
+  
+  ;; ============================================================================
+  ;; ERROR HANDLING MACROS
+  ;; ============================================================================
+  
+  ;; Wrap pipeline in try/catch
+  ;; Usage: (try-run source (map risky-fn) (collect)
+  ;;          (catch (e) (console.log e)))
+  
+  (defmacro try-run (source rest body)
+    (let* ((ops (filter (lambda (x) (!== (index x 0) 'catch)) body))
+           (catch-clause (find (lambda (x) (=== (index x 0) 'catch)) body)))
+      (if catch-clause
+        `(try
+          (return (await (pipe ~source ~@ops)))
+          ~catch-clause)
+        `(try
+          (return (await (pipe ~source ~@ops)))))))
+  
+  ;; ============================================================================
+  ;; PERFORMANCE MACROS
+  ;; ============================================================================
+  
+  ;; Time a pipeline execution
+  ;; Usage: (time-run "Process users" source (map fn) (collect))
+  
+  (defmacro time-run (label source rest ops)
+    (let* ((start-time (gensym "start"))
+           (result (gensym "result"))
+           (end-time (gensym "end")))
+    `(let* ((~start-time (call (prop (t:ref Date) "now"))))
+       (const* ((~result (await (pipe ~source ~@ops)))
+        (~end-time (call (prop (t:ref Date) "now"))))
+         (call (prop console "log")
+           (template ~label " took " :(~end-time - ~start-time) "ms"))
+         ~result))))
+  
+  ;; ============================================================================
+  ;; DEBUGGING MACROS
+  ;; ============================================================================
+  
+  ;; Insert debug tap at any point in pipeline
+  ;; Usage: (debug source (map inc) (debug "after map") (collect))
+  
+  (defmacro debug (label)
+    `(tap (lambda ((x))
+            (call (prop console "log") ~label x))))
+  
+  ;; Log entire pipeline flow
+  ;; Usage: (trace-run "User pipeline" source (map inc) (collect))
+  
+  (defmacro trace-run (label source rest ops)
+    (let* ((traced-ops
+             (call (prop ops "map")
+                   (lambda ((op i))
+                     `(block
+                        (tap (lambda ((x))
+                               (call (prop console "log")
+                           (template ~label " [" ~i "] ") x)))
+                      ~op)))))
+                `(await (pipe ~source ~@traced-ops))))
+  
+  ;; ============================================================================
+  ;; TYPE-SAFE PIPELINE BUILDERS
+  ;; ============================================================================
+  
+  ;; Enforce cardinality at compile time
+  ;; Usage: (single source (map inc) (first)) - must end with sink returning single value
+  
+  (defmacro single (source rest ops)
+    (let* ((last-op (index ops :(ops.length - 1))))
+      ;; In real implementation, validate last-op is a singleton sink
+      `(await (pipe ~source ~@ops))))
+  
+  ;; Enforce collection at compile time
+  ;; Usage: (many source (map inc) (collect)) - must end with collection sink
+  
+  (defmacro many (source rest ops)
+    (let* ((last-op (index ops :(ops.length - 1))))
+      ;; In real implementation, validate last-op is a collection sink
+      `(await (pipe ~source ~@ops))))
+  
+  ;; ============================================================================
+  ;; RESOURCE MANAGEMENT MACROS
+  ;; ============================================================================
+  
+  ;; Automatic resource cleanup
+  ;; Usage: (with-source (fromFile "data.csv") (s)
+  ;;          (run s (splitLines) (collect)))
+  
+  (defmacro with-source (source-expr (binding) rest body)
+    `(let* ((~binding ~source-expr))
+       (try
+         (block ~@body)
+         (finally
+           ;; Cleanup logic if needed
+           (block)))))
+  
+  ;; ============================================================================
+  ;; COMMON PIPELINE PATTERNS
+  ;; ============================================================================
+  
+  ;; Map and collect pattern
+  ;; Usage: (map-collect (array 1 2 3) inc)
+  
+  (defmacro map-collect (source fn)
+      `(run (fromArray ~source)
+        (map ~fn)
+          (collect)))
+  
+  ;; Filter and collect pattern
+  ;; Usage: (filter-collect (array 1 2 3 4) even?)
+  
+  (defmacro filter-collect (source pred)
+      `(run (fromArray ~source)
+        (filter ~pred)
+          (collect)))
+  
+  ;; Batch process pattern
+  ;; Usage: (batch-process items 100 process-batch)
+  
+  (defmacro batch-process (source batch-size fn)
+      `(run (fromArray ~source)
+        (chunk ~batch-size)
+        (flatMap ~fn)
+          (drain)))
+  
+  ;; ============================================================================
+  ;; PARALLEL PROCESSING SUGAR
+  ;; ============================================================================
+  
+  ;; Parallel map with specified concurrency
+  ;; Usage: (pmap 5 fetch-user (array "id1" "id2" "id3"))
+  
+  (defmacro pmap (concurrency fn source)
+      `(run ~source
+        (flatMap ~fn (object ("concurrency" ~concurrency)))
+          (collect)))
+  
+  ;; ============================================================================
+  ;; INTEROP MACROS
+  ;; ============================================================================
+  
+  ;; Convert promise to single-value source
+  ;; Usage: (from-promise (fetch "url"))
+  
+  (defmacro from-promise (promise-expr)
+    `(fromLazyPromise (lambda () ~promise-expr)))
+  
+  ;; Convert source to promise of first value
+  ;; Usage: (to-promise source)
+  
+  (defmacro to-promise (source)
+    `(pipe ~source (first)))
+  
+  ;; ============================================================================
+  ;; VALIDATION HELPERS
+  ;; ============================================================================
+  
+  ;; Assert source produces expected number of values
+  ;; Usage: (assert-count 5 source)
+  
+  (defmacro assert-count (expected source)
+    (let* ((actual (gensym "actual")))
+      `(let* ((~actual (run ~source (count))))
+         (if (!== ~actual ~expected)
+           (throw (new (t:ref Error)
+                       (template "Expected " ~expected " values, got " ~actual)))
+           ~actual))))
+  
+)

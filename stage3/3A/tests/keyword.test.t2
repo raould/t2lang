@@ -1,0 +1,5 @@
+(program
+  ;; keyword literals resolve to strings
+  (console.log :foo)
+  (console.log :bar-baz)
+  (console.log :type))

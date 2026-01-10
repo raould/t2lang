@@ -1,0 +1,15 @@
+(program
+  (let arr (array 10 20 30))
+  (let* ((a0 (index arr 0))
+         (a2 (index arr 2)))
+      (raw """console.assert(a0 == arr[0]);""")
+      (raw """console.assert(a2 == arr[2]);""")
+  )
+
+  ;; index access by number
+  (console.log (index arr 0))
+  (console.log (index arr 2))
+
+  ;; index access with computed index
+  (let i 1)
+  (console.log (index arr i)))
