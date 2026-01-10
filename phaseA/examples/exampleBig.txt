@@ -1,0 +1,148 @@
+; this is a fake example; it won't build since it refers to non-existent libs.
+(program
+  (import-default Logger "./logger")
+  (import-named ((normalizeRange norm) applyCorrection) "./math")
+  (import-all Utils "./utils")
+
+  (type-alias MetricStatus (type-literal "stale" "active" "frozen"))
+  (type-alias BoundRange
+    (type-object
+      ("min" (type-number))
+      ("max" (type-number))))
+  (type-alias RangeEnvelope
+    (type-intersection
+      (type-ref BoundRange)
+      (type-object
+        ("status" (type-ref MetricStatus))
+        ("meta" (type-object ("source" (type-string)) ("batchId" (type-number)))))))
+  (type-alias OptionalRange
+    (type-union (type-ref RangeEnvelope) (type-null)))
+  (type-alias Identity
+    (type-function (type-ref RangeEnvelope) (type-ref RangeEnvelope)))
+  (type-alias NormalizedRangeMap
+    (type-mapped (Key)
+      (type-ref RangeEnvelope)
+      (type-literal "norm" "optimized")
+      readonly
+      optional
+      (type-ref MetricStatus)))
+  (type-alias TimedEvent
+    (typeparams (T (extends (type-number))) (U (default (type-number))))
+    (type-object
+      ("value" (type-ref T))
+      ("units" (type-ref U))
+      ("status" (type-ref MetricStatus))))
+  (type-alias RangeFormatter
+    (type-function (type-ref RangeEnvelope) (type-ref MetricStatus)))
+  (type-alias RangeCatalog
+    (type-app
+      (type-ref NormalizedRangeMap)
+      (type-ref MetricStatus)))
+
+  (const*
+    ((config
+       (object
+         ("threshold" 80)
+         ("mode" "auto")
+         ("binCount" 6)
+         ("tags" (array "urgent" "steady" "archived"))))
+     (rawQueue
+       (array
+         (object ("id" 101) ("value" 12) ("state" "stale"))
+         (object ("id" 102) ("value" 145) ("state" "active"))
+         (object ("id" 103) ("value" 63) ("state" "frozen")))))
+    ((stats
+       (object
+         ("count" 0)
+         ("failures" 0)
+         ("levels" (array "low" "mid" "high"))
+         ("summary" (object ("min" 0) ("max" 0) ("mode" "unknown")))))))
+
+  (let*
+    (
+      ((array-pattern firstSample secondSample (rest backlog)) rawQueue)
+      ((object-pattern ("min" minVal) ("max" maxVal) ("mode" mode) (rest meta)) stats)
+      ((object-pattern ("status" firstStatus) ("value" firstValue) ("id" firstId)) firstSample))
+    (block
+      (assign minVal (call (prop Math "min") minVal firstValue))
+      (assign maxVal (call (prop Math "max") maxVal firstValue))
+      (assign (prop stats "summary")
+        (object ("min" minVal) ("max" maxVal) ("mode" mode)))
+      (for classic
+        (assign idx 0)
+        (< idx (call (prop Utils "countElements") backlog))
+        (call (prop Utils "bumpIndex") idx)
+        (block
+          (assign (prop stats "count") (call + (prop stats "count") 1))
+          (call Logger "scan" (index backlog idx))))
+      (for of
+        ((row) backlog)
+        (block
+          (assign (prop row "value") (norm (prop row "value")))
+          (assign (prop stats "levels") (prop stats "summary"))
+          (assign (index (prop stats "levels") (prop row "id")) (prop row "value"))
+          (if (call (prop Utils "isCritical") (prop row "value"))
+            (block
+              (call Logger "critical" (prop row "id"))
+              (throw (object ("message" "critical range") ("value" (prop row "value")))))
+            (block
+              (call Logger "row-ok" (prop row "state"))
+              (call Logger "row-value" (prop row "value"))))))
+      (for await
+        ((batch) (call (prop Utils "streamBatches") config))
+        (block
+          (call Logger "batch" (prop batch "id"))
+          (assign (prop stats "failures") (call + (prop stats "failures") (prop batch "errors")))))
+      (try
+        (call applyCorrection (prop firstSample "value"))
+        (catch (err)
+          (assign (prop stats "failures") (call + (prop stats "failures") 1))
+          (throw err))
+        (finally
+          (call Logger "cleanup")))
+      (switch (prop config "mode")
+        (case "auto"
+          (assign (prop stats "summary") (object ("mode" "auto") ("min" minVal) ("max" maxVal))))
+        (case "manual"
+          (assign (prop stats "summary") (object ("mode" "manual") ("min" minVal) ("max" maxVal))))
+        (default
+          (assign (prop stats "summary") (object ("mode" "fallback") ("min" minVal) ("max" maxVal)))))
+      (while (call (prop Utils "shouldContinue") stats)
+        (block
+          (assign (prop stats "count") (call + (prop stats "count") 1))
+          (assign (prop stats "summary") (object ("min" minVal) ("max" maxVal) ("mode" mode)))))
+      (let*
+        ((histogram (new Histogram (prop config "binCount"))))
+        (block
+          (call (prop histogram "reset"))
+          (assign (prop histogram "status") (prop firstSample "state"))))
+      (let*
+        ((proven
+           (object
+             ("range" (object ("min" minVal) ("max" maxVal)))
+             ("status" firstStatus)
+             ("meta" (object ("source" "telemetry") ("batchId" firstId)))))
+         (catalogEntry
+           (call
+             (type-app
+               (prop Utils "wrapMap")
+               (type-ref NormalizedRangeMap)
+               (type-ref MetricStatus))
+             config))
+         (formatted
+           (call
+             (type-app
+               (prop Utils "formatWith")
+               (type-ref TimedEvent)
+               (type-ref MetricStatus))
+             minVal)))
+        (block
+          (call Logger (type-assert (prop proven "status") (type-ref MetricStatus)))
+          (call (type-app (prop Utils "echoRange") (type-ref RangeEnvelope)) proven)
+          (call Logger catalogEntry)
+          (call Logger formatted)))
+      (return stats)))
+  (export (prop stats "summary"))
+  (export-default
+    (call Logger "exported"
+      (type-assert (prop stats "summary") (type-ref OptionalRange)))))

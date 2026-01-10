@@ -1,0 +1,9 @@
+(program
+  (let* ((a 4)
+         (b 2))
+    (return
+      (call +
+        (call * a b)
+        (call - b a)
+        (call / (call + a b) 2)
+        (call ?? null a)))))

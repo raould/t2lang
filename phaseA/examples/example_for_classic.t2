@@ -1,0 +1,11 @@
+(program
+  (let* ((sum 0)
+         (limit 3)
+         (idx 0))
+    (for classic
+      (assign idx 0)
+      (< idx limit)
+      (assign idx (call + idx 1))
+      (block
+        (assign sum (call + sum idx))))
+    (return sum)))

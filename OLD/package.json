@@ -1,0 +1,29 @@
+{
+  "name": "t2lang",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "t2tc": "./phase1/dist/cli.js",
+    "t2jc": "./common/dist/t2jc.js",
+    "t2run": "./common/dist/t2run.js"
+  },
+    "workspaces": [
+    "common",
+    "phase0",
+    "phase1"
+  ],
+  "scripts": {
+    "build": "npm --prefix common run build && npm run build -w phase1 && node scripts/install-local-bins.js",
+    "t2jc": "node ./common/dist/t2jc.js",
+    "t2run": "node ./common/dist/t2run.js",
+    "test": "npm run build && npm --prefix common test && npm --prefix phase0 test && npm --prefix phase1 test",
+    "lint": "npm --prefix common run lint && npm --prefix phase0 run lint && npm --prefix phase1 run lint",
+    "clean": "node -e \"const fs=require('fs');['node_modules','phase1/dist','phase1/node_modules'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p)}catch(e){}})\"",
+    "demo": "node -e \"const fs=require('fs');['phase1/examples/example1.ts','phase1/examples/example1.js'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p)}catch(e){}})\" && npm --prefix phase1 run build && npx t2tc phase1/examples/example1.t2 && npx tsx phase1/examples/example1.ts",
+    "demo-t2run": "node scripts/demo-t2run.js",
+    "bump-version": "node scripts/bump-version.js"
+  },
+  "devDependencies": {
+    "prettier": "^3.8.0"
+  }
+}

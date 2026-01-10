@@ -1,0 +1,5 @@
+(program
+  (const*
+    ((pair (array 5 7))
+     ((array-pattern first second) pair))
+    (return (call + first second))))

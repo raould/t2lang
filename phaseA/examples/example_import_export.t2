@@ -1,0 +1,6 @@
+(program
+  (import-default Logger "./logger")
+  (import-named ((log logAlias) info) "./logger")
+  (import-all Utils "./utils")
+  (export logAlias)
+  (export-default (call Logger "default")))

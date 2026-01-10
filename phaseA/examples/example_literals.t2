@@ -1,0 +1,7 @@
+(program
+  (return
+    (object
+      ("number" 42)
+      ("string" "alpha")
+      ("boolean" true)
+      ("nullish" null))))

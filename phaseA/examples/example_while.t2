@@ -1,0 +1,6 @@
+(program
+  (let* ((counter 0))
+    (while (call < counter 3)
+      (block
+        (assign counter (call + counter 1))))
+    (return counter)))

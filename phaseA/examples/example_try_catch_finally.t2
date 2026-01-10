@@ -1,0 +1,10 @@
+(program
+  (let* ((handled 0))
+    (try
+      (throw (object ("reason" "panic")))
+      (catch (err)
+        (assign handled (call + handled 1))
+        (return err))
+      (finally
+        (assign handled (call + handled 10))))
+    (return handled)))

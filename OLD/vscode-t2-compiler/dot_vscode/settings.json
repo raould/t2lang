@@ -1,0 +1,56 @@
+{
+  // Associate .t2 files with a language mode
+  "files.associations": {
+    "*.t2": "t2"
+  },
+
+  // Editor settings for .t2 files
+  "[t2]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.autoClosingBrackets": "always",
+    "editor.autoClosingQuotes": "always"
+  },
+
+  // Exclude generated files from search/explorer (optional)
+  "files.exclude": {
+    "**/*.t2.ts": false,
+    "**/*.t2.js": false
+  },
+
+  // ============================================================
+  // OPTION 1: Use "Run on Save" extension (emeraldwalk.RunOnSave)
+  // Install: ext install emeraldwalk.RunOnSave
+  // ============================================================
+  "emeraldwalk.runonsave": {
+    "commands": [
+      {
+        "match": "\\.t2$",
+        "cmd": "node ${workspaceFolder}/phase1/dist/cli.js ${file}"
+      }
+    ]
+  },
+
+  // ============================================================
+  // OPTION 2: Use "Trigger Task on Save" extension (Gruntfuggly.triggertaskonsave)
+  // Install: ext install Gruntfuggly.triggertaskonsave
+  // ============================================================
+  "triggerTaskOnSave.tasks": {
+    "T2: Compile Current File on Save": ["**/*.t2"]
+  },
+
+  // ============================================================
+  // OPTION 3: Use "Save and Run" extension (wk-j.save-and-run)
+  // Install: ext install wk-j.save-and-run
+  // ============================================================
+  "saveAndRun": {
+    "commands": [
+      {
+        "match": "\\.t2$",
+        "cmd": "node ${workspaceFolder}/phase1/dist/cli.js ${file}",
+        "useShortcut": false,
+        "silent": false
+      }
+    ]
+  }
+}
