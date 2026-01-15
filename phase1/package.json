@@ -28,6 +28,7 @@
     "typescript-eslint": "^8.53.0"
   },
   "dependencies": {
+    "t2-phase0": "file:../phase0",
     "prettier": "^3.7.4"
   }
 }

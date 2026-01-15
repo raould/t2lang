@@ -5,8 +5,18 @@
   "bin": {
     "t2c": "./dist/cli.js"
   },
-  "main": "./dist/api.js",
-  "types": "./dist/api.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./api": {
+      "import": "./dist/api.js",
+      "types": "./dist/api.d.ts"
+    }
+  },
   "files": [
     "dist"
   ],

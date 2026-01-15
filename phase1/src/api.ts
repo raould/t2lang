@@ -8,15 +8,7 @@ import { genProgram, PrettyOption } from "./codegen/tsCodegen.js";
 import { CompilerError, isCompilerError } from "./errors/compilerError.js";
 import * as ts from 'typescript';
 
-export interface CompilerConfig {
-  logLevel: "none" | "debug";
-  prettyOutput: PrettyOption;
-  dumpAst: boolean;
-  seed: string;
-  tracePhases: string[];
-  emitTypes: boolean;
-  enableTsc: boolean;
-}
+import type { CompilerConfig } from "t2-phase0";
 
 export interface CompilerContext {
   config: CompilerConfig;
