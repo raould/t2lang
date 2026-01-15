@@ -38,6 +38,7 @@ import {
   QuoteExpr,
   UnquoteExpr,
   UnquoteSpliceExpr,
+  LiteralExpr,
   SourceLocation
 } from "../ast/nodes.js";
 
@@ -457,7 +458,7 @@ export class MacroExpander {
         // will expand into multiple arguments / elements.
         const us = expr as UnquoteSpliceExpr;
         const evaluated = this.evalMacroExpr(us.expr, env);
-        if (evaluated && (evaluated as any).kind === "array") {
+        if (evaluated && evaluated.kind === "array") {
           // Return a lightweight splice marker (not part of the public AST)
           return ({ kind: "__splice", items: (evaluated as ArrayExpr).elements, location: expr.location } as unknown) as Expr;
         }
@@ -764,7 +765,12 @@ export class MacroExpander {
         // (prop object "name") -> PropExpr
         const obj = call.args[0] ? this.convertQuotedToAst(call.args[0]) : { kind: "identifier", name: "undefined", location: call.location } as Expr;
         const propArg = call.args[1];
-        const propName = propArg && propArg.kind === "literal" ? (propArg as any).value : String(propArg && (propArg as any).value !== undefined ? (propArg as any).value : "");
+        let propName: string = "";
+        if (propArg && propArg.kind === "literal") {
+          propName = (propArg as LiteralExpr).value as unknown as string;
+        } else if (propArg && (propArg as { value?: unknown }).value !== undefined) {
+          propName = String((propArg as { value?: unknown }).value);
+        }
         return { kind: "prop", object: obj, property: String(propName), location: call.location } as PropExpr;
       }
       case "call": {
@@ -774,9 +780,9 @@ export class MacroExpander {
         const outArgs: Expr[] = [];
         for (let i = 1; i < call.args.length; i++) {
           const a = call.args[i];
-          if ((a as any)?.kind === "__splice") {
-            const items = (a as any).items as Expr[];
-            for (const it of items) outArgs.push(this.convertQuotedToAst(it));
+          const maybeSplice = a as unknown as { kind?: string; items?: Expr[] };
+          if (maybeSplice.kind === "__splice" && maybeSplice.items) {
+            for (const it of maybeSplice.items) outArgs.push(this.convertQuotedToAst(it));
           } else {
             outArgs.push(this.convertQuotedToAst(a));
           }
@@ -803,9 +809,9 @@ export class MacroExpander {
         const outArgs: Expr[] = [];
         for (const a of call.args) {
           // Splice markers created by evalQuote have a kind of '__splice'
-          if ((a as any)?.kind === "__splice") {
-            const items = (a as any).items as Expr[];
-            for (const it of items) {
+          const splice = a as unknown as { kind: string; items?: Expr[] };
+          if (splice && splice.kind === "__splice" && splice.items) {
+            for (const it of splice.items) {
               outArgs.push(this.convertQuotedToAst(it));
             }
           } else {

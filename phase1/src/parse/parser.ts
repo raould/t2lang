@@ -99,7 +99,7 @@ export class Parser {
     return program;
   }
 
-  private parseSexpr(): any {
+  private parseSexpr(): Expr {
     const tok = this.current();
     if (tok.kind === "punct" && tok.value === "(") {
       return this.parseList();
@@ -107,7 +107,7 @@ export class Parser {
     return this.parseAtom();
   }
 
-  private parseList(): any {
+  private parseList(): Expr {
     const open = this.advance();
     const headTok = this.current();
     if (headTok.kind !== "identifier") {
@@ -136,7 +136,7 @@ export class Parser {
       case "const":
         return this.parseLetOrConst(open, true);
       case "defmacro":
-        return this.parseDefmacro(open);
+        return this.parseDefmacro(open) as unknown as Expr;
       case "if":
         return this.parseIf(open);
       case "prop":
