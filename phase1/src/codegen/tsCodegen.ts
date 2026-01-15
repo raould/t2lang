@@ -29,7 +29,7 @@ import {
   SourceLocation
 } from "../ast/nodes.js";
 import { TypeNode } from "../ast/nodes.js";
-import { TypeTable, Type } from "../typecheck/typeChecker.js";
+import type { TypeTable, Type } from "t2-phase0";
 
 import { createRequire } from "module";
 

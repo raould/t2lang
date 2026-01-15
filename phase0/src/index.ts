@@ -12,7 +12,7 @@ export { Lexer, Token, TokenKind } from "./parse/lexer.js";
 export { Resolver, ResolverBase } from "./resolve/resolver.js";
 
 // Type checker
-export { TypeChecker } from "./typecheck/typeChecker.js";
+export { TypeChecker, TypeCheckerBase, TypeTable, Type } from "./typecheck/typeChecker.js";
 
 // Code generator
 export { genProgram, PrettyOption, TsCodegenOptions, CodegenResult, PositionMapping } from "./codegen/tsCodegen.js";

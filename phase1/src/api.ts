@@ -3,7 +3,7 @@ import { Program } from "./ast/nodes.js";
 import { Parser } from "./parse/parser.js";
 import { MacroExpander } from "./expand/macroExpander.js";
 import { Resolver } from "./resolve/resolver.js";
-import { TypeChecker } from "./typecheck/typeChecker.js";
+import { TypeChecker } from "./typecheck/index.js";
 import { genProgram, PrettyOption } from "./codegen/index.js";
 import type { Program as Phase0Program } from "t2-phase0";
 import { CompilerError, isCompilerError } from "./errors/compilerError.js";
@@ -73,7 +73,8 @@ export async function compilePhase1(
     resolver.resolveProgram(phase0Ast);
 
     const typeChecker = new TypeChecker(ctx);
-    const typeCheckResult = typeChecker.checkProgram(phase0Ast as unknown as Program);
+    // phase0Ast is already typed as Phase0Program (normalized by the expander)
+    const typeCheckResult = typeChecker.checkProgram(phase0Ast as Phase0Program);
 
     if (typeCheckResult.errors.length > 0) {
       errors.push(...typeCheckResult.errors);
