@@ -26,6 +26,6 @@
 
 import { runCli } from "t2-phase0";
 import { compilePhase1 } from "./api.js";
-import { PrettyOption } from "./codegen/tsCodegen.js";
+import { PrettyOption } from "./codegen/index.js";
 
 await runCli(compilePhase1, PrettyOption);

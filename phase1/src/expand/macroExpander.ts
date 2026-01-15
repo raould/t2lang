@@ -72,6 +72,9 @@ export class MacroExpander {
     // Filter out macro definitions from output
     const filteredBody = expandedBody.filter(stmt => stmt.kind !== "defmacro");
 
+    // Normalize output to Phase0-compatible nodes (remove gensym nodes)
+    const normalizedBody = filteredBody.map(stmt => this.normalizeStatement(stmt));
+
     this.ctx.eventSink.emit({
       phase: "expand",
       kind: "macroExpansionDone",
@@ -80,8 +83,124 @@ export class MacroExpander {
 
     return {
       ...program,
-      body: filteredBody
+      body: normalizedBody
     };
+  }
+
+  /**
+   * Normalize statements to remove macro-only nodes (gensym -> identifier) so
+   * the output Program is Phase0-compatible.
+   */
+  private normalizeStatement(stmt: Statement): Statement {
+    switch (stmt.kind) {
+      case "exprStmt":
+        return { ...stmt, expr: this.normalizeExpr(stmt.expr) };
+      case "block":
+        return { ...stmt, body: stmt.body.map(e => this.normalizeExpr(e)) };
+      case "let":
+        return {
+          ...stmt,
+          bindings: stmt.bindings.map(b => ({ ...b, init: this.normalizeExpr(b.init) })),
+          body: stmt.body.map(e => this.normalizeExpr(e))
+        };
+      // defmacro should already be filtered out
+      default:
+        return stmt;
+    }
+  }
+
+  private normalizeExpr(expr: Expr): Expr {
+    switch (expr.kind) {
+      case "gensym":
+        return this.expandGensym(expr as GensymExpr);
+      case "call": {
+        const call = expr as CallExpr;
+        return {
+          ...call,
+          callee: this.normalizeExpr(call.callee),
+          args: call.args.map(a => this.normalizeExpr(a))
+        };
+      }
+      case "let": {
+        const let_ = expr as LetExpr;
+        return {
+          ...let_,
+          bindings: let_.bindings.map(b => ({ ...b, init: this.normalizeExpr(b.init) })),
+          body: let_.body.map(e => this.normalizeExpr(e))
+        };
+      }
+      case "array": {
+        const arr = expr as ArrayExpr;
+        return { ...arr, elements: arr.elements.map(e => this.normalizeExpr(e)) };
+      }
+      case "object": {
+        const obj = expr as ObjectExpr;
+        return { ...obj, fields: obj.fields.map(f => ({ ...f, value: this.normalizeExpr(f.value) })) };
+      }
+      case "block": {
+        const block = expr as BlockStmt;
+        return { ...block, body: block.body.map(e => this.normalizeExpr(e)) };
+      }
+      case "if": {
+        const if_ = expr as IfExpr;
+        return {
+          ...if_,
+          condition: this.normalizeExpr(if_.condition),
+          thenBranch: this.normalizeExpr(if_.thenBranch),
+          elseBranch: if_.elseBranch ? this.normalizeExpr(if_.elseBranch) : null
+        };
+      }
+      case "prop": {
+        const prop = expr as PropExpr;
+        return { ...prop, object: this.normalizeExpr(prop.object) };
+      }
+      case "function": {
+        const fn = expr as FunctionExpr;
+        return { ...fn, body: fn.body.map(e => this.normalizeExpr(e)) };
+      }
+      case "return": {
+        const ret = expr as ReturnExpr;
+        return { ...ret, value: ret.value ? this.normalizeExpr(ret.value) : null };
+      }
+      case "while": {
+        const w = expr as WhileExpr;
+        return { ...w, condition: this.normalizeExpr(w.condition), body: w.body.map(e => this.normalizeExpr(e)) };
+      }
+      case "assign": {
+        const a = expr as AssignExpr;
+        return { ...a, target: this.normalizeExpr(a.target), value: this.normalizeExpr(a.value) };
+      }
+      case "index": {
+        const idx = expr as IndexExpr;
+        return { ...idx, object: this.normalizeExpr(idx.object), index: this.normalizeExpr(idx.index) };
+      }
+      case "new": {
+        const n = expr as NewExpr;
+        return { ...n, callee: this.normalizeExpr(n.callee), args: n.args.map(a => this.normalizeExpr(a)) };
+      }
+      case "class": {
+        const c = expr as ClassExpr;
+        return {
+          ...c,
+          fields: c.fields.map(f => ({ ...f, initializer: f.initializer ? this.normalizeExpr(f.initializer) : null })),
+          methods: c.methods.map(m => ({ ...m, body: m.body.map(e => this.normalizeExpr(e)) }))
+        };
+      }
+      case "type-assert": {
+        const ta = expr as TypeAssertExpr;
+        return { ...ta, expr: this.normalizeExpr(ta.expr) };
+      }
+      case "throw": {
+        const t = expr as ThrowExpr;
+        return { ...t, value: this.normalizeExpr(t.value) };
+      }
+      case "try-catch": {
+        const tc = expr as TryCatchExpr;
+        return { ...tc, tryBody: tc.tryBody.map(e => this.normalizeExpr(e)), catchBody: tc.catchBody.map(e => this.normalizeExpr(e)), finallyBody: tc.finallyBody.map(e => this.normalizeExpr(e)) };
+      }
+      default:
+        return expr;
+    }
   }
 
   private collectMacros(program: Program): void {

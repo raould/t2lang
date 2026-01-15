@@ -4,7 +4,8 @@ import { Parser } from "./parse/parser.js";
 import { MacroExpander } from "./expand/macroExpander.js";
 import { Resolver } from "./resolve/resolver.js";
 import { TypeChecker } from "./typecheck/typeChecker.js";
-import { genProgram, PrettyOption } from "./codegen/tsCodegen.js";
+import { genProgram, PrettyOption } from "./codegen/index.js";
+import type { Program as Phase0Program } from "t2-phase0";
 import { CompilerError, isCompilerError } from "./errors/compilerError.js";
 import * as ts from 'typescript';
 
@@ -78,12 +79,12 @@ export async function compilePhase1(
     }
 
     const codegenResult = await genProgram(
-      ast,
+      ast as unknown as Phase0Program,
       {
         pretty: fullConfig.prettyOutput,
         emitTypes: fullConfig.emitTypes
       },
-      typeCheckResult.typeTable
+      typeCheckResult.typeTable as any
     );
 
     tsSource = codegenResult.tsSource;
