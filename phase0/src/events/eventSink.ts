@@ -1,7 +1,7 @@
 import { SourceLocation } from "../ast/nodes.js";
 
 export interface CompilerEvent {
-  phase: "parse" | "resolve" | "typeCheck" | "codegen";
+  phase: "parse" | "expand" | "resolve" | "typeCheck" | "codegen" | "tsc";
   kind: string;
   location?: SourceLocation;
   data?: unknown;
