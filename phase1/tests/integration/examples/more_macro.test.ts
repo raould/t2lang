@@ -22,8 +22,8 @@ test("unquote-splice inserts array elements into call args", async () => {
       (call-with-list (array 1 2 3)))
   `, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  // Unquote-splice currently produces an identifier reference to the list; ensure it was preserved
-  assert(result.tsSource.includes("lst") || result.tsSource.includes("console.log"));
+  // Should produce console.log(1, 2, 3)
+  assert(result.tsSource.includes("console.log(1, 2, 3)") || result.tsSource.includes("console.log(1,2,3)"));
 });
 
 // 3) Nested gensym hygiene: inner gensym should not capture outer ident with same base name

@@ -414,12 +414,21 @@ export class MacroExpander {
         };
       }
       case "call": {
-        // Regular call - substitute in callee and args
         const call = expr as CallExpr;
+        const evaluatedCallee = this.evalMacroExpr(call.callee, env);
+        const evaluatedArgs = call.args.map(a => this.evalMacroExpr(a, env));
+        // If callee is the `array` constructor, evaluate to an ArrayExpr at compile time
+        if (evaluatedCallee.kind === "identifier" && (evaluatedCallee as Identifier).name === "array") {
+          return {
+            kind: "array",
+            elements: evaluatedArgs,
+            location: expr.location
+          } as ArrayExpr;
+        }
         return {
           ...call,
-          callee: this.evalMacroExpr(call.callee, env),
-          args: call.args.map(a => this.evalMacroExpr(a, env))
+          callee: evaluatedCallee,
+          args: evaluatedArgs
         };
       }
       default:
@@ -437,6 +446,19 @@ export class MacroExpander {
         // Evaluate the unquoted expression
         const unquote = expr as UnquoteExpr;
         return this.evalMacroExpr(unquote.expr, env);
+      }
+      case "unquote-splice": {
+        // Evaluate the spliced expression at compile time. If it evaluates
+        // to an ArrayExpr, return a splice marker that `convertQuotedToAst`
+        // will expand into multiple arguments / elements.
+        const us = expr as UnquoteSpliceExpr;
+        const evaluated = this.evalMacroExpr(us.expr, env);
+        if (evaluated && (evaluated as any).kind === "array") {
+          // Return a lightweight splice marker (not part of the public AST)
+          return ({ kind: "__splice", items: (evaluated as ArrayExpr).elements, location: expr.location } as unknown) as Expr;
+        }
+        // If it's not an array literal, just return it (it may be an identifier)
+        return evaluated;
       }
       case "identifier":
         // Identifiers in quote are literal (not evaluated)
@@ -734,6 +756,29 @@ export class MacroExpander {
         return this.convertQuotedBlock(call);
       case "assign":
         return this.convertQuotedAssign(call);
+      case "prop": {
+        // (prop object "name") -> PropExpr
+        const obj = call.args[0] ? this.convertQuotedToAst(call.args[0]) : { kind: "identifier", name: "undefined", location: call.location } as Expr;
+        const propArg = call.args[1];
+        const propName = propArg && propArg.kind === "literal" ? (propArg as any).value : String(propArg && (propArg as any).value !== undefined ? (propArg as any).value : "");
+        return { kind: "prop", object: obj, property: String(propName), location: call.location } as PropExpr;
+      }
+      case "call": {
+        // (call callee arg1 arg2 ...) -> CallExpr
+        const calleeArg = call.args[0];
+        const calleeAst = calleeArg ? this.convertQuotedToAst(calleeArg) : { kind: "identifier", name: "undefined", location: call.location } as Expr;
+        const outArgs: Expr[] = [];
+        for (let i = 1; i < call.args.length; i++) {
+          const a = call.args[i];
+          if ((a as any)?.kind === "__splice") {
+            const items = (a as any).items as Expr[];
+            for (const it of items) outArgs.push(this.convertQuotedToAst(it));
+          } else {
+            outArgs.push(this.convertQuotedToAst(a));
+          }
+        }
+        return { kind: "call", callee: calleeAst as Expr, args: outArgs, location: call.location } as CallExpr;
+      }
       case "+":
       case "-":
       case "*":
@@ -749,12 +794,22 @@ export class MacroExpander {
       case "&&":
       case "||":
         return this.convertQuotedBinaryOp(call, name);
-      default:
-        // Regular function call - convert args
-        return {
-          ...call,
-          args: call.args.map(a => this.convertQuotedToAst(a))
-        };
+      default: {
+        // Regular function call - convert args and handle splice markers
+        const outArgs: Expr[] = [];
+        for (const a of call.args) {
+          // Splice markers created by evalQuote have a kind of '__splice'
+          if ((a as any)?.kind === "__splice") {
+            const items = (a as any).items as Expr[];
+            for (const it of items) {
+              outArgs.push(this.convertQuotedToAst(it));
+            }
+          } else {
+            outArgs.push(this.convertQuotedToAst(a));
+          }
+        }
+        return { ...call, args: outArgs };
+      }
     }
   }
 
