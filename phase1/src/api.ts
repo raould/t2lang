@@ -41,45 +41,46 @@ export async function compilePhase1(
   const ctx: CompilerContext = { config: fullConfig, eventSink };
 
   const errors: CompilerError[] = [];
-  let ast: Program | null = null;
+  let parsedAst: Program | null = null;
+  let phase0Ast: Phase0Program | null = null;
   let tsSource = "";
 
   try {
     const parser = new Parser("input.t2", source, ctx);
-    ast = parser.parseProgram();
+    parsedAst = parser.parseProgram();
 
     if (fullConfig.dumpAst) {
       ctx.eventSink.emit({
         phase: "parse",
         kind: "astDump",
-        data: { ast }
+        data: { ast: parsedAst }
       });
     }
 
     // Macro expansion phase - expands all macro calls
     const expander = new MacroExpander(ctx);
-    ast = expander.expandProgram(ast);
+    phase0Ast = expander.expandProgram(parsedAst);
 
     if (fullConfig.dumpAst) {
       ctx.eventSink.emit({
         phase: "expand",
         kind: "astDump",
-        data: { ast }
+        data: { ast: phase0Ast }
       });
     }
 
     const resolver = new Resolver(ctx);
-    resolver.resolveProgram(ast);
+    resolver.resolveProgram(phase0Ast);
 
     const typeChecker = new TypeChecker(ctx);
-    const typeCheckResult = typeChecker.checkProgram(ast);
+    const typeCheckResult = typeChecker.checkProgram(phase0Ast as unknown as Program);
 
     if (typeCheckResult.errors.length > 0) {
       errors.push(...typeCheckResult.errors);
     }
 
     const codegenResult = await genProgram(
-      ast as unknown as Phase0Program,
+      phase0Ast,
       {
         pretty: fullConfig.prettyOutput,
         emitTypes: fullConfig.emitTypes

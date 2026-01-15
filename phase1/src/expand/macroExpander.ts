@@ -40,6 +40,9 @@ import {
   UnquoteSpliceExpr,
   SourceLocation
 } from "../ast/nodes.js";
+
+// Return type of the expander is a Phase0 Program (AST normalized to Phase0 shape)
+import type { Program as Phase0Program } from "t2-phase0";
 import { CompilerContext } from "../api.js";
 
 interface MacroRegistry {
@@ -62,7 +65,7 @@ export class MacroExpander {
   /**
    * Main entry point: expand all macros in a program
    */
-  expandProgram(program: Program): Program {
+  expandProgram(program: Program): Phase0Program {
     // First pass: collect all macro definitions
     this.collectMacros(program);
 
@@ -81,10 +84,11 @@ export class MacroExpander {
       data: { macroCount: this.registry.macros.size }
     });
 
-    return {
+    // The normalized body conforms to the Phase0 AST shape; cast to Phase0Program for the public API
+    return ({
       ...program,
       body: normalizedBody
-    };
+    } as unknown) as Phase0Program;
   }
 
   /**
