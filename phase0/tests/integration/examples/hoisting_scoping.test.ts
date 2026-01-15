@@ -3,8 +3,6 @@ import test from "node:test";
 import assert from "node:assert";
 import { compilePhase0 } from "../../../src/api";
 
-const nonTsc = (errors: any[]) => errors.filter(e => e.phase !== "tsc");
-
 test("Function declaration is visible in outer scope", async () => {
   const result = await compilePhase0(`
     (program
