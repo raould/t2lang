@@ -139,9 +139,13 @@ export function readStdin(): Promise<string> {
   });
 }
 
+import type { CompilerConfig, CompileResult } from "./api.js";
+import type { PrettyOption } from "./codegen/tsCodegen.js";
+import type { CompilerEvent } from "./events/eventSink.js";
+
 export async function runCli(
-  compileFn: (source: string, config?: any) => Promise<any>,
-  prettyEnum: { pretty: any; newlines: any; ugly: any },
+  compileFn: (source: string, config?: Partial<CompilerConfig>) => Promise<CompileResult>,
+  prettyEnum: { pretty: PrettyOption; newlines: PrettyOption; ugly: PrettyOption },
   pkgPath?: string
 ): Promise<void> {
   const args = process.argv.slice(2);
@@ -179,7 +183,7 @@ export async function runCli(
     source = fs.readFileSync(options.input, "utf-8");
   }
 
-  let mappedPretty: any;
+  let mappedPretty: PrettyOption;
   switch (options.pretty) {
     case "pretty":
       mappedPretty = prettyEnum.pretty;
@@ -200,7 +204,7 @@ export async function runCli(
   });
 
   if (options.ast) {
-    const astDump = result.events.find((e: any) => e.kind === "astDump");
+    const astDump = result.events.find((e) => e.kind === "astDump") as CompilerEvent | undefined;
     if (astDump) {
       console.error("--- AST ---");
       console.error(JSON.stringify(astDump.data, null, 2));

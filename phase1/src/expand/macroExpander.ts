@@ -767,11 +767,13 @@ export class MacroExpander {
         const propArg = call.args[1];
         let propName: string = "";
         if (propArg && propArg.kind === "literal") {
-          propName = (propArg as LiteralExpr).value as unknown as string;
+          const lit = propArg as LiteralExpr;
+          if (typeof lit.value === "string") propName = lit.value;
+          else propName = String(lit.value);
         } else if (propArg && (propArg as { value?: unknown }).value !== undefined) {
           propName = String((propArg as { value?: unknown }).value);
         }
-        return { kind: "prop", object: obj, property: String(propName), location: call.location } as PropExpr;
+        return { kind: "prop", object: obj, property: propName, location: call.location } as PropExpr;
       }
       case "call": {
         // (call callee arg1 arg2 ...) -> CallExpr
@@ -780,7 +782,7 @@ export class MacroExpander {
         const outArgs: Expr[] = [];
         for (let i = 1; i < call.args.length; i++) {
           const a = call.args[i];
-          const maybeSplice = a as unknown as { kind?: string; items?: Expr[] };
+          const maybeSplice = a as { kind?: string; items?: Expr[] };
           if (maybeSplice.kind === "__splice" && maybeSplice.items) {
             for (const it of maybeSplice.items) outArgs.push(this.convertQuotedToAst(it));
           } else {
@@ -809,9 +811,9 @@ export class MacroExpander {
         const outArgs: Expr[] = [];
         for (const a of call.args) {
           // Splice markers created by evalQuote have a kind of '__splice'
-          const splice = a as unknown as { kind: string; items?: Expr[] };
-          if (splice && splice.kind === "__splice" && splice.items) {
-            for (const it of splice.items) {
+          const maybeSplice = a as { kind?: string; items?: Expr[] };
+          if (maybeSplice.kind === "__splice" && maybeSplice.items) {
+            for (const it of maybeSplice.items) {
               outArgs.push(this.convertQuotedToAst(it));
             }
           } else {
