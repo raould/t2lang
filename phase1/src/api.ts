@@ -1,0 +1,164 @@
+import { ArrayEventSink, EventSink } from "./events/eventSink.js";
+import { Program } from "./ast/nodes.js";
+import { Parser } from "./parse/parser.js";
+import { MacroExpander } from "./expand/macroExpander.js";
+import { Resolver } from "./resolve/resolver.js";
+import { TypeChecker } from "./typecheck/typeChecker.js";
+import { genProgram, PrettyOption } from "./codegen/tsCodegen.js";
+import { CompilerError, isCompilerError } from "./errors/compilerError.js";
+import * as ts from 'typescript';
+
+export interface CompilerConfig {
+  logLevel: "none" | "debug";
+  prettyOutput: PrettyOption;
+  dumpAst: boolean;
+  seed: string;
+  tracePhases: string[];
+  emitTypes: boolean;
+  enableTsc: boolean;
+}
+
+export interface CompilerContext {
+  config: CompilerConfig;
+  eventSink: EventSink;
+}
+
+export interface CompileResult {
+  tsSource: string;
+  errors: CompilerError[];
+  events: ArrayEventSink["events"];
+}
+
+export async function compilePhase1(
+  source: string,
+  config: Partial<CompilerConfig> = {}
+): Promise<CompileResult> {
+  const fullConfig: CompilerConfig = {
+    logLevel: "none",
+    prettyOutput: PrettyOption.newlines,
+    dumpAst: true,
+    seed: "default",
+    tracePhases: [],
+    emitTypes: false,
+    enableTsc: false,
+    ...config
+  };
+
+  const eventSink = new ArrayEventSink();
+  const ctx: CompilerContext = { config: fullConfig, eventSink };
+
+  const errors: CompilerError[] = [];
+  let ast: Program | null = null;
+  let tsSource = "";
+
+  try {
+    const parser = new Parser("input.t2", source, ctx);
+    ast = parser.parseProgram();
+
+    if (fullConfig.dumpAst) {
+      ctx.eventSink.emit({
+        phase: "parse",
+        kind: "astDump",
+        data: { ast }
+      });
+    }
+
+    // Macro expansion phase - expands all macro calls
+    const expander = new MacroExpander(ctx);
+    ast = expander.expandProgram(ast);
+
+    if (fullConfig.dumpAst) {
+      ctx.eventSink.emit({
+        phase: "expand",
+        kind: "astDump",
+        data: { ast }
+      });
+    }
+
+    const resolver = new Resolver(ctx);
+    resolver.resolveProgram(ast);
+
+    const typeChecker = new TypeChecker(ctx);
+    const typeCheckResult = typeChecker.checkProgram(ast);
+
+    if (typeCheckResult.errors.length > 0) {
+      errors.push(...typeCheckResult.errors);
+    }
+
+    const codegenResult = await genProgram(
+      ast,
+      {
+        pretty: fullConfig.prettyOutput,
+        emitTypes: fullConfig.emitTypes
+      },
+      typeCheckResult.typeTable
+    );
+
+    tsSource = codegenResult.tsSource;
+
+    if (fullConfig.enableTsc) {
+      // Run TypeScript compiler for additional validation
+      const tsProgram = ts.createProgram({
+        rootNames: ['input.ts'],
+        options: {
+          noEmit: true,
+          strict: true,
+          target: ts.ScriptTarget.ES2020,
+          module: ts.ModuleKind.CommonJS,
+        },
+        host: {
+          getSourceFile: (fileName) => {
+            if (fileName === 'input.ts') {
+              return ts.createSourceFile(fileName, tsSource, ts.ScriptTarget.ES2020);
+            }
+            return undefined;
+          },
+          getDefaultLibFileName: () => '',
+          writeFile: () => {},
+          getCurrentDirectory: () => '',
+          getCanonicalFileName: (fileName) => fileName,
+          useCaseSensitiveFileNames: () => false,
+          getNewLine: () => '\n',
+          fileExists: (fileName) => fileName === 'input.ts',
+          readFile: (fileName) => fileName === 'input.ts' ? tsSource : undefined,
+        }
+      });
+
+      const tsDiagnostics = ts.getPreEmitDiagnostics(tsProgram);
+      for (const diag of tsDiagnostics) {
+        if (diag.file && diag.start !== undefined && diag.length !== undefined) {
+          const tsStart = diag.start;
+          const tsEnd = diag.start + diag.length;
+          // Find the mapping that contains this position
+          const mapping = codegenResult.mappings.find(m => m.tsStart <= tsStart && tsEnd <= m.tsEnd);
+          const location = mapping ? mapping.t2Location : {
+            file: 'input.t2',
+            start: 0,
+            end: 0,
+            line: 1,
+            column: 1
+          };
+          const message = ts.flattenDiagnosticMessageText(diag.messageText, '\n');
+          errors.push({
+            message: `TypeScript: ${message}`,
+            location,
+            phase: "tsc"
+          });
+        }
+      }
+    }
+
+  } catch (err) {
+    if (isCompilerError(err)) {
+      errors.push(err);
+    } else {
+      throw err;
+    }
+  }
+
+  return {
+    tsSource,
+    errors,
+    events: eventSink.events
+  };
+}
