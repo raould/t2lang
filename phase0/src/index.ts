@@ -9,7 +9,7 @@ export { Parser } from "./parse/parser.js";
 export { Lexer, Token, TokenKind } from "./parse/lexer.js";
 
 // Resolver
-export { Resolver } from "./resolve/resolver.js";
+export { Resolver, ResolverBase } from "./resolve/resolver.js";
 
 // Type checker
 export { TypeChecker } from "./typecheck/typeChecker.js";
