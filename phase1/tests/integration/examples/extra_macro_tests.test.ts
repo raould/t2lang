@@ -219,3 +219,38 @@ test("macro generates throw expression", async () => {
   assert.strictEqual(result.errors.length, 0);
   assert(result.tsSource.includes("throw") || result.tsSource.includes("throw ("));
 });
+
+// Regression: ensure unquote-splice expands inside nested array in a returned array
+test("regression: unquote-splice in return array (splice in nested array)", async () => {
+  const result = await compilePhase1(`
+    (program
+      (defmacro mkretarr2 (lst) (quote (return (array 0 ~@lst 4))))
+      (mkretarr2 (array 1 2)))
+  `, { enableTsc: false });
+  expectNoErrors(result, "mkretarr2");
+  assert(result.tsSource.includes("return [") && (result.tsSource.includes("1, 2") || result.tsSource.includes("1,2")));
+});
+
+// Regression: quoted `new` with a single `array` arg should expand into argument list
+test("regression: quoted new with array arg expands", async () => {
+  const result = await compilePhase1(`
+    (program
+      (defmacro mknew2 (C args) (quote (new ~C ~args)))
+      (mknew2 Foo (array 1 2 3)))
+  `, { enableTsc: false });
+  expectNoErrors(result, "mknew2");
+  assert(result.tsSource.includes("new Foo(") && (result.tsSource.includes("1, 2, 3") || result.tsSource.includes("1,2,3")));
+});
+
+// Regression: identifiers inside quotes that match macro params should be substituted without explicit ~
+test("regression: identifier in quote substituted without ~", async () => {
+  const result = await compilePhase1(`
+    (program
+      (defmacro bareid (name) (quote (assign name 2)))
+      (let* ((x 1))
+        (bareid x)
+        x))
+  `, { enableTsc: false });
+  expectNoErrors(result, "bareid");
+  assert(result.tsSource.includes("x = 2") || result.tsSource.includes("x=2"));
+});
