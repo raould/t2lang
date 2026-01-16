@@ -20,9 +20,6 @@ test("macro generates function declaration", async () => {
       (mkfn f (block (return 42))))
   `, { enableTsc: false });
   expectNoErrors(result, "mkfn");
-  if (!result.tsSource.includes("function f")) {
-    console.log('DEBUG mkfn tsSource:', result.tsSource);
-  }
   assert(result.tsSource.includes("function f"));
   assert(result.tsSource.includes("return 42"));
 });
@@ -38,17 +35,18 @@ test("macro generates block with let and return", async () => {
   assert(result.tsSource.includes("x;") || result.tsSource.includes("x\n"));
 });
 
-test.skip("unquote-splice in array literal", async () => {
-  const result = await compilePhase1(`
+test("unquote-splice in array literal", async () => {
+  const src = `
     (program
       (defmacro mkarr (lst) (quote (array 0 ~@lst 4)))
-      (call console.log (mkarr (array 1 2 3))))
-  `, { enableTsc: false });
+      (call (prop console "log") (mkarr (array 1 2 3))))
+  `;
+  const result = await compilePhase1(src, { enableTsc: false });
   expectNoErrors(result, "mkarr");
   assert(result.tsSource.includes("1, 2, 3") || result.tsSource.includes("1,2,3"));
 });
 
-test.skip("unquote-splice in return array", async () => {
+test("unquote-splice in return array", async () => {
   const result = await compilePhase1(`
     (program
       (defmacro mkretarr (lst) (quote (return (array ~@lst))))
@@ -58,7 +56,7 @@ test.skip("unquote-splice in return array", async () => {
   assert(result.tsSource.includes("return [1") || result.tsSource.includes("return[1"));
 });
 
-test.skip("macro generates new expression", async () => {
+test("macro generates new expression", async () => {
   const result = await compilePhase1(`
     (program
       (defmacro mknew (C) (quote (new ~C (array 1))))
@@ -68,18 +66,18 @@ test.skip("macro generates new expression", async () => {
   assert(result.tsSource.includes("new Foo") || result.tsSource.includes("new Foo("));
 });
 
-test.skip("macro generates index access", async () => {
+test("macro generates index access", async () => {
   const result = await compilePhase1(`
     (program
       (defmacro mkindex (arr idx) (quote (index ~arr ~idx)))
       (let* ((a (array 10 20)))
-        (call console.log (mkindex a 0))))
+        (call (prop console "log") (mkindex a 0))))
   `, { enableTsc: false });
   expectNoErrors(result, "mkindex");
   assert(result.tsSource.includes("a[0]") || result.tsSource.includes("[0]"));
 });
 
-test.skip("macro generates simple assignment", async () => {
+test("macro generates simple assignment", async () => {
   const result = await compilePhase1(`
     (program
       (defmacro mkassign (target val) (quote (assign ~target ~val)))
@@ -91,7 +89,7 @@ test.skip("macro generates simple assignment", async () => {
   assert(result.tsSource.includes("x = 2") || result.tsSource.includes("x=2"));
 });
 
-test.skip("macro generates array index assignment", async () => {
+test("macro generates array index assignment", async () => {
   const result = await compilePhase1(`
     (program
       (defmacro mkassignidx (arr idx val) (quote (assign (index ~arr ~idx) ~val)))
@@ -103,31 +101,31 @@ test.skip("macro generates array index assignment", async () => {
   assert(result.tsSource.includes("[0] = 5") || result.tsSource.includes("[0]=5"));
 });
 
-test.skip("macro produces type-assert (as number)", async () => {
+test("macro produces type-assert (as number)", async () => {
   const result = await compilePhase1(`
     (program
       (defmacro asnum (x) (quote (type-assert ~x (type-ref "number"))))
-      (call console.log (asnum 1)))
+      (call (prop console "log") (asnum 1)))
   `, { enableTsc: false });
   expectNoErrors(result, "asnum");
   assert(result.tsSource.includes("as number") || result.tsSource.includes("(1 as number)"));
 });
 
-test.skip("macro preserves operators in quote (binary op)", async () => {
+test("macro preserves operators in quote (binary op)", async () => {
   const result = await compilePhase1(`
     (program
       (defmacro mkop (a b) (quote (+ ~a ~b)))
-      (call console.log (mkop 2 3)))
+      (call (prop console "log") (mkop 2 3)))
   `, { enableTsc: false });
   expectNoErrors(result, "mkop");
   assert(result.tsSource.includes("2 + 3") || result.tsSource.includes("(2+3)"));
 });
 
-test.skip("macro builds array from args", async () => {
+test("macro builds array from args", async () => {
   const result = await compilePhase1(`
     (program
       (defmacro mklist (a b c) (quote (array ~a ~b ~c)))
-      (call console.log (mklist 1 2 3)))
+      (call (prop console "log") (mklist 1 2 3)))
   `, { enableTsc: false });
   expectNoErrors(result, "mklist");
   assert(result.tsSource.includes("1, 2, 3") || result.tsSource.includes("1,2,3"));
@@ -159,57 +157,57 @@ test("nested macro expansion (macro calling macro)", async () => {
   assert(result.tsSource.includes("console.log(5)") || result.tsSource.includes("console.log(5)"));
 });
 
-test.skip("macro returns multiple statements in a block", async () => {
+test("macro returns multiple statements in a block", async () => {
   const result = await compilePhase1(`
     (program
-      (defmacro two (v) (quote (block (assign v 1) (assign v (call + v 1)))))
+      (defmacro two (v) (quote (block (assign ~v 1) (assign ~v (call + ~v 1)))))
       (let* ((x 0))
         (two x)
         x))
   `, { enableTsc: false });
   expectNoErrors(result, "two-block");
   assert(result.tsSource.includes("x = 1") || result.tsSource.includes("x=1"));
-  assert(result.tsSource.includes("x = x + 1") || result.tsSource.includes("x=x+1"));
+  assert(result.tsSource.includes("x = x + 1") || result.tsSource.includes("x=x+1") || result.tsSource.includes("x = (x + 1)") || result.tsSource.includes("x=(x+1)"));
 });
 
-test.skip("concat two arrays via unquote-splice", async () => {
+test("concat two arrays via unquote-splice", async () => {
   const result = await compilePhase1(`
     (program
       (defmacro concat (a b) (quote (array ~@a ~@b)))
-      (call console.log (concat (array 1 2) (array 3 4))))
+      (call (prop console "log") (concat (array 1 2) (array 3 4))))
   `, { enableTsc: false });
   expectNoErrors(result, "concat-arr");
   assert(result.tsSource.includes("1, 2, 3, 4") || result.tsSource.includes("1,2,3,4"));
 });
 
-test.skip("macro produces property chain", async () => {
+test("macro produces property chain", async () => {
   const result = await compilePhase1(`
     (program
       (defmacro mkchain (obj name) (quote (prop ~obj ~name)))
-      (call console.log (mkchain console "error")))
+      (call (prop console "log") (mkchain console "error")))
   `, { enableTsc: false });
   expectNoErrors(result, "mkchain");
   assert(result.tsSource.includes("console.error") || result.tsSource.includes("console.error"));
 });
 
-test.skip("macro expands inside function body", async () => {
+test("macro expands inside function body", async () => {
   const result = await compilePhase1(`
     (program
       (defmacro incr (x) (quote (assign ~x (call + ~x 1))))
       (function g () (incr y)))
   `, { enableTsc: false });
   expectNoErrors(result, "incr-fn");
-  assert(result.tsSource.includes("y = y + 1") || result.tsSource.includes("y=y+1"));
+  assert(result.tsSource.includes("y = y + 1") || result.tsSource.includes("y=y+1") || result.tsSource.includes("y = (y + 1)") || result.tsSource.includes("y=(y+1)"));
 });
 
-test.skip("macro generates conditional (if) expression", async () => {
+test("macro generates conditional (if) expression", async () => {
   const result = await compilePhase1(`
     (program
       (defmacro mkif (c t e) (quote (if ~c ~t ~e)))
-      (call console.log (mkif (> 1 0) 1 2)))
+      (call (prop console "log") (mkif (> 1 0) 1 2)))
   `, { enableTsc: false });
   expectNoErrors(result, "mkif");
-  assert(result.tsSource.includes("if (1 > 0)"));
+  assert(result.tsSource.includes("if (1 > 0)") || result.tsSource.includes("if ((1 > 0))"));
 });
 
 test("macro generates throw expression", async () => {

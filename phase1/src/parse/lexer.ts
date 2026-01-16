@@ -55,20 +55,20 @@ export class Lexer {
       // If next is a parenthesized expr, we need to read until matching paren
       if (next.kind === "punct" && next.value === "(") {
         const exprTokens: BaseToken[] = [];
-        let depth = 0;
-        // consume tokens including the opening paren
-        do {
+        // start with the opening paren
+        exprTokens.push(next as BaseToken);
+        let depth = 1;
+        // consume tokens until we close the initial paren
+        while (depth > 0) {
           const t = this.base.nextToken() as BaseToken;
           exprTokens.push(t);
           if (t.kind === "punct" && t.value === "(") depth++;
           else if (t.kind === "punct" && t.value === ")") depth--;
           if (t.kind === "eof") break;
-        } while (!(exprTokens.length > 0 && exprTokens[exprTokens.length - 1].kind === "punct" && exprTokens[exprTokens.length - 1].value === ")" && depth >= 0));
+        }
 
         this.enqueue({ kind: "identifier", value: formName, location: loc } as BaseToken);
-        this.enqueue(next as BaseToken);
         for (const t of exprTokens) this.enqueue(t);
-        this.enqueue({ kind: "punct", value: ")", location: loc } as BaseToken);
         return { kind: "punct", value: "(", location: loc } as BaseToken;
       }
 

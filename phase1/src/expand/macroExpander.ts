@@ -391,6 +391,9 @@ export class MacroExpander {
       result = this.evalMacroExpr(bodyExpr, env);
     }
 
+    // Expansion result (recursive expansion follows)
+
+
     // Recursively expand in case the result contains more macro calls
     return this.expandExpr(result);
   }
@@ -502,9 +505,16 @@ export class MacroExpander {
         // If it's not an array literal, just return it (it may be an identifier)
         return evaluated;
       }
-      case "identifier":
-        // Identifiers in quote are literal (not evaluated)
+      case "identifier": {
+        // Identifiers in quote are literal unless they are macro parameters
+        // bound in the environment (convenience: allow bare params without ~)
+        const id = expr as Identifier;
+        const bound = env.get(id.name);
+        if (bound) {
+          return this.cloneExpr(bound);
+        }
         return expr;
+      }
       case "literal":
         return expr;
       case "gensym":
@@ -518,6 +528,94 @@ export class MacroExpander {
         // Now convert back to proper AST
         const calleeAst = this.convertQuotedToAstSingle(processedCallee as Expr | SpliceMarker);
         const argsAst = this.flattenQuotedArgs(processedArgs as Array<Expr | SpliceMarker>);
+
+        // Special-case: quoted `array` constructor -> ArrayExpr
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "array") {
+          return { kind: "array", elements: argsAst, location: call.location } as ArrayExpr;
+        }
+
+        // Special-case: quoted `function` form: (function name (params) body...)
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "function") {
+          // Use processed args (after evalQuote) so unquotes are already evaluated
+          const nameArg = processedArgs[0] as Expr | SpliceMarker | undefined;
+          const paramsArg = processedArgs[1] as Expr | SpliceMarker | undefined;
+          let name: Identifier | null = null;
+          if (nameArg && !this.isSplice(nameArg) && (nameArg as Expr).kind === "identifier") {
+            name = nameArg as Identifier;
+          }
+          const params: Identifier[] = [];
+          if (paramsArg && !this.isSplice(paramsArg) && (paramsArg as Expr).kind === "array") {
+            const arr = paramsArg as ArrayExpr;
+            for (const el of arr.elements) {
+              if (el.kind === "identifier") params.push(el as Identifier);
+            }
+          }
+          const body = this.flattenQuotedArgs(processedArgs.slice(2) as Array<Expr | SpliceMarker>);
+          return { kind: "function", name, params, body, isDeclaration: false, location: call.location } as FunctionExpr;
+        }
+
+        // Special-case: quoted `return` form: (return value?) -> ReturnExpr
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "return") {
+          const val = argsAst[0] ? argsAst[0] : null;
+          return { kind: "return", value: val, location: call.location } as ReturnExpr;
+        }
+
+        // Special-case: quoted `block` form: (block stmt1 stmt2...) -> BlockStmt
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "block") {
+          return { kind: "block", body: argsAst, location: call.location } as BlockStmt;
+        }
+
+        // Special-case: assign/index/if/prop/type-assert/new forms
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "assign") {
+          return { kind: "assign", target: argsAst[0], value: argsAst[1], location: call.location } as AssignExpr;
+        }
+
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "index") {
+          return { kind: "index", object: argsAst[0], index: argsAst[1], location: call.location } as IndexExpr;
+        }
+
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "prop") {
+          const obj = argsAst[0] ? argsAst[0] : { kind: "identifier", name: "undefined", location: call.location } as Expr;
+          let propName = "";
+          const propArg = argsAst[1];
+          if (propArg && propArg.kind === "literal") {
+            const lit = propArg as LiteralExpr;
+            if (typeof lit.value === "string") propName = lit.value;
+            else propName = String(lit.value);
+          }
+          return { kind: "prop", object: obj, property: propName, location: call.location } as PropExpr;
+        }
+
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "if") {
+          return { kind: "if", condition: argsAst[0], thenBranch: argsAst[1], elseBranch: argsAst[2] || null, location: call.location } as IfExpr;
+        }
+
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "type-assert") {
+          // Convert the second arg to a type node if possible
+          const typeArg = call.args[1];
+          let typeNode: any = { kind: "type-ref", name: "any", location: call.location };
+          if (typeArg && typeArg.kind === "call") {
+            const typeCall = typeArg as CallExpr;
+            const typeCallee = typeCall.callee;
+            if (typeCallee.kind === "identifier" && (typeCallee as Identifier).name === "type-ref") {
+              const nameLit = typeCall.args[0];
+              if (nameLit && nameLit.kind === "literal") {
+                typeNode = { kind: "type-ref", name: (nameLit as LiteralExpr).value as string, location: call.location };
+              }
+            }
+          }
+          return { kind: "type-assert", expr: argsAst[0], typeAnnotation: typeNode, location: call.location } as any as TypeAssertExpr;
+        }
+
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "new") {
+          const calleeExpr = argsAst[0] ? argsAst[0] : { kind: "identifier", name: "undefined", location: call.location } as Expr;
+          let newArgs = argsAst.slice(1);
+          if (newArgs.length === 1 && newArgs[0].kind === "array") {
+            newArgs = (newArgs[0] as ArrayExpr).elements;
+          }
+          return { kind: "new", callee: calleeExpr, args: newArgs, location: call.location } as NewExpr;
+        }
+
         // Special-case: (call callee arg...) in quoted code should be transformed
         // into a CallExpr whose callee is the first arg and rest are args.
         if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "call") {
@@ -525,6 +623,7 @@ export class MacroExpander {
           const outArgs = argsAst.slice(1);
           return { kind: "call", callee: calleeArg, args: outArgs, location: call.location } as CallExpr;
         }
+
         return { kind: "call", callee: calleeAst, args: argsAst, location: call.location } as CallExpr;
       }
       case "array": {
@@ -703,9 +802,14 @@ export class MacroExpander {
       case "gensym":
         // Gensyms are always expanded
         return this.expandGensym(expr as GensymExpr);
-      case "identifier":
-        // Identifiers in quote are NOT substituted (they're literal)
+      case "identifier": {
+        // Identifiers in quote are NOT substituted by default, BUT if they
+        // match a macro binding name, substitute them (convenience for simple macros)
+        const id = expr as Identifier;
+        const bound = bindings.get(id.name);
+        if (bound) return this.cloneExpr(bound);
         return expr;
+      }
       case "call": {
         const call = expr as CallExpr;
         const callee = this.substituteInQuote(call.callee, bindings);
@@ -874,6 +978,24 @@ export class MacroExpander {
         const calleeAst = calleeArg ? this.convertQuotedToAstSingle(calleeArg) : { kind: "identifier", name: "undefined", location: call.location } as Expr;
         const outArgs = this.flattenQuotedArgs(call.args.slice(1) as Array<Expr | SpliceMarker>);
         return { kind: "call", callee: calleeAst as Expr, args: outArgs, location: call.location } as CallExpr;
+      }
+      case "new": {
+        // (new C arglist?) -> NewExpr. Treat a single array argument as expanded arg list
+        const calleeArg = call.args[0];
+        const calleeAst = calleeArg ? this.convertQuotedToAstSingle(calleeArg) : { kind: "identifier", name: "undefined", location: call.location } as Expr;
+        let argsAst = this.flattenQuotedArgs(call.args.slice(1) as Array<Expr | SpliceMarker>);
+        if (argsAst.length === 1 && argsAst[0].kind === "array") {
+          argsAst = (argsAst[0] as ArrayExpr).elements;
+        }
+        return { kind: "new", callee: calleeAst, args: argsAst, location: call.location } as NewExpr;
+      }
+      case "return": {
+        // (return value?) -> ReturnExpr
+        return {
+          kind: "return",
+          value: call.args[0] ? this.convertQuotedToAstSingle(call.args[0]) : null,
+          location: call.location
+        } as ReturnExpr;
       }
       case "+":
       case "-":
