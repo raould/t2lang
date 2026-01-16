@@ -309,7 +309,6 @@ export type Expr =
   | ThrowExpr
   | TryCatchExpr
   | BlockStmt
-  | SpliceExpr
   | QuoteExpr
   | UnquoteExpr
   | UnquoteSpliceExpr;
