@@ -785,10 +785,18 @@ export class MacroExpander {
           if (typeof lit.value === "string") propName = lit.value;
           else propName = String(lit.value);
         } else if (propArg) {
-          // Fall back to stringifying any other form (defensive)
-          // Use a safe property access to avoid unknown casts
-          const anyLike = propArg as unknown as { value?: unknown };
-          if (anyLike.value !== undefined) propName = String(anyLike.value);
+          if (propArg.kind === "identifier") {
+            propName = (propArg as Identifier).name;
+          } else if (propArg && (propArg as unknown as LiteralExpr).kind === "literal") {
+            propName = String((propArg as unknown as LiteralExpr).value);
+          } else {
+            // Fallback: stringify the node defensively
+            try {
+              propName = JSON.stringify(propArg);
+            } catch {
+              propName = "";
+            }
+          }
         }
         return { kind: "prop", object: obj, property: propName, location: call.location } as PropExpr;
       }
@@ -888,6 +896,8 @@ export class MacroExpander {
     }
     return null;
   }
+
+
 
   private convertQuotedIf(call: CallExpr): IfExpr {
     // (if condition then else?)

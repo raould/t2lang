@@ -5,7 +5,7 @@ import { MacroExpander } from "./expand/macroExpander.js";
 import { Resolver } from "./resolve/resolver.js";
 import { TypeChecker } from "./typecheck/index.js";
 import { genProgram, PrettyOption } from "./codegen/index.js";
-import type { Program as Phase0Program, TypeTable as Phase0TypeTable } from "t2-phase0";
+import type { Program as Phase0Program } from "t2-phase0";
 import { CompilerError, isCompilerError } from "./errors/compilerError.js";
 import * as ts from 'typescript';
 
@@ -42,7 +42,7 @@ export async function compilePhase1(
 
   const errors: CompilerError[] = [];
   let parsedAst: Program | null = null;
-  let phase0Ast: Phase0Program | null = null;
+  let phase0Ast: Phase0Program;
   let tsSource = "";
 
   try {
@@ -74,7 +74,7 @@ export async function compilePhase1(
 
     const typeChecker = new TypeChecker(ctx);
     // phase0Ast is already typed as Phase0Program (normalized by the expander)
-    const typeCheckResult = typeChecker.checkProgram(phase0Ast as Phase0Program);
+    const typeCheckResult = typeChecker.checkProgram(phase0Ast);
 
     if (typeCheckResult.errors.length > 0) {
       errors.push(...typeCheckResult.errors);
@@ -86,7 +86,7 @@ export async function compilePhase1(
         pretty: fullConfig.prettyOutput,
         emitTypes: fullConfig.emitTypes
       },
-      typeCheckResult.typeTable as Phase0TypeTable
+      typeCheckResult.typeTable
     );
 
     tsSource = codegenResult.tsSource;
