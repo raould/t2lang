@@ -309,9 +309,15 @@ export type Expr =
   | ThrowExpr
   | TryCatchExpr
   | BlockStmt
+  | SpliceExpr
   | QuoteExpr
   | UnquoteExpr
   | UnquoteSpliceExpr;
+
+export interface SpliceExpr extends BaseNode {
+  kind: "__splice";
+  items: Expr[];
+}
 
 export interface QuoteExpr extends BaseNode {
   kind: "quote";

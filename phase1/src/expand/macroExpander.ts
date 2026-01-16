@@ -50,6 +50,15 @@ interface MacroRegistry {
   macros: Map<string, MacroDef>;
 }
 
+// Internal splice marker used during quote evaluation. This is not part of the
+// public AST but helps the expander represent unquote-splice results until they
+// are converted back into multiple AST nodes by convertQuotedToAst.
+interface SpliceMarker {
+  kind: "__splice";
+  items: Expr[];
+  location: SourceLocation;
+}
+
 export class MacroExpander {
   private registry: MacroRegistry = { macros: new Map() };
   private gensymCounter = 0;
@@ -445,7 +454,7 @@ export class MacroExpander {
   /**
    * Evaluate a quoted expression - process unquotes
    */
-  private evalQuote(expr: Expr, env: Map<string, Expr>): Expr {
+  private evalQuote(expr: Expr, env: Map<string, Expr>): Expr | SpliceMarker {
     switch (expr.kind) {
       case "unquote": {
         // Evaluate the unquoted expression
@@ -460,7 +469,7 @@ export class MacroExpander {
         const evaluated = this.evalMacroExpr(us.expr, env);
         if (evaluated && evaluated.kind === "array") {
           // Return a lightweight splice marker (not part of the public AST)
-          return ({ kind: "__splice", items: (evaluated as ArrayExpr).elements, location: expr.location } as unknown) as Expr;
+          return { kind: "__splice", items: (evaluated as ArrayExpr).elements, location: expr.location };
         }
         // If it's not an array literal, just return it (it may be an identifier)
         return evaluated;
@@ -732,9 +741,14 @@ export class MacroExpander {
    * Inside quote, special forms like let* are parsed as CallExpr.
    * This method converts them back to proper AST nodes.
    */
-  private convertQuotedToAst(expr: Expr): Expr {
-    if (expr.kind !== "call") {
-      return expr;
+  private convertQuotedToAst(expr: Expr | SpliceMarker): Expr | SpliceMarker {
+    // If this is an internal splice marker, return it unchanged
+    if ((expr as SpliceMarker).kind === "__splice") {
+      return expr as SpliceMarker;
+    }
+
+    if ((expr as Expr).kind !== "call") {
+      return expr as Expr;
     }
 
     const call = expr as CallExpr;
@@ -770,8 +784,11 @@ export class MacroExpander {
           const lit = propArg as LiteralExpr;
           if (typeof lit.value === "string") propName = lit.value;
           else propName = String(lit.value);
-        } else if (propArg && (propArg as { value?: unknown }).value !== undefined) {
-          propName = String((propArg as { value?: unknown }).value);
+        } else if (propArg) {
+          // Fall back to stringifying any other form (defensive)
+          // Use a safe property access to avoid unknown casts
+          const anyLike = propArg as unknown as { value?: unknown };
+          if (anyLike.value !== undefined) propName = String(anyLike.value);
         }
         return { kind: "prop", object: obj, property: propName, location: call.location } as PropExpr;
       }
