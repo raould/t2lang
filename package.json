@@ -1,0 +1,14 @@
+{
+  "name": "t2lang",
+  "private": true,
+  "bin": {
+    "t2c": "./node_modules/t2lang-phase1/dist/cli.js"
+  },
+  "workspaces": [
+    "t2lang-phase0",
+    "t2lang-phase1"
+  ],
+  "scripts": {
+    "build": "npm run build -w t2lang-phase0 && npm run build -w t2lang-phase1"
+  }
+}
