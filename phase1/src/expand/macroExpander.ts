@@ -13,6 +13,8 @@ import {
   Program,
   Statement,
   Expr,
+  Phase0Statement,
+  Phase0Expr,
   Identifier,
   CallExpr,
   LetExpr,
@@ -43,7 +45,7 @@ import {
 } from "../ast/nodes.js";
 
 // Return type of the expander is a Phase0 Program (AST normalized to Phase0 shape)
-import type { Program as Phase0Program } from "t2-phase0";
+import type { Phase0Program } from "../ast/nodes.js";
 import { CompilerContext } from "../api.js";
 
 interface MacroRegistry {
@@ -86,7 +88,7 @@ export class MacroExpander {
     const filteredBody = expandedBody.filter(stmt => stmt.kind !== "defmacro");
 
     // Normalize output to Phase0-compatible nodes (remove gensym nodes)
-    const normalizedBody = filteredBody.map(stmt => this.normalizeStatement(stmt));
+    const normalizedBody: Phase0Statement[] = filteredBody.map(stmt => this.normalizeStatement(stmt));
 
     this.ctx.eventSink.emit({
       phase: "expand",
@@ -105,35 +107,35 @@ export class MacroExpander {
    * Normalize statements to remove macro-only nodes (gensym -> identifier) so
    * the output Program is Phase0-compatible.
    */
-  private normalizeStatement(stmt: Statement): Statement {
+  private normalizeStatement(stmt: Statement): Phase0Statement {
     switch (stmt.kind) {
       case "exprStmt":
-        return { ...stmt, expr: this.normalizeExpr(stmt.expr) };
+        return { ...stmt, expr: this.normalizeExpr(stmt.expr) } as Phase0Statement;
       case "block":
-        return { ...stmt, body: stmt.body.map(e => this.normalizeExpr(e)) };
+        return { ...stmt, body: stmt.body.map(e => this.normalizeExpr(e)) } as Phase0Statement;
       case "let":
         return {
           ...stmt,
           bindings: stmt.bindings.map(b => ({ ...b, init: this.normalizeExpr(b.init) })),
           body: stmt.body.map(e => this.normalizeExpr(e))
-        };
+        } as Phase0Statement;
       // defmacro should already be filtered out
       default:
-        return stmt;
+        return stmt as Phase0Statement;
     }
   }
 
-  private normalizeExpr(expr: Expr): Expr {
+  private normalizeExpr(expr: Expr): Phase0Expr {
     switch (expr.kind) {
       case "gensym":
-        return this.expandGensym(expr as GensymExpr);
+        return this.expandGensym(expr as GensymExpr) as Phase0Expr;
       case "call": {
         const call = expr as CallExpr;
         return {
           ...call,
           callee: this.normalizeExpr(call.callee),
           args: call.args.map(a => this.normalizeExpr(a))
-        };
+        } as Phase0Expr;
       }
       case "let": {
         const let_ = expr as LetExpr;
@@ -210,10 +212,30 @@ export class MacroExpander {
       }
       case "try-catch": {
         const tc = expr as TryCatchExpr;
-        return { ...tc, tryBody: tc.tryBody.map(e => this.normalizeExpr(e)), catchBody: tc.catchBody.map(e => this.normalizeExpr(e)), finallyBody: tc.finallyBody.map(e => this.normalizeExpr(e)) };
+        return { ...tc, tryBody: tc.tryBody.map(e => this.normalizeExpr(e)), catchBody: tc.catchBody.map(e => this.normalizeExpr(e)), finallyBody: tc.finallyBody.map(e => this.normalizeExpr(e)) } as Phase0Expr;
       }
+      case "for": {
+        const f = expr as ForExpr;
+        return { ...f, init: f.init ? this.normalizeExpr(f.init) : null, condition: f.condition ? this.normalizeExpr(f.condition) : null, update: f.update ? this.normalizeExpr(f.update) : null, body: f.body.map(e => this.normalizeExpr(e)) } as Phase0Expr;
+      }
+      case "identifier":
+        return expr as Phase0Expr;
+      case "literal":
+        return expr as Phase0Expr;
+      case "quote": {
+        const quoted = (expr as QuoteExpr).expr;
+        const converted = this.convertQuotedToAst(quoted);
+        if (this.isSplice(converted)) {
+          return { kind: "array", elements: converted.items, location: quoted.location } as ArrayExpr as Phase0Expr;
+        }
+        return this.normalizeExpr(converted as Expr);
+      }
+      case "unquote":
+        return this.normalizeExpr((expr as UnquoteExpr).expr);
+      case "unquote-splice":
+        return this.normalizeExpr((expr as UnquoteSpliceExpr).expr);
       default:
-        return expr;
+        return expr as Phase0Expr;
     }
   }
 

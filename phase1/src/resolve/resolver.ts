@@ -1,14 +1,14 @@
 import { CompilerContext } from "../api.js";
 import { ResolverBase } from "t2-phase0";
-import type { Program } from "t2-phase0";
+import type { Phase0Program } from "../ast/nodes.js";
 
 export class Resolver extends ResolverBase {
   constructor(ctx: CompilerContext) {
     super(ctx);
   }
 
-  resolveProgram(program: Program): void {
+  resolveProgram(program: Phase0Program): void {
     // Delegate to Phase0 resolver for standard resolution
-    super.resolveProgram(program);
+    super.resolveProgram(program as any);
   }
 }

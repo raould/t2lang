@@ -5,7 +5,7 @@ import { MacroExpander } from "./expand/macroExpander.js";
 import { Resolver } from "./resolve/resolver.js";
 import { TypeChecker } from "./typecheck/index.js";
 import { genProgram, PrettyOption } from "./codegen/index.js";
-import type { Program as Phase0Program } from "t2-phase0";
+import type { Phase0Program } from "./ast/nodes.js";
 import { CompilerError, isCompilerError } from "./errors/compilerError.js";
 import * as ts from 'typescript';
 
