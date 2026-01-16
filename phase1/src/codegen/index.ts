@@ -1,3 +1,3 @@
-// Re-export Phase0 codegen to avoid duplication in Phase1
+// Thin wrapper: delegate code generation to Phase0 implementation
 export { genProgram, PrettyOption } from "t2-phase0";
 export type { TsCodegenOptions, CodegenResult, PositionMapping } from "t2-phase0";

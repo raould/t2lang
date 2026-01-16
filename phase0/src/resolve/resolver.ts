@@ -34,11 +34,11 @@ interface Scope {
   symbols: Map<string, ResolvedSymbol>;
 }
 
-export class Resolver {
-  private nextSymbolId = 1;
-  private globalScope: Scope = { parent: null, symbols: new Map() };
+export class ResolverBase {
+  protected nextSymbolId = 1;
+  protected globalScope: Scope = { parent: null, symbols: new Map() };
 
-  constructor(private readonly ctx: CompilerContext) {}
+  constructor(protected readonly ctx: CompilerContext) {}
 
   resolveProgram(program: Program): void {
     this.resolveStatements(program.body, this.globalScope);
@@ -49,7 +49,7 @@ export class Resolver {
     });
   }
 
-  private resolveStatements(stmts: Statement[], scope: Scope): void {
+  protected resolveStatements(stmts: Statement[], scope: Scope): void {
     for (const stmt of stmts) {
       if (stmt.kind === "exprStmt") {
         this.resolveExpr(stmt.expr, scope);
@@ -66,7 +66,7 @@ export class Resolver {
     }
   }
 
-  private resolveExpr(expr: Expr, scope: Scope): void {
+  protected resolveExpr(expr: Expr, scope: Scope): void {
     switch (expr.kind) {
       case "identifier":
         this.resolveIdentifier(expr as Identifier, scope);
@@ -130,14 +130,14 @@ export class Resolver {
     }
   }
 
-  private resolveBlock(node: BlockStmt, scope: Scope): void {
+  protected resolveBlock(node: BlockStmt, scope: Scope): void {
     const child = this.createScope(scope);
     for (const expr of node.body) {
       this.resolveExpr(expr, child);
     }
   }
 
-  private resolveIdentifier(node: Identifier, scope: Scope): void {
+  protected resolveIdentifier(node: Identifier, scope: Scope): void {
     if (node.name === "this") {
       return;
     }
@@ -160,14 +160,14 @@ export class Resolver {
     });
   }
 
-  private resolveCall(node: CallExpr, scope: Scope): void {
+  protected resolveCall(node: CallExpr, scope: Scope): void {
     this.resolveExpr(node.callee, scope);
     for (const arg of node.args) {
       this.resolveExpr(arg, scope);
     }
   }
 
-  private resolveIf(node: IfExpr, scope: Scope): void {
+  protected resolveIf(node: IfExpr, scope: Scope): void {
     this.resolveExpr(node.condition, scope);
     this.resolveExpr(node.thenBranch, scope);
     if (node.elseBranch !== null) {
@@ -175,12 +175,12 @@ export class Resolver {
     }
   }
 
-  private resolveProp(node: PropExpr, scope: Scope): void {
+  protected resolveProp(node: PropExpr, scope: Scope): void {
     this.resolveExpr(node.object, scope);
     // Property name is a string literal, no resolution needed
   }
 
-  private resolveFunction(node: FunctionExpr, scope: Scope): void {
+  protected resolveFunction(node: FunctionExpr, scope: Scope): void {
     // Create a new scope for the function body
     const fnScope = this.createScope(scope);
     
@@ -209,37 +209,37 @@ export class Resolver {
     }
   }
 
-  private resolveReturn(node: ReturnExpr, scope: Scope): void {
+  protected resolveReturn(node: ReturnExpr, scope: Scope): void {
     if (node.value !== null) {
       this.resolveExpr(node.value, scope);
     }
   }
 
-  private resolveWhile(node: WhileExpr, scope: Scope): void {
+  protected resolveWhile(node: WhileExpr, scope: Scope): void {
     this.resolveExpr(node.condition, scope);
     for (const expr of node.body) {
       this.resolveExpr(expr, scope);
     }
   }
 
-  private resolveArray(node: ArrayExpr, scope: Scope): void {
+  protected resolveArray(node: ArrayExpr, scope: Scope): void {
     for (const elem of node.elements) {
       this.resolveExpr(elem, scope);
     }
   }
 
-  private resolveObject(node: ObjectExpr, scope: Scope): void {
+  protected resolveObject(node: ObjectExpr, scope: Scope): void {
     for (const field of node.fields) {
       this.resolveExpr(field.value, scope);
     }
   }
 
-  private resolveAssign(node: AssignExpr, scope: Scope): void {
+  protected resolveAssign(node: AssignExpr, scope: Scope): void {
     this.resolveExpr(node.target, scope);
     this.resolveExpr(node.value, scope);
   }
 
-  private resolveFor(node: ForExpr, scope: Scope): void {
+  protected resolveFor(node: ForExpr, scope: Scope): void {
     if (node.init !== null) {
       this.resolveExpr(node.init, scope);
     }
@@ -254,19 +254,19 @@ export class Resolver {
     }
   }
 
-  private resolveIndex(node: IndexExpr, scope: Scope): void {
+  protected resolveIndex(node: IndexExpr, scope: Scope): void {
     this.resolveExpr(node.object, scope);
     this.resolveExpr(node.index, scope);
   }
 
-  private resolveNew(node: NewExpr, scope: Scope): void {
+  protected resolveNew(node: NewExpr, scope: Scope): void {
     this.resolveExpr(node.callee, scope);
     for (const arg of node.args) {
       this.resolveExpr(arg, scope);
     }
   }
 
-  private resolveClass(node: ClassExpr, scope: Scope): void {
+  protected resolveClass(node: ClassExpr, scope: Scope): void {
     // Add class name to scope
     const sym = this.createSymbol(node.name.name, scope);
     node.name.symbolId = sym.id;
@@ -296,15 +296,15 @@ export class Resolver {
     }
   }
 
-  private resolveTypeAssert(node: TypeAssertExpr, scope: Scope): void {
+  protected resolveTypeAssert(node: TypeAssertExpr, scope: Scope): void {
     this.resolveExpr(node.expr, scope);
   }
 
-  private resolveThrow(node: ThrowExpr, scope: Scope): void {
+  protected resolveThrow(node: ThrowExpr, scope: Scope): void {
     this.resolveExpr(node.value, scope);
   }
 
-  private resolveTryCatch(node: TryCatchExpr, scope: Scope): void {
+  protected resolveTryCatch(node: TryCatchExpr, scope: Scope): void {
     for (const expr of node.tryBody) {
       this.resolveExpr(expr, scope);
     }
@@ -323,7 +323,7 @@ export class Resolver {
     }
   }
 
-  private resolveLet(node: LetExpr, scope: Scope): void {
+  protected resolveLet(node: LetExpr, scope: Scope): void {
     const child = this.createScope(scope);
 
     // Phase 0: all let bindings are sequential (like let*)
@@ -340,11 +340,11 @@ export class Resolver {
     }
   }
 
-  private createScope(parent: Scope): Scope {
+  protected createScope(parent: Scope): Scope {
     return { parent, symbols: new Map() };
   }
 
-  private createSymbol(name: string, scope: Scope): ResolvedSymbol {
+  protected createSymbol(name: string, scope: Scope): ResolvedSymbol {
     const sym: ResolvedSymbol = { id: this.nextSymbolId++, name };
     scope.symbols.set(name, sym);
     this.ctx.eventSink.emit({
@@ -355,7 +355,7 @@ export class Resolver {
     return sym;
   }
 
-  private lookup(scope: Scope, name: string): ResolvedSymbol | null {
+  protected lookup(scope: Scope, name: string): ResolvedSymbol | null {
     let s: Scope | null = scope;
     while (s) {
       const sym = s.symbols.get(name);
@@ -365,3 +365,6 @@ export class Resolver {
     return null;
   }
 }
+
+// Keep default Resolver export for Phase0 compatibility
+export class Resolver extends ResolverBase {}

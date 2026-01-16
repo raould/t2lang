@@ -3,20 +3,13 @@ import { Program } from "./ast/nodes.js";
 import { Parser } from "./parse/parser.js";
 import { MacroExpander } from "./expand/macroExpander.js";
 import { Resolver } from "./resolve/resolver.js";
-import { TypeChecker } from "./typecheck/typeChecker.js";
-import { genProgram, PrettyOption } from "./codegen/tsCodegen.js";
+import { TypeChecker } from "./typecheck/index.js";
+import { genProgram, PrettyOption } from "./codegen/index.js";
+import type { Phase0Program } from "./ast/nodes.js";
 import { CompilerError, isCompilerError } from "./errors/compilerError.js";
 import * as ts from 'typescript';
 
-export interface CompilerConfig {
-  logLevel: "none" | "debug";
-  prettyOutput: PrettyOption;
-  dumpAst: boolean;
-  seed: string;
-  tracePhases: string[];
-  emitTypes: boolean;
-  enableTsc: boolean;
-}
+import type { CompilerConfig } from "t2-phase0";
 
 export interface CompilerContext {
   config: CompilerConfig;
@@ -48,45 +41,47 @@ export async function compilePhase1(
   const ctx: CompilerContext = { config: fullConfig, eventSink };
 
   const errors: CompilerError[] = [];
-  let ast: Program | null = null;
+  let parsedAst: Program | null = null;
+  let phase0Ast: Phase0Program;
   let tsSource = "";
 
   try {
     const parser = new Parser("input.t2", source, ctx);
-    ast = parser.parseProgram();
+    parsedAst = parser.parseProgram();
 
     if (fullConfig.dumpAst) {
       ctx.eventSink.emit({
         phase: "parse",
         kind: "astDump",
-        data: { ast }
+        data: { ast: parsedAst }
       });
     }
 
     // Macro expansion phase - expands all macro calls
     const expander = new MacroExpander(ctx);
-    ast = expander.expandProgram(ast);
+    phase0Ast = expander.expandProgram(parsedAst);
 
     if (fullConfig.dumpAst) {
       ctx.eventSink.emit({
         phase: "expand",
         kind: "astDump",
-        data: { ast }
+        data: { ast: phase0Ast }
       });
     }
 
     const resolver = new Resolver(ctx);
-    resolver.resolveProgram(ast);
+    resolver.resolveProgram(phase0Ast);
 
     const typeChecker = new TypeChecker(ctx);
-    const typeCheckResult = typeChecker.checkProgram(ast);
+    // phase0Ast is already typed as Phase0Program (normalized by the expander)
+    const typeCheckResult = typeChecker.checkProgram(phase0Ast);
 
     if (typeCheckResult.errors.length > 0) {
       errors.push(...typeCheckResult.errors);
     }
 
     const codegenResult = await genProgram(
-      ast,
+      phase0Ast,
       {
         pretty: fullConfig.prettyOutput,
         emitTypes: fullConfig.emitTypes

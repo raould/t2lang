@@ -287,6 +287,15 @@ export interface ExprStmt extends BaseNode {
   expr: Expr;
 }
 
+import type { Statement as Phase0StatementType } from "t2-phase0";
+export type Phase0Statement = Phase0StatementType;
+export type Phase0Expr = import("t2-phase0").Expr;
+export type Phase0Program = import("t2-phase0").Program;
+export type Phase0Identifier = import("t2-phase0").Identifier;
+export type Phase0Literal = import("t2-phase0").LiteralExpr;
+export type Phase0CallExpr = import("t2-phase0").CallExpr;
+export type Phase0LetExpr = import("t2-phase0").LetExpr;
+
 export type Expr =
   | Identifier
   | LiteralExpr
@@ -312,6 +321,11 @@ export type Expr =
   | QuoteExpr
   | UnquoteExpr
   | UnquoteSpliceExpr;
+
+export interface SpliceExpr extends BaseNode {
+  kind: "__splice";
+  items: Expr[];
+}
 
 export interface QuoteExpr extends BaseNode {
   kind: "quote";

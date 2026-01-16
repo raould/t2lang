@@ -99,7 +99,7 @@ export class Parser {
     return program;
   }
 
-  private parseSexpr(): any {
+  private parseSexpr(): Expr | BlockStmt | ImportStmt | ExportStmt | LetExpr | TypeAliasStmt | MacroDef | Program {
     const tok = this.current();
     if (tok.kind === "punct" && tok.value === "(") {
       return this.parseList();
@@ -107,7 +107,15 @@ export class Parser {
     return this.parseAtom();
   }
 
-  private parseList(): any {
+  private ensureExpr(node: Expr | BlockStmt | ImportStmt | ExportStmt | LetExpr | TypeAliasStmt | MacroDef | Program): Expr {
+    // Disallow statement forms in expression positions
+    if (node.kind === "type-alias" || node.kind === "import" || node.kind === "export" || node.kind === "defmacro" || node.kind === "program") {
+      this.error("Expected expression but found statement", this.current());
+    }
+    return node as Expr;
+  }
+
+  private parseList(): Expr | BlockStmt | ImportStmt | ExportStmt | LetExpr | TypeAliasStmt | MacroDef | Program {
     const open = this.advance();
     const headTok = this.current();
     if (headTok.kind !== "identifier") {
@@ -122,7 +130,7 @@ export class Parser {
           this.error("Nested (program ...) forms are not allowed", headTok);
         }
         this.inProgram = true;
-        const program = this.parseProgramList(open) as unknown as Expr;
+        const program = this.parseProgramList(open);
         this.inProgram = false;
         return program;
       }
@@ -170,21 +178,21 @@ export class Parser {
       case "type-assert":
         return this.parseTypeAssert(open);
       case "type-alias":
-        return this.parseTypeAlias(open) as unknown as Expr;
+        return this.parseTypeAlias(open);
       case "import":
       case "import-default":
       case "import-named":
       case "import-all":
-        return this.parseImport(open, head) as unknown as Expr;
+        return this.parseImport(open, head);
       case "export":
       case "export-default":
-        return this.parseExport(open, head) as unknown as Expr;
+        return this.parseExport(open, head);
       case "throw":
         return this.parseThrow(open);
       case "try":
         return this.parseTryCatch(open);
       case "block":
-        return this.parseBlock(open) as unknown as Expr;
+        return this.parseBlock(open);
       case "quote":
         return this.parseQuote(open);
       case "unquote":
@@ -199,7 +207,7 @@ export class Parser {
   private parseProgramList(open: Token): Program {
     const body: Statement[] = [];
     while (!(this.current().kind === "punct" && this.current().value === ")")) {
-      const form = this.parseSexpr() as Expr | BlockStmt | ImportStmt | ExportStmt | LetExpr | TypeAliasStmt | MacroDef;
+      const form = this.parseSexpr();
       if (form.kind === "block" || form.kind === "let" || form.kind === "type-alias" || form.kind === "defmacro") {
         body.push(form);
       } else if (form.kind === "import" || form.kind === "export") {
@@ -251,7 +259,7 @@ export class Parser {
       }
       this.advance();
 
-      const init = this.parseSexpr() as Expr;
+      const init = this.ensureExpr(this.parseSexpr());
 
       const bindingClose = this.current();
       if (!(bindingClose.kind === "punct" && bindingClose.value === ")")) {
@@ -273,7 +281,7 @@ export class Parser {
 
     const body: Expr[] = [];
     while (!(this.current().kind === "punct" && this.current().value === ")")) {
-      body.push(this.parseSexpr());
+      body.push(this.ensureExpr(this.parseSexpr()));
     }
 
     const close = this.advance();
@@ -294,13 +302,13 @@ export class Parser {
   }
 
   private parseIf(open: Token): IfExpr {
-    const condition = this.parseSexpr();
-    const thenBranch = this.parseSexpr();
+    const condition = this.ensureExpr(this.parseSexpr());
+    const thenBranch = this.ensureExpr(this.parseSexpr());
     
     // Check if there's an else branch (not at closing paren)
     let elseBranch: Expr | null = null;
     if (!(this.current().kind === "punct" && this.current().value === ")")) {
-      elseBranch = this.parseSexpr();
+      elseBranch = this.ensureExpr(this.parseSexpr());
     }
     
     const close = this.advance();
@@ -321,7 +329,7 @@ export class Parser {
   }
 
   private parseProp(open: Token): PropExpr {
-    const object = this.parseSexpr();
+    const object = this.ensureExpr(this.parseSexpr());
     
     const propertyTok = this.current();
     if (propertyTok.kind !== "string") {
@@ -526,7 +534,7 @@ export class Parser {
 
   private parseUnquote(open: Token): UnquoteExpr {
     // (unquote expr)
-    const expr = this.parseSexpr() as Expr;
+    const expr = this.ensureExpr(this.parseSexpr());
     const close = this.advance();
     if (!(close.kind === "punct" && close.value === ")")) {
       this.error("Expected ) to close unquote", close);
@@ -546,7 +554,7 @@ export class Parser {
 
   private parseUnquoteSplice(open: Token): UnquoteSpliceExpr {
     // (unquote-splice expr)
-    const expr = this.parseSexpr() as Expr;
+    const expr = this.ensureExpr(this.parseSexpr());
     const close = this.advance();
     if (!(close.kind === "punct" && close.value === ")")) {
       this.error("Expected ) to close unquote-splice", close);
@@ -627,7 +635,7 @@ export class Parser {
   private parseBodyUntilClose(): Expr[] {
     const body: Expr[] = [];
     while (!(this.current().kind === "punct" && this.current().value === ")")) {
-      body.push(this.parseSexpr());
+      body.push(this.ensureExpr(this.parseSexpr()));
     }
     return body;
   }
@@ -637,7 +645,7 @@ export class Parser {
     let value: Expr | null = null;
     
     if (!(this.current().kind === "punct" && this.current().value === ")")) {
-      value = this.parseSexpr();
+      value = this.ensureExpr(this.parseSexpr());
     }
     
     const close = this.advance();
@@ -657,7 +665,7 @@ export class Parser {
 
   private parseWhile(open: Token): WhileExpr {
     // (while condition body...)
-    const condition = this.parseSexpr();
+    const condition = this.ensureExpr(this.parseSexpr());
     const body = this.parseBodyUntilClose();
     const close = this.advance();
     
@@ -679,7 +687,7 @@ export class Parser {
     // (array elem1 elem2 ...)
     const elements: Expr[] = [];
     while (!(this.current().kind === "punct" && this.current().value === ")")) {
-      elements.push(this.parseSexpr());
+      elements.push(this.ensureExpr(this.parseSexpr()));
     }
     const close = this.advance();
     
@@ -719,7 +727,7 @@ export class Parser {
       }
       this.advance();
       
-      const value = this.parseSexpr();
+      const value = this.ensureExpr(this.parseSexpr());
       
       const fieldClose = this.current();
       if (!(fieldClose.kind === "punct" && fieldClose.value === ")")) {
@@ -749,8 +757,8 @@ export class Parser {
   }
 
   private parseAssign(open: Token): AssignExpr {
-    const target = this.parseSexpr();
-    const value = this.parseSexpr();
+    const target = this.ensureExpr(this.parseSexpr());
+    const value = this.ensureExpr(this.parseSexpr());
     const close = this.advance();
     
     return {
@@ -772,11 +780,24 @@ export class Parser {
     // Use _ or null for empty slots
     const initExpr = this.parseSexpr();
     const condExpr = this.parseSexpr();
-    const updateExpr = this.parseSexpr();
+    const updateExpr = this.parseSexpr(); // these are allowed to be statement-like; we'll narrow below
+
+    let init: Expr | null = null;
+    if (!this.isNullPlaceholder(initExpr)) {
+      init = this.ensureExpr(initExpr);
+    }
+
+    let condition: Expr | null = null;
+    if (!this.isNullPlaceholder(condExpr)) {
+      condition = this.ensureExpr(condExpr);
+    }
+
+    let update: Expr | null = null;
+    if (!this.isNullPlaceholder(updateExpr)) {
+      update = this.ensureExpr(updateExpr);
+    }
     
-    const init = this.isNullPlaceholder(initExpr) ? null : initExpr;
-    const condition = this.isNullPlaceholder(condExpr) ? null : condExpr;
-    const update = this.isNullPlaceholder(updateExpr) ? null : updateExpr;
+
     
     const body = this.parseBodyUntilClose();
     const close = this.advance();
@@ -797,7 +818,7 @@ export class Parser {
     };
   }
 
-  private isNullPlaceholder(expr: Expr): boolean {
+  private isNullPlaceholder(expr: Expr | BlockStmt | ImportStmt | ExportStmt | LetExpr | TypeAliasStmt | MacroDef | Program): boolean {
     if (expr.kind === "identifier" && (expr as Identifier).name === "_") {
       return true;
     }
@@ -808,8 +829,8 @@ export class Parser {
   }
 
   private parseIndex(open: Token): IndexExpr {
-    const object = this.parseSexpr();
-    const index = this.parseSexpr();
+    const object = this.ensureExpr(this.parseSexpr());
+    const index = this.ensureExpr(this.parseSexpr());
     const close = this.advance();
     
     return {
@@ -827,10 +848,10 @@ export class Parser {
   }
 
   private parseNew(open: Token): NewExpr {
-    const callee = this.parseSexpr();
+    const callee = this.ensureExpr(this.parseSexpr());
     const args: Expr[] = [];
     while (!(this.current().kind === "punct" && this.current().value === ")")) {
-      args.push(this.parseSexpr());
+      args.push(this.ensureExpr(this.parseSexpr()));
     }
     const close = this.advance();
     
@@ -901,7 +922,7 @@ export class Parser {
         
         let initializer: Expr | null = null;
         if (!(this.current().kind === "punct" && this.current().value === ")")) {
-          initializer = this.parseSexpr();
+          initializer = this.ensureExpr(this.parseSexpr());
         }
         
         this.advance(); // )
@@ -948,7 +969,7 @@ export class Parser {
   private parseTypeAssert(open: Token): TypeAssertExpr {
     // (type-assert expr TYPE)
     // TYPE may be a string (legacy) or a structured type form like (type-array ...)
-    const expr = this.parseSexpr();
+    const expr = this.ensureExpr(this.parseSexpr());
 
     const typeNode = this.parseTypeSexprOrLiteral();
 
@@ -1396,7 +1417,7 @@ export class Parser {
     // (export name)
     // (export-default expr)
     if (head === "export-default") {
-      const declaration = this.parseSexpr();
+      const declaration = this.ensureExpr(this.parseSexpr());
       const close = this.advance();
       return {
         kind: "export",
@@ -1436,7 +1457,7 @@ export class Parser {
 
   private parseThrow(open: Token): ThrowExpr {
     // (throw expr)
-    const value = this.parseSexpr();
+    const value = this.ensureExpr(this.parseSexpr());
     const close = this.advance();
     
     return {
@@ -1470,7 +1491,7 @@ export class Parser {
           break;
         }
       }
-      tryBody.push(this.parseSexpr());
+      tryBody.push(this.ensureExpr(this.parseSexpr()));
     }
     
     // Parse catch clause if present
@@ -1491,7 +1512,7 @@ export class Parser {
         }
         
         while (!(this.current().kind === "punct" && this.current().value === ")")) {
-          catchBody.push(this.parseSexpr());
+          catchBody.push(this.ensureExpr(this.parseSexpr()));
         }
         this.advance(); // )
       }
@@ -1505,7 +1526,7 @@ export class Parser {
         this.advance(); // finally
         
         while (!(this.current().kind === "punct" && this.current().value === ")")) {
-          finallyBody.push(this.parseSexpr());
+          finallyBody.push(this.ensureExpr(this.parseSexpr()));
         }
         this.advance(); // )
       }
@@ -1532,7 +1553,7 @@ export class Parser {
   private parseBlock(open: Token): BlockStmt {
     const body: Expr[] = [];
     while (!(this.current().kind === "punct" && this.current().value === ")")) {
-      body.push(this.parseSexpr());
+      body.push(this.ensureExpr(this.parseSexpr()));
     }
     const close = this.advance();
     return {
@@ -1549,10 +1570,10 @@ export class Parser {
   }
 
   private parseExplicitCall(open: Token): CallExpr {
-    const callee = this.parseSexpr();
+    const callee = this.ensureExpr(this.parseSexpr());
     const args: Expr[] = [];
     while (!(this.current().kind === "punct" && this.current().value === ")")) {
-      args.push(this.parseSexpr());
+      args.push(this.ensureExpr(this.parseSexpr()));
     }
     const close = this.advance();
     return {
@@ -1577,7 +1598,7 @@ export class Parser {
     };
     const args: Expr[] = [];
     while (!(this.current().kind === "punct" && this.current().value === ")")) {
-      args.push(this.parseSexpr());
+      args.push(this.ensureExpr(this.parseSexpr()));
     }
     const close = this.advance();
     return {

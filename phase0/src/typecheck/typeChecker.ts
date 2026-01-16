@@ -61,8 +61,8 @@ export interface TypeCheckResult {
   errors: CompilerError[];
 }
 
-export class TypeChecker {
-  private typeTable = new TypeTable();
+export class TypeCheckerBase {
+  protected typeTable = new TypeTable();
   private errors: CompilerError[] = [];
   private typeEnv: Array<Map<number, Type>> = [new Map()];
   private typeAliases = new Map<string, Type>();
@@ -979,3 +979,7 @@ export class TypeChecker {
     throw err;
   }
 }
+// Keep default TypeChecker export for Phase0 compatibility
+export class TypeChecker extends TypeCheckerBase {}
+
+export default TypeChecker;

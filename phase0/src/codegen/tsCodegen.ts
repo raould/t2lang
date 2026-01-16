@@ -130,10 +130,11 @@ export async function genProgram(program: Program, options: TsCodegenOptions, ty
       break;
     case PrettyOption.pretty: {
       const require = createRequire(import.meta.url);
-      let prettierPkg: any;
+      let prettierPkg: unknown;
       try {
         prettierPkg = require("prettier");
-        code = await prettierPkg.format(result.tsSource + "\n", { parser: "typescript" });
+        const formatter = prettierPkg as { format: (text: string, opts?: { parser: string }) => string };
+        code = await formatter.format(result.tsSource + "\n", { parser: "typescript" });
         // Note: formatting changes positions, so mappings are invalidated for pretty mode
         // For now, clear mappings if pretty
         if (code !== result.tsSource + "\n") {
