@@ -539,6 +539,17 @@ export class MacroExpander {
         const call = expr as CallExpr;
         const evaluatedCallee = this.evalMacroExpr(call.callee, env);
         const evaluatedArgs = call.args.map(a => this.evalMacroExpr(a, env));
+
+        // Handle call-form gensym: (gensym "prefix") -> Identifier
+        if (evaluatedCallee.kind === "identifier" && (evaluatedCallee as Identifier).name === "gensym") {
+          const prefixArg = evaluatedArgs[0];
+          let prefix: string | undefined = undefined;
+          if (prefixArg && prefixArg.kind === "literal" && typeof (prefixArg as LiteralExpr).value === "string") {
+            prefix = (prefixArg as LiteralExpr).value as string;
+          }
+          return this.expandGensym({ kind: "gensym", prefix, location: expr.location } as GensymExpr);
+        }
+
         // Handle call-form quote: (quote X)
         if (evaluatedCallee.kind === "identifier" && (evaluatedCallee as Identifier).name === "quote") {
           const quoted = call.args[0];
@@ -548,6 +559,7 @@ export class MacroExpander {
           }
           return evaluatedQuoted as Expr;
         }
+
         // If callee is the `array` constructor, evaluate to an ArrayExpr at compile time
         if (evaluatedCallee.kind === "identifier" && (evaluatedCallee as Identifier).name === "array") {
           return {
@@ -1259,9 +1271,11 @@ export class MacroExpander {
     // A binding is represented as (name init) -> CallExpr where callee is name, args[0] is init
     if (expr.kind === "call") {
       const call = expr as CallExpr;
-      if (call.callee.kind === "identifier" && call.args.length >= 1) {
+      // Convert the callee to an AST node in case it was produced by evalQuote (e.g., a gensym id)
+      const nameAst = this.convertQuotedToAstSingle(call.callee as Expr | SpliceMarker);
+      if (nameAst.kind === "identifier" && call.args.length >= 1) {
         return {
-          name: call.callee as Identifier,
+          name: nameAst as Identifier,
           init: this.convertQuotedToAstSingle(call.args[0])
         };
       }
