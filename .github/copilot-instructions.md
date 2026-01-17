@@ -1,0 +1,12 @@
+* read all .md files in this project to get context on the goals and design.
+* when writing TypeScript code, keep it simple.
+* if you make edits to files in t2lang-phase0, then "cd t2lang-phase0; npm run lint; npm test" and fix any errors.
+* if you make edits to files in t2lang-phase1, then "cd t2lang-phase1; npm run lint; npm test" and fix any errors.
+* t2lang's type checking is meant to be only for validating the basic structure of the source .t2 sexpr syntax. The type checker is not meant to implement TypeScript's type checking. Instead, t2lang can optionally run TypeScript immediately on the output from t2lang compiler in order to get full type checking of the original input program. (see the CompilerConfig.enableTsc flag.)
+* when creating or updating tests, make sure this line of code exists after the invocation of the compiler ("compilePhase0" or "compilePhase1"), and before the test assertions. The idea is to output any errors the t2lang compiler raised.
+```
+  if (result.errors.length > 0) { console.error(result.errors); }
+```
+* The macro system should try to be like Clojure's design, not like Racket's.
+* Note that if you run "npm test" you do not have to run "npm build" first because the "test" scripts in package.json already invoke "npm build".
+* do not offer to create PRs.
