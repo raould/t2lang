@@ -264,7 +264,7 @@ export async function runCli(
     });
 
     if (options.ast) {
-        const astDump = result.events.find((e) => e.kind === "astDump");
+        const astDump = result.events.find((e: any) => e.kind === "astDump");
         if (astDump) {
             console.error("--- AST ---");
             console.error(JSON.stringify(astDump.data, null, 2));
@@ -284,11 +284,11 @@ export async function runCli(
         let out = result.tsSource;
         try {
             const prettier = await import('prettier');
-            const formatted = prettier.format(out, { parser: 'typescript' });
-            if (formatted && typeof (formatted as any).then === 'function') {
+            const formatted: any = prettier.format(out, { parser: 'typescript' });
+            if (formatted && typeof formatted.then === 'function') {
                 out = await formatted;
             } else {
-                out = formatted as string;
+                out = formatted;
             }
         } catch {
             // ignore
@@ -299,11 +299,11 @@ export async function runCli(
         let out = result.tsSource;
         try {
             const prettier = await import('prettier');
-            const formatted = prettier.format(out, { parser: 'typescript' });
-            if (formatted && typeof (formatted as any).then === 'function') {
+            const formatted: any = prettier.format(out, { parser: 'typescript' });
+            if (formatted && typeof formatted.then === 'function') {
                 out = await formatted;
             } else {
-                out = formatted as string;
+                out = formatted;
             }
         } catch {
             // ignore
