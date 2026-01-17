@@ -1,4 +1,13 @@
 import type { Token } from "../parse/lexer.js";
+import type { Expr, QuoteExpr, UnquoteExpr, UnquoteSpliceExpr } from "../ast/nodes.js";
+
+export interface ParserWithQuoted {
+    parseQuotedSexpr(): Expr;
+    parseQuotedList(): Expr;
+    parseUnquote(open: any): UnquoteExpr;
+    parseUnquoteSplice(open: any): UnquoteSpliceExpr;
+    parseQuote(open: any): QuoteExpr;
+}
 
 export function attachQuotedParsers(parser: any) {
     parser.parseQuotedSexpr = function (): any {

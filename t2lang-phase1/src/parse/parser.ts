@@ -1,14 +1,14 @@
 // Wrapper Parser: use Phase0's Parser but source tokens from Phase1's Lexer
-import { Parser as BaseParser } from "t2lang-phase0";
+import { Parser as BaseParser, attachQuotedParsers, ParserWithQuoted } from "t2lang-phase0";
 import { Lexer as Phase1Lexer } from "./lexer.js";
 import type { Token } from "t2lang-phase0";
 import type { CompilerContext } from "../api.js";
 
 export class Parser {
-  private base: any;
+  private base: ParserWithQuoted & Record<string, any>;
   constructor(file: string, source: string, ctx: CompilerContext) {
     // Create the standard base parser which sets up internal state.
-    this.base = new BaseParser(file, source, ctx);
+    this.base = new BaseParser(file, source, ctx) as unknown as ParserWithQuoted & Record<string, any>;
     // Replace its token stream with Phase1's tokens produced by our Lexer
     const lexer = new Phase1Lexer(file, source);
     const toks: Token[] = [];
@@ -20,10 +20,10 @@ export class Parser {
     this.base.tokens = toks;
     this.base.index = 0;
 
-    const self = this.base as any;
+    const self = this.base as ParserWithQuoted & Record<string, any>;
 
     // Attach shared quoted parsing helpers from Phase0
-    (require("t2lang-phase0").attachQuotedParsers)(self);
+    attachQuotedParsers(self);
 
     // Add defmacro parsing helpers (so Phase1's defmacro is parsed properly)
     self.parseParamList = function () {

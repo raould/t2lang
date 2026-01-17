@@ -38,3 +38,5 @@ export { runCli } from "./cliHelper.js";
 export { GensymGenerator } from "./lib/gensym.js";
 export { QuotedToAstConverter } from "./lib/convertQuotedToAst.js";
 export { attachQuotedParsers } from "./lib/quotedParser.js";
+export type { ParserWithQuoted } from "./lib/quotedParser.js";
+export { Substitutor } from "./lib/substitute.js";

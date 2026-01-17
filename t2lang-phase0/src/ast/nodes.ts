@@ -279,6 +279,37 @@ export interface ExprStmt extends BaseNode {
   expr: Expr;
 }
 
+// Macro-related nodes (used during parsing/expansion)
+export interface GensymExpr extends BaseNode {
+  kind: "gensym";
+  prefix?: string;
+  generatedName?: string;
+  typeId?: number | null;
+}
+
+export interface QuoteExpr extends BaseNode {
+  kind: "quote";
+  expr: Expr;
+  typeId?: number | null;
+}
+
+export interface UnquoteExpr extends BaseNode {
+  kind: "unquote";
+  expr: Expr;
+  typeId?: number | null;
+}
+
+export interface UnquoteSpliceExpr extends BaseNode {
+  kind: "unquote-splice";
+  expr: Expr;
+  typeId?: number | null;
+}
+
+export interface SpliceExpr extends BaseNode {
+  kind: "__splice";
+  items: Expr[];
+}
+
 export type Expr =
   | Identifier
   | LiteralExpr
@@ -299,8 +330,12 @@ export type Expr =
   | TypeAssertExpr
   | ThrowExpr
   | TryCatchExpr
-  | BlockStmt;
-
+  | BlockStmt
+  | GensymExpr
+  | QuoteExpr
+  | UnquoteExpr
+  | UnquoteSpliceExpr
+  | SpliceExpr;
 export type Statement =
   | ExprStmt
   | BlockStmt
