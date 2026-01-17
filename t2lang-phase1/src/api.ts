@@ -49,6 +49,12 @@ export async function compilePhase1(
     const parser = new Parser("input.t2", source, ctx);
     parsedAst = parser.parseProgram();
 
+    // Debug hook: print parse AST
+    if (process.env.T2_DEBUG_PARSE === "1") {
+      const nodeCount = Array.isArray(parsedAst?.body) ? parsedAst!.body.length : 0;
+      console.error(`[DEBUG] Parsed AST: nodeCount=${nodeCount}`);
+    }
+
     if (fullConfig.dumpAst) {
       ctx.eventSink.emit({
         phase: "parse",
@@ -61,6 +67,12 @@ export async function compilePhase1(
     const expander = new MacroExpander(ctx);
     phase0Ast = expander.expandProgram(parsedAst)
 
+    // Debug hook: print expanded AST
+    if (process.env.T2_DEBUG_EXPAND === "1") {
+      const nodeCount = Array.isArray(phase0Ast?.body) ? phase0Ast!.body.length : 0;
+      console.error(`[DEBUG] Expanded AST: nodeCount=${nodeCount}`);
+    }
+
     if (fullConfig.dumpAst) {
       ctx.eventSink.emit({
         phase: "expand",
@@ -72,9 +84,21 @@ export async function compilePhase1(
     const resolver = new Resolver(ctx);
     resolver.resolveProgram(phase0Ast);
 
+    // Debug hook: print resolved AST
+    if (process.env.T2_DEBUG_RESOLVE === "1") {
+      const nodeCount = Array.isArray(phase0Ast?.body) ? phase0Ast!.body.length : 0;
+      console.error(`[DEBUG] Resolved AST: nodeCount=${nodeCount}`);
+    }
+
     const typeChecker = new TypeChecker(ctx);
     // phase0Ast is already typed as Phase0Program (normalized by the expander)
     const typeCheckResult = typeChecker.checkProgram(phase0Ast);
+
+    // Debug hook: print type-checked AST and type table
+    if (process.env.T2_DEBUG_TYPECHECK === "1") {
+      const cnt = Array.isArray(phase0Ast?.body) ? phase0Ast!.body.length : 0;
+      console.error(`[DEBUG] TypeCheck result: nodeCount=${cnt}, types=${typeCheckResult.typeTable.toJSON().length}`);
+    }
 
     if (typeCheckResult.errors.length > 0) {
       errors.push(...typeCheckResult.errors);
@@ -89,6 +113,11 @@ export async function compilePhase1(
       typeCheckResult.typeTable
     );
     tsSource = codegenResult.tsSource;
+
+    // Debug hook: print codegen output
+    if (process.env.T2_DEBUG_CODEGEN === "1") {
+      console.error("[DEBUG] Codegen output:\n" + tsSource);
+    }
 
     if (fullConfig.enableTsc) {
       // Run TypeScript compiler for additional validation

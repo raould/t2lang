@@ -54,6 +54,12 @@ export async function compilePhase0(
     const parser = new Parser("input.t2", source, ctx);
     ast = parser.parseProgram();
 
+    // Debug hook: print parse output when T2_DEBUG_PARSE=1
+    if (process.env.T2_DEBUG_PARSE === "1") {
+      const nodeCount = Array.isArray(ast?.body) ? ast!.body.length : 0;
+      console.error(`[DEBUG] Parsed AST: nodeCount=${nodeCount}`);
+    }
+
     if (fullConfig.dumpAst) {
       ctx.eventSink.emit({
         phase: "parse",
@@ -65,8 +71,20 @@ export async function compilePhase0(
     const resolver = new Resolver(ctx);
     resolver.resolveProgram(ast);
 
+    // Debug hook: print resolved AST when T2_DEBUG_RESOLVE=1
+    if (process.env.T2_DEBUG_RESOLVE === "1") {
+      const nodeCount = Array.isArray(ast?.body) ? ast!.body.length : 0;
+      console.error(`[DEBUG] Resolved AST: nodeCount=${nodeCount}`);
+    }
+
     const typeChecker = new TypeChecker(ctx);
     const typeCheckResult = typeChecker.checkProgram(ast);
+
+    // Debug hook: print type-checked AST and type table when T2_DEBUG_TYPECHECK=1
+    if (process.env.T2_DEBUG_TYPECHECK === "1") {
+      const cnt = Array.isArray(ast?.body) ? ast!.body.length : 0;
+      console.error(`[DEBUG] TypeCheck result: nodeCount=${cnt}, types=${typeCheckResult.typeTable.toJSON().length}`);
+    }
 
     if (typeCheckResult.errors.length > 0) {
       errors.push(...typeCheckResult.errors);
@@ -82,6 +100,11 @@ export async function compilePhase0(
     );
 
     tsSource = codegenResult.tsSource;
+
+    // Debug hook: print codegen output when T2_DEBUG_CODEGEN=1
+    if (process.env.T2_DEBUG_CODEGEN === "1") {
+      console.error("[DEBUG] Codegen output: size=" + tsSource.length);
+    }
 
     if (fullConfig.enableTsc) {
       // Run TypeScript compiler for additional validation
@@ -101,7 +124,7 @@ export async function compilePhase0(
             return undefined;
           },
           getDefaultLibFileName: () => '',
-          writeFile: () => {},
+          writeFile: () => { },
           getCurrentDirectory: () => '',
           getCanonicalFileName: (fileName) => fileName,
           useCaseSensitiveFileNames: () => false,

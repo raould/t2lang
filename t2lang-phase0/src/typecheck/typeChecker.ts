@@ -53,6 +53,11 @@ export class TypeTable {
   get(id: number): Type {
     return this.types[id];
   }
+
+  // Provide a JSON-friendly serialization for debugging
+  toJSON(): Type[] {
+    return this.types.slice();
+  }
 }
 
 export interface TypeCheckResult {
