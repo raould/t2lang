@@ -24,6 +24,44 @@ This reduces maintenance, avoids drift, and centralizes bug fixes and behavior i
 
 ---
 
+## Progress Update (2026-01-17) ✅
+- Extracted helpers into Phase0 and added focused tests:
+  - **`GensymGenerator`** — `t2lang-phase0/src/lib/gensym.ts` + unit tests ✅
+  - **`QuotedToAstConverter`** — `t2lang-phase0/src/lib/convertQuotedToAst.ts` + unit tests ✅
+  - **`attachQuotedParsers`** — `t2lang-phase0/src/lib/quotedParser.ts` + unit test ✅
+- Phase1 changes using Phase0 helpers:
+  - `MacroExpander` delegates gensym and quoted→AST conversion to Phase0 helpers (reduced duplication).
+  - Phase1 `Parser` now calls Phase0's `attachQuotedParsers` (quoted parsing centralized).
+  - Added Phase1 integration tests covering nested splice/gensym edge cases (6 tests).
+- Verification (local):
+  - `t2lang-phase0` tests: **231/231** passing.
+  - `t2lang-phase1` tests: **57/57** passing.
+  - Lint: clean in both packages.
+
+## Updated Inventory (what still lives in Phase1)
+- Remaining Phase1-specific (heavier) files to consider next:
+  - `src/parse/lexer.ts` — Phase1-specific lexer behavior for quasiquote/backtick handling (likely stays in Phase1 or becomes an opt-in extension).
+  - `src/expand/macroExpander.ts` — core expander (now **thinner**; many helpers extracted to Phase0).
+  - `src/api.ts` — compile driver / Phase1 entrypoint.
+  - `src/cli.ts` — CLI glue that delegates to `t2lang-common`.
+- Many other Phase1 files are thin wrappers/re-exports of Phase0 (parser adapter, resolver wrapper, typecheck wrapper, codegen re-exports, events, errors).
+
+## Prioritized Next Steps (small, test-first, low risk) 🔜
+1. **Extract low-risk helpers** from `macroExpander` into Phase0 (one helper per change):
+   - `flattenQuotedArgs` / splice flattening (isolated and high value)
+   - `substituteAndExpand` / `evalQuote` helpers (next largest; add unit tests)
+2. **Add focused tests** (≤10 per change) for nested splices, quoted let-binding forms, and other edge cases observed during debugging.
+3. **Tighten parser hooks**: add types for parser extension points and make `attachQuotedParsers` strongly typed.
+4. **Consider `expandMacros` API**: once helpers are extracted and well-tested, expose a Phase0 `expandMacros` or `MacroExpansion` facade so Phase1 can become a small adapter that only orchestrates config and top-level callbacks.
+
+## Testing & Rollout (unchanged)
+- Keep each extraction to a small, reviewable commit/PR with unit tests in Phase0 and integration tests in Phase1.
+- Verify by running `cd <pkg> ; npm run lint ; npm test` in both packages before merging.
+
+---
+
+
+
 ## Inventory (initial findings) 🔎
 Files and areas to inspect (candidate duplicates):
 - `parse/lexer.ts` (both packages — lexing differences around backtick/quasiquote)
