@@ -13,7 +13,16 @@ export interface CliOptions {
     pretty: "ugly" | "newlines" | "pretty";
     help: boolean;
     version: boolean;
+
+    // CompilerConfig-related flags
+    emitTypes: boolean;
+    enableTsc: boolean;
+    seed?: string;
+    trace?: string[];
+    logLevel: "none" | "debug";
 }
+
+const SUPPORTED_TRACE_PHASES = ['parse', 'expand', 'resolve', 'typeCheck', 'codegen', 'tsc'];
 
 export function parseArgs(args: string[]): CliOptions {
     const options: CliOptions = {
@@ -24,6 +33,11 @@ export function parseArgs(args: string[]): CliOptions {
         pretty: "newlines",
         help: false,
         version: false,
+        emitTypes: false,
+        enableTsc: false,
+        seed: undefined,
+        trace: [],
+        logLevel: "none",
     };
 
     let i = 0;
@@ -45,6 +59,43 @@ export function parseArgs(args: string[]): CliOptions {
             options.stdout = true;
         } else if (arg === "--ast") {
             options.ast = true;
+        } else if (arg === "--emit-types") {
+            options.emitTypes = true;
+        } else if (arg === "--enable-tsc") {
+            options.enableTsc = true;
+        } else if (arg === "--seed") {
+            i++;
+            if (i >= args.length) {
+                console.error("Error: --seed requires a seed string");
+                process.exit(1);
+            }
+            options.seed = args[i];
+        } else if (arg === "--trace") {
+            i++;
+            if (i >= args.length) {
+                console.error("Error: --trace requires a comma-separated list of phases");
+                process.exit(1);
+            }
+            const phases = args[i].split(",").map(s => s.trim()).filter(Boolean);
+            // Validate phases
+            for (const p of phases) {
+                if (!SUPPORTED_TRACE_PHASES.includes(p)) {
+                    throw new Error(`Unknown trace phase '${p}'. Supported phases: ${SUPPORTED_TRACE_PHASES.join(', ')}`);
+                }
+            }
+            options.trace = phases;
+        } else if (arg === "--log-level") {
+            i++;
+            if (i >= args.length) {
+                console.error("Error: --log-level requires a value (none|debug)");
+                process.exit(1);
+            }
+            const val = args[i];
+            if (val !== "none" && val !== "debug") {
+                console.error(`Error: Invalid log-level '${val}'. Use 'none' or 'debug'`);
+                process.exit(1);
+            }
+            options.logLevel = val as "none" | "debug";
         } else if (arg === "--pretty-option") {
             i++;
             if (i >= args.length) {
@@ -96,6 +147,11 @@ Options:
   --stdout              Print output to stdout instead of file
   --ast                 Print AST dump to stderr
   --pretty-option <ugly|newlines|pretty>  Set pretty mode (default: newlines)
+  --emit-types          Emit TypeScript type annotations in output
+  --enable-tsc          Run TypeScript compiler on emitted output (enableTsc)
+  --seed <string>       Set compiler seed value
+  --trace <p1,p2>       Comma-separated trace phases (supported: parse, expand, resolve, typeCheck, codegen, tsc)
+  --log-level <none|debug>  Set logging verbosity
   -h, --help            Show this help message
   -v, --version         Show version
 `.trim());
@@ -198,8 +254,13 @@ export async function runCli(
     }
 
     const result = await compileFn(source, {
+        logLevel: options.logLevel,
         prettyOutput: mappedPretty,
         dumpAst: options.ast,
+        seed: options.seed ?? "default",
+        tracePhases: options.trace ?? [],
+        emitTypes: options.emitTypes,
+        enableTsc: options.enableTsc
     });
 
     if (options.ast) {

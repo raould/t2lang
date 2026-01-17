@@ -4,7 +4,7 @@
 * done: defmacro expansion is not working correctly at least from the CLI.
 * done: make sure phase1 has build dependency on phase0 so that phase1 is never using stale phase0 code. (Added `t2lang-phase0` dependency and `prebuild` script to run phase0 build before phase1.)
 * done: tests and examples for how CompilerConfig.dumpAst works. (Added integration tests in Phase0/Phase1 and `common/README.md` example.)
-* add CLI support for all of CompilerConfig so the values can be set from the command line, for example the "dumpAst" flag.
+* done: add CLI support for all of CompilerConfig so the values can be set from the command line, for example the "dumpAst" flag. (Added flags: `--emit-types`, `--enable-tsc`, `--seed`, `--trace`, `--log-level` and corresponding tests.)
 * each major stage of the compiler pipeline must support a T2_DEBUG_"modulename" flag like T2_DEBUG_EXPAND for the result from MacroExpander.
    ```
       // DEBUG: Print expanded AST to console for investigation
