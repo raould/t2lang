@@ -1,0 +1,10 @@
+{
+    "name": "t2lang-common",
+    "version": "0.1.0",
+    "type": "module",
+    "main": "src/cliHelper.js",
+    "exports": {
+        ".": "./src/cliHelper.js"
+    },
+    "license": "MIT"
+}

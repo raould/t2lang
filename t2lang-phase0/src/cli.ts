@@ -27,5 +27,10 @@
 import { compilePhase0 } from "./api.js";
 import { runCli } from "./cliHelper.js";
 import { PrettyOption } from "./codegen/tsCodegen.js";
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 
-await runCli("Phase0", compilePhase0, PrettyOption);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+await runCli("Phase0", compilePhase0, PrettyOption, path.join(__dirname, "..", "package.json"));

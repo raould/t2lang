@@ -24,8 +24,13 @@
  *   -v, --version         Show version
  */
 
-import { runCli } from "t2lang-phase0";
+import { runCli } from "./cliHelper.js";
 import { compilePhase1 } from "./api.js";
 import { PrettyOption } from "./codegen/index.js";
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 
-await runCli("Phase1", compilePhase1, PrettyOption);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+await runCli("Phase1", compilePhase1, PrettyOption, path.join(__dirname, "..", "package.json"));

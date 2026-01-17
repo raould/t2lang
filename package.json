@@ -5,6 +5,7 @@
     "t2c": "./node_modules/t2lang-phase1/dist/cli.js"
   },
   "workspaces": [
+    "common",
     "t2lang-phase0",
     "t2lang-phase1"
   ],
