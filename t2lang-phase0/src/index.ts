@@ -33,3 +33,6 @@ export {
 
 // CLI helper
 export { runCli } from "./cliHelper.js";
+
+// Utilities
+export { GensymGenerator } from "./lib/gensym.js";

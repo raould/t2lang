@@ -47,6 +47,7 @@ import {
 // Return type of the expander is a Phase0 Program (AST normalized to Phase0 shape)
 import type { Phase0Program } from "../ast/nodes.js";
 import { CompilerContext } from "../api.js";
+import { GensymGenerator } from "t2lang-phase0";
 
 interface MacroRegistry {
   macros: Map<string, MacroDef>;
@@ -63,7 +64,8 @@ interface SpliceMarker {
 
 export class MacroExpander {
   private registry: MacroRegistry = { macros: new Map() };
-  private gensymCounter = 0;
+  // Use shared gensym generator from Phase0 to centralize gensym behavior
+  private gensymGen = new GensymGenerator();
 
   constructor(private readonly ctx: CompilerContext) { }
 
@@ -71,9 +73,8 @@ export class MacroExpander {
   /**
    * Generate a unique symbol name (like Clojure's gensym)
    */
-  private generateSymbol(prefix: string = "G__"): string {
-    return `${prefix}${++this.gensymCounter}`;
-  }
+  // Gensym generation delegated to Phase0's GensymGenerator
+
 
   /**
    * Main entry point: expand all macros in a program
@@ -1171,12 +1172,8 @@ export class MacroExpander {
    * Expand gensym to produce a unique identifier
    */
   private expandGensym(gensym: GensymExpr): Identifier {
-    const name = gensym.generatedName || this.generateSymbol(gensym.prefix || "G__");
-    return {
-      kind: "identifier",
-      name,
-      location: gensym.location
-    };
+    // Delegate gensym expansion to Phase0 helper to ensure consistent naming
+    return this.gensymGen.expandGensym({ prefix: gensym.prefix, generatedName: gensym.generatedName, location: gensym.location });
   }
 
   /**
