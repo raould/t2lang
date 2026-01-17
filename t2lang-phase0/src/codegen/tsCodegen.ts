@@ -354,8 +354,16 @@ function genFunction(node: FunctionExpr, options: TsCodegenOptions): string {
   }
 
   for (const e of node.body) {
-    result += genExpr(e, options);
-    result += ";\n";
+    if (e.kind === "block") {
+      // Unwrap nested block inside function body to avoid double braces
+      for (const inner of (e as BlockStmt).body) {
+        result += genExpr(inner, options);
+        result += ";\n";
+      }
+    } else {
+      result += genExpr(e, options);
+      result += ";\n";
+    }
   }
   result += "}";
   return result;
