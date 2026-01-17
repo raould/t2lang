@@ -65,7 +65,7 @@ export async function compilePhase1(
 
     // Macro expansion phase - expands all macro calls
     const expander = new MacroExpander(ctx);
-    phase0Ast = expander.expandProgram(parsedAst)
+    phase0Ast = expander.expandProgram(parsedAst!)
 
     // Debug hook: print expanded AST
     if (process.env.T2_DEBUG_EXPAND === "1") {

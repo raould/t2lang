@@ -131,7 +131,26 @@ export class Parser {
   private parseList(): Expr {
     const open = this.advance();
     const headTok = this.current();
+
+    // If the list is empty '()', treat it as an empty array
+    if (headTok.kind === "punct" && headTok.value === ")") {
+      const close = this.advance();
+      return {
+        kind: "array",
+        elements: [],
+        location: {
+          file: this.file,
+          start: open.location.start,
+          end: close.location.end,
+          line: open.location.line,
+          column: open.location.column
+        }
+      } as unknown as Expr;
+    }
+
     if (headTok.kind !== "identifier") {
+      // Debug info for odd non-identifier head cases
+      console.error('parseList: unexpected non-identifier head', headTok, 'around tokens:', this.tokens.slice(Math.max(0, this.index - 3), this.index + 3));
       this.error("List must start with an identifier", headTok);
     }
     const head = headTok.value as string;
@@ -251,12 +270,43 @@ export class Parser {
 
     while (!(this.current().kind === "punct" && this.current().value === ")")) {
       const bindingOpen = this.current();
+
+      // Allow splice placeholders to appear directly as items in the bindings list
+      // e.g., (let* (unquote-splice wl) body...) or if the splice is parenthesized
+      // it may appear as ((unquote-splice wl)). In either case accept and consume it.
+      if (bindingOpen.kind === "identifier" && (bindingOpen.value as string) === "unquote-splice") {
+        // Debug: show we saw a direct splice item in binding list
+        console.error('parseLetOrConst: saw direct unquote-splice at', bindingOpen);
+
+        this.advance(); // consume 'unquote-splice'
+        // Parse inner expression (the thing to splice) and ignore result
+        this.parseSexpr();
+        // Continue to next binding item
+        continue;
+      }
+
       if (!(bindingOpen.kind === "punct" && bindingOpen.value === "(")) {
         this.error("Expected (name expr) binding", bindingOpen);
       }
       this.advance();
 
       const nameTok = this.current();
+
+      // Support splice inside an individual binding list entry: ((unquote-splice ...))
+      if (nameTok.kind === "identifier" && (nameTok.value as string) === "unquote-splice") {
+        // Parse the splice expression and ignore it as a binding placeholder.
+        this.advance(); // consume 'unquote-splice'
+        // Parse the inner expression of the splice
+        this.parseSexpr();
+        const bindingCloseSplice = this.current();
+        if (!(bindingCloseSplice.kind === "punct" && bindingCloseSplice.value === ")")) {
+          this.error("Expected ) to close binding splice", bindingCloseSplice);
+        }
+        this.advance();
+        // Skip adding any binding for a splice
+        continue;
+      }
+
       if (nameTok.kind !== "identifier") {
         this.error("Expected identifier in binding", nameTok);
       }

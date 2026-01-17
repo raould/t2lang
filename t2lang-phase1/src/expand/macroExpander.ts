@@ -115,6 +115,7 @@ export class MacroExpander {
     // represented as an exprStmt whose expr is a call to `defmacro`.
     const filteredBody = expandedBody.filter(stmt => {
       if (stmt.kind === "defmacro") return false;
+      if (stmt.kind === "exprStmt" && (stmt as any).expr && ((stmt as any).expr.kind === "defmacro")) return false;
       if (stmt.kind === "exprStmt" && stmt.expr.kind === "call") {
         const call = stmt.expr as CallExpr;
         if (call.callee.kind === "identifier" && (call.callee as Identifier).name === "defmacro") return false;
@@ -278,6 +279,7 @@ export class MacroExpander {
 
   private collectMacros(program: Program): void {
     for (const stmt of program.body) {
+      // Handle direct defmacro statements (if parser emits them as top-level statements)
       if (stmt.kind === "defmacro") {
         const macro = stmt as MacroDef;
         this.registry.macros.set(macro.name.name, macro);
@@ -285,6 +287,19 @@ export class MacroExpander {
           phase: "expand",
           kind: "macroRegistered",
           data: { name: macro.name.name, params: macro.params.map(p => p.name) }
+        });
+        continue;
+      }
+
+      // Handle defmacro emitted INSIDE an exprStmt like: (defmacro name (params) body...)
+      // Some parsers produce this as an exprStmt whose expr is a defmacro node. Support that.
+      if (stmt.kind === "exprStmt" && (stmt as any).expr && ((stmt as any).expr.kind === "defmacro")) {
+        const macroExpr = (stmt as any).expr as MacroDef;
+        this.registry.macros.set(macroExpr.name.name, macroExpr);
+        this.ctx.eventSink.emit({
+          phase: "expand",
+          kind: "macroRegistered",
+          data: { name: macroExpr.name.name, params: macroExpr.params.map((p: Identifier) => p.name) }
         });
         continue;
       }
@@ -477,6 +492,7 @@ export class MacroExpander {
       case "identifier": {
         const id = expr as Identifier;
         const bound = env.get(id.name);
+
         if (bound) {
           // Return a COPY to avoid mutation issues
           return this.cloneExpr(bound);
@@ -661,6 +677,8 @@ export class MacroExpander {
           return { kind: "array", elements: argsAst, location: call.location } as ArrayExpr;
         }
 
+
+
         // Special-case: quoted `function` form: (function name (params) body...)
         if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "function") {
           // Use processed args (after evalQuote) so unquotes are already evaluated
@@ -784,6 +802,53 @@ export class MacroExpander {
         }
         return { kind: "return", value: null, location: ret.location } as ReturnExpr;
       }
+
+      case "assign": {
+        const assign = expr as AssignExpr;
+        const target = this.evalQuote(assign.target, env);
+        const value = this.evalQuote(assign.value, env);
+        return { kind: "assign", target: this.convertQuotedToAstSingle(target as Expr | SpliceMarker), value: this.convertQuotedToAstSingle(value as Expr | SpliceMarker), location: assign.location } as AssignExpr;
+      }
+
+      case "index": {
+        const idx = expr as IndexExpr;
+        const object = this.evalQuote(idx.object, env);
+        const index = this.evalQuote(idx.index, env);
+        return { kind: "index", object: this.convertQuotedToAstSingle(object as Expr | SpliceMarker), index: this.convertQuotedToAstSingle(index as Expr | SpliceMarker), location: idx.location } as IndexExpr;
+      }
+
+      case "prop": {
+        const prop = expr as PropExpr;
+        const object = this.evalQuote(prop.object, env);
+        // Property is a string in AST; leave as-is or evaluate if it came from unquote
+        return { kind: "prop", object: this.convertQuotedToAstSingle(object as Expr | SpliceMarker), property: prop.property, location: prop.location } as PropExpr;
+      }
+
+      case "if": {
+        const if_ = expr as IfExpr;
+        const cond = this.evalQuote(if_.condition, env);
+        const thenBranch = this.evalQuote(if_.thenBranch, env);
+        const elseBranch = if_.elseBranch ? this.evalQuote(if_.elseBranch, env) : null;
+        return { kind: "if", condition: this.convertQuotedToAstSingle(cond as Expr | SpliceMarker), thenBranch: this.convertQuotedToAstSingle(thenBranch as Expr | SpliceMarker), elseBranch: elseBranch ? this.convertQuotedToAstSingle(elseBranch as Expr | SpliceMarker) : null, location: if_.location } as IfExpr;
+      }
+
+      case "type-assert": {
+        const ta = expr as TypeAssertExpr;
+        const processed = this.evalQuote(ta.expr, env);
+        return { kind: "type-assert", expr: this.convertQuotedToAstSingle(processed as Expr | SpliceMarker), typeAnnotation: ta.typeAnnotation, location: ta.location } as TypeAssertExpr;
+      }
+
+      case "new": {
+        const n = expr as NewExpr;
+        const callee = this.evalQuote(n.callee, env);
+        const args = n.args.map(a => this.evalQuote(a, env) as Expr | SpliceMarker);
+        let argsAst = this.flattenQuotedArgs(args);
+        if (argsAst.length === 1 && argsAst[0].kind === "array") {
+          argsAst = (argsAst[0] as ArrayExpr).elements;
+        }
+        return { kind: "new", callee: this.convertQuotedToAstSingle(callee as Expr | SpliceMarker), args: argsAst, location: n.location } as NewExpr;
+      }
+
       case "array": {
         const arr = expr as ArrayExpr;
         const processed = arr.elements.map(e => this.evalQuote(e, env) as Expr | SpliceMarker);
@@ -792,6 +857,33 @@ export class MacroExpander {
           elements: this.flattenQuotedArgs(processed)
         };
       }
+
+      case "block": {
+        const block = expr as BlockStmt;
+        const processed = block.body.map(e => this.evalQuote(e, env) as Expr | SpliceMarker);
+        const body = this.flattenQuotedArgs(processed);
+        return { kind: "block", body, location: block.location } as BlockStmt;
+      }
+
+      case "let*": {
+        const let_ = expr as LetStarExpr;
+        const bindings: LetBinding[] = [];
+        for (const b of let_.bindings) {
+          const nameExpr = this.evalQuote(b.name, env);
+          const nameAst = this.convertQuotedToAstSingle(nameExpr as Expr | SpliceMarker);
+          const initExpr = this.evalQuote(b.init, env);
+          const initAst = this.convertQuotedToAstSingle(initExpr as Expr | SpliceMarker);
+          if (nameAst.kind === "identifier") {
+            bindings.push({ name: nameAst as Identifier, init: initAst });
+          } else {
+            // Fallback: keep original name
+            bindings.push({ name: b.name, init: initAst });
+          }
+        }
+        const processed = let_.body.map(e => this.evalQuote(e, env) as Expr | SpliceMarker);
+        return { kind: "let*", bindings, body: this.flattenQuotedArgs(processed), isConst: let_.isConst, location: let_.location } as LetStarExpr;
+      }
+
       default:
         return expr;
     }
@@ -822,6 +914,16 @@ export class MacroExpander {
       case "unquote":
         // Unquote: evaluate the expression with substitutions
         return this.substituteAndExpand((expr as UnquoteExpr).expr, bindings);
+      case "unquote-splice": {
+        // Evaluate inner expression and return an internal splice marker
+        // so callers (flattenQuotedArgs) can expand items into lists.
+        const us = expr as UnquoteSpliceExpr;
+        const evaluated = this.substituteAndExpand(us.expr, bindings);
+        if (evaluated && evaluated.kind === "array") {
+          return { kind: "__splice", items: (evaluated as ArrayExpr).elements, location: expr.location } as unknown as Expr;
+        }
+        return { kind: "__splice", items: [evaluated], location: expr.location } as unknown as Expr;
+      }
       case "gensym":
         return this.expandGensym(expr as GensymExpr);
       case "call": {
@@ -957,6 +1059,15 @@ export class MacroExpander {
       case "unquote":
         // Unquote inside quote: substitute and return
         return this.substituteAndExpand((expr as UnquoteExpr).expr, bindings);
+      case "unquote-splice": {
+        // Evaluate unquote-splice inside quoted code and return internal splice marker
+        const us = expr as UnquoteSpliceExpr;
+        const evaluated = this.substituteAndExpand(us.expr, bindings);
+        if (evaluated && evaluated.kind === "array") {
+          return { kind: "__splice", items: (evaluated as ArrayExpr).elements, location: expr.location } as SpliceMarker as Expr;
+        }
+        return { kind: "__splice", items: [evaluated], location: expr.location } as SpliceMarker as Expr;
+      }
       case "gensym":
         // Gensyms are always expanded
         return this.expandGensym(expr as GensymExpr);
@@ -1000,11 +1111,18 @@ export class MacroExpander {
         const let_ = expr as LetStarExpr;
         return {
           ...let_,
-          bindings: let_.bindings.map(b => ({
-            ...b,
-            name: b.name, // Keep name as-is in quote
-            init: this.toPhase0(this.substituteInQuote(b.init, bindings))
-          })),
+          bindings: let_.bindings.map(b => {
+            // Evaluate the binding name in quote context so unquote/gensym
+            // can generate a proper Identifier for the binding name.
+            const nameExpr = this.substituteInQuote(b.name, bindings);
+            const nameAst = this.convertQuotedToAstSingle(nameExpr as Expr | SpliceMarker);
+            const nameId = nameAst.kind === "identifier" ? nameAst as Identifier : b.name;
+            return {
+              ...b,
+              name: nameId,
+              init: this.toPhase0(this.substituteInQuote(b.init, bindings))
+            };
+          }),
           body: let_.body.map(e => this.toPhase0(this.substituteInQuote(e, bindings)))
         };
       }
@@ -1125,9 +1243,15 @@ export class MacroExpander {
     // Check if the callee is an identifier (special form name)
     if (call.callee.kind !== "identifier") {
       // Nested call - convert args recursively. Use single conversion for callee and flatten args for splices.
+      const calleeConverted = this.convertQuotedToAstSingle(call.callee);
+      // If the converted callee is itself a call (e.g., nested binding like ((~name ~val)))
+      // and the outer call has no extra args, flatten it by returning the inner call directly.
+      if (calleeConverted && (calleeConverted as Expr).kind === "call" && (!call.args || call.args.length === 0)) {
+        return calleeConverted as Expr;
+      }
       return {
         ...call,
-        callee: this.convertQuotedToAstSingle(call.callee),
+        callee: calleeConverted,
         args: this.flattenQuotedArgs(call.args)
       };
     }
@@ -1236,6 +1360,7 @@ export class MacroExpander {
     // bindings may be represented as a call, an array, or produced via splice markers.
     // Normalize into Phase0Expr[] using flattenQuotedArgs so splices are expanded.
     const normalizedBindings: Phase0Expr[] = bindingsArg ? this.flattenQuotedArgs([bindingsArg]) : [];
+
 
     const bindings: LetBinding[] = [];
     for (const b of normalizedBindings) {
