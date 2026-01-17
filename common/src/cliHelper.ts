@@ -30,7 +30,7 @@ export function parseArgs(args: string[]): CliOptions {
         output: null,
         stdout: false,
         ast: false,
-        pretty: "newlines",
+        pretty: "pretty",
         help: false,
         version: false,
         emitTypes: false,
@@ -146,7 +146,7 @@ Options:
   -o, --output <file>   Output file path (default: input with .ts extension)
   --stdout              Print output to stdout instead of file
   --ast                 Print AST dump to stderr
-  --pretty-option <ugly|newlines|pretty>  Set pretty mode (default: newlines)
+    --pretty-option <ugly|newlines|pretty>  Set pretty mode (default: pretty)
   --emit-types          Emit TypeScript type annotations in output
   --enable-tsc          Run TypeScript compiler on emitted output (enableTsc)
   --seed <string>       Set compiler seed value
@@ -238,7 +238,7 @@ export async function runCli(
         source = fs.readFileSync(options.input, "utf-8");
     }
 
-    let mappedPretty: any;
+    let mappedPretty: any = prettyEnum.pretty;
     switch (options.pretty) {
         case "pretty":
             mappedPretty = prettyEnum.pretty;
@@ -281,10 +281,34 @@ export async function runCli(
     }
 
     if (options.stdout) {
-        console.log(result.tsSource);
+        let out = result.tsSource;
+        try {
+            const prettier = await import('prettier');
+            const formatted = prettier.format(out, { parser: 'typescript' });
+            if (formatted && typeof (formatted as any).then === 'function') {
+                out = await formatted;
+            } else {
+                out = formatted as string;
+            }
+        } catch {
+            // ignore
+        }
+        console.log(out);
     } else {
         const outputPath = options.output ?? getOutputPath(options.input);
-        fs.writeFileSync(outputPath, result.tsSource, "utf-8");
+        let out = result.tsSource;
+        try {
+            const prettier = await import('prettier');
+            const formatted = prettier.format(out, { parser: 'typescript' });
+            if (formatted && typeof (formatted as any).then === 'function') {
+                out = await formatted;
+            } else {
+                out = formatted as string;
+            }
+        } catch {
+            // ignore
+        }
+        fs.writeFileSync(outputPath, out, "utf-8");
         console.error(`Compiled ${options.input} -> ${outputPath}`);
     }
 }

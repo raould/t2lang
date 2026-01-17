@@ -1,0 +1,56 @@
+(program
+  (type-alias HTMLVideoElement (type-object))
+  (type-alias HTMLAudioElement (type-object))
+  (type-alias HTMLCanvasElement (type-object))
+  (type-alias URL (type-object))
+
+  (type-alias AllowedElements
+    (type-object
+      ("video" (type-ref "HTMLVideoElement"))
+      ("audio" (type-ref "HTMLAudioElement"))
+      ("canvas" (type-ref "HTMLCanvasElement"))
+    )
+  )
+  (type-alias Languages
+    (type-object
+      ("de" (type-ref "URL"))
+      ("en" (type-ref "URL"))
+      ("pt" (type-ref "URL"))
+      ("es" (type-ref "URL"))
+      ("fr" (type-ref "URL"))
+      ("ja" (type-ref "URL"))
+    )
+  )
+
+  (function isAvailable (obj key)
+    (block
+      (return (call (prop obj "hasOwnProperty") key))
+    )
+  )
+
+  (function loadLanguage (collection lang)
+    (block
+      (if (call isAvailable collection lang)
+        (block
+          (return (index collection lang))
+        )
+        (block
+          (return (null))
+        )
+      )
+    )
+  )
+
+  (function selectElement (collection elem)
+    (block
+      (if (call isAvailable collection elem)
+        (block
+          (return (index collection elem))
+        )
+        (block
+          (return (null))
+        )
+      )
+    )
+  )
+)
