@@ -38,12 +38,43 @@ export class Lexer {
           if (t.kind === "eof") break;
         }
         this.enqueue({ kind: "identifier", value: "quote", location: loc } as BaseToken);
-        for (const t of exprTokens) this.enqueue(t);
+        // Expand inline ~ and ~@ forms inside the quoted tokens so they are treated as unquotes/splices
+        for (const t of exprTokens) {
+          if (t.kind === "identifier" && typeof t.value === "string" && t.value.startsWith("~")) {
+            const text = t.value as string;
+            const isSpliceInner = text.startsWith("~@");
+            const remainder = isSpliceInner ? text.slice(2) : text.slice(1);
+            const formNameInner = isSpliceInner ? "unquote-splice" : "unquote";
+            if (remainder.length > 0) {
+              const numMatch = /^-?\d+$/.test(remainder);
+              const exprTok = numMatch ? { kind: "number", value: Number(remainder), location: t.location } as Token : { kind: "identifier", value: remainder, location: t.location } as Token;
+              this.enqueue({ kind: "identifier", value: formNameInner, location: t.location } as BaseToken);
+              this.enqueue(exprTok as BaseToken);
+              this.enqueue({ kind: "punct", value: ")", location: t.location } as BaseToken);
+              continue;
+            }
+          }
+          this.enqueue(t);
+        }
         this.enqueue({ kind: "punct", value: ")", location: loc } as BaseToken);
         return { kind: "punct", value: "(", location: loc } as BaseToken;
       }
-      // Single-token expression
+      // Single-token expression: expand ~ and ~@ shorthand if present
       this.enqueue({ kind: "identifier", value: "quote", location: loc } as BaseToken);
+      if (next.kind === "identifier" && typeof next.value === "string" && next.value.startsWith("~")) {
+        const text = next.value as string;
+        const isSpliceInner = text.startsWith("~@");
+        const remainder = isSpliceInner ? text.slice(2) : text.slice(1);
+        const formNameInner = isSpliceInner ? "unquote-splice" : "unquote";
+        if (remainder.length > 0) {
+          const numMatch = /^-?\d+$/.test(remainder);
+          const exprTok = numMatch ? { kind: "number", value: Number(remainder), location: next.location } as Token : { kind: "identifier", value: remainder, location: next.location } as Token;
+          this.enqueue({ kind: "identifier", value: formNameInner, location: next.location } as BaseToken);
+          this.enqueue(exprTok as BaseToken);
+          this.enqueue({ kind: "punct", value: ")", location: next.location } as BaseToken);
+          return { kind: "punct", value: "(", location: loc } as BaseToken;
+        }
+      }
       this.enqueue(next as BaseToken);
       this.enqueue({ kind: "punct", value: ")", location: loc } as BaseToken);
       return { kind: "punct", value: "(", location: loc } as BaseToken;

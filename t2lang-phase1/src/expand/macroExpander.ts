@@ -83,10 +83,44 @@ export class MacroExpander {
     this.collectMacros(program);
 
     // Second pass: expand macro calls
-    const expandedBody = this.expandStatements(program.body);
+    // First, convert legacy call-style defmacro expressions (exprStmt with a call to `defmacro`)
+    // into proper MacroDef statements so subsequent passes can handle them uniformly.
+    const preprocessedBody: Statement[] = program.body.map(stmt => {
+      if (stmt.kind === "exprStmt" && stmt.expr.kind === "call") {
+        const call = stmt.expr as CallExpr;
+        if (call.callee.kind === "identifier" && (call.callee as Identifier).name === "defmacro") {
+          const nameArg = call.args[0];
+          const paramsArg = call.args[1];
+          const bodyArgs = call.args.slice(2);
+          if (nameArg && nameArg.kind === "identifier") {
+            const nameId = nameArg as Identifier;
+            const params: Identifier[] = [];
+            if (paramsArg && paramsArg.kind === "call") {
+              const paramsCall = paramsArg as CallExpr;
+              if (paramsCall.callee && paramsCall.callee.kind === "identifier") params.push(paramsCall.callee as Identifier);
+              for (const p of paramsCall.args) {
+                if (p.kind === "identifier") params.push(p as Identifier);
+              }
+            }
+            return { kind: "defmacro", name: nameId, params, body: bodyArgs, location: stmt.location } as MacroDef;
+          }
+        }
+      }
+      return stmt;
+    });
 
-    // Filter out macro definitions from output
-    const filteredBody = expandedBody.filter(stmt => stmt.kind !== "defmacro");
+    const expandedBody = this.expandStatements(preprocessedBody);
+
+    // Filter out macro definitions from output. Also remove legacy-style defmacro
+    // represented as an exprStmt whose expr is a call to `defmacro`.
+    const filteredBody = expandedBody.filter(stmt => {
+      if (stmt.kind === "defmacro") return false;
+      if (stmt.kind === "exprStmt" && stmt.expr.kind === "call") {
+        const call = stmt.expr as CallExpr;
+        if (call.callee.kind === "identifier" && (call.callee as Identifier).name === "defmacro") return false;
+      }
+      return true;
+    });
 
     // Normalize output to Phase0-compatible nodes (remove gensym nodes)
     const normalizedBody: Phase0Statement[] = filteredBody.map(stmt => this.normalizeStatement(stmt));
@@ -236,7 +270,9 @@ export class MacroExpander {
       case "unquote-splice":
         return this.normalizeExpr((expr as UnquoteSpliceExpr).expr);
       default:
-        return expr as Phase0Expr;
+        // Defensive cast: some Phase1-only nodes (like internal splice markers)
+        // may reach here; treat them as unknown when asserting Phase0 shape.
+        return expr as unknown as Phase0Expr;
     }
   }
 
@@ -250,6 +286,34 @@ export class MacroExpander {
           kind: "macroRegistered",
           data: { name: macro.name.name, params: macro.params.map(p => p.name) }
         });
+        continue;
+      }
+
+      // Also support legacy-style macro definitions represented as an exprStmt whose
+      // expr is a call to the identifier `defmacro`. Some programs may still use this
+      // form (especially during parsing re-exports), so detect and register them here.
+      if (stmt.kind === "exprStmt" && stmt.expr.kind === "call") {
+        const call = stmt.expr as CallExpr;
+        if (call.callee.kind === "identifier" && (call.callee as Identifier).name === "defmacro") {
+          // Expect: (defmacro name (params...) body...)
+          const nameArg = call.args[0];
+          const paramsArg = call.args[1];
+          const bodyArgs = call.args.slice(2);
+          if (nameArg && nameArg.kind === "identifier") {
+            const nameId = nameArg as Identifier;
+            const params: Identifier[] = [];
+            if (paramsArg && paramsArg.kind === "call") {
+              const paramsCall = paramsArg as CallExpr;
+              if (paramsCall.callee && paramsCall.callee.kind === "identifier") params.push(paramsCall.callee as Identifier);
+              for (const p of paramsCall.args) {
+                if (p.kind === "identifier") params.push(p as Identifier);
+              }
+            }
+            const macro: MacroDef = { kind: "defmacro", name: nameId, params, body: bodyArgs, location: stmt.location };
+            this.registry.macros.set(macro.name.name, macro);
+            this.ctx.eventSink.emit({ phase: "expand", kind: "macroRegistered", data: { name: macro.name.name, params: macro.params.map(p => p.name) } });
+          }
+        }
       }
     }
   }
@@ -267,12 +331,12 @@ export class MacroExpander {
       case "exprStmt":
         return {
           ...stmt,
-          expr: this.expandExpr(stmt.expr)
+          expr: this.toPhase0(this.expandExpr(stmt.expr))
         };
       case "block":
         return {
           ...stmt,
-          body: stmt.body.map(e => this.expandExpr(e))
+          body: stmt.body.map(e => this.toPhase0(this.expandExpr(e)))
         };
       case "let*":
         return this.expandLet(stmt as LetStarExpr);
@@ -332,10 +396,10 @@ export class MacroExpander {
         return this.expandQuotedExpr((expr as QuoteExpr).expr);
       case "unquote":
         // Unquote outside of quote context just expands its contents
-        return this.expandExpr((expr as UnquoteExpr).expr);
+        return this.toPhase0(this.expandExpr((expr as UnquoteExpr).expr));
       case "unquote-splice":
         // Unquote-splice outside of quote context just expands its contents
-        return this.expandExpr((expr as UnquoteSpliceExpr).expr);
+        return this.toPhase0(this.expandExpr((expr as UnquoteSpliceExpr).expr));
       default:
         return expr;
     }
@@ -360,8 +424,8 @@ export class MacroExpander {
 
     return {
       ...call,
-      callee: expandedCallee,
-      args: expandedArgs
+      callee: this.toPhase0(expandedCallee),
+      args: expandedArgs.map(a => this.toPhase0(a))
     };
   }
 
@@ -424,6 +488,18 @@ export class MacroExpander {
         return expr;
       case "gensym":
         return this.expandGensym(expr as GensymExpr);
+      case "unquote": {
+        // Evaluate the unquoted expression
+        return this.evalMacroExpr((expr as UnquoteExpr).expr, env);
+      }
+      case "unquote-splice": {
+        const us = expr as UnquoteSpliceExpr;
+        const evaluated = this.evalMacroExpr(us.expr, env);
+        if (evaluated && evaluated.kind === "array") {
+          return { kind: "__splice", items: (evaluated as ArrayExpr).elements, location: expr.location } as unknown as Expr;
+        }
+        return { kind: "__splice", items: [evaluated], location: expr.location } as unknown as Expr;
+      }
       case "quote": {
         // Evaluate unquotes inside the quote
         const evaluatedQuoted = this.evalQuote((expr as QuoteExpr).expr, env);
@@ -454,27 +530,36 @@ export class MacroExpander {
         const if_ = expr as IfExpr;
         return {
           ...if_,
-          condition: this.evalMacroExpr(if_.condition, env),
-          thenBranch: this.evalMacroExpr(if_.thenBranch, env),
-          elseBranch: if_.elseBranch ? this.evalMacroExpr(if_.elseBranch, env) : null
+          condition: this.toPhase0(this.evalMacroExpr(if_.condition, env)),
+          thenBranch: this.toPhase0(this.evalMacroExpr(if_.thenBranch, env)),
+          elseBranch: if_.elseBranch ? this.toPhase0(this.evalMacroExpr(if_.elseBranch, env)) : null
         };
       }
       case "call": {
         const call = expr as CallExpr;
         const evaluatedCallee = this.evalMacroExpr(call.callee, env);
         const evaluatedArgs = call.args.map(a => this.evalMacroExpr(a, env));
+        // Handle call-form quote: (quote X)
+        if (evaluatedCallee.kind === "identifier" && (evaluatedCallee as Identifier).name === "quote") {
+          const quoted = call.args[0];
+          const evaluatedQuoted = this.evalQuote(quoted, env);
+          if (this.isSplice(evaluatedQuoted)) {
+            return { kind: "array", elements: evaluatedQuoted.items, location: expr.location } as ArrayExpr;
+          }
+          return evaluatedQuoted as Expr;
+        }
         // If callee is the `array` constructor, evaluate to an ArrayExpr at compile time
         if (evaluatedCallee.kind === "identifier" && (evaluatedCallee as Identifier).name === "array") {
           return {
             kind: "array",
-            elements: evaluatedArgs,
+            elements: evaluatedArgs.map(a => this.toPhase0(a)),
             location: expr.location
           } as ArrayExpr;
         }
         return {
           ...call,
-          callee: evaluatedCallee,
-          args: evaluatedArgs
+          callee: this.toPhase0(evaluatedCallee),
+          args: evaluatedArgs.map(a => this.toPhase0(a))
         };
       }
       default:
@@ -509,9 +594,29 @@ export class MacroExpander {
         return { kind: "__splice", items: [evaluated], location: expr.location } as SpliceMarker;
       }
       case "identifier": {
+        // Support shorthand unquote/unquote-splice inside quotes: identifiers
+        // beginning with `~` or `~@` should behave like (unquote ...) and
+        // (unquote-splice ...).
+        const id = expr as Identifier;
+        if (typeof id.name === "string" && id.name.startsWith("~@")) {
+          const remainder = id.name.slice(2);
+          let inner: Expr = { kind: "identifier", name: remainder, location: id.location } as Identifier;
+          // numeric shorthand (~@1) -> number literal
+          if (/^-?\d+$/.test(remainder)) {
+            inner = { kind: "literal", value: Number(remainder), location: id.location } as LiteralExpr;
+          }
+          return this.evalMacroExpr({ kind: "unquote-splice", expr: inner, location: id.location } as UnquoteSpliceExpr, env);
+        }
+        if (typeof id.name === "string" && id.name.startsWith("~")) {
+          const remainder = id.name.slice(1);
+          let inner: Expr = { kind: "identifier", name: remainder, location: id.location } as Identifier;
+          if (/^-?\d+$/.test(remainder)) {
+            inner = { kind: "literal", value: Number(remainder), location: id.location } as LiteralExpr;
+          }
+          return this.evalMacroExpr({ kind: "unquote", expr: inner, location: id.location } as UnquoteExpr, env);
+        }
         // Identifiers in quote are literal unless they are macro parameters
         // bound in the environment (convenience: allow bare params without ~)
-        const id = expr as Identifier;
         const bound = env.get(id.name);
         if (bound) {
           return this.cloneExpr(bound);
@@ -523,6 +628,13 @@ export class MacroExpander {
       case "gensym":
         // Gensyms are evaluated even in quote
         return this.expandGensym(expr as GensymExpr);
+      case "function": {
+        const fn = expr as FunctionExpr;
+        const nameExpr = fn.name ? this.evalQuote(fn.name, env) : null;
+        const nameId = nameExpr && (nameExpr as Expr).kind === "identifier" ? (nameExpr as Identifier) : null;
+        const body = this.flattenQuotedArgs(fn.body.map(b => this.evalQuote(b, env)) as Array<Expr | SpliceMarker>);
+        return { kind: "function", name: nameId, params: fn.params, body, isDeclaration: fn.isDeclaration, location: fn.location } as FunctionExpr;
+      }
       case "call": {
         const call = expr as CallExpr;
         // Recursively process for unquotes
@@ -535,6 +647,26 @@ export class MacroExpander {
         // Special-case: quoted `array` constructor -> ArrayExpr
         if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "array") {
           return { kind: "array", elements: argsAst, location: call.location } as ArrayExpr;
+        }
+
+        // Special-case: quoted `function` form: (function name (params) body...)
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "function") {
+          // Use processed args (after evalQuote) so unquotes are already evaluated
+          const nameArg = processedArgs[0] as Expr | SpliceMarker | undefined;
+          const paramsArg = processedArgs[1] as Expr | SpliceMarker | undefined;
+          let name: Identifier | null = null;
+          if (nameArg && !this.isSplice(nameArg) && (nameArg as Expr).kind === "identifier") {
+            name = nameArg as Identifier;
+          }
+          const params: Identifier[] = [];
+          if (paramsArg && !this.isSplice(paramsArg) && (paramsArg as Expr).kind === "array") {
+            const arr = paramsArg as ArrayExpr;
+            for (const el of arr.elements) {
+              if (el.kind === "identifier") params.push(el as Identifier);
+            }
+          }
+          const body = this.flattenQuotedArgs(processedArgs.slice(2) as Array<Expr | SpliceMarker>);
+          return { kind: "function", name, params, body, isDeclaration: false, location: call.location } as FunctionExpr;
         }
 
         // Special-case: quoted `function` form: (function name (params) body...)
@@ -629,6 +761,17 @@ export class MacroExpander {
 
         return { kind: "call", callee: calleeAst, args: argsAst, location: call.location } as CallExpr;
       }
+      case "return": {
+        const ret = expr as ReturnExpr;
+        if (ret.value) {
+          const processed = this.evalQuote(ret.value, env);
+          if (this.isSplice(processed)) {
+            return { kind: "array", elements: processed.items, location: ret.location } as ArrayExpr;
+          }
+          return { kind: "return", value: processed as Expr, location: ret.location } as ReturnExpr;
+        }
+        return { kind: "return", value: null, location: ret.location } as ReturnExpr;
+      }
       case "array": {
         const arr = expr as ArrayExpr;
         const processed = arr.elements.map(e => this.evalQuote(e, env) as Expr | SpliceMarker);
@@ -673,8 +816,8 @@ export class MacroExpander {
         const call = expr as CallExpr;
         return {
           ...call,
-          callee: this.substituteAndExpand(call.callee, bindings),
-          args: call.args.map(a => this.substituteAndExpand(a, bindings))
+          callee: this.toPhase0(this.substituteAndExpand(call.callee, bindings)),
+          args: call.args.map(a => this.toPhase0(this.substituteAndExpand(a, bindings)))
         };
       }
       case "let*": {
@@ -683,25 +826,25 @@ export class MacroExpander {
           ...let_,
           bindings: let_.bindings.map(b => ({
             ...b,
-            init: this.substituteAndExpand(b.init, bindings)
+            init: this.toPhase0(this.substituteAndExpand(b.init, bindings))
           })),
-          body: let_.body.map(e => this.substituteAndExpand(e, bindings))
+          body: let_.body.map(e => this.toPhase0(this.substituteAndExpand(e, bindings)))
         };
       }
       case "if": {
         const if_ = expr as IfExpr;
         return {
           ...if_,
-          condition: this.substituteAndExpand(if_.condition, bindings),
-          thenBranch: this.substituteAndExpand(if_.thenBranch, bindings),
-          elseBranch: if_.elseBranch ? this.substituteAndExpand(if_.elseBranch, bindings) : null
+          condition: this.toPhase0(this.substituteAndExpand(if_.condition, bindings)),
+          thenBranch: this.toPhase0(this.substituteAndExpand(if_.thenBranch, bindings)),
+          elseBranch: if_.elseBranch ? this.toPhase0(this.substituteAndExpand(if_.elseBranch, bindings)) : null
         };
       }
       case "prop": {
         const prop = expr as PropExpr;
         return {
           ...prop,
-          object: this.substituteAndExpand(prop.object, bindings)
+          object: this.toPhase0(this.substituteAndExpand(prop.object, bindings))
         };
       }
       case "function": {
@@ -709,14 +852,14 @@ export class MacroExpander {
         // Don't substitute inside function params, but do in body
         return {
           ...fn,
-          body: fn.body.map(e => this.substituteAndExpand(e, bindings))
+          body: fn.body.map(e => this.toPhase0(this.substituteAndExpand(e, bindings)))
         };
       }
       case "array": {
         const arr = expr as ArrayExpr;
         return {
           ...arr,
-          elements: arr.elements.map(e => this.substituteAndExpand(e, bindings))
+          elements: arr.elements.map(e => this.toPhase0(this.substituteAndExpand(e, bindings)))
         };
       }
       case "object": {
@@ -725,7 +868,7 @@ export class MacroExpander {
           ...obj,
           fields: obj.fields.map(f => ({
             ...f,
-            value: this.substituteAndExpand(f.value, bindings)
+            value: this.toPhase0(this.substituteAndExpand(f.value, bindings))
           }))
         };
       }
@@ -733,60 +876,60 @@ export class MacroExpander {
         const block = expr as BlockStmt;
         return {
           ...block,
-          body: block.body.map(e => this.substituteAndExpand(e, bindings))
+          body: block.body.map(e => this.toPhase0(this.substituteAndExpand(e, bindings)))
         };
       }
       case "return": {
         const ret = expr as ReturnExpr;
         return {
           ...ret,
-          value: ret.value ? this.substituteAndExpand(ret.value, bindings) : null
+          value: ret.value ? this.toPhase0(this.substituteAndExpand(ret.value, bindings)) : null
         };
       }
       case "while": {
         const while_ = expr as WhileExpr;
         return {
           ...while_,
-          condition: this.substituteAndExpand(while_.condition, bindings),
-          body: while_.body.map(e => this.substituteAndExpand(e, bindings))
+          condition: this.toPhase0(this.substituteAndExpand(while_.condition, bindings)),
+          body: while_.body.map(e => this.toPhase0(this.substituteAndExpand(e, bindings)))
         };
       }
       case "assign": {
         const assign = expr as AssignExpr;
         return {
           ...assign,
-          target: this.substituteAndExpand(assign.target, bindings),
-          value: this.substituteAndExpand(assign.value, bindings)
+          target: this.toPhase0(this.substituteAndExpand(assign.target, bindings)),
+          value: this.toPhase0(this.substituteAndExpand(assign.value, bindings))
         };
       }
       case "index": {
         const index = expr as IndexExpr;
         return {
           ...index,
-          object: this.substituteAndExpand(index.object, bindings),
-          index: this.substituteAndExpand(index.index, bindings)
+          object: this.toPhase0(this.substituteAndExpand(index.object, bindings)),
+          index: this.toPhase0(this.substituteAndExpand(index.index, bindings))
         };
       }
       case "new": {
         const new_ = expr as NewExpr;
         return {
           ...new_,
-          callee: this.substituteAndExpand(new_.callee, bindings),
-          args: new_.args.map(a => this.substituteAndExpand(a, bindings))
+          callee: this.toPhase0(this.substituteAndExpand(new_.callee, bindings)),
+          args: new_.args.map(a => this.toPhase0(this.substituteAndExpand(a, bindings)))
         };
       }
       case "throw": {
         const throw_ = expr as ThrowExpr;
         return {
           ...throw_,
-          value: this.substituteAndExpand(throw_.value, bindings)
+          value: this.toPhase0(this.substituteAndExpand(throw_.value, bindings))
         };
       }
       case "type-assert": {
         const ta = expr as TypeAssertExpr;
         return {
           ...ta,
-          expr: this.substituteAndExpand(ta.expr, bindings)
+          expr: this.toPhase0(this.substituteAndExpand(ta.expr, bindings))
         };
       }
       default:
@@ -806,9 +949,27 @@ export class MacroExpander {
         // Gensyms are always expanded
         return this.expandGensym(expr as GensymExpr);
       case "identifier": {
+        // Support shorthand unquote/unquote-splice inside quoted code
+        const id = expr as Identifier;
+        if (typeof id.name === "string" && id.name.startsWith("~@")) {
+          const remainder = id.name.slice(2);
+          let inner: Expr = { kind: "identifier", name: remainder, location: id.location } as Identifier;
+          if (/^-?\d+$/.test(remainder)) {
+            inner = { kind: "literal", value: Number(remainder), location: id.location } as LiteralExpr;
+          }
+          return this.substituteAndExpand({ kind: "unquote-splice", expr: inner, location: id.location } as UnquoteSpliceExpr, bindings);
+        }
+        if (typeof id.name === "string" && id.name.startsWith("~")) {
+          const remainder = id.name.slice(1);
+          let inner: Expr = { kind: "identifier", name: remainder, location: id.location } as Identifier;
+          if (/^-?\d+$/.test(remainder)) {
+            inner = { kind: "literal", value: Number(remainder), location: id.location } as LiteralExpr;
+          }
+          return this.substituteAndExpand({ kind: "unquote", expr: inner, location: id.location } as UnquoteExpr, bindings);
+        }
+
         // Identifiers in quote are NOT substituted by default, BUT if they
         // match a macro binding name, substitute them (convenience for simple macros)
-        const id = expr as Identifier;
         const bound = bindings.get(id.name);
         if (bound) return this.cloneExpr(bound);
         return expr;
@@ -830,33 +991,46 @@ export class MacroExpander {
           bindings: let_.bindings.map(b => ({
             ...b,
             name: b.name, // Keep name as-is in quote
-            init: this.substituteInQuote(b.init, bindings)
+            init: this.toPhase0(this.substituteInQuote(b.init, bindings))
           })),
-          body: let_.body.map(e => this.substituteInQuote(e, bindings))
+          body: let_.body.map(e => this.toPhase0(this.substituteInQuote(e, bindings)))
         };
       }
       case "if": {
         const if_ = expr as IfExpr;
         return {
           ...if_,
-          condition: this.substituteInQuote(if_.condition, bindings),
-          thenBranch: this.substituteInQuote(if_.thenBranch, bindings),
-          elseBranch: if_.elseBranch ? this.substituteInQuote(if_.elseBranch, bindings) : null
+          condition: this.toPhase0(this.substituteInQuote(if_.condition, bindings)),
+          thenBranch: this.toPhase0(this.substituteInQuote(if_.thenBranch, bindings)),
+          elseBranch: if_.elseBranch ? this.toPhase0(this.substituteInQuote(if_.elseBranch, bindings)) : null
         };
       }
       case "array": {
         const arr = expr as ArrayExpr;
         return {
           ...arr,
-          elements: arr.elements.map(e => this.substituteInQuote(e, bindings))
+          elements: arr.elements.map(e => this.toPhase0(this.substituteInQuote(e, bindings)))
         };
       }
       case "block": {
         const block = expr as BlockStmt;
         return {
           ...block,
-          body: block.body.map(e => this.substituteInQuote(e, bindings))
+          body: block.body.map(e => this.toPhase0(this.substituteInQuote(e, bindings)))
         };
+      }
+      case "function": {
+        const fn = expr as FunctionExpr;
+        const name = fn.name ? this.substituteInQuote(fn.name, bindings) : null;
+        const body = this.flattenQuotedArgs(fn.body.map(e => this.substituteInQuote(e, bindings)));
+        return { kind: "function", name: name && (name as Expr).kind === "identifier" ? name as Identifier : null, params: fn.params, body, isDeclaration: fn.isDeclaration, location: fn.location } as FunctionExpr;
+      }
+      case "return": {
+        const ret = expr as ReturnExpr;
+        return {
+          ...ret,
+          value: ret.value ? this.toPhase0(this.substituteInQuote(ret.value, bindings)) : null
+        } as ReturnExpr;
       }
       default:
         return expr;
@@ -882,6 +1056,14 @@ export class MacroExpander {
     return JSON.parse(JSON.stringify(expr));
   }
 
+  // Helper to cast Phase1 Exprs to Phase0 Exprs when embedding into Phase0-shaped nodes.
+  // Many of the expander methods produce Phase1-only nodes (gensym, quote, etc.) that will
+  // be normalized later. To satisfy TypeScript's strict assignability to Phase0 types we
+  // cast at the sites where a Phase0-shaped object is being constructed.
+  private toPhase0(e: Expr): Phase0Expr {
+    return e as unknown as Phase0Expr;
+  }
+
   /**
    * Convert a quoted call structure back to proper T2 AST.
    * 
@@ -892,17 +1074,17 @@ export class MacroExpander {
     return !!node && (node as SpliceMarker).kind === "__splice";
   }
 
-  private convertQuotedToAstSingle(node: Expr | SpliceMarker): Expr {
+  private convertQuotedToAstSingle(node: Expr | SpliceMarker): Phase0Expr {
     const r = this.convertQuotedToAst(node);
     if (this.isSplice(r)) {
       // Convert splice marker to an ArrayExpr when used in single-expression context
-      return { kind: "array", elements: r.items, location: r.location } as ArrayExpr;
+      return this.toPhase0({ kind: "array", elements: r.items, location: r.location } as ArrayExpr);
     }
-    return r as Expr;
+    return this.toPhase0(r as Expr);
   }
 
-  private flattenQuotedArgs(nodes: Array<Expr | SpliceMarker>): Expr[] {
-    const out: Expr[] = [];
+  private flattenQuotedArgs(nodes: Array<Expr | SpliceMarker>): Phase0Expr[] {
+    const out: Phase0Expr[] = [];
     for (const n of nodes) {
       const r = this.convertQuotedToAst(n);
       if (this.isSplice(r)) {
@@ -910,7 +1092,7 @@ export class MacroExpander {
           out.push(this.convertQuotedToAstSingle(it));
         }
       } else {
-        out.push(r as Expr);
+        out.push(this.convertQuotedToAstSingle(r as Expr));
       }
     }
     return out;
@@ -1017,7 +1199,7 @@ export class MacroExpander {
         return this.convertQuotedBinaryOp(call, name);
       default: {
         // Regular function call - convert args and handle splice markers
-        const outArgs: Expr[] = [];
+        const outArgs: Phase0Expr[] = [];
         for (const a of call.args) {
           // Splice markers created by evalQuote have a kind of '__splice'
           const maybeSplice = a as { kind?: string; items?: Expr[] };
@@ -1029,7 +1211,7 @@ export class MacroExpander {
             outArgs.push(this.convertQuotedToAstSingle(a));
           }
         }
-        return { ...call, args: outArgs };
+        return this.toPhase0({ ...call, args: outArgs });
       }
     }
   }
@@ -1039,23 +1221,29 @@ export class MacroExpander {
     // bindings is first arg, rest are body
     const bindingsArg = call.args[0];
     const bodyArgs = call.args.slice(1);
+    // bindings may be represented as a call, an array, or produced via splice markers.
+    // Normalize into Phase0Expr[] using flattenQuotedArgs so splices are expanded.
+    const normalizedBindings: Phase0Expr[] = bindingsArg ? this.flattenQuotedArgs([bindingsArg]) : [];
 
-    // bindings should be a call-like structure: (binding1 binding2 ...)
-    // Each binding is: (name init)
     const bindings: LetBinding[] = [];
-
-    if (bindingsArg && bindingsArg.kind === "call") {
-      const bindingsCall = bindingsArg as CallExpr;
-      // First element is the first binding (as callee)
-      const firstBinding = this.parseBindingFromExpr(bindingsCall.callee);
-      if (firstBinding) bindings.push(firstBinding);
-      // Rest are in args
-      for (const arg of bindingsCall.args) {
-        const binding = this.parseBindingFromExpr(arg);
-        if (binding) bindings.push(binding);
+    for (const b of normalizedBindings) {
+      // Each binding is expected to be a call-like form: (name init)
+      if (b && (b as Expr).kind === "call") {
+        const callB = b as CallExpr;
+        const parsed = this.parseBindingFromExpr(callB);
+        if (parsed) bindings.push(parsed);
+        continue;
       }
-    } else if (bindingsArg && bindingsArg.kind === "array") {
-      // Empty bindings
+      // Support array-of-bindings encoded as ArrayExpr (e.g., (array (name init) ...))
+      if ((b as Expr).kind === "array") {
+        const arr = b as ArrayExpr;
+        for (const el of arr.elements) {
+          if (el.kind === "call") {
+            const parsed = this.parseBindingFromExpr(el as CallExpr);
+            if (parsed) bindings.push(parsed);
+          }
+        }
+      }
     }
 
     return {
@@ -1141,8 +1329,8 @@ export class MacroExpander {
         const call = expr as CallExpr;
         return {
           ...call,
-          callee: this.walkAndExpandGensyms(call.callee),
-          args: call.args.map(a => this.walkAndExpandGensyms(a))
+          callee: this.toPhase0(this.walkAndExpandGensyms(call.callee)),
+          args: call.args.map(a => this.toPhase0(this.walkAndExpandGensyms(a)))
         };
       }
       case "let*": {
@@ -1151,16 +1339,16 @@ export class MacroExpander {
           ...let_,
           bindings: let_.bindings.map(b => ({
             ...b,
-            init: this.walkAndExpandGensyms(b.init)
+            init: this.toPhase0(this.walkAndExpandGensyms(b.init))
           })),
-          body: let_.body.map(e => this.walkAndExpandGensyms(e))
+          body: let_.body.map(e => this.toPhase0(this.walkAndExpandGensyms(e)))
         };
       }
       case "array": {
         const arr = expr as ArrayExpr;
         return {
           ...arr,
-          elements: arr.elements.map(e => this.walkAndExpandGensyms(e))
+          elements: arr.elements.map(e => this.toPhase0(this.walkAndExpandGensyms(e)))
         };
       }
       default:
@@ -1174,54 +1362,54 @@ export class MacroExpander {
       ...let_,
       bindings: let_.bindings.map(b => ({
         ...b,
-        init: this.expandExpr(b.init)
+        init: this.toPhase0(this.expandExpr(b.init))
       })),
-      body: let_.body.map(e => this.expandExpr(e))
+      body: let_.body.map(e => this.toPhase0(this.expandExpr(e)))
     };
   }
 
   private expandIf(if_: IfExpr): IfExpr {
     return {
       ...if_,
-      condition: this.expandExpr(if_.condition),
-      thenBranch: this.expandExpr(if_.thenBranch),
-      elseBranch: if_.elseBranch ? this.expandExpr(if_.elseBranch) : null
+      condition: this.toPhase0(this.expandExpr(if_.condition)),
+      thenBranch: this.toPhase0(this.expandExpr(if_.thenBranch)),
+      elseBranch: if_.elseBranch ? this.toPhase0(this.expandExpr(if_.elseBranch)) : null
     };
   }
 
   private expandProp(prop: PropExpr): PropExpr {
     return {
       ...prop,
-      object: this.expandExpr(prop.object)
+      object: this.toPhase0(this.expandExpr(prop.object))
     };
   }
 
   private expandFunction(fn: FunctionExpr): FunctionExpr {
     return {
       ...fn,
-      body: fn.body.map(e => this.expandExpr(e))
+      body: fn.body.map(e => this.toPhase0(this.expandExpr(e)))
     };
   }
 
   private expandReturn(ret: ReturnExpr): ReturnExpr {
     return {
       ...ret,
-      value: ret.value ? this.expandExpr(ret.value) : null
+      value: ret.value ? this.toPhase0(this.expandExpr(ret.value)) : null
     };
   }
 
   private expandWhile(while_: WhileExpr): WhileExpr {
     return {
       ...while_,
-      condition: this.expandExpr(while_.condition),
-      body: while_.body.map(e => this.expandExpr(e))
+      condition: this.toPhase0(this.expandExpr(while_.condition)),
+      body: while_.body.map(e => this.toPhase0(this.expandExpr(e)))
     };
   }
 
   private expandArray(arr: ArrayExpr): ArrayExpr {
     return {
       ...arr,
-      elements: arr.elements.map(e => this.expandExpr(e))
+      elements: arr.elements.map(e => this.toPhase0(this.expandExpr(e)))
     };
   }
 
@@ -1230,7 +1418,7 @@ export class MacroExpander {
       ...obj,
       fields: obj.fields.map(f => ({
         ...f,
-        value: this.expandExpr(f.value)
+        value: this.toPhase0(this.expandExpr(f.value))
       }))
     };
   }
@@ -1238,34 +1426,34 @@ export class MacroExpander {
   private expandAssign(assign: AssignExpr): AssignExpr {
     return {
       ...assign,
-      target: this.expandExpr(assign.target),
-      value: this.expandExpr(assign.value)
+      target: this.toPhase0(this.expandExpr(assign.target)),
+      value: this.toPhase0(this.expandExpr(assign.value))
     };
   }
 
   private expandFor(for_: ForExpr): ForExpr {
     return {
       ...for_,
-      init: for_.init ? this.expandExpr(for_.init) : null,
-      condition: for_.condition ? this.expandExpr(for_.condition) : null,
-      update: for_.update ? this.expandExpr(for_.update) : null,
-      body: for_.body.map(e => this.expandExpr(e))
+      init: for_.init ? this.toPhase0(this.expandExpr(for_.init)) : null,
+      condition: for_.condition ? this.toPhase0(this.expandExpr(for_.condition)) : null,
+      update: for_.update ? this.toPhase0(this.expandExpr(for_.update)) : null,
+      body: for_.body.map(e => this.toPhase0(this.expandExpr(e)))
     };
   }
 
   private expandIndex(index: IndexExpr): IndexExpr {
     return {
       ...index,
-      object: this.expandExpr(index.object),
-      index: this.expandExpr(index.index)
+      object: this.toPhase0(this.expandExpr(index.object)),
+      index: this.toPhase0(this.expandExpr(index.index))
     };
   }
 
   private expandNew(new_: NewExpr): NewExpr {
     return {
       ...new_,
-      callee: this.expandExpr(new_.callee),
-      args: new_.args.map(a => this.expandExpr(a))
+      callee: this.toPhase0(this.expandExpr(new_.callee)),
+      args: new_.args.map(a => this.toPhase0(this.expandExpr(a)))
     };
   }
 
@@ -1274,11 +1462,11 @@ export class MacroExpander {
       ...class_,
       fields: class_.fields.map(f => ({
         ...f,
-        initializer: f.initializer ? this.expandExpr(f.initializer) : null
+        initializer: f.initializer ? this.toPhase0(this.expandExpr(f.initializer)) : null
       })),
       methods: class_.methods.map(m => ({
         ...m,
-        body: m.body.map(e => this.expandExpr(e))
+        body: m.body.map(e => this.toPhase0(this.expandExpr(e)))
       }))
     };
   }
@@ -1286,30 +1474,30 @@ export class MacroExpander {
   private expandTypeAssert(ta: TypeAssertExpr): TypeAssertExpr {
     return {
       ...ta,
-      expr: this.expandExpr(ta.expr)
+      expr: this.toPhase0(this.expandExpr(ta.expr))
     };
   }
 
   private expandThrow(throw_: ThrowExpr): ThrowExpr {
     return {
       ...throw_,
-      value: this.expandExpr(throw_.value)
+      value: this.toPhase0(this.expandExpr(throw_.value))
     };
   }
 
   private expandTryCatch(tc: TryCatchExpr): TryCatchExpr {
     return {
       ...tc,
-      tryBody: tc.tryBody.map(e => this.expandExpr(e)),
-      catchBody: tc.catchBody.map(e => this.expandExpr(e)),
-      finallyBody: tc.finallyBody.map(e => this.expandExpr(e))
+      tryBody: tc.tryBody.map(e => this.toPhase0(this.expandExpr(e))),
+      catchBody: tc.catchBody.map(e => this.toPhase0(this.expandExpr(e))),
+      finallyBody: tc.finallyBody.map(e => this.toPhase0(this.expandExpr(e)))
     };
   }
 
   private expandBlock(block: BlockStmt): BlockStmt {
     return {
       ...block,
-      body: block.body.map(e => this.expandExpr(e))
+      body: block.body.map(e => this.toPhase0(this.expandExpr(e)))
     };
   }
 }
