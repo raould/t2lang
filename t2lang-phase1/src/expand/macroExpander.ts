@@ -47,7 +47,7 @@ import {
 // Return type of the expander is a Phase0 Program (AST normalized to Phase0 shape)
 import type { Phase0Program } from "../ast/nodes.js";
 import { CompilerContext } from "../api.js";
-import { GensymGenerator } from "t2lang-phase0";
+import { GensymGenerator, QuotedToAstConverter } from "t2lang-phase0";
 
 interface MacroRegistry {
   macros: Map<string, MacroDef>;
@@ -66,8 +66,11 @@ export class MacroExpander {
   private registry: MacroRegistry = { macros: new Map() };
   // Use shared gensym generator from Phase0 to centralize gensym behavior
   private gensymGen = new GensymGenerator();
+  private quotedConverter: QuotedToAstConverter;
 
-  constructor(private readonly ctx: CompilerContext) { }
+  constructor(private readonly ctx: CompilerContext) {
+    this.quotedConverter = new QuotedToAstConverter();
+  }
 
 
   /**
@@ -1197,254 +1200,30 @@ export class MacroExpander {
    * Inside quote, special forms like let* are parsed as CallExpr.
    * This method converts them back to proper AST nodes.
    */
+  // Delegate quoted->AST conversion to shared helper in phase0
+
+
   private isSplice(node: unknown): node is SpliceMarker {
-    return !!node && (node as SpliceMarker).kind === "__splice";
+    return (this.quotedConverter as any).isSplice(node);
   }
 
   private convertQuotedToAstSingle(node: Expr | SpliceMarker): Phase0Expr {
-    const r = this.convertQuotedToAst(node);
-    if (this.isSplice(r)) {
-      // Convert splice marker to an ArrayExpr when used in single-expression context
+    const r = (this.quotedConverter as any).convertQuotedToAst(node as any) as any;
+    if ((this.quotedConverter as any).isSplice(r)) {
       return this.toPhase0({ kind: "array", elements: r.items, location: r.location } as ArrayExpr);
     }
     return this.toPhase0(r as Expr);
   }
 
   private flattenQuotedArgs(nodes: Array<Expr | SpliceMarker>): Phase0Expr[] {
-    const out: Phase0Expr[] = [];
-    for (const n of nodes) {
-      const r = this.convertQuotedToAst(n);
-      if (this.isSplice(r)) {
-        for (const it of r.items) {
-          out.push(this.convertQuotedToAstSingle(it));
-        }
-      } else {
-        out.push(this.convertQuotedToAstSingle(r as Expr));
-      }
-    }
-    return out;
+    return (this.quotedConverter as any).flattenQuotedArgs(nodes as any) as Phase0Expr[];
   }
 
   private convertQuotedToAst(expr: Expr | SpliceMarker): Expr | SpliceMarker {
-    // If this is an internal splice marker, return it unchanged
-    if ((expr as SpliceMarker).kind === "__splice") {
-      return expr as SpliceMarker;
-    }
-
-    if ((expr as Expr).kind !== "call") {
-      return expr as Expr;
-    }
-
-    const call = expr as CallExpr;
-
-    // Check if the callee is an identifier (special form name)
-    if (call.callee.kind !== "identifier") {
-      // Nested call - convert args recursively. Use single conversion for callee and flatten args for splices.
-      const calleeConverted = this.convertQuotedToAstSingle(call.callee);
-      // If the converted callee is itself a call (e.g., nested binding like ((~name ~val)))
-      // and the outer call has no extra args, flatten it by returning the inner call directly.
-      if (calleeConverted && (calleeConverted as Expr).kind === "call" && (!call.args || call.args.length === 0)) {
-        return calleeConverted as Expr;
-      }
-      return {
-        ...call,
-        callee: calleeConverted,
-        args: this.flattenQuotedArgs(call.args)
-      };
-    }
-
-    const name = (call.callee as Identifier).name;
-
-    switch (name) {
-      case "let*":
-      case "const":
-        return this.convertQuotedLet(call, name === "const");
-      case "if":
-        return this.convertQuotedIf(call);
-      case "block":
-        return this.convertQuotedBlock(call);
-      case "assign":
-        return this.convertQuotedAssign(call);
-      case "prop": {
-        // (prop object "name") -> PropExpr
-        const obj = call.args[0] ? this.convertQuotedToAstSingle(call.args[0]) : { kind: "identifier", name: "undefined", location: call.location } as Expr;
-        const propArg = call.args[1];
-        let propName: string = "";
-        if (propArg && propArg.kind === "literal") {
-          const lit = propArg as LiteralExpr;
-          if (typeof lit.value === "string") propName = lit.value;
-          else propName = String(lit.value);
-        } else if (propArg) {
-          if (propArg.kind === "identifier") {
-            propName = (propArg as Identifier).name;
-          } else if (propArg && (propArg as unknown as LiteralExpr).kind === "literal") {
-            propName = String((propArg as unknown as LiteralExpr).value);
-          } else {
-            // Fallback: stringify the node defensively
-            try {
-              propName = JSON.stringify(propArg);
-            } catch {
-              propName = "";
-            }
-          }
-        }
-        return { kind: "prop", object: obj, property: propName, location: call.location } as PropExpr;
-      }
-      case "call": {
-        // (call callee arg1 arg2 ...) -> CallExpr
-        const calleeArg = call.args[0];
-        const calleeAst = calleeArg ? this.convertQuotedToAstSingle(calleeArg) : { kind: "identifier", name: "undefined", location: call.location } as Expr;
-        const outArgs = this.flattenQuotedArgs(call.args.slice(1) as Array<Expr | SpliceMarker>);
-        return { kind: "call", callee: calleeAst as Expr, args: outArgs, location: call.location } as CallExpr;
-      }
-      case "new": {
-        // (new C arglist?) -> NewExpr. Treat a single array argument as expanded arg list
-        const calleeArg = call.args[0];
-        const calleeAst = calleeArg ? this.convertQuotedToAstSingle(calleeArg) : { kind: "identifier", name: "undefined", location: call.location } as Expr;
-        let argsAst = this.flattenQuotedArgs(call.args.slice(1) as Array<Expr | SpliceMarker>);
-        if (argsAst.length === 1 && argsAst[0].kind === "array") {
-          argsAst = (argsAst[0] as ArrayExpr).elements;
-        }
-        return { kind: "new", callee: calleeAst, args: argsAst, location: call.location } as NewExpr;
-      }
-      case "return": {
-        // (return value?) -> ReturnExpr
-        return {
-          kind: "return",
-          value: call.args[0] ? this.convertQuotedToAstSingle(call.args[0]) : null,
-          location: call.location
-        } as ReturnExpr;
-      }
-      case "+":
-      case "-":
-      case "*":
-      case "/":
-      case "<":
-      case ">":
-      case "<=":
-      case ">=":
-      case "==":
-      case "!=":
-      case "===":
-      case "!==":
-      case "&&":
-      case "||":
-        return this.convertQuotedBinaryOp(call, name);
-      default: {
-        // Regular function call - convert args and handle splice markers
-        const outArgs: Phase0Expr[] = [];
-        for (const a of call.args) {
-          // Splice markers created by evalQuote have a kind of '__splice'
-          const maybeSplice = a as { kind?: string; items?: Expr[] };
-          if (maybeSplice.kind === "__splice" && maybeSplice.items) {
-            for (const it of maybeSplice.items) {
-              outArgs.push(this.convertQuotedToAstSingle(it));
-            }
-          } else {
-            outArgs.push(this.convertQuotedToAstSingle(a));
-          }
-        }
-        return this.toPhase0({ ...call, args: outArgs });
-      }
-    }
-  }
-
-  private convertQuotedLet(call: CallExpr, isConst: boolean): LetStarExpr {
-    // (let* bindings body...)
-    // bindings is first arg, rest are body
-    const bindingsArg = call.args[0];
-    const bodyArgs = call.args.slice(1);
-    // bindings may be represented as a call, an array, or produced via splice markers.
-    // Normalize into Phase0Expr[] using flattenQuotedArgs so splices are expanded.
-    const normalizedBindings: Phase0Expr[] = bindingsArg ? this.flattenQuotedArgs([bindingsArg]) : [];
-
-
-    const bindings: LetBinding[] = [];
-    for (const b of normalizedBindings) {
-      // Each binding is expected to be a call-like form: (name init)
-      if (b && (b as Expr).kind === "call") {
-        const callB = b as CallExpr;
-        const parsed = this.parseBindingFromExpr(callB);
-        if (parsed) bindings.push(parsed);
-        continue;
-      }
-      // Support array-of-bindings encoded as ArrayExpr (e.g., (array (name init) ...))
-      if ((b as Expr).kind === "array") {
-        const arr = b as ArrayExpr;
-        for (const el of arr.elements) {
-          if (el.kind === "call") {
-            const parsed = this.parseBindingFromExpr(el as CallExpr);
-            if (parsed) bindings.push(parsed);
-          }
-        }
-      }
-    }
-
-    return {
-      kind: "let*",
-      bindings,
-      body: this.flattenQuotedArgs(bodyArgs),
-      isConst,
-      location: call.location
-    };
-  }
-
-  private parseBindingFromExpr(expr: Expr): LetBinding | null {
-    // A binding is represented as (name init) -> CallExpr where callee is name, args[0] is init
-    if (expr.kind === "call") {
-      const call = expr as CallExpr;
-      // Convert the callee to an AST node in case it was produced by evalQuote (e.g., a gensym id)
-      const nameAst = this.convertQuotedToAstSingle(call.callee as Expr | SpliceMarker);
-      if (nameAst.kind === "identifier" && call.args.length >= 1) {
-        return {
-          name: nameAst as Identifier,
-          init: this.convertQuotedToAstSingle(call.args[0])
-        };
-      }
-    }
-    return null;
+    return (this.quotedConverter as any).convertQuotedToAst(expr as any) as any;
   }
 
 
-
-  private convertQuotedIf(call: CallExpr): IfExpr {
-    // (if condition then else?)
-    return {
-      kind: "if",
-      condition: this.convertQuotedToAstSingle(call.args[0]),
-      thenBranch: call.args[1] ? this.convertQuotedToAstSingle(call.args[1]) : { kind: "literal", value: null, location: call.location },
-      elseBranch: call.args[2] ? this.convertQuotedToAstSingle(call.args[2]) : null,
-      location: call.location
-    };
-  }
-
-  private convertQuotedBlock(call: CallExpr): BlockStmt {
-    return {
-      kind: "block",
-      body: this.flattenQuotedArgs(call.args),
-      location: call.location
-    };
-  }
-
-  private convertQuotedAssign(call: CallExpr): AssignExpr {
-    return {
-      kind: "assign",
-      target: this.convertQuotedToAstSingle(call.args[0]),
-      value: this.convertQuotedToAstSingle(call.args[1]),
-      location: call.location
-    };
-  }
-
-  private convertQuotedBinaryOp(call: CallExpr, op: string): CallExpr {
-    // Binary ops are represented as (op left right)
-    // Return as CallExpr with identifier callee
-    return {
-      kind: "call",
-      callee: { kind: "identifier", name: op, location: call.location },
-      args: this.flattenQuotedArgs(call.args),
-      location: call.location
-    };
-  }
 
   /**
    * Expand quoted expression (handles gensyms)
