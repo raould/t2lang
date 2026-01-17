@@ -889,6 +889,15 @@ export class Parser {
         location: tok.location
       };
     }
+    if (tok.kind === "identifier") {
+      // Accept bare identifier as a type-ref (sugar for (type-ref "Name"))
+      this.advance();
+      return {
+        kind: "type-ref",
+        name: tok.value as string,
+        location: tok.location
+      };
+    }
 
     if (tok.kind === "punct" && tok.value === "(") {
       // structured type form
@@ -1061,6 +1070,13 @@ export class Parser {
               this.error("Expected field name in type-object", nameTok);
             }
             this.advance();
+
+            // Allow optional colon separator syntax: ("key" : Type) or ("key": Type)
+            const maybeColon = this.current();
+            if (maybeColon.kind === "identifier" && maybeColon.value === ":") {
+              this.advance();
+            }
+
             const fieldType = this.parseTypeSexprOrLiteral();
 
             const fieldClose = this.current();
