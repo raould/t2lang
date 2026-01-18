@@ -1,53 +1,34 @@
-# SUGAR Migration & Plan
+# SUGAR Migration — Current Summary
 
-This file records the current todo list for Phase1 sugar migration (lexer vs macros), with statuses and short descriptions.
+This file documents the current Phase1 sugar design, what is supported, and where each transformation happens.
 
-- Edge-case tests: add unit tests for nested/quoted/mixed forms (parenthesized sigils, quoted field names, nested parens).
-- Widen type canonicalization: apply the type-object canonicalizer beyond top-level type-alias (other type annotation sites).
-- Finalize lexer sigils: verify/complete support for alternate sigils (/, #) if you want them preserved as aliases.
-- Prune sugarRewrite.ts: remove any remaining dead code and keep only truly structural rewrites.
-- Docs & changelog: finalize SugarAndMacroDesign.md, add CHANGELOG entry describing the migration.
-- QA / integration: run CLI end-to-end on all Phase1 examples and Phase0 integration tests to ensure no regressions.
+Supported sugar (current):
+- Parenthesized dot-sigil fields: `(.name: Type)` — converted to `("name" Type)` during Phase1 preprocessing.
+- Colon-type shorthand in field position (e.g. `name: Type`) — normalized by the Phase1 `MacroExpander` into canonical Phase0 `type-object` fields.
+- Dotted identifiers (e.g. `a.b.c`) — combined into a single identifier token by the Phase1 `Lexer` and expanded to nested `prop` calls by the `MacroExpander`.
 
-- 1. Inventory sugar features: Completed
-  - List existing sugar rewrites in `t2lang-phase1/src/parse/sugarRewrite.ts` and examples (colon-type, sigils, dotted access, field shorthand).
+Where transformations occur:
+- `Lexer` (`t2lang-phase1/src/parse/lexer.ts`): token-level handling — dotted identifiers and parenthesized dot-sigil sequences are recognized and tokenized.
+- `rewriteSugar` (`t2lang-phase1/src/parse/sugarRewrite.ts`): small, structural preprocessing (currently includes a targeted preprocessing step that rewrites `(.name: Type)` into `("name" Type)` before tokenization).
+- `MacroExpander` (`t2lang-phase1/src/expand/macroExpander.ts`): context-aware canonicalization — converts shorthand type fields to Phase0 canonical `( "name" (type-ref "Type") )` forms and turns dotted identifiers into nested `prop` expressions.
 
-- 2. Map sugars to macro/reader-macro options: Completed
-  - For each sugar, decide whether a reader macro, Phase1 macro, or lexer rewrite is more appropriate and note trade-offs.
+Design notes / rationale:
+- Keep Phase0 minimal: Phase0 parser and typechecker expect canonical, simple S-expr shapes. Ergonomic sugars should be implemented in Phase1.
+- Put purely lexical concerns in the `Lexer`, and put context-sensitive rewrites in the `MacroExpander` so parsing and Phase0 remain stable.
+- Parenthesized dot-sigil forms were kept as a Phase1 preprocess step to ensure compatibility with the Phase0 `type-object` parser.
 
-- 3. Recommend migration approach: Completed
-  - Propose priorities (which sugar to move first), and the preferred mechanism (reader macro vs macro) with justification.
+Status and tests:
+- Phase0 tests: passing (all unit and integration tests run locally).
+- Phase1 tests: passing. Unit tests were added for lexer sugar and `type-object` canonicalization.
 
-- 4. Provide example designs: Completed
-  - Small pseudo-implementations showing how to implement key sugars as macros or reader macros.
+Notes for contributors:
+- If adding new sugar, prefer lexer for purely lexical rewrites and `MacroExpander` for context-aware normalization.
+- Avoid adding Phase0-aware rewrites in `sugarRewrite` unless they are purely structural and do not require symbol resolution.
 
-- 5. Prototype selected migration (optional): In-Progress
-  - Implement one chosen sugar as a macro/reader-macro in Phase1 and run tests.
+Changelog pointers:
+- See `CHANGELOG.md` and `t2lang-phase1/docs/SugarAndMacroDesign.md` for migration history and rationale.
 
-- 6. Move lexical sugars to lexer: Completed
-  - Modify `t2lang-phase1/src/parse/lexer.ts` to tokenize dotted identifiers and `.name:`/`/name:` sigils as distinct tokens.
+Next suggested actions:
+- Add more edge-case unit tests (nested parentheses, quoted names, mixed forms).
+- Continue simplifying `sugarRewrite.ts` to only contain structural rewrites that are safe pre-parse.
 
-- 7. Add Phase1 macro for `type-object` canonicalization: Completed
-  - Implement a macro/pass in Phase1 expansion that rewrites colon-type shorthand and parenthesized dot-sigil pairs into canonical `(name (type-ref ...))` fields. (Removed support for bare `.`/`/`/`#` forms.)
-
-- 8. Remove corresponding parts from `sugarRewrite.ts`: Completed
-  - After lexer & macro are in place, simplify `sugarRewrite.ts` removing the handled cases and keep remaining sugars.
-
-- 9. Add unit tests for lexer and macro changes: Completed
-  - Add tests for dotted identifiers, `.name:` parenthesized and bare forms, and macro expansion of dotted id.
-
-- 10. Remove dotted-access from sugarRewrite: Completed
-  - Eliminate dotted-identifier handling in `sugarRewrite.ts` now implemented by macro expander.
-
-- 11. Add design doc for lexer vs macro responsibilities: In-Progress
-  - Create `t2lang-phase1/docs/SugarAndMacroDesign.md` summarizing which sugars live in lexer, macro, or Phase1 rewrite and why.
-
-
-Notes
-
-- Current status: Phase1 lexer handles lexical tokenization for several sugars; MacroExpander performs context-aware canonicalization for `type-object` and dotted identifier to `prop` transforms. `sugarRewrite.ts` has been reduced to a minimal structural rewrite module.
-
-- Next recommended steps:
-  - Add more unit tests for edge cases (nested parentheses, quoted names, mixed forms).
-  - Clean up `sugarRewrite.ts` comments and remove any remaining dead code.
-  - Consider documenting migration decisions in CHANGELOG or release notes.

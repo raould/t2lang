@@ -1,9 +1,9 @@
-export type TypeA = object;
-export type TypeB = object;
-export type TypeC = object;
-export type TypeD = object;
-export type AllowedElements = { video: TypeA; audio: TypeB; canvas: TypeC };
-export type Languages = {
+type TypeA = {};
+type TypeB = {};
+type TypeC = {};
+type TypeD = {};
+type AllowedElements = { video: TypeA; audio: TypeB; canvas: TypeC };
+type Languages = {
   de: TypeD;
   en: TypeD;
   pt: TypeD;
@@ -12,7 +12,7 @@ export type Languages = {
   ja: TypeD;
 };
 function isAvailable(obj, key) {
-  return Object.prototype.hasOwnProperty.call(obj, key);
+  return obj.hasOwnProperty(key);
 }
 function loadLanguage(collection, lang) {
   if (isAvailable(collection, lang)) {
@@ -28,8 +28,3 @@ function selectElement(collection, elem) {
     return null;
   }
 }
-
-// reference example symbols to avoid unused-var lint in examples
-void isAvailable;
-void loadLanguage;
-void selectElement;

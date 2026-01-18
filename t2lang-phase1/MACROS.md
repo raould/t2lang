@@ -3,6 +3,12 @@
 ## Overview
 Implement hygienic macros in the style of Clojure, where macros must explicitly use `gensym` to avoid variable capture.
 
+* ensure the macro system is designed robustly: repeatedly applies macros until no more macro forms are present, effectively reaching a steady state of fully expanded code before compilation, using functions like macroexpand and macroexpand-1 to process nested or sequential macro calls.
+* Compile-Time Process: Macros run during compile time (or load time), not runtime, transforming code (represented as data structures) into different code
+* macroexpand-1: This function expands the outermost macro in a form, once.
+* macroexpand: This function repeatedly calls macroexpand-1 on a form until no more macros are found, returning the final, fully expanded code.
+* Nested Macros: If Macro A expands into code containing Macro B, macroexpand will first expand A, then process the resulting code to expand B (and any other macros) until everything is resolved.
+
 ## Key Components
 
 ### 1. Gensym Function

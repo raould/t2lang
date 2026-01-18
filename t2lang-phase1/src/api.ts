@@ -12,6 +12,11 @@ import * as ts from 'typescript';
 
 import type { CompilerConfig } from "t2lang-phase0";
 
+type LocalCompilerConfig = CompilerConfig & {
+  dumpAstBeforeExpand?: boolean;
+  dumpAstAfterExpand?: boolean;
+};
+
 export interface CompilerContext {
   config: CompilerConfig;
   eventSink: EventSink;
@@ -27,16 +32,33 @@ export async function compilePhase1(
   source: string,
   config: Partial<CompilerConfig> = {}
 ): Promise<CompileResult> {
-  const fullConfig: CompilerConfig = {
+  const fullConfig: LocalCompilerConfig = {
     logLevel: "none",
     prettyOutput: PrettyOption.newlines,
+    // Legacy single flag kept for convenience; Phase1 supports finer-grained
+    // AST dumps before and after macro expansion.
     dumpAst: true,
+    dumpAstBeforeExpand: true,
+    dumpAstAfterExpand: true,
     seed: "default",
     tracePhases: [],
     emitTypes: false,
     enableTsc: false,
     ...config
   };
+
+  // If caller explicitly provided the legacy `dumpAst` flag, respect it
+  // by default for both before/after dumps unless the caller supplied
+  // the more specific flags.
+  const cfgAny = config as any;
+  if (typeof cfgAny.dumpAst !== 'undefined') {
+    if (typeof cfgAny.dumpAstBeforeExpand === 'undefined') {
+      fullConfig.dumpAstBeforeExpand = cfgAny.dumpAst;
+    }
+    if (typeof cfgAny.dumpAstAfterExpand === 'undefined') {
+      fullConfig.dumpAstAfterExpand = cfgAny.dumpAst;
+    }
+  }
 
   const eventSink = new ArrayEventSink();
   const ctx: CompilerContext = { config: fullConfig, eventSink };
@@ -58,7 +80,7 @@ export async function compilePhase1(
       console.error(`[DEBUG] Parsed AST: nodeCount=${nodeCount}`);
     }
 
-    if (fullConfig.dumpAst) {
+    if (fullConfig.dumpAstBeforeExpand || fullConfig.dumpAst) {
       ctx.eventSink.emit({
         phase: "parse",
         kind: "astDump",
@@ -76,7 +98,7 @@ export async function compilePhase1(
       console.error(`[DEBUG] Expanded AST: nodeCount=${nodeCount}`);
     }
 
-    if (fullConfig.dumpAst) {
+    if (fullConfig.dumpAstAfterExpand || fullConfig.dumpAst) {
       ctx.eventSink.emit({
         phase: "expand",
         kind: "astDump",

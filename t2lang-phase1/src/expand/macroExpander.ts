@@ -72,6 +72,44 @@ export class MacroExpander {
     this.quotedConverter = new QuotedToAstConverter();
   }
 
+  /**
+   * Public helper: perform one-step macro expansion on a form.
+   * If `expr` is a macro call, evaluate the macro body once and return
+   * the raw expansion result (do not recursively macro-expand the result).
+   */
+  public macroexpand1(expr: Expr): Expr {
+    if (expr.kind !== 'call') return expr;
+    const call = expr as CallExpr;
+    // Only consider simple identifier callees for macroexpand-1
+    if (call.callee.kind !== 'identifier') return expr;
+    const name = (call.callee as Identifier).name;
+    const macro = this.registry.macros.get(name);
+    if (!macro) return expr;
+
+    // Build env mapping params -> raw arg ASTs (no expansion)
+    const env = new Map<string, Expr>();
+    for (let i = 0; i < macro.params.length; i++) {
+      const param = macro.params[i];
+      const arg = call.args[i] || ({ kind: 'literal', value: null, location: call.location } as Expr);
+      env.set(param.name, arg);
+    }
+
+    // Evaluate macro body expressions in this env, returning the last value
+    let result: Expr = { kind: 'literal', value: null, location: call.location } as Expr;
+    for (const bodyExpr of macro.body) {
+      result = this.evalMacroExpr(bodyExpr, env);
+    }
+    return result;
+  }
+
+  /**
+   * Public helper: fully macro-expand a form until steady-state.
+   * Delegates to the internal expander which already performs recursive expansion.
+   */
+  public macroexpand(expr: Expr): Expr {
+    return this.expandExpr(expr);
+  }
+
 
   /**
    * Generate a unique symbol name (like Clojure's gensym)

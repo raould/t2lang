@@ -10,6 +10,8 @@ export interface CliOptions {
     output: string | null;
     stdout: boolean;
     ast: boolean;
+    astBeforeExpand: boolean;
+    astAfterExpand: boolean;
     pretty: "ugly" | "newlines" | "pretty";
     help: boolean;
     version: boolean;
@@ -30,6 +32,8 @@ export function parseArgs(args: string[]): CliOptions {
         output: null,
         stdout: false,
         ast: false,
+        astBeforeExpand: false,
+        astAfterExpand: false,
         pretty: "pretty",
         help: false,
         version: false,
@@ -59,6 +63,10 @@ export function parseArgs(args: string[]): CliOptions {
             options.stdout = true;
         } else if (arg === "--ast") {
             options.ast = true;
+        } else if (arg === "--ast-before-expand") {
+            options.astBeforeExpand = true;
+        } else if (arg === "--ast-after-expand") {
+            options.astAfterExpand = true;
         } else if (arg === "--emit-types") {
             options.emitTypes = true;
         } else if (arg === "--enable-tsc") {
@@ -145,7 +153,9 @@ Examples:
 Options:
   -o, --output <file>   Output file path (default: input with .ts extension)
   --stdout              Print output to stdout instead of file
-  --ast                 Print AST dump to stderr
+    --ast                 Print AST dump to stderr (both before and after macro expansion)
+    --ast-before-expand   Print AST dump to stderr just before macro expansion
+    --ast-after-expand    Print AST dump to stderr just after macro expansion
     --pretty-option <ugly|newlines|pretty>  Set pretty mode (default: pretty)
   --emit-types          Emit TypeScript type annotations in output
   --enable-tsc          Run TypeScript compiler on emitted output (enableTsc)
@@ -256,18 +266,33 @@ export async function runCli(
     const result = await compileFn(source, {
         logLevel: options.logLevel,
         prettyOutput: mappedPretty,
+        // Legacy `--ast` toggles both dumps; the more specific flags control
+        // dumps independently.
         dumpAst: options.ast,
+        dumpAstBeforeExpand: options.ast || options.astBeforeExpand,
+        dumpAstAfterExpand: options.ast || options.astAfterExpand,
         seed: options.seed ?? "default",
         tracePhases: options.trace ?? [],
         emitTypes: options.emitTypes,
         enableTsc: options.enableTsc
     });
 
-    if (options.ast) {
-        const astDump = result.events.find((e: any) => e.kind === "astDump");
-        if (astDump) {
-            console.error("--- AST ---");
-            console.error(JSON.stringify(astDump.data, null, 2));
+    // Print ASTs according to requested flags. If `--ast` was given, print
+    // both before and after expansion (if available). Otherwise print the
+    // specific requested dump(s).
+    if (options.ast || options.astBeforeExpand) {
+        const parseDump = result.events.find((e: any) => e.kind === "astDump" && e.phase === 'parse');
+        if (parseDump) {
+            console.error("--- AST (before macro expansion) ---");
+            console.error(JSON.stringify(parseDump.data, null, 2));
+            console.error("--- END AST ---");
+        }
+    }
+    if (options.ast || options.astAfterExpand) {
+        const expandDump = result.events.find((e: any) => e.kind === "astDump" && e.phase === 'expand');
+        if (expandDump) {
+            console.error("--- AST (after macro expansion) ---");
+            console.error(JSON.stringify(expandDump.data, null, 2));
             console.error("--- END AST ---");
         }
     }
