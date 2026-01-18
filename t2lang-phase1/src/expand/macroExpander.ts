@@ -808,8 +808,8 @@ export class MacroExpander {
 
 
 
-        // Special-case: quoted `function` or `fn` form: (function|fn name (params) body...)
-        if (calleeAst.kind === "identifier" && ([(calleeAst as Identifier).name].includes('function') || (calleeAst as Identifier).name === 'fn')) {
+        // Special-case: quoted `fn` form: (fn name (params) body...)
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === 'fn') {
           // Use processed args (after evalQuote) so unquotes are already evaluated
           const nameArg = processedArgs[0] as Expr | SpliceMarker | undefined;
           const paramsArg = processedArgs[1] as Expr | SpliceMarker | undefined;
@@ -828,8 +828,8 @@ export class MacroExpander {
           return { kind: "function", name, params, body, isDeclaration: false, location: call.location } as FunctionExpr;
         }
 
-        // Special-case: quoted `function` or `fn` form: (function|fn name (params) body...)
-        if (calleeAst.kind === "identifier" && ([(calleeAst as Identifier).name].includes('function') || (calleeAst as Identifier).name === 'fn')) {
+        // Special-case: quoted `fn` form: (fn name (params) body...)
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === 'fn') {
           // Use processed args (after evalQuote) so unquotes are already evaluated
           const nameArg = processedArgs[0] as Expr | SpliceMarker | undefined;
           const paramsArg = processedArgs[1] as Expr | SpliceMarker | undefined;

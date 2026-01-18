@@ -384,7 +384,7 @@ export class Parser {
 
 
   private parseFunction(open: Token): FunctionExpr {
-    // (function name (params) body...)
+    // (fn name (params) body...)
     const nameTok = this.current();
     if (nameTok.kind !== "identifier") {
       this.error("Expected function name", nameTok);
