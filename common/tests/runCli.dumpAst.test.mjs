@@ -13,7 +13,8 @@ test('runCli --ast prints AST dump to stderr', async () => {
     try {
         fs.writeFileSync(tmpPath, 'program', 'utf-8');
         process.argv = ['node', 't2c', tmpPath, '--ast'];
-        const compileFn = async (source, config) => {
+        const compileFn = async (_source, _config) => {
+            void _source; void _config;
             return {
                 tsSource: '',
                 errors: [],
@@ -24,7 +25,7 @@ test('runCli --ast prints AST dump to stderr', async () => {
         assert.ok(captured.includes('--- AST ---'));
         assert.ok(captured.includes('"test": true'));
     } finally {
-        try { fs.unlinkSync(tmpPath); } catch { };
+        try { fs.unlinkSync(tmpPath); } catch (e) { void e; };
         process.argv = oldArgv;
         console.error = oldConsoleError;
     }

@@ -11,10 +11,12 @@ function isPlainObject(v: any): boolean {
     return v && typeof v === 'object' && !Array.isArray(v);
 }
 
+const idRegex = new RegExp('^[A-Za-z_\\-+*\\/<>=%][A-Za-z0-9_\\-+*\\/<>=%.]*$');
+
 function atomToString(v: any): string {
     if (v === null) return 'null';
     if (v === undefined) return 'undefined';
-    if (typeof v === 'string') return v.match(/^[A-Za-z_\-+*\/<>=%][A-Za-z0-9_\-+*\/<>=%\.]*$/) ? v : escapeString(v);
+    if (typeof v === 'string') return idRegex.test(v) ? v : escapeString(v);
     if (typeof v === 'number' || typeof v === 'boolean') return String(v);
     return escapeString(String(v));
 }

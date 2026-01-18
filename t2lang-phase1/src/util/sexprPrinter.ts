@@ -7,7 +7,6 @@
 let impl: ((n: any) => string) | null = null;
 try {
     const url = new URL('../../../common/src/ast/sexprPrinter.js', import.meta.url).href;
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const mod = await import(url);
     impl = (mod && (mod.printSexpr || mod.default)) as any;
 } catch (e) {
