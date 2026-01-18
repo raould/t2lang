@@ -1,11 +1,10 @@
-// Phase1-only sugar rewrite. Converts several ergonomic forms into
-// Phase0 minimal sexprs before parsing.
-// Supported rewrites:
-//  - ("name" : Type)   -> ("name" (type-ref "Type"))
-//  - (/name: EXPR)       -> (field "name" EXPR)
-//  - (.name: EXPR)       -> (field "name" EXPR)
-//  - (field name EXPR)   -> (field "name" EXPR)
-//  - (prop OBJ name)     -> (prop OBJ "name")
+// Phase1-only sugar rewrite (reduced):
+// This module performs small, structural rewrites that are convenient
+// to do at the sexpr level. Lexical/token-level sugars (dotted
+// identifiers, leading dot-sigils) are handled in the Phase1 `Lexer`.
+// Context-sensitive canonicalization for types (e.g. `type-object`
+// field normalization) is performed in the `MacroExpander` so the
+// parser and Phase0 remain minimal and stable.
 
 type Node = string | Node[];
 
