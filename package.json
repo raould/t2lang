@@ -2,9 +2,9 @@
   "name": "t2lang",
   "private": true,
   "bin": {
-    "t2tc": "./node_modules/t2lang-phase1/dist/cli.js",
-    "t2jc": "./node_modules/t2lang-common/dist/t2jc.js",
-    "t2run": "./node_modules/t2lang-common/dist/t2run.js"
+    "t2tc": "./t2lang-phase1/dist/cli.js",
+    "t2jc": "./common/dist/t2jc.js",
+    "t2run": "./common/dist/t2run.js"
   },
   "workspaces": [
     "common",
@@ -16,7 +16,8 @@
     "test": "npm run build && npm --prefix common test && npm --prefix t2lang-phase0 test && npm --prefix t2lang-phase1 test",
     "lint": "npm --prefix common run lint && npm --prefix t2lang-phase0 run lint && npm --prefix t2lang-phase1 run lint",
     "clean": "node -e \"const fs=require('fs');['node_modules','t2lang-phase1/dist','t2lang-phase1/node_modules'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p)}catch(e){}})\"",
-    "demo": "node -e \"const fs=require('fs');['t2lang-phase1/examples/example1.ts','t2lang-phase1/examples/example1.js'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p)}catch(e){}})\" && npm --prefix t2lang-phase1 run build && npx t2tc t2lang-phase1/examples/example1.t2 && npx tsx t2lang-phase1/examples/example1.ts"
+    "demo": "node -e \"const fs=require('fs');['t2lang-phase1/examples/example1.ts','t2lang-phase1/examples/example1.js'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p)}catch(e){}})\" && npm --prefix t2lang-phase1 run build && npx t2tc t2lang-phase1/examples/example1.t2 && npx tsx t2lang-phase1/examples/example1.ts",
+    "demo-t2run": "node scripts/demo-t2run.js"
   },
   "devDependencies": {
     "prettier": "^3.8.0"
