@@ -284,6 +284,7 @@ export async function runCli(
         const parseDump = result.events.find((e: any) => e.kind === "astDump" && e.phase === 'parse');
         if (parseDump) {
             console.error("--- AST (before macro expansion) ---");
+            console.error("--- WARNING: This is pseudo-code, NOT valid T2 syntax! ---");
             console.error(JSON.stringify(parseDump.data, null, 2));
             console.error("--- END AST ---");
         }
@@ -292,6 +293,7 @@ export async function runCli(
         const expandDump = result.events.find((e: any) => e.kind === "astDump" && e.phase === 'expand');
         if (expandDump) {
             console.error("--- AST (after macro expansion) ---");
+            console.error("--- WARNING: This is pseudo-code, NOT valid T2 syntax! ---");
             console.error(JSON.stringify(expandDump.data, null, 2));
             console.error("--- END AST ---");
         }
