@@ -1,0 +1,33 @@
+{
+    "name": "vscode-t2-formatter",
+    "displayName": "T2 S-expression Formatter",
+    "publisher": "local",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.60.0"
+    },
+    "main": "./extension.js",
+    "activationEvents": [
+        "onLanguage:t2",
+        "onCommand:t2format.formatDocument"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "t2",
+                "aliases": [
+                    "t2"
+                ],
+                "extensions": [
+                    ".t2"
+                ]
+            }
+        ],
+        "commands": [
+            {
+                "command": "t2format.formatDocument",
+                "title": "Format T2 Document"
+            }
+        ]
+    }
+}

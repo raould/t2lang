@@ -3,3 +3,4 @@
 * function syntax should support inline argument type annotations.
 * read t2lang-phase0/TODO.md
 * read t2lang-phase1/TODO.md
+* human: continue to create examples based on https://typescript-cookbook.com/examples/
