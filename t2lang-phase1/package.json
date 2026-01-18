@@ -13,6 +13,7 @@
   "scripts": {
     "prebuild": "npm --prefix ../common run build && npm --prefix ../t2lang-phase0 run build",
     "build": "tsc",
+    "clean": "node -e \"const fs=require('fs');['node_modules','dist'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p)}catch(e){}})\"",
     "test": "npm run build && node --import tsx --test \"tests/**/*.test.ts\"",
     "lint": "eslint . --ext .ts",
     "prepublishOnly": "npm run build"

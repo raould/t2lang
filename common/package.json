@@ -20,6 +20,7 @@
     "license": "MIT",
     "scripts": {
         "build": "tsc",
+        "clean": "node -e \"const fs=require('fs');['node_modules','dist'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p)}catch(e){}})\"",
         "test": "npm run build && node --import tsx --test \"tests/**/*.test.mjs\"",
         "lint": "eslint . --ext .ts,.js",
         "prepublishOnly": "npm run build"
