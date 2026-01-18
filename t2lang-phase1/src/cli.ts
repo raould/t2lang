@@ -39,7 +39,7 @@ const __dirname = path.dirname(__filename);
 // flows (running from source) pick up local CLI helper changes.
 let parseArgs: any, showHelp: any, showVersion: any, readStdin: any, getOutputPath: any, formatError: any;
 try {
-    // @ts-ignore - prefer local workspace helper when running from source
+    // @ts-expect-error - prefer local workspace helper when running from source
     const local = await import('../common/src/cliHelper.js');
     ({ parseArgs, showHelp, showVersion, readStdin, getOutputPath, formatError } = (local as any));
 } catch {
