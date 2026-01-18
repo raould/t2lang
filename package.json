@@ -13,7 +13,7 @@
   "scripts": {
     "build": "npm run build -w t2lang-phase1",
     "clean": "node -e \"const fs=require('fs');['node_modules','t2lang-phase1/dist','t2lang-phase1/node_modules'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p)}catch(e){}})\"",
-    "demo": "node -e \"const fs=require('fs');['t2lang-phase1/examples/example1.ts','t2lang-phase1/examples/example1.js'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p)}catch(e){}})\" && npm run build && npm --prefix t2lang-phase1 run build && npx t2tc t2lang-phase1/examples/example1.t2 && npx tsx t2lang-phase1/examples/example1.ts"
+    "demo": "node -e \"const fs=require('fs');['t2lang-phase1/examples/example1.ts','t2lang-phase1/examples/example1.js'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p)}catch(e){}})\" && npm --prefix t2lang-phase1 run build && npx t2tc t2lang-phase1/examples/example1.t2 && npx tsx t2lang-phase1/examples/example1.ts"
   },
   "devDependencies": {
     "prettier": "^3.8.0"
