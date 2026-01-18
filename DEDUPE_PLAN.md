@@ -68,19 +68,32 @@ Action: finalize package.json exports and index.d.ts; consider adding types to p
 
 ---
 
-## Progress Update (2026-01-17) ✅
-- Extracted helpers into Phase0 and added focused tests:
-  - **`GensymGenerator`** — `t2lang-phase0/src/lib/gensym.ts` + unit tests ✅
-  - **`QuotedToAstConverter`** — `t2lang-phase0/src/lib/convertQuotedToAst.ts` + unit tests ✅
-  - **`attachQuotedParsers`** — `t2lang-phase0/src/lib/quotedParser.ts` + unit test ✅
-- Phase1 changes using Phase0 helpers:
-  - `MacroExpander` delegates gensym and quoted→AST conversion to Phase0 helpers (reduced duplication).
-  - Phase1 `Parser` now calls Phase0's `attachQuotedParsers` (quoted parsing centralized).
-  - Added Phase1 integration tests covering nested splice/gensym edge cases (6 tests).
-- Verification (local):
-  - `t2lang-phase0` tests: **231/231** passing.
-  - `t2lang-phase1` tests: **57/57** passing.
-  - Lint: clean in both packages.
+## Progress Update (2026-01-18) ✅
+
+- Sexpr printer consolidated in `common`:
+  - `common/src/ast/sexprPrinter.(ts|js|d.ts)` is the canonical implementation; it prints `fields` as sexpr lists and converts legacy JSON-embedded strings when possible.
+  - `t2lang-phase1` now statically imports the printer from `t2lang-common/ast/sexprPrinter.js` (no runtime fallback).
+
+- CLI AST dumping updated:
+  - `--ast-before-expand` and `--ast-after-expand` flags now emit human-readable S-expression ASTs via the shared `printSexpr` helper.
+
+- Macro & expander helpers:
+  - `macroexpand` / `macroexpand1` helpers and several normalization utilities are implemented and available in Phase1's expander (with shared helpers moved into `common`/Phase0 where appropriate).
+
+- Packaging & export stability:
+  - `common/package.json` exposes the sexpr printer subpath and ships only built `.js` and `.d.ts` via the `files` field.
+  - Verified local pack → install → consumer build flow: created `t2lang-common-0.1.0.tgz`, installed it, confirmed Node runtime import of `t2lang-common/ast/sexprPrinter.js` and successful TypeScript consumer build.
+  - Removed the dynamic workspace fallback in Phase1; Phase1 now relies on the packaged `t2lang-common` exports.
+
+- Tests (local run):
+  - `t2lang-phase0` tests: **237** passing, **0** failing.
+  - `t2lang-phase1` tests: **59** passing, **0** failing.
+
+- Other fixes:
+  - Replaced JSON-embedded AST `fields` with sexpr lists in printed output (printer now handles legacy cases).
+  - Removed duplicated sexpr printing code from Phase1 and updated CLI helpers to use `common`.
+
+Verification: both packages build and their test suites pass locally after the changes.
 
 ## Updated Inventory (what still lives in Phase1)
 - Remaining Phase1-specific (heavier) files to consider next:
