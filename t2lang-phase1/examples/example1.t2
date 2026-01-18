@@ -25,6 +25,9 @@
     (fn isAvailable (obj key)
         (return (call obj.hasOwnProperty key))
     )
+    (fn isNotAvailable (obj key)
+        (return (not obj.hasOwnProperty key))
+    )
 
     (fn loadLanguage (collection lang)
         (if (call isAvailable collection lang)
@@ -40,6 +43,7 @@
         )
     )
 )
+
 
 
 

@@ -204,6 +204,66 @@ export class TypeCheckerBase {
     }
 
     let t: Type = { kind: "unknown" };
+    // Operator handling for plain identifier callees (e.g. (+ 1 2), (and a b))
+    if (node.callee.kind === 'identifier') {
+      const name = (node.callee as Identifier).name;
+      const argTypes = argTypeIds.map(id => (id === null ? { kind: 'unknown' } as Type : this.typeTable.get(id)));
+
+      const isNumeric = (ty: Type) => ty.kind === 'number' || (ty.kind === 'literal' && typeof ty.value === 'number') || ty.kind === 'unknown';
+      const isBoolean = (ty: Type) => ty.kind === 'boolean' || (ty.kind === 'literal' && typeof ty.value === 'boolean') || ty.kind === 'unknown';
+
+      // Arithmetic
+      if ((name === '+' || name === '-' || name === '*' || name === '/' || name === '%' || name === '**') && node.args.length === 2) {
+        if (!isNumeric(argTypes[0]) || !isNumeric(argTypes[1])) {
+          throw { message: `Arithmetic operator ${name} requires numeric operands`, location: node.location, phase: 'typeCheck' } as CompilerError;
+        }
+        t = { kind: 'number' };
+      }
+
+      // Comparisons
+      else if ((name === '<' || name === '<=' || name === '>' || name === '>=') && node.args.length === 2) {
+        if (!isNumeric(argTypes[0]) || !isNumeric(argTypes[1])) {
+          throw { message: `Comparison ${name} requires comparable operands`, location: node.location, phase: 'typeCheck' } as CompilerError;
+        }
+        t = { kind: 'boolean' };
+      }
+
+      // Equality
+      else if ((name === '==' || name === '===' || name === '!=' || name === '!==') && node.args.length === 2) {
+        t = { kind: 'boolean' };
+      }
+
+      // Logical
+      else if ((name === 'and' || name === 'or' || name === '&&' || name === '||') && node.args.length === 2) {
+        if (!isBoolean(argTypes[0]) || !isBoolean(argTypes[1])) {
+          throw { message: `Logical operator ${name} requires boolean operands`, location: node.location, phase: 'typeCheck' } as CompilerError;
+        }
+        t = { kind: 'boolean' };
+      }
+
+      else if ((name === 'not' || name === '!') && node.args.length === 1) {
+        if (!isBoolean(argTypes[0])) {
+          throw { message: `Logical operator ${name} requires boolean operand`, location: node.location, phase: 'typeCheck' } as CompilerError;
+        }
+        t = { kind: 'boolean' };
+      }
+
+      // Bitwise
+      else if ((name === '&' || name === '|' || name === '^' || name === '<<' || name === '>>' || name === '>>>') && node.args.length === 2) {
+        if (!isNumeric(argTypes[0]) || !isNumeric(argTypes[1])) {
+          throw { message: `Bitwise operator ${name} requires numeric operands`, location: node.location, phase: 'typeCheck' } as CompilerError;
+        }
+        t = { kind: 'number' };
+      }
+
+      // Boolean xor word-form
+      else if (name === 'xor' && node.args.length === 2) {
+        if (!isBoolean(argTypes[0]) || !isBoolean(argTypes[1])) {
+          throw { message: `xor requires boolean operands`, location: node.location, phase: 'typeCheck' } as CompilerError;
+        }
+        t = { kind: 'boolean' };
+      }
+    }
     if (calleeTypeId !== null) {
       const calleeType = this.typeTable.get(calleeTypeId);
       if (calleeType.kind === "function") {

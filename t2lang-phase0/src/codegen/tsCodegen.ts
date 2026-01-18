@@ -42,6 +42,7 @@ export interface TsCodegenOptions {
   pretty: PrettyOption;
   emitTypes: boolean;
   typeTable?: TypeTable;
+  runtimePropCallCheck?: boolean;
 }
 
 export interface PositionMapping {
@@ -268,6 +269,7 @@ const BINARY_OPERATORS: Set<string> = new Set([
   "&&", "||",
   "&", "|", "^",
   "<<", ">>", ">>>"
+  , "**"
 ]);
 
 const UNARY_OPERATORS: Set<string> = new Set([
@@ -278,25 +280,50 @@ function genCall(node: CallExpr, options: TsCodegenOptions): string {
   // Check if callee is an identifier that's an operator
   if (node.callee.kind === "identifier") {
     const name = (node.callee as Identifier).name;
+    let op = name;
+    // Map word-forms to JS operators
+    if (name === 'and') op = '&&';
+    if (name === 'or') op = '||';
+    if (name === 'not') op = '!';
+    // xor handled specially below
 
     // Binary operator with exactly 2 args
-    if (BINARY_OPERATORS.has(name) && node.args.length === 2) {
+    if (BINARY_OPERATORS.has(op) && node.args.length === 2) {
       const left = genExpr(node.args[0], options);
       const right = genExpr(node.args[1], options);
-      return `(${left} ${name} ${right})`;
+      return `(${left} ${op} ${right})`;
+    }
+
+    // Special-case boolean xor word-form
+    if (name === 'xor' && node.args.length === 2) {
+      const left = genExpr(node.args[0], options);
+      const right = genExpr(node.args[1], options);
+      return `((${left} && !${right}) || (!${left} && ${right}))`;
     }
 
     // Unary operator with exactly 1 arg
-    if (UNARY_OPERATORS.has(name) && node.args.length === 1) {
+    if (UNARY_OPERATORS.has(op) && node.args.length === 1) {
       const operand = genExpr(node.args[0], options);
-      if (name === "typeof") {
+      if (op === "typeof") {
         return `typeof ${operand}`;
       }
-      return `(${name}${operand})`;
+      return `(${op}${operand})`;
     }
   }
 
   // Regular function call
+  // If caller requested runtime prop-call checks and the callee is a prop,
+  // generate a safe wrapper that evaluates the object once and verifies
+  // the property is callable before invoking it.
+  if (options.runtimePropCallCheck && node.callee.kind === "prop") {
+    const prop = node.callee as PropExpr;
+    const objectExpr = genExpr(prop.object, options);
+    const propName = prop.property;
+    const args = node.args.map(arg => genExpr(arg, options)).join(", ");
+    // Use an IIFE to evaluate object once and avoid naming collisions.
+    return `((__obj) => { if (typeof __obj[${JSON.stringify(propName)}] !== \"function\") { throw new Error(\`Property ${propName} is not a function\`); } return __obj[${JSON.stringify(propName)}](${args}); })(${objectExpr})`;
+  }
+
   const callee = genExpr(node.callee, options);
   const args = node.args.map(arg => genExpr(arg, options)).join(", ");
   return `${callee}(${args})`;

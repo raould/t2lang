@@ -44,6 +44,7 @@ export async function compilePhase1(
     tracePhases: [],
     emitTypes: false,
     enableTsc: false,
+    runtimePropCallCheck: false,
     ...config
   };
 
@@ -134,6 +135,7 @@ export async function compilePhase1(
       {
         pretty: fullConfig.prettyOutput,
         emitTypes: fullConfig.emitTypes
+        , runtimePropCallCheck: fullConfig.runtimePropCallCheck
       },
       typeCheckResult.typeTable
     );

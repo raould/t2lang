@@ -10,21 +10,66 @@ export interface BaseNode {
   location: SourceLocation;
 }
 
+// Union of all node "kind" string literals.
+export type Kind =
+  | "identifier"
+  | "literal"
+  | "call"
+  | "let*"
+  | "if"
+  | "prop"
+  | "function"
+  | "return"
+  | "while"
+  | "array"
+  | "object"
+  | "assign"
+  | "for"
+  | "index"
+  | "new"
+  | "class"
+  | "type-assert"
+  | "type-ref"
+  | "type-array"
+  | "type-number"
+  | "type-string"
+  | "type-boolean"
+  | "type-null"
+  | "type-undefined"
+  | "type-literal"
+  | "type-object"
+  | "type-function"
+  | "type-union"
+  | "type-intersection"
+  | "type-alias"
+  | "import"
+  | "export"
+  | "throw"
+  | "try-catch"
+  | "block"
+  | "exprStmt"
+  | "gensym"
+  | "quote"
+  | "unquote"
+  | "unquote-splice"
+  | "__splice"
+  | "program";
+
 export interface Identifier extends BaseNode {
-  kind: "identifier";
+  kind: Extract<Kind, "identifier">;
   name: string;
   symbolId?: number;
   typeId?: number | null;
 }
 
 export interface LiteralExpr extends BaseNode {
-  kind: "literal";
+  kind: Extract<Kind, "literal">;
   value: string | number | boolean | null | "undefined";
   typeId?: number | null;
 }
 
 export interface CallExpr extends BaseNode {
-  kind: "call";
+  kind: Extract<Kind, "call">;
   callee: Expr;
   args: Expr[];
   typeId?: number | null;
@@ -36,7 +81,7 @@ export interface LetBinding {
 }
 
 export interface LetStarExpr extends BaseNode {
-  kind: "let*";
+  kind: Extract<Kind, "let*">;
   isConst: boolean;
   bindings: LetBinding[];
   body: Expr[];
@@ -44,7 +89,7 @@ export interface LetStarExpr extends BaseNode {
 }
 
 export interface IfExpr extends BaseNode {
-  kind: "if";
+  kind: Extract<Kind, "if">;
   condition: Expr;
   thenBranch: Expr;
   elseBranch: Expr | null;
@@ -52,14 +97,14 @@ export interface IfExpr extends BaseNode {
 }
 
 export interface PropExpr extends BaseNode {
-  kind: "prop";
+  kind: Extract<Kind, "prop">;
   object: Expr;
   property: string;
   typeId?: number | null;
 }
 
 export interface FunctionExpr extends BaseNode {
-  kind: "function";
+  kind: Extract<Kind, "function">;
   name: Identifier | null;
   params: Identifier[];
   body: Expr[];
@@ -68,20 +113,20 @@ export interface FunctionExpr extends BaseNode {
 }
 
 export interface ReturnExpr extends BaseNode {
-  kind: "return";
+  kind: Extract<Kind, "return">;
   value: Expr | null;
   typeId?: number | null;
 }
 
 export interface WhileExpr extends BaseNode {
-  kind: "while";
+  kind: Extract<Kind, "while">;
   condition: Expr;
   body: Expr[];
   typeId?: number | null;
 }
 
 export interface ArrayExpr extends BaseNode {
-  kind: "array";
+  kind: Extract<Kind, "array">;
   elements: Expr[];
   typeId?: number | null;
 }
@@ -92,20 +137,20 @@ export interface ObjectField {
 }
 
 export interface ObjectExpr extends BaseNode {
-  kind: "object";
+  kind: Extract<Kind, "object">;
   fields: ObjectField[];
   typeId?: number | null;
 }
 
 export interface AssignExpr extends BaseNode {
-  kind: "assign";
+  kind: Extract<Kind, "assign">;
   target: Expr;
   value: Expr;
   typeId?: number | null;
 }
 
 export interface ForExpr extends BaseNode {
-  kind: "for";
+  kind: Extract<Kind, "for">;
   init: Expr | null;
   condition: Expr | null;
   update: Expr | null;
@@ -114,14 +159,14 @@ export interface ForExpr extends BaseNode {
 }
 
 export interface IndexExpr extends BaseNode {
-  kind: "index";
+  kind: Extract<Kind, "index">;
   object: Expr;
   index: Expr;
   typeId?: number | null;
 }
 
 export interface NewExpr extends BaseNode {
-  kind: "new";
+  kind: Extract<Kind, "new">;
   callee: Expr;
   args: Expr[];
   typeId?: number | null;
@@ -139,7 +184,7 @@ export interface ClassMethod {
 }
 
 export interface ClassExpr extends BaseNode {
-  kind: "class";
+  kind: Extract<Kind, "class">;
   name: Identifier;
   superclass: Identifier | null;
   fields: ClassField[];
@@ -148,7 +193,7 @@ export interface ClassExpr extends BaseNode {
 }
 
 export interface TypeAssertExpr extends BaseNode {
-  kind: "type-assert";
+  kind: Extract<Kind, "type-assert">;
   expr: Expr;
   typeAnnotation: TypeNode;
   typeId?: number | null;
@@ -157,37 +202,37 @@ export interface TypeAssertExpr extends BaseNode {
 // --- Type AST nodes (Phase0 structured types)
 // Add locations to type nodes for better diagnostics
 export interface TypeRef extends BaseNode {
-  kind: "type-ref";
+  kind: Extract<Kind, "type-ref">;
   name: string;
 }
 
 export interface TypeArray extends BaseNode {
-  kind: "type-array";
+  kind: Extract<Kind, "type-array">;
   element: TypeNode;
 }
 
 export interface TypeNumber extends BaseNode {
-  kind: "type-number";
+  kind: Extract<Kind, "type-number">;
 }
 
 export interface TypeString extends BaseNode {
-  kind: "type-string";
+  kind: Extract<Kind, "type-string">;
 }
 
 export interface TypeBoolean extends BaseNode {
-  kind: "type-boolean";
+  kind: Extract<Kind, "type-boolean">;
 }
 
 export interface TypeNull extends BaseNode {
-  kind: "type-null";
+  kind: Extract<Kind, "type-null">;
 }
 
 export interface TypeUndefined extends BaseNode {
-  kind: "type-undefined";
+  kind: Extract<Kind, "type-undefined">;
 }
 
 export interface TypeLiteral extends BaseNode {
-  kind: "type-literal";
+  kind: Extract<Kind, "type-literal">;
   value: string | number | boolean | null | "undefined";
 }
 
@@ -197,23 +242,23 @@ export interface TypeObjectField {
 }
 
 export interface TypeObject extends BaseNode {
-  kind: "type-object";
+  kind: Extract<Kind, "type-object">;
   fields: TypeObjectField[];
 }
 
 export interface TypeFunction extends BaseNode {
-  kind: "type-function";
+  kind: Extract<Kind, "type-function">;
   params: TypeNode[];
   returns: TypeNode;
 }
 
 export interface TypeUnion extends BaseNode {
-  kind: "type-union";
+  kind: Extract<Kind, "type-union">;
   types: TypeNode[];
 }
 
 export interface TypeIntersection extends BaseNode {
-  kind: "type-intersection";
+  kind: Extract<Kind, "type-intersection">;
   types: TypeNode[];
 }
 
@@ -232,13 +277,13 @@ export type TypeNode =
   | TypeIntersection;
 
 export interface TypeAliasStmt extends BaseNode {
-  kind: "type-alias";
+  kind: Extract<Kind, "type-alias">;
   name: Identifier;
   typeAnnotation: TypeNode;
 }
 
 export interface ImportStmt extends BaseNode {
-  kind: "import";
+  kind: Extract<Kind, "import">;
   importKind: "default" | "named" | "all";
   name?: string; // for default and all
   names?: string[]; // for named
@@ -247,20 +292,20 @@ export interface ImportStmt extends BaseNode {
 }
 
 export interface ExportStmt extends BaseNode {
-  kind: "export";
+  kind: Extract<Kind, "export">;
   exportKind: "named" | "default";
   name?: string; // for named
   declaration?: Expr; // for default
 }
 
 export interface ThrowExpr extends BaseNode {
-  kind: "throw";
+  kind: Extract<Kind, "throw">;
   value: Expr;
   typeId?: number | null;
 }
 
 export interface TryCatchExpr extends BaseNode {
-  kind: "try-catch";
+  kind: Extract<Kind, "try-catch">;
   tryBody: Expr[];
   catchParam: Identifier | null;
   catchBody: Expr[];
@@ -269,44 +314,44 @@ export interface TryCatchExpr extends BaseNode {
 }
 
 export interface BlockStmt extends BaseNode {
-  kind: "block";
+  kind: Extract<Kind, "block">;
   body: Expr[];
   typeId?: number | null;
 }
 
 export interface ExprStmt extends BaseNode {
-  kind: "exprStmt";
+  kind: Extract<Kind, "exprStmt">;
   expr: Expr;
 }
 
 // Macro-related nodes (used during parsing/expansion)
 export interface GensymExpr extends BaseNode {
-  kind: "gensym";
+  kind: Extract<Kind, "gensym">;
   prefix?: string;
   generatedName?: string;
   typeId?: number | null;
 }
 
 export interface QuoteExpr extends BaseNode {
-  kind: "quote";
+  kind: Extract<Kind, "quote">;
   expr: Expr;
   typeId?: number | null;
 }
 
 export interface UnquoteExpr extends BaseNode {
-  kind: "unquote";
+  kind: Extract<Kind, "unquote">;
   expr: Expr;
   typeId?: number | null;
 }
 
 export interface UnquoteSpliceExpr extends BaseNode {
-  kind: "unquote-splice";
+  kind: Extract<Kind, "unquote-splice">;
   expr: Expr;
   typeId?: number | null;
 }
 
 export interface SpliceExpr extends BaseNode {
-  kind: "__splice";
+  kind: Extract<Kind, "__splice">;
   items: Expr[];
 }
 
@@ -345,6 +390,6 @@ export type Statement =
   | ExportStmt;
 
 export interface Program extends BaseNode {
-  kind: "program";
+  kind: Extract<Kind, "program">;
   body: Statement[];
 }

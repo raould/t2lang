@@ -109,6 +109,30 @@ function transform(node: Node): Node {
                 }
             }
         }
+        // Dotted-head sugar: allow concise method call syntax like
+        // (a.b c) -> (call (prop a "b") c)
+        if (/^[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z_$][A-Za-z0-9_$]*)+$/.test(head) && out.length >= 2) {
+            const parts = (head as string).split('.');
+            // build nested (prop ..) nodes: (prop (prop a "b") "c")
+            let propNode: Node = parts[0];
+            for (let j = 1; j < parts.length; j++) {
+                propNode = ['prop', propNode, `"${parts[j]}"`];
+            }
+            // rewrite into (call PROP args...)
+            const args = out.slice(1);
+            const newNode: Node[] = ['call', propNode, ...args];
+            return transform(newNode) as Node;
+        }
+        // Bracketed computed form in head: a["x"] -> (prop a "x")
+        const bracketMatch = (head as string).match(/^([A-Za-z_$][A-Za-z0-9_$]*)\s*\[\s*(".*?"|'.*?')\s*\]$/);
+        if (bracketMatch && out.length >= 2) {
+            const base = bracketMatch[1];
+            const key = bracketMatch[2];
+            const propNode: Node = ['prop', base, key as string];
+            const args = out.slice(1);
+            const newNode: Node[] = ['call', propNode, ...args];
+            return transform(newNode) as Node;
+        }
     }
 
     // Recursively transform children (ensure strings like `a.b` are transformed)

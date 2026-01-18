@@ -15,6 +15,10 @@ export interface CompilerConfig {
   tracePhases: string[];
   emitTypes: boolean;
   enableTsc: boolean;
+  // If true, codegen will wrap property-call callee expressions with a
+  // runtime check that the property is a function and throw a helpful
+  // runtime error if not. Default: false.
+  runtimePropCallCheck?: boolean;
 }
 
 export interface CompilerContext {
@@ -40,6 +44,7 @@ export async function compilePhase0(
     tracePhases: [],
     emitTypes: false,
     enableTsc: false,
+    runtimePropCallCheck: false,
     ...config
   };
 
@@ -95,6 +100,7 @@ export async function compilePhase0(
       {
         pretty: fullConfig.prettyOutput,
         emitTypes: fullConfig.emitTypes
+        , runtimePropCallCheck: fullConfig.runtimePropCallCheck
       },
       typeCheckResult.typeTable
     );
