@@ -61,71 +61,25 @@ function parseTokens(tokens: string[], idx = 0): { node: Node; next: number } {
     return { node: tokens[idx], next: idx + 1 };
 }
 
-function buildPropNode(parts: string[]): Node {
-    if (parts.length === 2) {
-        const [obj, key] = parts;
-        const keyTok = (/^".*"$/.test(key) || /^~/.test(key)) ? key : `"${key}"`;
-        return ['prop', obj, keyTok] as Node;
-    }
-    const last = parts[parts.length - 1];
-    const rest = parts.slice(0, parts.length - 1);
-    return ['prop', buildPropNode(rest), (/^".*"$/.test(last) || /^~/.test(last)) ? last : `"${last}"`] as Node;
-}
+// Note: dotted identifier -> prop transformation is handled in the macro expander.
 
 function transform(node: Node): Node {
     if (typeof node === 'string') {
-        // transform dotted access like `a.b` or `a.b.c` into nested (prop ...)
-        const dotted = (node as string).match(/^([A-Za-z_$][\w$]*)(?:\.([A-Za-z_$][\w$]*))+$/);
-        if (dotted) {
-            const parts = (node as string).split('.');
-            return buildPropNode(parts);
-        }
         return node;
     }
     // node is array
     const arr = node.slice() as Node[];
 
-    // Special-case: type-object entries use a different shape. Convert
-    // `(#name: Type)` into `("name" (type-ref "Type"))` inside type-object.
-    if (arr.length > 0 && typeof arr[0] === 'string' && (arr[0] as string) === 'type-object') {
-        const out: Node[] = [];
-        out.push(arr[0]);
-        for (let i = 1; i < arr.length; i++) {
-            const child = arr[i];
-            if (Array.isArray(child) && typeof child[0] === 'string') {
-                const m = (child[0] as string).match(/^(?:\/|\.)([A-Za-z_][\w$]*):$/);
-                if (m) {
-                    const name = m[1];
-                    const typeEl = child[1];
-                    const typeName = (typeof typeEl === 'string') ? (typeEl as string) : nodeToString(typeEl as Node);
-                    out.push([`"${name}"`, ['type-ref', `"${typeName.replace(/^"|"$/g, '')}"`]] as Node);
-                    continue;
-                }
-            }
-            out.push(transform(child as Node));
-        }
-        return out.map(e => transform(e as Node)) as Node;
-    }
+    // (type-object) specific canonicalization is handled in the macro expander
+    // and the lexer now tokenizes dot-sigil forms; keep transform focused on
+    // generic structural rewrites.
 
     // First pass: handle inline sigil elements like #name: EXPR
     const out: Node[] = [];
     for (let i = 0; i < arr.length; i++) {
         const el = arr[i];
         if (typeof el === 'string') {
-            // dotted access in-list: convert `a.b.c` -> nested (prop ...)
-            const s = el as string;
-            if (/^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+$/.test(s)) {
-                out.push(buildPropNode(s.split('.')));
-                continue;
-            }
-            const m = s.match(/^(?:\/|\.)([A-Za-z_][\w$]*):$/);
-            if (m) {
-                const name = m[1];
-                // consume next element as expression
-                const nextEl = arr[++i];
-                out.push(['field', `"${name}"`, transform(nextEl)] as Node);
-                continue;
-            }
+            // inline sigil handling moved to lexer/macro; leave atoms unchanged
         }
         // handle plain (field name EXPR) where name is bare identifier
         if (Array.isArray(el)) {
