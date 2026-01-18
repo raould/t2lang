@@ -34,9 +34,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Custom CLI: use common parser at runtime but print AST dumps as sexpr
-// Import via dynamic path concatenation to avoid TS resolving external source
-// into this project's type-checking rootDir.
-const mod = await import(".." + "/.." + "/common/src/cliHelper.js");
+// Import the shared CLI helper from the installed package so builds import
+// the published/common package artifact rather than referencing workspace
+// source files directly.
+const mod = await import('t2lang-common');
 const { parseArgs, showHelp, showVersion, readStdin, getOutputPath, formatError } = (mod as any);
 
 const args = process.argv.slice(2);

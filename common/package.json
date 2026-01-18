@@ -8,5 +8,17 @@
         "./ast/sexprPrinter.js": "./src/ast/sexprPrinter.js"
     },
     "types": "src/index.d.ts",
-    "license": "MIT"
+    "files": [
+        "src/*.js",
+        "src/*.d.ts",
+        "src/ast/*.js",
+        "src/ast/*.d.ts",
+        "src/index.d.ts",
+        "README.md",
+        "tests"
+    ],
+    "license": "MIT",
+    "dependencies": {
+        "t2lang-common": "file:t2lang-common-0.1.0.tgz"
+    }
 }

@@ -24,6 +24,109 @@ This reduces maintenance, avoids drift, and centralizes bug fixes and behavior i
 
 ---
 
+# P0 most important: Package Export Stability
+
+Definition: package export stability = a guaranteed, documented set of public module specifiers, entry points, and TypeScript types (the public surface) that consumers can import reliably across releases without unexpected breakage.
+
+What it requires:
+
+Explicit exports: exports field (and main/module) in package.json that list public entry points and subpaths.
+Runtime artifacts: built JS files that match the declared export paths (no missing files).
+Type declarations: .d.ts files (or "types") for every exported entry so TS consumers resolve types.
+Packaged files: files or published tarball contains the JS + d.ts + any runtime assets.
+Semver policy: documented versioning rules so breaking changes use major bumps.
+Docs/changelog: note exported API and any deprecations.
+Consumer tests: automated tests that import the package the same way real consumers will.
+How to confirm locally (quick steps):
+
+Build the package:
+npm run -w common build (or ensure prepare builds on pack).
+Create a tarball:
+cd common && npm pack → produces t2lang-common-<ver>.tgz.
+Test runtime imports from a consumer (example shows the subpath export):
+In repo root (or a temp dir):
+npm i ./common/t2lang-common-0.1.0.tgz
+Then in Node:
+node -e "import('t2lang-common/ast/sexprPrinter.js').then(m=>console.log(typeof m.printSexpr))"
+Or in the consumer workspace: install the tarball and run the consumer build/tests:
+npm i ../common/t2lang-common-0.1.0.tgz && npm run -w t2lang-phase1 test
+Test TypeScript resolution:
+From a TypeScript consumer, run tsc --noEmit or npm run -w t2lang-phase1 build to ensure types resolve through the installed package.
+Inspect tarball contents:
+tar -tf t2lang-common-0.1.0.tgz — verify exported paths, .js, and .d.ts files are included.
+How to confirm in CI (recommended):
+
+Add a job that:
+Runs npm -w common run build && npm -w common pack (or npm pack).
+Installs the produced tarball into a consumer job workspace (or npm install <tarball>).
+Runs consumer build and test.
+Optionally runs tar -tf to ensure expected files are present.
+Gate merges on that job passing.
+Stability practices / rules:
+
+Document the public exports and mark internal/private modules (not exported) clearly.
+Follow semver strictly: any breaking export rename => major bump.
+Use deprecation shims: keep old export re-exporting new path for one minor release, logging deprecation.
+Add automated compatibility tests that run before merging.
+Edge cases to watch:
+
+Monorepo paths workarounds let TypeScript resolve local source, but they don’t guarantee runtime. Always validate the published artifact (tarball) rather than only local paths.
+Subpath export names must exactly match runtime file names and packaging layout (case-sensitive on some systems).
+Consumers using ESM vs CJS import forms require consistent type/fields.
+Quick checklist you can tick now:
+
+Build common and run npm pack.
+Confirm exports in package.json match files in the tarball.
+Install tarball in a consumer and run its tests.
+Run tsc in consumer to validate types.
+Add CI job to repeat the above automatically.
+
+---
+
+High priority (easy wins)
+
+sexprPrinter
+
+Files: sexprPrinter.ts (canonical), sexprPrinter.js, sexprPrinter.ts (runtime wrapper).
+Issue: Phase1 currently uses a runtime wrapper that loads the common implementation; some older compiled JS still had JSON fallback.
+Action: keep sexprPrinter.ts as canonical; replace sexprPrinter.ts with a tiny static re-export once common package exports/types are stable:
+export { printSexpr } from 't2lang-common/ast/sexprPrinter.js'
+Benefit: single implementation, easier maintenance and tests.
+cliHelper (CLI arg parsing & AST dump printing)
+
+Files: cliHelper.ts (now canonical), cliHelper.ts (delegation), cli.js (build), cli.ts (phase1-specific wrapper).
+Issue: common now holds CLI helper but compiled JS and some callers still use JSON.dump fallback.
+Action: ensure all consumers import the single helper in common (update imports), remove leftover copies in phase0 if any, and regenerate builds so dist files reflect source.
+Benefit: consistent CLI flags/behavior and unified AST printing.
+Medium priority
+
+Event system (EventSink, ArrayEventSink, CompilerEvent)
+
+Files: eventSink.ts (authoritative), eventSink.ts (re-exports), many consumers across phases.
+Issue: phase1 re-exports the phase0 events API; that's okay, but there's potential to centralize into common if you want common to be the cross-phase API surface.
+Action: Recommendation: keep Event types in Phase0 (core) and import/re-export from other phases (current pattern). Only move to common if you're making common the canonical public API for toolchains.
+AST / debug printing helpers (JSON dumps)
+
+Files: numerous dev scripts and tests call JSON.stringify(...) (e.g., dev/*.mjs, scripts/*, tests).
+Issue: inconsistent formats (some JSON, some sexpr). We already added a sexpr printer; many places still print JSON strings.
+Action: Add a small common/src/debug/printAst.ts that accepts an AST and prints via printSexpr (fallback to JSON.stringify), then update dev scripts and tests to use this helper.
+Benefit: consistent, readable AST output everywhere.
+Lower priority / housekeeping
+
+dist artifacts that were edited by hand
+
+Files: cliHelper.js, other compiled JS were edited directly during debugging.
+Issue: source and compiled outputs can drift if compiled JS is manually changed.
+Action: revert manual edits in dist/src/*.js so they are generated by tsc; run npm -w common run build and npm -w t2lang-phase1 run build to regenerate artifacts. If you must keep manual run-time fixes, prefer editing the TypeScript source and then rebuilding.
+Benefit: coherent build pipeline, fewer surprises.
+tsconfig path mappings / package exports
+
+Files: package.json (exports for sexprPrinter.js), tsconfig.json (paths mapping to .d.ts).
+Issue: current workaround uses paths to point type-checking to common d.ts; once common is packaged or built consistently, it will be safe to replace runtime loaders with static imports.
+Action: finalize package.json exports and index.d.ts; consider adding types to package then switch t2lang-phase1 to static imports.
+
+---
+
 ## Progress Update (2026-01-17) ✅
 - Extracted helpers into Phase0 and added focused tests:
   - **`GensymGenerator`** — `t2lang-phase0/src/lib/gensym.ts` + unit tests ✅

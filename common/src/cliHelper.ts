@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { printSexpr } from './ast/sexprPrinter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -285,7 +286,13 @@ export async function runCli(
         if (parseDump) {
             console.error("--- AST (before macro expansion) ---");
             console.error("--- WARNING: This is pseudo-code, NOT valid T2 syntax! ---");
-            console.error(JSON.stringify(parseDump.data, null, 2));
+            try {
+                const ast = (parseDump.data && (parseDump.data.ast ?? parseDump.data)) || parseDump.data;
+                console.error(printSexpr(ast));
+            } catch (err) {
+                console.error('AST print failed:', String(err));
+                console.error(JSON.stringify(parseDump.data, null, 2));
+            }
             console.error("--- END AST ---");
         }
     }
@@ -294,7 +301,13 @@ export async function runCli(
         if (expandDump) {
             console.error("--- AST (after macro expansion) ---");
             console.error("--- WARNING: This is pseudo-code, NOT valid T2 syntax! ---");
-            console.error(JSON.stringify(expandDump.data, null, 2));
+            try {
+                const ast = (expandDump.data && (expandDump.data.ast ?? expandDump.data)) || expandDump.data;
+                console.error(printSexpr(ast));
+            } catch (err) {
+                console.error('AST print failed:', String(err));
+                console.error(JSON.stringify(expandDump.data, null, 2));
+            }
             console.error("--- END AST ---");
         }
     }

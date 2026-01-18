@@ -7,8 +7,15 @@ export async function runCli(
     prettyEnum: { pretty: any; newlines: any; ugly: any },
     pkgPath?: string
 ): Promise<void> {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore: import from workspace source helper (exists at runtime)
-    const mod = await import("../../common/src/cliHelper.js");
-    return mod.runCli(notice, compileFn, prettyEnum, pkgPath);
+    try {
+        const pkg = await import('t2lang-common');
+        return pkg.runCli(notice, compileFn, prettyEnum, pkgPath);
+    } catch {
+        // Fallback to relative workspace path for development (avoid static
+        // TS resolution by using dynamic string concatenation)
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        const mod = await import(".." + "/.." + "/common/src/cliHelper.js");
+        return mod.runCli(notice, compileFn, prettyEnum, pkgPath);
+    }
 }
