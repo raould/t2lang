@@ -3,7 +3,8 @@
   "private": true,
   "bin": {
     "t2tc": "./node_modules/t2lang-phase1/dist/cli.js",
-    "t2jc": "./node_modules/t2lang-common/dist/t2jc.js"
+    "t2jc": "./node_modules/t2lang-common/dist/t2jc.js",
+    "t2run": "./node_modules/t2lang-common/dist/t2run.js"
   },
   "workspaces": [
     "common",
