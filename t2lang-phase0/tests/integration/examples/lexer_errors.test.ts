@@ -47,7 +47,7 @@ test("caret operator works", async () => {
 test("tilde operator works", async () => {
   const result = await compilePhase0(`(program (~ 5))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.match(result.tsSource, /\(~5\)/);
+  assert.match(result.tsSource, /\(~\(?\s*5\s*\)?\)/);
 });
 
 test("unterminated string produces error", async () => {

@@ -34,11 +34,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Custom CLI: use common parser at runtime but print AST dumps as sexpr
-// Import the shared CLI helper from the installed package so builds import
-// the published/common package artifact rather than referencing workspace
-// source files directly.
-const mod = await import('t2lang-common');
-const { parseArgs, showHelp, showVersion, readStdin, getOutputPath, formatError } = (mod as any);
+// Import the shared CLI helper. Prefer the local workspace build if present,
+// otherwise fall back to the installed package name. This makes development
+// flows (running from source) pick up local CLI helper changes.
+let parseArgs: any, showHelp: any, showVersion: any, readStdin: any, getOutputPath: any, formatError: any;
+try {
+    const local = await import('../common/src/cliHelper.js');
+    ({ parseArgs, showHelp, showVersion, readStdin, getOutputPath, formatError } = (local as any));
+} catch (e) {
+    const mod = await import('t2lang-common');
+    ({ parseArgs, showHelp, showVersion, readStdin, getOutputPath, formatError } = (mod as any));
+}
 
 const args = process.argv.slice(2);
 const options = parseArgs(args);
@@ -69,7 +75,7 @@ if (options.input === "-") {
     source = fs.readFileSync(options.input, 'utf-8');
 }
 
-const mappedPretty = options.pretty === 'pretty' ? PrettyOption.pretty : options.pretty === 'newlines' ? PrettyOption.newlines : PrettyOption.ugly;
+const mappedPretty = options.pretty === 'pretty' ? PrettyOption.pretty : PrettyOption.ugly;
 
 const result = await compilePhase1(source, {
     logLevel: options.logLevel,
@@ -109,13 +115,17 @@ if (result.errors.length > 0) {
 
 if (options.stdout) {
     let out = result.tsSource;
-    try { const prettier = await import('prettier'); const formatted: any = prettier.format(out, { parser: 'typescript' }); out = (formatted && typeof formatted.then === 'function') ? await formatted : formatted; } catch { /* ignore formatting errors */ }
+    if (mappedPretty === PrettyOption.pretty) {
+        try { const prettier = await import('prettier'); const formatted: any = prettier.format(out, { parser: 'typescript' }); out = (formatted && typeof formatted.then === 'function') ? await formatted : formatted; } catch { /* ignore formatting errors */ }
+    }
     console.log(out);
 } else {
     const fs = await import('node:fs');
     const outputPath = options.output ?? getOutputPath(options.input);
     let out = result.tsSource;
-    try { const prettier = await import('prettier'); const formatted: any = prettier.format(out, { parser: 'typescript' }); out = (formatted && typeof formatted.then === 'function') ? await formatted : formatted; } catch { /* ignore formatting errors */ }
+    if (mappedPretty === PrettyOption.pretty) {
+        try { const prettier = await import('prettier'); const formatted: any = prettier.format(out, { parser: 'typescript' }); out = (formatted && typeof formatted.then === 'function') ? await formatted : formatted; } catch { /* ignore formatting errors */ }
+    }
     fs.writeFileSync(outputPath, out, 'utf-8');
     console.error(`Compiled ${options.input} -> ${outputPath}`);
 }

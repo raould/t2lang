@@ -321,9 +321,10 @@ function genCall(node: CallExpr, options: TsCodegenOptions): string {
     if (UNARY_OPERATORS.has(op) && node.args.length === 1) {
       const operand = genExpr(node.args[0], options);
       if (op === "typeof") {
-        return `typeof ${operand}`;
+        return `typeof (${operand})`;
       }
-      return `(${op}${operand})`;
+      // Parenthesize the operand to ensure evaluation order is explicit
+      return `(${op}(${operand}))`;
     }
   }
 

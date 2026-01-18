@@ -59,13 +59,13 @@ test("logical operators", async () => {
 
   const not = await compilePhase0(`(program (! true))`, { enableTsc: true });
   assert.strictEqual(nonTsc(not.errors).length, 0);
-  assert.match(not.tsSource, /\(!true\)/);
+  assert.match(not.tsSource, /\(!\(?\s*true\s*\)?\)/);
 });
 
 test("unary typeof", async () => {
   const result = await compilePhase0(`(program (let* ((x 1)) (typeof x)))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.match(result.tsSource, /typeof x/);
+  assert.match(result.tsSource, /typeof\s*\(?\s*x\s*\)?/);
 });
 
 test("nested operators", async () => {

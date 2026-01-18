@@ -48,12 +48,12 @@ test("logical operators", async () => {
   assert.match(or.tsSource, /\(true \|\| false\)/);
 
   const not = await compilePhase0(`(program (! true))`, { enableTsc: false });
-  assert.match(not.tsSource, /\(!true\)/);
+  assert.match(not.tsSource, /\(!\(?\s*true\s*\)?\)/);
 });
 
 test("unary typeof", async () => {
   const result = await compilePhase0(`(program (let* ((x 1)) (typeof x)))`, { enableTsc: false });
-  assert.match(result.tsSource, /typeof x/);
+  assert.match(result.tsSource, /typeof\s*\(?\s*x\s*\)?/);
 });
 
 test("nested operators", async () => {

@@ -13,7 +13,7 @@ export interface CliOptions {
     ast: boolean;
     astBeforeExpand: boolean;
     astAfterExpand: boolean;
-    pretty: "ugly" | "newlines" | "pretty";
+    pretty: "ugly" | "pretty";
     help: boolean;
     version: boolean;
 
@@ -35,7 +35,7 @@ export function parseArgs(args: string[]): CliOptions {
         ast: false,
         astBeforeExpand: false,
         astAfterExpand: false,
-        pretty: "newlines",
+        pretty: "pretty",
         help: false,
         version: false,
         emitTypes: true,
@@ -46,7 +46,15 @@ export function parseArgs(args: string[]): CliOptions {
 
     let i = 0;
     while (i < args.length) {
-        const arg = args[i];
+        let arg = args[i];
+
+        // Support long flags with `=`: --flag=value
+        if (arg.startsWith("--") && arg.includes("=")) {
+            const parts = arg.split("=", 2);
+            arg = parts[0];
+            // replace current arg with the name and insert value as next
+            args.splice(i, 1, arg, parts[1]);
+        }
 
         if (arg === "-h" || arg === "--help") {
             options.help = true;
@@ -107,15 +115,15 @@ export function parseArgs(args: string[]): CliOptions {
         } else if (arg === "--pretty-option") {
             i++;
             if (i >= args.length) {
-                console.error("Error: --pretty-option requires a mode (ugly|newlines|pretty)");
+                console.error("Error: --pretty-option requires a mode (ugly|pretty)");
                 process.exit(1);
             }
             const mode = args[i];
-            if (mode !== "ugly" && mode !== "newlines" && mode !== "pretty") {
-                console.error(`Error: Invalid pretty mode '${mode}'. Use one of: ugly, newlines, pretty`);
+            if (mode !== "ugly" && mode !== "pretty") {
+                console.error(`Error: Invalid pretty mode '${mode}'. Use one of: ugly, pretty`);
                 process.exit(1);
             }
-            options.pretty = mode as "ugly" | "newlines" | "pretty";
+            options.pretty = mode as "ugly" | "pretty";
         } else if (arg === "--pretty") {
             options.pretty = "pretty";
         } else if (arg.startsWith("-") && arg !== "-") {
@@ -156,7 +164,7 @@ Options:
     --ast                 Print AST dump to stderr (both before and after macro expansion)
     --ast-before-expand   Print AST dump to stderr just before macro expansion
     --ast-after-expand    Print AST dump to stderr just after macro expansion
-    --pretty-option <ugly|newlines|pretty>  Set pretty mode (default: pretty)
+    --pretty-option <ugly|pretty>  Set pretty mode (default: pretty)
   --emit-types          Emit TypeScript type annotations in output
   --enable-tsc          Run TypeScript compiler on emitted output (enableTsc)
   --seed <string>       Set compiler seed value
@@ -210,7 +218,7 @@ export function readStdin(): Promise<string> {
 export async function runCli(
     notice: string,
     compileFn: (source: string, config?: Partial<any>) => Promise<any>,
-    prettyEnum: { pretty: any; newlines: any; ugly: any },
+    prettyEnum: { pretty: any; ugly: any },
     pkgPath?: string
 ): Promise<void> {
     const args = process.argv.slice(2);
@@ -252,9 +260,6 @@ export async function runCli(
     switch (options.pretty) {
         case "pretty":
             mappedPretty = prettyEnum.pretty;
-            break;
-        case "newlines":
-            mappedPretty = prettyEnum.newlines;
             break;
         case "ugly":
             mappedPretty = prettyEnum.ugly;
@@ -321,31 +326,38 @@ export async function runCli(
 
     if (options.stdout) {
         let out = result.tsSource;
-        try {
-            const prettier = await import('prettier');
-            const formatted: any = prettier.format(out, { parser: 'typescript' });
-            if (formatted && typeof formatted.then === 'function') {
-                out = await formatted;
-            } else {
-                out = formatted;
+        // Only run Prettier when the mapped pretty mode requests 'pretty'. For
+        // 'ugly' we want to preserve explicit parentheses and
+        // other grouping emitted by the compiler.
+        if (mappedPretty === prettyEnum.pretty) {
+            try {
+                const prettier = await import('prettier');
+                const formatted: any = prettier.format(out, { parser: 'typescript' });
+                if (formatted && typeof formatted.then === 'function') {
+                    out = await formatted;
+                } else {
+                    out = formatted;
+                }
+            } catch {
+                // ignore formatting errors
             }
-        } catch {
-            // ignore
         }
         console.log(out);
     } else {
         const outputPath = options.output ?? getOutputPath(options.input);
         let out = result.tsSource;
-        try {
-            const prettier = await import('prettier');
-            const formatted: any = prettier.format(out, { parser: 'typescript' });
-            if (formatted && typeof formatted.then === 'function') {
-                out = await formatted;
-            } else {
-                out = formatted;
+        if (mappedPretty === prettyEnum.pretty) {
+            try {
+                const prettier = await import('prettier');
+                const formatted: any = prettier.format(out, { parser: 'typescript' });
+                if (formatted && typeof formatted.then === 'function') {
+                    out = await formatted;
+                } else {
+                    out = formatted;
+                }
+            } catch {
+                // ignore formatting errors
             }
-        } catch {
-            // ignore
         }
         fs.writeFileSync(outputPath, out, "utf-8");
         console.error(`Compiled ${options.input} -> ${outputPath}`);

@@ -26,10 +26,7 @@
         (return (call obj.hasOwnProperty key))
     )
     (fn isNotAvailable (obj key)
-        (if (call obj.hasOwnProperty key)
-            (return false)
-            (return true)
-        )
+        (return (not (obj.hasOwnProperty key)))
     )
 
     (fn loadLanguage (collection lang)
@@ -48,6 +45,8 @@
 
     (console.log "hello world")
 )
+
+
 
 
 
