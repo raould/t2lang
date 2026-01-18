@@ -4,7 +4,8 @@
     "type": "module",
     "main": "src/cliHelper.js",
     "exports": {
-        ".": "./src/cliHelper.js"
+        ".": "./src/cliHelper.js",
+        "./ast/sexprPrinter.js": "./src/ast/sexprPrinter.js"
     },
     "license": "MIT"
 }

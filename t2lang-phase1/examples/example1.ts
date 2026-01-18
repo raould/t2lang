@@ -1,9 +1,9 @@
-type TypeA = {};
-type TypeB = {};
-type TypeC = {};
-type TypeD = {};
-type AllowedElements = { video: TypeA; audio: TypeB; canvas: TypeC };
-type Languages = {
+export type TypeA = object;
+export type TypeB = object;
+export type TypeC = object;
+export type TypeD = object;
+export type AllowedElements = { video: TypeA; audio: TypeB; canvas: TypeC };
+export type Languages = {
   de: TypeD;
   en: TypeD;
   pt: TypeD;
@@ -11,20 +11,25 @@ type Languages = {
   fr: TypeD;
   ja: TypeD;
 };
-function isAvailable(obj, key) {
-  return obj.hasOwnProperty(key);
+function isAvailable(obj: any, key: string) {
+  return Object.prototype.hasOwnProperty.call(obj, key);
 }
-function loadLanguage(collection, lang) {
+function loadLanguage(collection: any, lang: string) {
   if (isAvailable(collection, lang)) {
     return collection[lang];
   } else {
     return null;
   }
 }
-function selectElement(collection, elem) {
+function selectElement(collection: any, elem: string) {
   if (isAvailable(collection, elem)) {
     return collection[elem];
   } else {
     return null;
   }
 }
+
+// prevent example-only unused warnings
+void isAvailable;
+void loadLanguage;
+void selectElement;

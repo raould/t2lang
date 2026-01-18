@@ -24,13 +24,109 @@
  *   -v, --version         Show version
  */
 
-import { runCli } from "./cliHelper.js";
 import { compilePhase1 } from "./api.js";
 import { PrettyOption } from "./codegen/index.js";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { printSexpr as localPrintSexpr } from "./util/sexprPrinter.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-await runCli("Phase1", compilePhase1, PrettyOption, path.join(__dirname, "..", "package.json"));
+// Custom CLI: use common parser at runtime but print AST dumps as sexpr
+// Import via dynamic path concatenation to avoid TS resolving external source
+// into this project's type-checking rootDir.
+const mod = await import(".." + "/.." + "/common/src/cliHelper.js");
+const { parseArgs, showHelp, showVersion, readStdin, getOutputPath, formatError } = (mod as any);
+
+const args = process.argv.slice(2);
+const options = parseArgs(args);
+
+if (options.help) {
+    showHelp("Phase1");
+    process.exit(0);
+}
+
+if (options.version) {
+    showVersion(path.join(__dirname, "..", "package.json"));
+    process.exit(0);
+}
+
+if (!options.input) {
+    console.error("Error: No input file specified (use '-' for stdin)");
+    console.error("Run 't2c --help' for usage information");
+    process.exit(1);
+}
+
+let source;
+if (options.input === "-") {
+    if (!options.output) options.stdout = true;
+    source = await readStdin();
+} else {
+    const fs = await import('node:fs');
+    if (!fs.existsSync(options.input)) { console.error(`Error: File not found: ${options.input}`); process.exit(1); }
+    source = fs.readFileSync(options.input, 'utf-8');
+}
+
+const mappedPretty = options.pretty === 'pretty' ? PrettyOption.pretty : options.pretty === 'newlines' ? PrettyOption.newlines : PrettyOption.ugly;
+
+const result = await compilePhase1(source, {
+    logLevel: options.logLevel,
+    prettyOutput: mappedPretty,
+    dumpAst: options.ast,
+    // Cast to any to allow local debug flags passed through to Phase1
+    dumpAstBeforeExpand: options.ast || options.astBeforeExpand,
+    dumpAstAfterExpand: options.ast || options.astAfterExpand,
+    seed: options.seed ?? 'default',
+    tracePhases: options.trace ?? [],
+    emitTypes: options.emitTypes,
+    enableTsc: options.enableTsc
+} as any);
+
+// Prefer the common sexpr printer at runtime when available; fall back to the local one.
+let runtimePrinter = localPrintSexpr as (n: any) => string;
+try {
+    // @ts-expect-error: optional runtime import from workspace package export
+    const commonPrinter = await import('t2lang-common/ast/sexprPrinter.js');
+    if (commonPrinter && typeof commonPrinter.printSexpr === 'function') {
+        runtimePrinter = commonPrinter.printSexpr as (n: any) => string;
+    }
+} catch {
+    // ignore - fallback to local printer
+}
+
+if (options.ast || options.astBeforeExpand) {
+    const parseDump = (result.events as any).find((e: any) => e.kind === 'astDump' && e.phase === 'parse');
+    if (parseDump) {
+        console.error('--- AST (before macro expansion) ---');
+        try { console.error(runtimePrinter((parseDump as any).data.ast)); } catch { console.error(JSON.stringify((parseDump as any).data, null, 2)); }
+        console.error('--- END AST ---');
+    }
+}
+if (options.ast || options.astAfterExpand) {
+    const expandDump = (result.events as any).find((e: any) => e.kind === 'astDump' && e.phase === 'expand');
+    if (expandDump) {
+        console.error('--- AST (after macro expansion) ---');
+        try { console.error(runtimePrinter((expandDump as any).data.ast)); } catch { console.error(JSON.stringify((expandDump as any).data, null, 2)); }
+        console.error('--- END AST ---');
+    }
+}
+
+if (result.errors.length > 0) {
+    console.error(`Compilation failed with ${result.errors.length} error(s):`);
+    for (const error of result.errors) console.error('  ' + formatError(error));
+    process.exit(1);
+}
+
+if (options.stdout) {
+    let out = result.tsSource;
+    try { const prettier = await import('prettier'); const formatted: any = prettier.format(out, { parser: 'typescript' }); out = (formatted && typeof formatted.then === 'function') ? await formatted : formatted; } catch { /* ignore formatting errors */ }
+    console.log(out);
+} else {
+    const fs = await import('node:fs');
+    const outputPath = options.output ?? getOutputPath(options.input);
+    let out = result.tsSource;
+    try { const prettier = await import('prettier'); const formatted: any = prettier.format(out, { parser: 'typescript' }); out = (formatted && typeof formatted.then === 'function') ? await formatted : formatted; } catch { /* ignore formatting errors */ }
+    fs.writeFileSync(outputPath, out, 'utf-8');
+    console.error(`Compiled ${options.input} -> ${outputPath}`);
+}
