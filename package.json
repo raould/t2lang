@@ -10,6 +10,7 @@
     "t2lang-phase1"
   ],
   "scripts": {
-    "build": "npm run build -w t2lang-phase0 && npm run build -w t2lang-phase1"
+    "build": "npm run build -w common && npm run build -w t2lang-phase0 && npm run build -w t2lang-phase1",
+    "demo": "npm run build && cd t2lang-phase1 && npx t2c --enable-tsc examples/example1.t2 && node examples/example1.js"
   }
 }

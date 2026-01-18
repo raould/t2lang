@@ -267,6 +267,7 @@ const BINARY_OPERATORS: Set<string> = new Set([
   "==", "!=", "===", "!==",
   "<", "<=", ">", ">=",
   "&&", "||",
+  "??",
   "&", "|", "^",
   "<<", ">>", ">>>"
   , "**"
@@ -286,6 +287,21 @@ function genCall(node: CallExpr, options: TsCodegenOptions): string {
     if (name === 'or') op = '||';
     if (name === 'not') op = '!';
     // xor handled specially below
+
+    // Ternary special form: (ternary cond then else)
+    if ((name === 'ternary' || name === '?:') && node.args.length === 3) {
+      const cond = genExpr(node.args[0], options);
+      const th = genExpr(node.args[1], options);
+      const el = genExpr(node.args[2], options);
+      return `(${cond} ? ${th} : ${el})`;
+    }
+
+    // Nullish-assignment special form: (??= target value) -> `target ??= value`
+    if (name === '??=' && node.args.length === 2) {
+      const target = genExpr(node.args[0], options);
+      const value = genExpr(node.args[1], options);
+      return `(${target} ??= ${value})`;
+    }
 
     // Binary operator with exactly 2 args
     if (BINARY_OPERATORS.has(op) && node.args.length === 2) {

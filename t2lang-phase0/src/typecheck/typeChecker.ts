@@ -268,6 +268,86 @@ export class TypeCheckerBase {
         }
         t = { kind: 'boolean' };
       }
+
+      // Nullish coalescing: (?? left right)
+      else if (name === '??' && node.args.length === 2) {
+        const left = argTypes[0];
+        const right = argTypes[1];
+
+        // Helper to remove null/undefined from a type
+        const removeNullish = (tt: Type): Type => {
+          if (tt.kind === 'union') {
+            const parts = tt.types.filter((p) => p.kind !== 'null' && p.kind !== 'undefined');
+            if (parts.length === 0) return { kind: 'unknown' };
+            if (parts.length === 1) return parts[0];
+            return { kind: 'union', types: parts };
+          }
+          if (tt.kind === 'null' || tt.kind === 'undefined') return { kind: 'unknown' };
+          return tt;
+        };
+
+        const leftNonNull = left ? removeNullish(left) : { kind: 'unknown' } as Type;
+        const rightType = right ?? { kind: 'unknown' } as Type;
+
+        // If left (without nullish) is unknown, result is right; otherwise form union of leftNonNull and right
+        if (leftNonNull.kind === 'unknown') {
+          t = rightType;
+        } else if (this.typesEqual(leftNonNull, rightType)) {
+          t = leftNonNull;
+        } else if (rightType.kind === 'unknown') {
+          t = leftNonNull;
+        } else {
+          // Merge into union, avoiding duplicates
+          const types: Type[] = [];
+          const pushIfNew = (x: Type) => {
+            if (!types.some((y) => this.typesEqual(x, y))) types.push(x);
+          };
+          pushIfNew(leftNonNull);
+          pushIfNew(rightType);
+          t = types.length === 1 ? types[0] : { kind: 'union', types };
+        }
+      }
+
+      // Nullish-assignment: (??= target value) - treat like assignment
+      else if (name === '??=' && node.args.length === 2) {
+        // First arg is a target expression; determine its target type
+        const targetExpr = node.args[0];
+        const valueExpr = node.args[1];
+        const targetType = this.getAssignmentTargetType(targetExpr);
+        const valueTypeId = this.checkExpr(valueExpr);
+        const valueType = valueTypeId !== null ? this.typeTable.get(valueTypeId) : { kind: 'unknown' } as Type;
+
+        if (targetType && valueType) {
+          if (!this.isAssignable(valueType, targetType)) {
+            const err: CompilerError = {
+              message: `Nullish-assignment value type ${this.typeToString(valueType)} not assignable to target type ${this.typeToString(targetType)}`,
+              location: node.location,
+              phase: 'typeCheck'
+            };
+            throw err;
+          }
+        }
+
+        t = targetType ?? valueType;
+      }
+
+      // Ternary: (ternary cond then else)
+      else if ((name === 'ternary' || name === '?:') && node.args.length === 3) {
+        // ensure condition is boolean
+        const condTypeId = argTypeIds[0];
+        if (condTypeId !== null) this.checkConditionType(condTypeId, node.args[0].location);
+        const thenType = argTypes[1] ?? { kind: 'unknown' } as Type;
+        const elseType = argTypes[2] ?? { kind: 'unknown' } as Type;
+        if (this.typesEqual(thenType, elseType)) {
+          t = thenType;
+        } else {
+          // union
+          const types: Type[] = [];
+          if (!types.some((y) => this.typesEqual(thenType, y))) types.push(thenType);
+          if (!types.some((y) => this.typesEqual(elseType, y))) types.push(elseType);
+          t = { kind: 'union', types };
+        }
+      }
     }
     if (calleeTypeId !== null) {
       const calleeType = this.typeTable.get(calleeTypeId);
