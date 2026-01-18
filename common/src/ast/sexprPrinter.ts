@@ -26,7 +26,30 @@ export function printSexpr(node: any, opts: PrintOpts = {}): string {
 
     function inner(n: any): string {
         if (n === null || n === undefined) return atomToString(n);
-        if (typeof n === 'string' || typeof n === 'number' || typeof n === 'boolean') return atomToString(n);
+        if (typeof n === 'string') {
+            const s = n as string;
+            const t = s.trim();
+            if ((t.startsWith('{') || t.startsWith('[')) && (t.endsWith('}') || t.endsWith(']'))) {
+                try {
+                    const parsed = JSON.parse(s);
+                    return inner(parsed);
+                } catch {
+                    // Try a lightweight unescape of typical JSON-escaped quotes and reparse
+                    try {
+                        const unescaped = s.replace(/\\"/g, '"');
+                        const t2 = unescaped.trim();
+                        if ((t2.startsWith('{') || t2.startsWith('[')) && (t2.endsWith('}') || t2.endsWith(']'))) {
+                            const parsed2 = JSON.parse(unescaped);
+                            return inner(parsed2);
+                        }
+                    } catch {
+                        // Fall through to default string handling
+                    }
+                }
+            }
+            return atomToString(n);
+        }
+        if (typeof n === 'number' || typeof n === 'boolean') return atomToString(n);
         if (Array.isArray(n)) {
             return '(' + n.map(inner).join(' ') + ')';
         }
@@ -57,6 +80,11 @@ export function printSexpr(node: any, opts: PrintOpts = {}): string {
         if (kind === 'object') {
             const fields = (n.fields || []).map((f: any) => `(field ${atomToString(f.name)} ${inner(f.value)})`).join(' ');
             return `(object ${fields})`;
+        }
+
+        // Handle type-object field entries or generic { name: string, type: ... } shapes
+        if (isPlainObject(n) && typeof (n as any).name === 'string' && ('type' in n)) {
+            return `(field ${atomToString((n as any).name)} ${inner((n as any).type)})`;
         }
         if (kind === 'prop') {
             return `(prop ${inner(n.object)} ${atomToString(n.property)})`;

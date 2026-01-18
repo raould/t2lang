@@ -28,9 +28,7 @@ import { compilePhase1 } from "./api.js";
 import { PrettyOption } from "./codegen/index.js";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-// Use the common sexpr printer at runtime. If it's unavailable, fall back to a
-// minimal JSON-based printer so the CLI still functions.
-let runtimePrinter = (n: any) => JSON.stringify(n);
+import { printSexpr } from './util/sexprPrinter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -85,21 +83,11 @@ const result = await compilePhase1(source, {
     enableTsc: options.enableTsc
 } as any);
 
-// Prefer the common sexpr printer at runtime when available; fall back to JSON.
-try {
-    const commonPrinter = await import('t2lang-common/ast/sexprPrinter.js');
-    if (commonPrinter && typeof commonPrinter.printSexpr === 'function') {
-        runtimePrinter = commonPrinter.printSexpr as (n: any) => string;
-    }
-} catch {
-    // ignore - keep JSON fallback
-}
-
 if (options.ast || options.astBeforeExpand) {
     const parseDump = (result.events as any).find((e: any) => e.kind === 'astDump' && e.phase === 'parse');
     if (parseDump) {
         console.error('--- AST (before macro expansion) ---');
-        try { console.error(runtimePrinter((parseDump as any).data.ast)); } catch { console.error(JSON.stringify((parseDump as any).data, null, 2)); }
+        try { console.error(printSexpr((parseDump as any).data.ast)); } catch (err) { console.error('AST print failed:', String(err)); }
         console.error('--- END AST ---');
     }
 }
@@ -107,7 +95,7 @@ if (options.ast || options.astAfterExpand) {
     const expandDump = (result.events as any).find((e: any) => e.kind === 'astDump' && e.phase === 'expand');
     if (expandDump) {
         console.error('--- AST (after macro expansion) ---');
-        try { console.error(runtimePrinter((expandDump as any).data.ast)); } catch { console.error(JSON.stringify((expandDump as any).data, null, 2)); }
+        try { console.error(printSexpr((expandDump as any).data.ast)); } catch (err) { console.error('AST print failed:', String(err)); }
         console.error('--- END AST ---');
     }
 }
