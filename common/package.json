@@ -7,6 +7,6 @@
         ".": "./src/cliHelper.js",
         "./ast/sexprPrinter.js": "./src/ast/sexprPrinter.js"
     },
-    "types": "src/ast/sexprPrinter.d.ts",
+    "types": "src/index.d.ts",
     "license": "MIT"
 }
