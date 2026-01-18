@@ -148,29 +148,35 @@ export async function compilePhase1(
 
     if (fullConfig.enableTsc) {
       // Run TypeScript compiler for additional validation
+      const compilerOptions: ts.CompilerOptions = {
+        noEmit: true,
+        strict: true,
+        target: ts.ScriptTarget.ES2020,
+        module: ts.ModuleKind.CommonJS,
+      };
+
       const tsProgram = ts.createProgram({
         rootNames: ['input.ts'],
-        options: {
-          noEmit: true,
-          strict: true,
-          target: ts.ScriptTarget.ES2020,
-          module: ts.ModuleKind.CommonJS,
-        },
+        options: compilerOptions,
         host: {
           getSourceFile: (fileName) => {
             if (fileName === 'input.ts') {
               return ts.createSourceFile(fileName, tsSource, ts.ScriptTarget.ES2020);
             }
+            const text = ts.sys.readFile(fileName);
+            if (text !== undefined && text !== null) {
+              return ts.createSourceFile(fileName, text, ts.ScriptTarget.ES2020);
+            }
             return undefined;
           },
-          getDefaultLibFileName: () => '',
+          getDefaultLibFileName: (opts) => ts.getDefaultLibFileName(opts),
           writeFile: () => { },
-          getCurrentDirectory: () => '',
-          getCanonicalFileName: (fileName) => fileName,
-          useCaseSensitiveFileNames: () => false,
-          getNewLine: () => '\n',
-          fileExists: (fileName) => fileName === 'input.ts',
-          readFile: (fileName) => fileName === 'input.ts' ? tsSource : undefined,
+          getCurrentDirectory: () => ts.sys.getCurrentDirectory(),
+          getCanonicalFileName: (fileName) => ts.sys.useCaseSensitiveFileNames ? fileName : fileName.toLowerCase(),
+          useCaseSensitiveFileNames: () => ts.sys.useCaseSensitiveFileNames,
+          getNewLine: () => ts.sys.newLine,
+          fileExists: (fileName) => fileName === 'input.ts' || ts.sys.fileExists(fileName),
+          readFile: (fileName) => fileName === 'input.ts' ? tsSource : ts.sys.readFile(fileName),
         }
       });
 

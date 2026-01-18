@@ -11,7 +11,7 @@
     "dist"
   ],
   "scripts": {
-    "prebuild": "npm -w t2lang-phase0 run build",
+    "prebuild": "npm --prefix ../common run build && npm --prefix ../t2lang-phase0 run build",
     "build": "tsc",
     "test": "npm run build && node --import tsx --test \"tests/**/*.test.ts\"",
     "lint": "eslint . --ext .ts",
