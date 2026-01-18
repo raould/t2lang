@@ -29,5 +29,10 @@
                 "title": "Format T2 Document"
             }
         ]
-    }
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/local/vscode-t2-formatter.git"
+    },
+    "license": "MIT"
 }
