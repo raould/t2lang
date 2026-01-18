@@ -1,5 +1,4 @@
 import assert from 'assert';
-import fs from 'fs';
 import { tokenize as phase1Tokenize } from '../../src/parse/sugarRewrite.js';
 
 // This test file uses the sugarRewrite tokenizer to inspect tokenization results
