@@ -12,7 +12,7 @@
     "t2lang-phase1"
   ],
   "scripts": {
-    "build": "npm run build -w t2lang-phase1",
+    "build": "npm --prefix common run build && npm run build -w t2lang-phase1 && node scripts/install-local-bins.js",
     "test": "npm run build && npm --prefix common test && npm --prefix t2lang-phase0 test && npm --prefix t2lang-phase1 test",
     "lint": "npm --prefix common run lint && npm --prefix t2lang-phase0 run lint && npm --prefix t2lang-phase1 run lint",
     "clean": "node -e \"const fs=require('fs');['node_modules','t2lang-phase1/dist','t2lang-phase1/node_modules'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p)}catch(e){}})\"",
