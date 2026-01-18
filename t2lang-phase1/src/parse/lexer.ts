@@ -20,12 +20,52 @@ export class Lexer {
 
     const tok = this.base.nextToken() as Token;
 
+    // If we just saw an open paren followed by a dot-sigil, handle it here
+    if (tok.kind === "punct" && tok.value === "(") {
+      const next = this.base.nextToken() as Token;
+      if (next.kind === "error" && next.value === ".") {
+        const nameTok = this.base.nextToken() as Token;
+        if (nameTok.kind === "identifier") {
+          let name = String(nameTok.value);
+          if (name.endsWith(':')) name = name.slice(0, -1);
+          this.enqueue({ kind: "string", value: name, location: nameTok.location } as Token);
+
+          let typeStart = this.base.nextToken() as Token;
+          if (typeStart.kind === 'identifier' && String(typeStart.value) === ':') {
+            typeStart = this.base.nextToken() as Token;
+          }
+
+          if (typeStart.kind === 'punct' && typeStart.value === '(') {
+            const collected: Token[] = [typeStart];
+            let depth = 1;
+            while (depth > 0) {
+              const t = this.base.nextToken() as Token;
+              collected.push(t);
+              if (t.kind === 'punct' && t.value === '(') depth++;
+              else if (t.kind === 'punct' && t.value === ')') depth--;
+              if (t.kind === 'eof') break;
+            }
+            for (const t of collected) this.enqueue(t);
+          } else {
+            this.enqueue(typeStart);
+          }
+
+          this.enqueue({ kind: 'punct', value: ')', location: nameTok.location } as Token);
+          return tok;
+        } else {
+          this.enqueue(next);
+          this.enqueue(nameTok);
+          return tok;
+        }
+      }
+      this.enqueue(next);
+      return tok;
+    }
+
     // Handle backtick as a standalone token for quote
     if (tok.kind === "punct" && tok.value === "`") {
       const loc = tok.location;
-      // Wrap the next token/expression in (quote ...)
       const next = this.base.nextToken() as Token;
-      // If next is a parenthesized expr, read until matching paren
       if (next.kind === "punct" && next.value === "(") {
         const exprTokens: BaseToken[] = [];
         exprTokens.push(next as BaseToken);
@@ -38,10 +78,6 @@ export class Lexer {
           if (t.kind === "eof") break;
         }
         this.enqueue({ kind: "identifier", value: "quote", location: loc } as BaseToken);
-        // Expand inline ~ and ~@ forms inside the quoted tokens so they are treated as
-        // (unquote ...) and (unquote-splice ...) during quoted parsing. Be careful to
-        // avoid emitting an extra ')' when the shorthand is already the sole token within
-        // its own parentheses (e.g., (~name)).
         for (let i = 0; i < exprTokens.length; i++) {
           const t = exprTokens[i];
           if (t.kind === "identifier" && typeof t.value === "string" && t.value.startsWith("~")) {
@@ -52,20 +88,13 @@ export class Lexer {
             if (remainder.length > 0) {
               const numMatch = /^-?\d+$/.test(remainder);
               const exprTok = numMatch ? { kind: "number", value: Number(remainder), location: t.location } as Token : { kind: "identifier", value: remainder, location: t.location } as Token;
-
               const prev = exprTokens[i - 1];
-              const next = exprTokens[i + 1];
-              const isWrappedInParens = prev && prev.kind === "punct" && prev.value === "(" && next && next.kind === "punct" && next.value === ")";
-
-              // Replace shorthand with explicit form name + expr token. If not wrapped in its
-              // own parens, emit a closing ')' to finish the injected form.
+              const next2 = exprTokens[i + 1];
+              const isWrappedInParens = prev && prev.kind === "punct" && prev.value === "(" && next2 && next2.kind === "punct" && next2.value === ")";
               this.enqueue({ kind: "identifier", value: formNameInner, location: t.location } as BaseToken);
               this.enqueue(exprTok as BaseToken);
               if (!isWrappedInParens) {
                 this.enqueue({ kind: "punct", value: ")", location: t.location } as BaseToken);
-              } else {
-                // Wrapped in parens (e.g., (~name)) — do nothing extra. Keep the original
-                // closing paren; it will be enqueued as part of the surrounding tokens.
               }
               continue;
             }
@@ -75,7 +104,6 @@ export class Lexer {
         this.enqueue({ kind: "punct", value: ")", location: loc } as BaseToken);
         return { kind: "punct", value: "(", location: loc } as BaseToken;
       }
-      // Single-token expression: expand shorthand ~ and ~@ into explicit unquote forms
       this.enqueue({ kind: "identifier", value: "quote", location: loc } as BaseToken);
       if (next.kind === "identifier" && typeof next.value === "string" && next.value.startsWith("~")) {
         const text = next.value as string;
@@ -96,9 +124,65 @@ export class Lexer {
       return { kind: "punct", value: "(", location: loc } as BaseToken;
     }
 
-    // No global expansion of ~ and ~@ here; expansion is handled only inside
-    // backtick (`) quoted parenthesized expressions above so that unquote
-    // semantics are lexical to quasiquoting and do not affect normal parsing.
+    // Handle leading dot-sigil forms like `.name: Type` (no surrounding parens)
+    if (tok.kind === 'error' && tok.value === '.') {
+      const nameTok = this.base.nextToken() as Token;
+      if (nameTok.kind === 'identifier') {
+        let name = String(nameTok.value);
+        if (name.endsWith(':')) name = name.slice(0, -1);
+        this.enqueue({ kind: 'punct', value: '(', location: nameTok.location } as Token);
+        this.enqueue({ kind: 'string', value: name, location: nameTok.location } as Token);
+
+        let typeStart = this.base.nextToken() as Token;
+        if (typeStart.kind === 'identifier' && String(typeStart.value) === ':') {
+          typeStart = this.base.nextToken() as Token;
+        }
+
+        if (typeStart.kind === 'punct' && typeStart.value === '(') {
+          const collected: Token[] = [typeStart];
+          let depth = 1;
+          while (depth > 0) {
+            const t = this.base.nextToken() as Token;
+            collected.push(t);
+            if (t.kind === 'punct' && t.value === '(') depth++;
+            else if (t.kind === 'punct' && t.value === ')') depth--;
+            if (t.kind === 'eof') break;
+          }
+          for (const t of collected) this.enqueue(t);
+        } else {
+          this.enqueue(typeStart);
+        }
+
+        this.enqueue({ kind: 'punct', value: ')', location: nameTok.location } as Token);
+        return this.tokenQueue.shift()!;
+      }
+      return tok;
+    }
+
+    // Combine dotted identifiers like `a.b.c` into a single identifier token
+    if (tok.kind === 'identifier') {
+      let combined = String(tok.value);
+      while (true) {
+        const peek = this.base.nextToken() as Token;
+        if (peek.kind === 'error' && peek.value === '.') {
+          const nextId = this.base.nextToken() as Token;
+          if (nextId.kind === 'identifier') {
+            combined = combined + '.' + String(nextId.value);
+            continue;
+          } else {
+            this.enqueue(nextId);
+            this.enqueue(peek);
+            break;
+          }
+        }
+        this.enqueue(peek);
+        break;
+      }
+      if (combined !== String(tok.value)) {
+        return { kind: 'identifier', value: combined, location: tok.location } as Token;
+      }
+    }
+
     return tok;
   }
 

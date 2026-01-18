@@ -258,8 +258,18 @@ export class MacroExpander {
         const f = expr as ForExpr;
         return { ...f, init: f.init ? this.normalizeExpr(f.init) : null, condition: f.condition ? this.normalizeExpr(f.condition) : null, update: f.update ? this.normalizeExpr(f.update) : null, body: f.body.map(e => this.normalizeExpr(e)) } as Phase0Expr;
       }
-      case "identifier":
+      case "identifier": {
+        const id = expr as Identifier;
+        if (id.name.indexOf('.') !== -1) {
+          const parts = id.name.split('.');
+          let node: Expr = { kind: 'identifier', name: parts[0], location: id.location } as Identifier;
+          for (let i = 1; i < parts.length; i++) {
+            node = { kind: 'prop', object: node, property: parts[i], location: id.location } as unknown as PropExpr;
+          }
+          return node as Phase0Expr;
+        }
         return expr as Phase0Expr;
+      }
       case "literal":
         return expr as Phase0Expr;
       case "quote": {
