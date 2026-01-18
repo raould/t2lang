@@ -15,3 +15,4 @@
 * t2lang-phase1 might also be where more human-friendly syntax and sugar is added, making use of macros.
 * When making changes, try to not change phase0 if it can be avoided.
 * Do try to add more small integration tests in the relevant phase0 or phase1 when making changes or adding new features.
+* When making changes, also make sure all t2lang-phase1/examples build and run correctly.
