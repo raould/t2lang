@@ -26,5 +26,5 @@ test("extended type nodes and type-alias", async () => {
   assert.match(result.tsSource, /\(true as boolean\)/);
   assert.match(result.tsSource, /\(null as null\)/);
   assert.match(result.tsSource, /\(undefined as undefined\)/);
-  assert.match(result.tsSource, /\(\"hi\" as \"hi\"\)/);
+  assert.match(result.tsSource, /\("hi" as "hi"\)/);
 });

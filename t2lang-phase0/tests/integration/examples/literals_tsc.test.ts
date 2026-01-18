@@ -62,5 +62,5 @@ test("string literal escapes", async () => {
   const nonTscErrors = result.errors.filter(e => e.phase !== "tsc");
   assert.strictEqual(nonTscErrors.length, 0);
   assert.match(result.tsSource, /\\n/);
-  assert.match(result.tsSource, /\\\"line2\\\"/);
+  assert.match(result.tsSource, /\\["]line2\\["]/);
 });

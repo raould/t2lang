@@ -9,7 +9,7 @@ import { compilePhase0 } from "../../../src/api";
 test("empty object", async () => {
   const result = await compilePhase0(`(program (obj))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.match(result.tsSource, /\{  \}/);
+  assert.match(result.tsSource, /\{ {2}\}/);
 });
 
 test("object with string value", async () => {

@@ -338,7 +338,7 @@ function genCall(node: CallExpr, options: TsCodegenOptions): string {
     const propName = prop.property;
     const args = node.args.map(arg => genExpr(arg, options)).join(", ");
     // Use an IIFE to evaluate object once and avoid naming collisions.
-    return `((__obj) => { if (typeof __obj[${JSON.stringify(propName)}] !== \"function\") { throw new Error(\`Property ${propName} is not a function\`); } return __obj[${JSON.stringify(propName)}](${args}); })(${objectExpr})`;
+    return `((__obj) => { if (typeof __obj[${JSON.stringify(propName)}] !== "function") { throw new Error(\`Property ${propName} is not a function\`); } return __obj[${JSON.stringify(propName)}](${args}); })(${objectExpr})`;
   }
 
   const callee = genExpr(node.callee, options);

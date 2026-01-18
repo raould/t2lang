@@ -11,7 +11,7 @@ const nonTsc = (errors: any[]) => errors.filter(e => e.phase !== "tsc");
 test("empty object", async () => {
   const result = await compilePhase0(`(program (obj))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.match(result.tsSource, /\{  \}/);
+  assert.match(result.tsSource, /\{ {2}\}/);
 });
 
 test("object with string value", async () => {
