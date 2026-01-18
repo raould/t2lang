@@ -6,8 +6,10 @@
 * read t2lang-phase0/TODO.md
 * read t2lang-phase1/TODO.md
 * human: continue to create examples based on https://typescript-cookbook.com/examples/
+* ensure the macro system is designed robusly: repeatedly applies macros until no more macro forms are present, effectively reaching a steady state of fully expanded code before compilation, using functions like macroexpand and macroexpand-1 to process nested or sequential macro calls. Compile-Time Process: Macros run during compile time (or load time), not runtime, transforming code (represented as data structures) into different code macroexpand-1: This function expands the outermost macro in a form, once. macroexpand: This function repeatedly calls macroexpand-1 on a form until no more macros are found, returning the final, fully expanded code. Nested Macros: If Macro A expands into code containing Macro B, macroexpand will first expand A, then process the resulting code to expand B (and any other macros) until everything is resolved.
 
 # sugar ideas
 
 * how close to looking like typescript should we get? e.g. class definition in t2 can have a lot of parenthases.
+* (call anObject.aMethod anArgument) could we have sugar that allows the more concise (anObject.aMethod anArgument)? the t2lang typechecker is not expected to be able to determine if .aMethod really is a method or a field. However in the case of the user mistakenly trying (anObject.aField anArgument) ideally the resulting errors from the typescript compiler would be somehow enough to indicate to the user what the original problem is.
 * experiment with designs to implement infix with "(infix 1 + 2)" or "(infix (1 + 2))" becoming "(+ 1 2), then a leading dot like ".(1 + 2)". Note that it must support variable names. Note that the infix applies to everything inside so "(infix (1 + (2 * 3)))" means the parenthases inside are mathematical grouping, not sexprs.

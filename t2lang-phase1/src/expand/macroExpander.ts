@@ -130,6 +130,11 @@ export class MacroExpander {
     // Normalize output to Phase0-compatible nodes (remove gensym nodes)
     const normalizedBody: Phase0Statement[] = filteredBody.map(stmt => this.normalizeStatement(stmt));
 
+    // Normalize any type nodes within the normalized body so `type-object`
+    // ergonomic forms are canonicalized everywhere (not just top-level
+    // type-alias statements).
+    this.normalizeTypesInProgram(normalizedBody);
+
     this.ctx.eventSink.emit({
       phase: "expand",
       kind: "macroExpansionDone",
@@ -289,6 +294,36 @@ export class MacroExpander {
         // may reach here; treat them as unknown when asserting Phase0 shape.
         return expr as unknown as Phase0Expr;
     }
+  }
+
+  private normalizeTypesInProgram(body: Phase0Statement[]): void {
+    const walk = (obj: any) => {
+      if (!obj || typeof obj !== 'object') return;
+      if (Array.isArray(obj)) {
+        for (const e of obj) walk(e);
+        return;
+      }
+      // If this object has a typeAnnotation, normalize it
+      if (obj.typeAnnotation) {
+        obj.typeAnnotation = this.normalizeTypeNode(obj.typeAnnotation as any);
+      }
+      // If this object is a TypeAliasStmt, ensure its typeAnnotation normalized
+      if (obj.kind === 'type-alias' && obj.typeAnnotation) {
+        obj.typeAnnotation = this.normalizeTypeNode(obj.typeAnnotation as any);
+      }
+      // Recurse into known child arrays/objects
+      for (const k of Object.keys(obj)) {
+        if (k === 'typeAnnotation') continue;
+        const v = obj[k];
+        if (Array.isArray(v)) {
+          for (const it of v) walk(it);
+        } else if (v && typeof v === 'object') {
+          walk(v);
+        }
+      }
+    };
+
+    for (const stmt of body) walk(stmt as any);
   }
 
   private collectMacros(program: Program): void {

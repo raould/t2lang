@@ -121,7 +121,14 @@ function nodeToString(node: Node): string {
 }
 
 export function rewriteSugar(source: string): string {
-    const tokens = tokenize(source);
+    // Convert parenthesized dot-sigil fields like `(.name: Type)` into
+    // canonical form `("name" Type)` so the Phase0 parser sees a
+    // normal string field name followed by the type expression.
+    // Match `(` then optional space, then `.name` (allowing dots/hyphens),
+    // optional space, then `:` (with optional space). Replace the prefix
+    // with `("name" ` and leave the rest of the expression intact.
+    const preprocessed = source.replace(/\(\s*\.\s*([A-Za-z0-9_.-]+)\s*:/g, (_m, p1) => `("${p1}" `);
+    const tokens = tokenize(preprocessed);
     const nodes: Node[] = [];
     let i = 0;
     while (i < tokens.length) {

@@ -124,40 +124,8 @@ export class Lexer {
       return { kind: "punct", value: "(", location: loc } as BaseToken;
     }
 
-    // Handle leading dot-sigil forms like `.name: Type` (no surrounding parens)
-    if (tok.kind === 'error' && tok.value === '.') {
-      const nameTok = this.base.nextToken() as Token;
-      if (nameTok.kind === 'identifier') {
-        let name = String(nameTok.value);
-        if (name.endsWith(':')) name = name.slice(0, -1);
-        this.enqueue({ kind: 'punct', value: '(', location: nameTok.location } as Token);
-        this.enqueue({ kind: 'string', value: name, location: nameTok.location } as Token);
-
-        let typeStart = this.base.nextToken() as Token;
-        if (typeStart.kind === 'identifier' && String(typeStart.value) === ':') {
-          typeStart = this.base.nextToken() as Token;
-        }
-
-        if (typeStart.kind === 'punct' && typeStart.value === '(') {
-          const collected: Token[] = [typeStart];
-          let depth = 1;
-          while (depth > 0) {
-            const t = this.base.nextToken() as Token;
-            collected.push(t);
-            if (t.kind === 'punct' && t.value === '(') depth++;
-            else if (t.kind === 'punct' && t.value === ')') depth--;
-            if (t.kind === 'eof') break;
-          }
-          for (const t of collected) this.enqueue(t);
-        } else {
-          this.enqueue(typeStart);
-        }
-
-        this.enqueue({ kind: 'punct', value: ')', location: nameTok.location } as Token);
-        return this.tokenQueue.shift()!;
-      }
-      return tok;
-    }
+    // Only support parenthesized dot-sigil forms like `(.name: Type)`.
+    // Bare `.name: Type` (without surrounding parens) is not supported.
 
     // Combine dotted identifiers like `a.b.c` into a single identifier token
     if (tok.kind === 'identifier') {
