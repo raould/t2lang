@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "t2c1": "./dist/cli.js"
+    "t2tc": "./dist/cli.js"
   },
   "main": "./dist/api.js",
   "types": "./dist/api.d.ts",

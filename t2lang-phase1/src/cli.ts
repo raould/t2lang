@@ -81,7 +81,7 @@ const result = await compilePhase1(source, {
     seed: options.seed ?? 'default',
     tracePhases: options.trace ?? [],
     emitTypes: options.emitTypes,
-    enableTsc: options.enableTsc
+    // enableTsc removed; TypeScript checks should be done with separate tool
 } as any);
 
 if (options.ast || options.astBeforeExpand) {

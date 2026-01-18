@@ -2,7 +2,8 @@
   "name": "t2lang",
   "private": true,
   "bin": {
-    "t2c": "./node_modules/t2lang-phase1/dist/cli.js"
+    "t2tc": "./node_modules/t2lang-phase1/dist/cli.js",
+    "t2jc": "./node_modules/t2lang-common/dist/t2jc.js"
   },
   "workspaces": [
     "common",
@@ -11,7 +12,7 @@
   ],
   "scripts": {
     "build": "npm run build -w t2lang-phase1",
-    "demo": "npm run build && cd t2lang-phase1 && npx t2c --enable-tsc examples/example1.t2 && node examples/example1.js"
+    "demo": "rm -f t2lang-phase1/examples/example1.ts && rm -f t2lang-phase1/examples/example1.js && npm run build && cd t2lang-phase1 && npx t2tc examples/example1.t2 && node examples/example1.js"
   },
   "devDependencies": {
     "prettier": "^3.8.0"

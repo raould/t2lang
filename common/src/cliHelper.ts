@@ -19,7 +19,6 @@ export interface CliOptions {
 
     // CompilerConfig-related flags
     emitTypes: boolean;
-    enableTsc: boolean;
     seed?: string;
     trace?: string[];
     logLevel: "none" | "debug";
@@ -39,7 +38,6 @@ export function parseArgs(args: string[]): CliOptions {
         help: false,
         version: false,
         emitTypes: true,
-        enableTsc: false,
         seed: undefined,
         trace: [],
         logLevel: "none",
@@ -70,8 +68,6 @@ export function parseArgs(args: string[]): CliOptions {
             options.astAfterExpand = true;
         } else if (arg === "--emit-types") {
             options.emitTypes = true;
-        } else if (arg === "--enable-tsc") {
-            options.enableTsc = true;
         } else if (arg === "--seed") {
             i++;
             if (i >= args.length) {
@@ -274,8 +270,7 @@ export async function runCli(
         dumpAstAfterExpand: options.ast || options.astAfterExpand,
         seed: options.seed ?? "default",
         tracePhases: options.trace ?? [],
-        emitTypes: options.emitTypes,
-        enableTsc: options.enableTsc
+        emitTypes: options.emitTypes
     });
 
     // Print ASTs according to requested flags. If `--ast` was given, print

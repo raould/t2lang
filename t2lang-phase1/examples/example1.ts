@@ -35,3 +35,4 @@ function selectElement(collection: any, elem: any): unknown {
     return null;
   }
 }
+console.log("hello world");

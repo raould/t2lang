@@ -79,17 +79,17 @@ export function showHelp(notice?: string): void {
   console.log(`
 T2 Compiler ${notice ?? ''}
 
-Usage:
-  t2c <input.t2> [options]
-  t2c - [options]                   # read from stdin
+  Usage:
+  t2tc <input.t2> [options]
+  t2tc - [options]                   # read from stdin
 
 Examples:
-  t2c helloworld.t2                 # produces helloworld.ts
-  t2c helloworld.t2 -o out.ts       # produces out.ts
-  t2c helloworld.t2 --stdout        # prints to stdout
-  t2c -                             # read from stdin, write to stdout
-  t2c - -o out.ts                   # read from stdin, write to file
-  echo '(program (foo 1))' | t2c -  # pipe input
+  t2tc helloworld.t2                 # produces helloworld.ts
+  t2tc helloworld.t2 -o out.ts       # produces out.ts
+  t2tc helloworld.t2 --stdout        # prints to stdout
+  t2tc -                             # read from stdin, write to stdout
+  t2tc - -o out.ts                   # read from stdin, write to file
+  echo '(program (foo 1))' | t2tc -  # pipe input
 
 Options:
   -o, --output <file>   Output file path (default: input with .ts extension)
@@ -105,12 +105,12 @@ export function showVersion(pkgPath?: string): void {
   try {
     const file = pkgPath ?? path.join(__dirname, "..", "package.json");
     const pkg = JSON.parse(fs.readFileSync(file, "utf-8"));
-    console.log(`t2c version ${pkg.version}`);
+    console.log(`t2tc version ${pkg.version}`);
   } catch {
-    console.log("t2c version 0.1.0");
+    console.log("t2tc version 0.1.0");
   }
 }
-
+console.error("Run 't2tc --help' for usage information");
 export function getOutputPath(inputPath: string): string {
   const parsed = path.parse(inputPath);
   return path.join(parsed.dir, parsed.name + ".ts");
