@@ -369,11 +369,53 @@ export class MacroExpander {
         };
       case "let*":
         return this.expandLet(stmt as LetStarExpr);
+      case "type-alias":
+        return this.expandTypeAlias(stmt as any);
       case "defmacro":
         return stmt; // Keep as-is, will be filtered out later
       default:
         return stmt;
     }
+  }
+
+  private expandTypeAlias(stmt: any): any {
+    // Normalize the type annotation for TypeAlias statements so that any
+    // ergonomic forms (dot-sigil names, colon shorthand) are canonicalized.
+    const normalized = { ...stmt };
+    if (normalized.typeAnnotation) {
+      normalized.typeAnnotation = this.normalizeTypeNode(normalized.typeAnnotation);
+    }
+    return normalized;
+  }
+
+  private normalizeTypeNode(node: any): any {
+    if (!node || typeof node !== 'object') return node;
+    if (node.kind === 'type-object' && Array.isArray(node.fields)) {
+      const fields = node.fields.map((f: any) => {
+        // Support legacy shapes where field.name might include a leading '.' or trailing ':'
+        let name = f.name;
+        if (typeof name === 'string') {
+          name = name.replace(/^\./, '').replace(/[:]$/, '');
+        } else if (name && typeof name === 'object' && name.name) {
+          name = String(name.name).replace(/^\./, '').replace(/[:]$/, '');
+        }
+
+        const typeNode = this.normalizeTypeNode(f.type || f[1] || f);
+        return { name, type: typeNode };
+      });
+      return { ...node, fields };
+    }
+    // recurse into composed types
+    if (node.kind === 'type-array') {
+      return { ...node, element: this.normalizeTypeNode(node.element) };
+    }
+    if (node.kind === 'type-function') {
+      return { ...node, params: node.params.map((p: any) => this.normalizeTypeNode(p)), returns: this.normalizeTypeNode(node.returns) };
+    }
+    if (node.kind === 'type-union' || node.kind === 'type-intersection') {
+      return { ...node, types: node.types.map((t: any) => this.normalizeTypeNode(t)) };
+    }
+    return node;
   }
 
   private expandExpr(expr: Expr): Expr {
