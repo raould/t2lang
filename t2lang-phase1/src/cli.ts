@@ -28,7 +28,9 @@ import { compilePhase1 } from "./api.js";
 import { PrettyOption } from "./codegen/index.js";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { printSexpr as localPrintSexpr } from "./util/sexprPrinter.js";
+// Use the common sexpr printer at runtime. If it's unavailable, fall back to a
+// minimal JSON-based printer so the CLI still functions.
+let runtimePrinter = (n: any) => JSON.stringify(n);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -83,16 +85,14 @@ const result = await compilePhase1(source, {
     enableTsc: options.enableTsc
 } as any);
 
-// Prefer the common sexpr printer at runtime when available; fall back to the local one.
-let runtimePrinter = localPrintSexpr as (n: any) => string;
+// Prefer the common sexpr printer at runtime when available; fall back to JSON.
 try {
-    // @ts-expect-error: optional runtime import from workspace package export
     const commonPrinter = await import('t2lang-common/ast/sexprPrinter.js');
     if (commonPrinter && typeof commonPrinter.printSexpr === 'function') {
         runtimePrinter = commonPrinter.printSexpr as (n: any) => string;
     }
 } catch {
-    // ignore - fallback to local printer
+    // ignore - keep JSON fallback
 }
 
 if (options.ast || options.astBeforeExpand) {

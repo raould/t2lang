@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { printSexpr } from '../src/util/sexprPrinter.js';
 import { compilePhase1 } from '../src/api.js';
+
+const { printSexpr } = await import('../src/util/sexprPrinter.js');
 
 test('sexpr printer prints simple program', () => {
     const ast = {
