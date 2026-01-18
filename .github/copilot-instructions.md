@@ -10,3 +10,8 @@
 * The macro system should try to be like Clojure's design, not like Racket's.
 * Note that if you run "npm test" you do not have to run "npm build" first because the "test" scripts in package.json already invoke "npm build".
 * do not offer to create PRs.
+* t2lang-phase0 is meant to be a low-level sexpr syntax with as little sugar as possible. It doesn't support macros for example. It is meant to be more like a "core calculus" for ease of machine processing; to keep code simple and consistent.
+* t2lang-phase1 is meant to add macros.
+* t2lang-phase1 might also be where more human-friendly syntax and sugar is added, making use of macros.
+* When making changes, try to not change phase0 if it can be avoided.
+* Do try to add more small integration tests in the relevant phase0 or phase1 when making changes or adding new features.

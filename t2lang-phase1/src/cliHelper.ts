@@ -7,6 +7,7 @@ export async function runCli(
     prettyEnum: { pretty: any; newlines: any; ugly: any },
     pkgPath?: string
 ): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore: import from workspace source helper (exists at runtime)
     const mod = await import("../../common/src/cliHelper.js");
     return mod.runCli(notice, compileFn, prettyEnum, pkgPath);

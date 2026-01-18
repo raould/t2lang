@@ -1,14 +1,135 @@
+// Phase1-only sugar rewrite. Converts several ergonomic forms into
+// Phase0 minimal sexprs before parsing.
+// Supported rewrites:
+//  - ("name" : Type)   -> ("name" (type-ref "Type"))
+//  - (#name: EXPR)       -> (field "name" EXPR)
+//  - (field name EXPR)   -> (field "name" EXPR)
+//  - (prop OBJ name)     -> (prop OBJ "name")
+
+type Node = string | Node[];
+
+function tokenize(src: string): string[] {
+    const tokens: string[] = [];
+    let i = 0;
+    while (i < src.length) {
+        const ch = src[i];
+        if (ch === '(' || ch === ')') {
+            tokens.push(ch);
+            i++;
+            continue;
+        }
+        if (ch === '"') {
+            // string
+            let j = i + 1;
+            let s = '"';
+            while (j < src.length) {
+                const c = src[j];
+                s += c;
+                j++;
+                if (c === '"' && src[j - 2] !== '\\') break;
+            }
+            tokens.push(s);
+            i = j;
+            continue;
+        }
+        if (/\s/.test(ch)) { i++; continue; }
+        // atom
+        let j = i;
+        let atom = '';
+        while (j < src.length && !/\s|\(|\)/.test(src[j])) {
+            atom += src[j];
+            j++;
+        }
+        tokens.push(atom);
+        i = j;
+    }
+    return tokens;
+}
+
+function parseTokens(tokens: string[], idx = 0): { node: Node; next: number } {
+    if (tokens[idx] === '(') {
+        const arr: Node[] = [];
+        let i = idx + 1;
+        while (i < tokens.length && tokens[i] !== ')') {
+            const res = parseTokens(tokens, i);
+            arr.push(res.node);
+            i = res.next;
+        }
+        return { node: arr, next: (tokens[i] === ')') ? i + 1 : i };
+    }
+    return { node: tokens[idx], next: idx + 1 };
+}
+
+function transform(node: Node): Node {
+    if (typeof node === 'string') return node;
+    // node is array
+    const arr = node.slice() as Node[];
+
+    // First pass: handle inline sigil elements like #name: EXPR
+    const out: Node[] = [];
+    for (let i = 0; i < arr.length; i++) {
+        const el = arr[i];
+        if (typeof el === 'string') {
+            const m = el.match(/^#([A-Za-z_][\w$]*)[:]$/);
+            if (m) {
+                const name = m[1];
+                // consume next element as expression
+                const nextEl = arr[++i];
+                out.push(['field', `"${name}"`, transform(nextEl)] as Node);
+                continue;
+            }
+        }
+        // handle plain (field name EXPR) where name is bare identifier
+        if (Array.isArray(el)) {
+            out.push(transform(el));
+            continue;
+        }
+        out.push(el);
+    }
+
+    // Second pass: specific list-head rewrites
+    if (out.length > 0 && typeof out[0] === 'string') {
+        const head = out[0] as string;
+        if (head === 'field') {
+            // ensure second element is quoted string
+            if (out.length >= 2 && typeof out[1] === 'string') {
+                const nameTok = out[1] as string;
+                if (!/^".*"$/.test(nameTok) && !/^~/.test(nameTok)) {
+                    out[1] = `"${nameTok}"` as any;
+                }
+            }
+        }
+        if (head === 'prop') {
+            // prop OBJ KEY -> ensure KEY is quoted
+            if (out.length >= 3 && typeof out[2] === 'string') {
+                const keyTok = out[2] as string;
+                if (!/^".*"$/.test(keyTok) && !/^~/.test(keyTok)) {
+                    out[2] = `"${keyTok}"` as any;
+                }
+            }
+        }
+    }
+
+    // Recursively transform children
+    return out.map(e => (typeof e === 'string' ? e : transform(e as Node))) as Node;
+}
+
+function nodeToString(node: Node): string {
+    if (typeof node === 'string') return node;
+    return '(' + node.map(n => nodeToString(n)).join(' ') + ')';
+}
+
 export function rewriteSugar(source: string): string {
-    // Transform `("key" : Type)` into `("key" (type-ref "Type"))`
-    // This is a simple, local text-based rewrite applied in Phase1 only.
-    // Regex matches: ("..." : Identifier)
-    const fieldColonRegex = /\(\s*"([^"]+)"\s*:\s*([A-Za-z0-9_$.]+)\s*\)/g;
-
-    const out = source.replace(fieldColonRegex, (_m, key, typeName) => {
-        return `(\"${key}\" (type-ref \"${typeName}\"))`;
-    });
-
-    return out;
+    const tokens = tokenize(source);
+    const nodes: Node[] = [];
+    let i = 0;
+    while (i < tokens.length) {
+        const res = parseTokens(tokens, i);
+        nodes.push(res.node);
+        i = res.next;
+    }
+    const transformed = nodes.map(n => transform(n));
+    return transformed.map(n => nodeToString(n)).join('\n');
 }
 
 export default rewriteSugar;
