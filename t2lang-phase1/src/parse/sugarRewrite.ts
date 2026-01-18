@@ -2,7 +2,8 @@
 // Phase0 minimal sexprs before parsing.
 // Supported rewrites:
 //  - ("name" : Type)   -> ("name" (type-ref "Type"))
-//  - (#name: EXPR)       -> (field "name" EXPR)
+//  - (/name: EXPR)       -> (field "name" EXPR)
+//  - (.name: EXPR)       -> (field "name" EXPR)
 //  - (field name EXPR)   -> (field "name" EXPR)
 //  - (prop OBJ name)     -> (prop OBJ "name")
 
@@ -92,7 +93,7 @@ function transform(node: Node): Node {
         for (let i = 1; i < arr.length; i++) {
             const child = arr[i];
             if (Array.isArray(child) && typeof child[0] === 'string') {
-                const m = (child[0] as string).match(/^#([A-Za-z_][\w$]*)[:]$/);
+                const m = (child[0] as string).match(/^(?:\/|\.)([A-Za-z_][\w$]*):$/);
                 if (m) {
                     const name = m[1];
                     const typeEl = child[1];
@@ -117,7 +118,7 @@ function transform(node: Node): Node {
                 out.push(buildPropNode(s.split('.')));
                 continue;
             }
-            const m = s.match(/^#([A-Za-z_][\w$]*)[:]$/);
+            const m = s.match(/^(?:\/|\.)([A-Za-z_][\w$]*):$/);
             if (m) {
                 const name = m[1];
                 // consume next element as expression
@@ -180,3 +181,16 @@ export function rewriteSugar(source: string): string {
 }
 
 export default rewriteSugar;
+
+// Debug helper: parse source into nodes (before transform) for inspection
+export function parseToNodes(source: string): Node[] {
+    const tokens = tokenize(source);
+    const nodes: Node[] = [];
+    let i = 0;
+    while (i < tokens.length) {
+        const res = parseTokens(tokens, i);
+        nodes.push(res.node);
+        i = res.next;
+    }
+    return nodes;
+}

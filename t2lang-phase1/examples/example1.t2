@@ -6,19 +6,19 @@
 
     (type-alias AllowedElements
         (type-object
-            (#video: TypeA)
-            (#audio: TypeB)
-            (#canvas: TypeC)
+            (.video: TypeA)
+            (.audio: TypeB)
+            (.canvas: TypeC)
         )
     )
     (type-alias Languages
         (type-object
-            (#de: TypeD)
-            (#en: TypeD)
-            (#pt: TypeD)
-            (#es: TypeD)
-            (#fr: TypeD)
-            (#ja: TypeD)
+            (.de: TypeD)
+            (.en: TypeD)
+            (.pt: TypeD)
+            (.es: TypeD)
+            (.fr: TypeD)
+            (.ja: TypeD)
         )
     )
 
@@ -40,5 +40,6 @@
         )
     )
 )
+
 
 
