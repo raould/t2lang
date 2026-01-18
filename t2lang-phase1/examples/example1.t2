@@ -6,19 +6,19 @@
 
   (type-alias AllowedElements
     (type-object
-      ("video" (type-ref "HTMLVideoElement"))
-      ("audio" (type-ref "HTMLAudioElement"))
-      ("canvas" (type-ref "HTMLCanvasElement"))
+      ("video" : HTMLVideoElement)
+      ("audio" : HTMLAudioElement)
+      ("canvas" : HTMLCanvasElement)
     )
   )
   (type-alias Languages
     (type-object
-      ("de" (type-ref "URL"))
-      ("en" (type-ref "URL"))
-      ("pt" (type-ref "URL"))
-      ("es" (type-ref "URL"))
-      ("fr" (type-ref "URL"))
-      ("ja" (type-ref "URL"))
+      ("de" : URL)
+      ("en" : URL)
+      ("pt" : URL)
+      ("es" : URL)
+      ("fr" : URL)
+      ("ja" : URL)
     )
   )
 

@@ -1,6 +1,7 @@
 import { ArrayEventSink, EventSink } from "./events/eventSink.js";
 import { Program } from "./ast/nodes.js";
 import { Parser } from "./parse/parser.js";
+import { rewriteSugar } from "./parse/sugarRewrite.js";
 import { MacroExpander } from "./expand/macroExpander.js";
 import { Resolver } from "./resolve/resolver.js";
 import { TypeChecker } from "./typecheck/index.js";
@@ -46,7 +47,9 @@ export async function compilePhase1(
   let tsSource = "";
 
   try {
-    const parser = new Parser("input.t2", source, ctx);
+    // Apply Phase1-only sugar rewrites before parsing Phase0 sexprs.
+    const rewritten = rewriteSugar(source);
+    const parser = new Parser("input.t2", rewritten, ctx);
     parsedAst = parser.parseProgram();
 
     // Debug hook: print parse AST
