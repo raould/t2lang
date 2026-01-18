@@ -1,21 +1,13 @@
+import * as common from 't2lang-common';
+
 // Wrapper that delegates to the shared common CLI helper implementation
-// using the workspace `common` source so behavior is persistent and
-// works in development without installing packages.
+// using the packaged `t2lang-common` export. This avoids referencing
+// workspace TS sources during consumer builds.
 export async function runCli(
     notice: string,
     compileFn: (source: string, config?: Partial<any>) => Promise<any>,
     prettyEnum: { pretty: any; newlines: any; ugly: any },
     pkgPath?: string
 ): Promise<void> {
-    try {
-        const pkg = await import('t2lang-common');
-        return pkg.runCli(notice, compileFn, prettyEnum, pkgPath);
-    } catch {
-        // Fallback to relative workspace path for development (avoid static
-        // TS resolution by using dynamic string concatenation)
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        const mod = await import(".." + "/.." + "/common/src/cliHelper.js");
-        return mod.runCli(notice, compileFn, prettyEnum, pkgPath);
-    }
+    return (common as any).runCli(notice, compileFn, prettyEnum, pkgPath);
 }

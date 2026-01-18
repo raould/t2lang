@@ -24,65 +24,6 @@ This reduces maintenance, avoids drift, and centralizes bug fixes and behavior i
 
 ---
 
-# P0 most important: Package Export Stability
-
-Definition: package export stability = a guaranteed, documented set of public module specifiers, entry points, and TypeScript types (the public surface) that consumers can import reliably across releases without unexpected breakage.
-
-What it requires:
-
-Explicit exports: exports field (and main/module) in package.json that list public entry points and subpaths.
-Runtime artifacts: built JS files that match the declared export paths (no missing files).
-Type declarations: .d.ts files (or "types") for every exported entry so TS consumers resolve types.
-Packaged files: files or published tarball contains the JS + d.ts + any runtime assets.
-Semver policy: documented versioning rules so breaking changes use major bumps.
-Docs/changelog: note exported API and any deprecations.
-Consumer tests: automated tests that import the package the same way real consumers will.
-How to confirm locally (quick steps):
-
-Build the package:
-npm run -w common build (or ensure prepare builds on pack).
-Create a tarball:
-cd common && npm pack → produces t2lang-common-<ver>.tgz.
-Test runtime imports from a consumer (example shows the subpath export):
-In repo root (or a temp dir):
-npm i ./common/t2lang-common-0.1.0.tgz
-Then in Node:
-node -e "import('t2lang-common/ast/sexprPrinter.js').then(m=>console.log(typeof m.printSexpr))"
-Or in the consumer workspace: install the tarball and run the consumer build/tests:
-npm i ../common/t2lang-common-0.1.0.tgz && npm run -w t2lang-phase1 test
-Test TypeScript resolution:
-From a TypeScript consumer, run tsc --noEmit or npm run -w t2lang-phase1 build to ensure types resolve through the installed package.
-Inspect tarball contents:
-tar -tf t2lang-common-0.1.0.tgz — verify exported paths, .js, and .d.ts files are included.
-How to confirm in CI (recommended):
-
-Add a job that:
-Runs npm -w common run build && npm -w common pack (or npm pack).
-Installs the produced tarball into a consumer job workspace (or npm install <tarball>).
-Runs consumer build and test.
-Optionally runs tar -tf to ensure expected files are present.
-Gate merges on that job passing.
-Stability practices / rules:
-
-Document the public exports and mark internal/private modules (not exported) clearly.
-Follow semver strictly: any breaking export rename => major bump.
-Use deprecation shims: keep old export re-exporting new path for one minor release, logging deprecation.
-Add automated compatibility tests that run before merging.
-Edge cases to watch:
-
-Monorepo paths workarounds let TypeScript resolve local source, but they don’t guarantee runtime. Always validate the published artifact (tarball) rather than only local paths.
-Subpath export names must exactly match runtime file names and packaging layout (case-sensitive on some systems).
-Consumers using ESM vs CJS import forms require consistent type/fields.
-Quick checklist you can tick now:
-
-Build common and run npm pack.
-Confirm exports in package.json match files in the tarball.
-Install tarball in a consumer and run its tests.
-Run tsc in consumer to validate types.
-Add CI job to repeat the above automatically.
-
----
-
 High priority (easy wins)
 
 sexprPrinter
@@ -248,3 +189,62 @@ Acceptance: All macro tests pass and Phase1's surface-level adapter is < 100 LOC
 ---
 
 If you'd like, I can start with the **first extraction** (pick a small helper to extract, add tests, and replace a Phase1 duplicate) and submit the changes in small commits. Which helper would you like me to extract first: `parseQuotedSexpr`, `convertQuotedToAst`, or `expandGensym`? 
+
+---
+
+# Test & Fix & Confirm Package Export Stability
+
+Definition: package export stability = a guaranteed, documented set of public module specifiers, entry points, and TypeScript types (the public surface) that consumers can import reliably across releases without unexpected breakage.
+
+What it requires:
+
+Explicit exports: exports field (and main/module) in package.json that list public entry points and subpaths.
+Runtime artifacts: built JS files that match the declared export paths (no missing files).
+Type declarations: .d.ts files (or "types") for every exported entry so TS consumers resolve types.
+Packaged files: files or published tarball contains the JS + d.ts + any runtime assets.
+Semver policy: documented versioning rules so breaking changes use major bumps.
+Docs/changelog: note exported API and any deprecations.
+Consumer tests: automated tests that import the package the same way real consumers will.
+How to confirm locally (quick steps):
+
+Build the package:
+npm run -w common build (or ensure prepare builds on pack).
+Create a tarball:
+cd common && npm pack → produces t2lang-common-<ver>.tgz.
+Test runtime imports from a consumer (example shows the subpath export):
+In repo root (or a temp dir):
+npm i ./common/t2lang-common-0.1.0.tgz
+Then in Node:
+node -e "import('t2lang-common/ast/sexprPrinter.js').then(m=>console.log(typeof m.printSexpr))"
+Or in the consumer workspace: install the tarball and run the consumer build/tests:
+npm i ../common/t2lang-common-0.1.0.tgz && npm run -w t2lang-phase1 test
+Test TypeScript resolution:
+From a TypeScript consumer, run tsc --noEmit or npm run -w t2lang-phase1 build to ensure types resolve through the installed package.
+Inspect tarball contents:
+tar -tf t2lang-common-0.1.0.tgz — verify exported paths, .js, and .d.ts files are included.
+How to confirm in CI (recommended):
+
+Add a job that:
+Runs npm -w common run build && npm -w common pack (or npm pack).
+Installs the produced tarball into a consumer job workspace (or npm install <tarball>).
+Runs consumer build and test.
+Optionally runs tar -tf to ensure expected files are present.
+Gate merges on that job passing.
+Stability practices / rules:
+
+Document the public exports and mark internal/private modules (not exported) clearly.
+Follow semver strictly: any breaking export rename => major bump.
+Use deprecation shims: keep old export re-exporting new path for one minor release, logging deprecation.
+Add automated compatibility tests that run before merging.
+Edge cases to watch:
+
+Monorepo paths workarounds let TypeScript resolve local source, but they don’t guarantee runtime. Always validate the published artifact (tarball) rather than only local paths.
+Subpath export names must exactly match runtime file names and packaging layout (case-sensitive on some systems).
+Consumers using ESM vs CJS import forms require consistent type/fields.
+Quick checklist you can tick now:
+
+Build common and run npm pack.
+Confirm exports in package.json match files in the tarball.
+Install tarball in a consumer and run its tests.
+Run tsc in consumer to validate types.
+Add CI job to repeat the above automatically.
