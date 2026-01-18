@@ -54,4 +54,13 @@ Checklist
 - [ ] Add unit and integration tests.
 - [ ] Run full Phase0/Phase1 test suites and fix any regressions.
 
+- [ ] Support nullish testing and coalescing (`??`, `??=`) and associated semantics.
+- [ ] Support ternary operator (`cond ? a : b`) in Phase0 (typed and codegen emissions).
+
+Checklist additions:
+- [ ] Add unit tests for nullish coalescing `??` (parsing, typing, codegen behavior).
+- [ ] Add unit tests for nullish assignment `??=` and edge cases.
+- [ ] Add unit/integration tests for ternary `cond ? a : b` once grammar/type rules decided.
+- [ ] Update `Phase0_Syntax_and_Grammar.md` to list `??` and ternary when implemented.
+
 Rationale: Implementing operators in Phase0 centralizes semantics and code generation for the canonical AST. Keeping operators as plain S-expr call heads avoids macros/sugar and makes the language simpler to reason about and test.

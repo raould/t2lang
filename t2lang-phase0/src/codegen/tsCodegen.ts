@@ -273,7 +273,7 @@ const BINARY_OPERATORS: Set<string> = new Set([
 ]);
 
 const UNARY_OPERATORS: Set<string> = new Set([
-  "!", "-", "~", "typeof"
+  "!", "-", "~", "typeof", "!!"
 ]);
 
 function genCall(node: CallExpr, options: TsCodegenOptions): string {

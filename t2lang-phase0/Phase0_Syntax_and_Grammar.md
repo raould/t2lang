@@ -40,6 +40,18 @@ expr ::=
 * (obj field\*)  
 * (type-assert expr type)
 
+Note: Literals include boolean `true` and `false`, `null`, and `undefined`.
+
+Call heads may be ordinary identifiers or operator symbols/words. Phase0 treats operators as ordinary S-expr call heads, for example:
+
+- Arithmetic: `(+ 1 2)`, `(- 3 1)`, `(* 2 3)`, `(/ 6 2)`, `(% 7 3)`, `(** 2 3)`
+- Comparisons: `(< a b)`, `(<= a b)`, `(> a b)`, `(>= a b)`
+- Equality: `(== a b)`, `(=== a b)`, `(!= a b)`, `(!== a b)`
+- Logical (word-forms): `(and a b)`, `(or a b)`, `(not a)` — codegen maps these to `&&`, `||`, `!` respectively
+- Bitwise: `(& a b)`, `(| a b)`, `(^ a b)`, `(<< a b)`, `(>> a b)`, `(>>> a b)`
+
+Planned operators (see TODO_OPS.md): nullish coalescing `??` and ternary `?:` are not currently part of Phase0 grammar and are listed as future work.
+
 ## **Types**
 
 type ::=

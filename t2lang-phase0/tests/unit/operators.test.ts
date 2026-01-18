@@ -30,3 +30,27 @@ test("boolean logic and/or/not/xor", async () => {
     assert.strictEqual(res.errors.length, 0);
     assert.ok(res.tsSource.includes("&&") || res.tsSource.includes("and"));
 });
+
+test("plus should not concatenate strings", async () => {
+    const src = `
+  (program
+    (expr (+ "a" "b"))
+  )
+  `;
+    const res = await compilePhase0(src, { enableTsc: false });
+    // Expect a typecheck error for string operands to '+'
+    assert.ok(res.errors.length > 0, `Expected type errors but got none; tsSource:\n${res.tsSource}`);
+});
+
+test("double-bang (!!) coerces to boolean and emits !!", async () => {
+    const src = `
+  (program
+    (expr (!! 0))
+    (expr (!! ""))
+    (expr (!! true))
+  )
+  `;
+    const res = await compilePhase0(src, { enableTsc: false });
+    assert.strictEqual(res.errors.length, 0);
+    assert.ok(res.tsSource.includes("!!"));
+});

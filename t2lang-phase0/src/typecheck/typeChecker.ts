@@ -241,6 +241,11 @@ export class TypeCheckerBase {
         t = { kind: 'boolean' };
       }
 
+      // Double-bang: coercion to boolean of any value
+      else if (name === '!!' && node.args.length === 1) {
+        t = { kind: 'boolean' };
+      }
+
       else if ((name === 'not' || name === '!') && node.args.length === 1) {
         if (!isBoolean(argTypes[0])) {
           throw { message: `Logical operator ${name} requires boolean operand`, location: node.location, phase: 'typeCheck' } as CompilerError;
