@@ -63,7 +63,7 @@ An expression evaluated for its side effects. In the `(program ...)` body, any e
 
 ## **Function**
 
-(function name (param1 param2 ...) body type?)
+(fn name (param1 param2 ...) body type?)
 
 Defines a function.
 

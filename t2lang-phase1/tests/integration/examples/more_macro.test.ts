@@ -34,7 +34,7 @@ test("nested gensym hygiene prevents capture across nested scopes", async () => 
     (program
       (defmacro make-temp-fn (val)
         (let* ((tmp (gensym "tmp")))
-          (quote (function f () (let* ((~tmp ~val)) ~tmp)))))
+          (quote (fn f () (let* ((~tmp ~val)) ~tmp)))))
       (let* ((tmp 999))
         (make-temp-fn 42)
         tmp))

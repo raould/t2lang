@@ -22,24 +22,25 @@
         )
     )
 
-    (function isAvailable (obj key)
+    (fn isAvailable (obj key)
         (return (call obj.hasOwnProperty key))
     )
 
-    (function loadLanguage (collection lang)
+    (fn loadLanguage (collection lang)
         (if (call isAvailable collection lang)
             (return (index collection lang))
             (return null)
         )
     )
 
-    (function selectElement (collection elem)
+    (fn selectElement (collection elem)
         (if (call isAvailable collection elem)
             (return (index collection elem))
             (return null)
         )
     )
 )
+
 
 
 

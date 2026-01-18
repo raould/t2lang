@@ -16,8 +16,8 @@ function expectNoErrors(result: any, name: string) {
 test("macro generates function declaration", async () => {
   const result = await compilePhase1(`
     (program
-      (defmacro mkfn (name body) (quote (function ~name () ~body)))
-      (mkfn f (block (return 42))))
+      (defmacro mkfn (name body) (quote (fn ~name () ~body)))
+      (mkfn f (block (return 42)))))
   `, { enableTsc: false });
   expectNoErrors(result, "mkfn");
   assert(result.tsSource.includes("function f"));
@@ -136,7 +136,7 @@ test("gensym in function to ensure hygiene (no capture)", async () => {
     (program
       (defmacro tempfn (val)
         (let* ((tmp (gensym "tmp")))
-          (quote (function f () (let* ((~tmp ~val)) ~tmp)))))
+          (quote (fn f () (let* ((~tmp ~val)) ~tmp)))))
       (let* ((tmp 999))
         (tempfn 42)
         tmp))
@@ -194,7 +194,7 @@ test("macro expands inside function body", async () => {
   const result = await compilePhase1(`
     (program
       (defmacro incr (x) (quote (assign ~x (call + ~x 1))))
-      (function g () (incr y)))
+      (fn g () (incr y)))
   `, { enableTsc: false });
   expectNoErrors(result, "incr-fn");
   assert(result.tsSource.includes("y = y + 1") || result.tsSource.includes("y=y+1") || result.tsSource.includes("y = (y + 1)") || result.tsSource.includes("y=(y+1)"));

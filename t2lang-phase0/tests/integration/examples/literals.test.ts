@@ -7,25 +7,25 @@ import assert from "node:assert";
 import { compilePhase0 } from "../../../src/api";
 
 test("boolean literal true", async () => {
-  const result = await compilePhase0(`(program (function foo (x) x) (foo true))`, { enableTsc: false });
+  const result = await compilePhase0(`(program (fn foo (x) x) (foo true))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
   assert.ok(result.tsSource.includes("foo(true)"));
 });
 
 test("boolean literal false", async () => {
-  const result = await compilePhase0(`(program (function foo (x) x) (foo false))`, { enableTsc: false });
+  const result = await compilePhase0(`(program (fn foo (x) x) (foo false))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
   assert.ok(result.tsSource.includes("foo(false)"));
 });
 
 test("null literal", async () => {
-  const result = await compilePhase0(`(program (function foo (x) x) (foo null))`, { enableTsc: false });
+  const result = await compilePhase0(`(program (fn foo (x) x) (foo null))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
   assert.ok(result.tsSource.includes("foo(null)"));
 });
 
 test("undefined literal", async () => {
-  const result = await compilePhase0(`(program (function foo (x) x) (foo undefined))`, { enableTsc: false });
+  const result = await compilePhase0(`(program (fn foo (x) x) (foo undefined))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
   assert.ok(result.tsSource.includes("foo(undefined)"));
 });
@@ -33,7 +33,7 @@ test("undefined literal", async () => {
 test("mixed literals in let binding", async () => {
   const result = await compilePhase0(`
     (program
-      (function foo (a b c d) a)
+      (fn foo (a b c d) a)
       (let* ((a true)
             (b false)
             (c null)
@@ -50,7 +50,7 @@ test("mixed literals in let binding", async () => {
 test("string literal escapes", async () => {
   const result = await compilePhase0(String.raw`
     (program
-      (function foo (x) x)
+      (fn foo (x) x)
       (foo "line1\n\"line2\"")
     )
   `, { enableTsc: false });

@@ -6,7 +6,7 @@ import { Program } from "../../../src/ast/nodes";
 test("block with nested let and call", async () => {
   const source = `
     (program
-      (function foo (x) x)
+      (fn foo (x) x)
       (block
         (let* ((y 1))
           (foo y))

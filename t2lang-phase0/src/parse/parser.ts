@@ -418,14 +418,31 @@ export class Parser {
   }
 
   private parseLambda(open: Token): FunctionExpr {
-    // (fn (params) body...) - anonymous function
+    // (fn name? (params) body...) - named or anonymous function
+    // If the first item is an identifier and the next token is a '(' then
+    // treat it as a named function: (fn name (params) ...)
+    let name: Identifier | null = null;
+    const firstTok = this.current();
+    if (firstTok.kind === "identifier") {
+      const nextTok = this.tokens[this.index + 1];
+      if (nextTok && nextTok.kind === "punct" && nextTok.value === "(") {
+        // consume name
+        this.advance();
+        name = {
+          kind: "identifier",
+          name: firstTok.value as string,
+          location: firstTok.location
+        };
+      }
+    }
+
     const params = this.parseParamList();
     const body = this.parseBodyUntilClose();
     const close = this.advance();
 
     return {
       kind: "function",
-      name: null,
+      name,
       params,
       body,
       isDeclaration: false,

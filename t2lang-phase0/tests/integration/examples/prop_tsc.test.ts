@@ -51,7 +51,7 @@ test("method call on object", async () => {
 
 test("implicit call still works", async () => {
   // Backwards compatible: (foo 1) should still work
-  const result = await compilePhase0(`(program (function foo (a b) a) (foo 1 2))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (fn foo (a b) a) (foo 1 2))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
   assert.ok(result.tsSource.includes("foo(1, 2)"));
 });

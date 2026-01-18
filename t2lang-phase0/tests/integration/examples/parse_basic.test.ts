@@ -4,7 +4,7 @@ import { compilePhase0 } from "../../../src/api";
 import { Program } from "../../../src/ast/nodes";
 
 test("basic parse: call", async () => {
-  const source = `(program (function foo (x) x) (foo 42))`;
+  const source = `(program (fn foo (x) x) (foo 42))`;
 
   const result = await compilePhase0(source, {
     prettyOutput: true,
@@ -112,7 +112,7 @@ test("parse export-default", async () => {
 test("identifier location uses start position", async () => {
   const source = `
     (program
-      (function foo (x) x)
+      (fn foo (x) x)
       (foo 1))
   `;
 

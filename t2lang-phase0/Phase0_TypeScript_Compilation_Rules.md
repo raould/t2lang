@@ -73,7 +73,7 @@ Any expression form that is not a statement is wrapped in an `ExprStmt` and term
 
 ## **Function**
 
-`(function f (p1 p2 ...) body type?)`
+`(fn f (p1 p2 ...) body type?)`
 
 Compiles to:
 

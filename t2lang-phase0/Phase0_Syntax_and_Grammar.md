@@ -22,7 +22,7 @@ statement ::=
 * (const identifier expr)  
 * (assign expr expr)  
 * (expr expr)  
-* (function name params block type?)  
+* (fn name params block type?)  
 * (class name class-body)  
 * import-statement  
 * export-statement

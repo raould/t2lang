@@ -9,7 +9,7 @@ import { compilePhase0 } from "../../../src/api";
 test("lisp-style semicolon comment", async () => {
   const result = await compilePhase0(`
     (program
-      (function foo (x) x)
+      (fn foo (x) x)
       ; this is a comment
       (foo 1))
   `, { enableTsc: false });
@@ -20,7 +20,7 @@ test("lisp-style semicolon comment", async () => {
 });
 
 test("lisp-style inline comment", async () => {
-  const result = await compilePhase0(`(program (function foo (x) x) (foo 1) ; inline comment
+  const result = await compilePhase0(`(program (fn foo (x) x) (foo 1) ; inline comment
   )`, { enableTsc: false });
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
@@ -30,7 +30,7 @@ test("lisp-style inline comment", async () => {
 test("c-style double-slash comment", async () => {
   const result = await compilePhase0(`
     (program
-      (function bar (x) x)
+      (fn bar (x) x)
       // this is a C-style comment
       (bar 2))
   `, { enableTsc: false });
@@ -43,7 +43,7 @@ test("c-style double-slash comment", async () => {
 test("c-style block comment", async () => {
   const result = await compilePhase0(`
     (program
-      (function baz (x) x)
+      (fn baz (x) x)
       /* block comment */
       (baz 3))
   `, { enableTsc: false });
@@ -56,7 +56,7 @@ test("c-style block comment", async () => {
 test("multi-line block comment", async () => {
   const result = await compilePhase0(`
     (program
-      (function qux (x) x)
+      (fn qux (x) x)
       /* this is
          a multi-line
          block comment */
@@ -70,9 +70,9 @@ test("multi-line block comment", async () => {
 test("mixed comment styles", async () => {
   const result = await compilePhase0(`
     (program
-      (function a (x) x)
-      (function b (x) x)
-      (function c (x) x)
+      (fn a (x) x)
+      (fn b (x) x)
+      (fn c (x) x)
       ; lisp comment
       (a 1)
       // c-style comment  
@@ -87,7 +87,7 @@ test("mixed comment styles", async () => {
 });
 
 test("comment at end of file", async () => {
-  const result = await compilePhase0(`(program (function foo (x) x) (foo 1)) ; trailing comment`, { enableTsc: false });
+  const result = await compilePhase0(`(program (fn foo (x) x) (foo 1)) ; trailing comment`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
   assert.ok(result.tsSource.includes("foo(1)"));
 });

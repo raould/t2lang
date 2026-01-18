@@ -9,6 +9,6 @@ import { compilePhase0 } from "../../../src/api";
 const nonTsc = (errors: any[]) => errors.filter(e => e.phase !== "tsc");
 
 test("nested program form produces error", async () => {
-  const result = await compilePhase0(`(program (program (function foo (x) x)))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (program (fn foo (x) x)))`, { enableTsc: true });
   assert.ok(nonTsc(result.errors).length > 0);
 });

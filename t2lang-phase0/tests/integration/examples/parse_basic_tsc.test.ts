@@ -10,7 +10,7 @@ import { Program } from "../../../src/ast/nodes";
 const nonTsc = (errors: any[]) => errors.filter(e => e.phase !== "tsc");
 
 test("basic parse: call", async () => {
-  const source = `(program (function foo (x) x) (foo 42))`;
+  const source = `(program (fn foo (x) x) (foo 42))`;
 
   const result = await compilePhase0(source, {
     prettyOutput: true,
@@ -118,7 +118,7 @@ test("parse export-default", async () => {
 test("identifier location uses start position", async () => {
   const source = `
     (program
-      (function foo (x) x)
+      (fn foo (x) x)
       (foo 1))
   `;
 

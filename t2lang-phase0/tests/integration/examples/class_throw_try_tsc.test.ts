@@ -73,7 +73,7 @@ test("simple type assert", async () => {
 });
 
 test("type assert on expression", async () => {
-  const result = await compilePhase0(`(program (function getValue () "ok") (type-assert (getValue) "string"))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (fn getValue () "ok") (type-assert (getValue) "string"))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
   assert.ok(result.tsSource.includes("(getValue() as string)"));
 });

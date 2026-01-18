@@ -9,14 +9,14 @@ import { compilePhase0 } from "../../../src/api";
 const nonTsc = (errors: any[]) => errors.filter(e => e.phase !== "tsc");
 
 test("if with then only", async () => {
-  const result = await compilePhase0(`(program (function foo (x) x) (if true (foo 1)))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (fn foo (x) x) (if true (foo 1)))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
   assert.ok(result.tsSource.includes("if (true)"));
   assert.ok(result.tsSource.includes("foo(1)"));
 });
 
 test("if with then and else", async () => {
-  const result = await compilePhase0(`(program (function foo (x) x) (function bar (x) x) (if false (foo 1) (bar 2)))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (fn foo (x) x) (fn bar (x) x) (if false (foo 1) (bar 2)))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
   assert.ok(result.tsSource.includes("if (false)"));
   assert.ok(result.tsSource.includes("foo(1)"));
@@ -27,8 +27,8 @@ test("if with then and else", async () => {
 test("if with identifier condition", async () => {
   const result = await compilePhase0(`
     (program
-      (function foo (x) x)
-      (function bar (x) x)
+      (fn foo (x) x)
+      (fn bar (x) x)
       (let* ((x true))
         (if x (foo 1) (bar 2))))
   `, { enableTsc: true });
@@ -37,7 +37,7 @@ test("if with identifier condition", async () => {
 });
 
 test("if with call condition", async () => {
-  const result = await compilePhase0(`(program (function isReady () true) (function go () null) (if (isReady) (go)))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (fn isReady () true) (fn go () null) (if (isReady) (go)))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
   assert.ok(result.tsSource.includes("if (isReady())"));
 });
@@ -45,9 +45,9 @@ test("if with call condition", async () => {
 test("nested if expressions", async () => {
   const result = await compilePhase0(`
     (program
-      (function a () null)
-      (function b () null)
-      (function c () null)
+      (fn a () null)
+      (fn b () null)
+      (fn c () null)
       (if true
         (if false (a) (b))
         (c)))
@@ -60,9 +60,9 @@ test("nested if expressions", async () => {
 test("if with block branches", async () => {
   const result = await compilePhase0(`
     (program
-      (function foo (x) x)
-      (function bar (x) x)
-      (function baz (x) x)
+      (fn foo (x) x)
+      (fn bar (x) x)
+      (fn baz (x) x)
       (if true
         (block
           (foo 1)

@@ -7,7 +7,7 @@ import assert from "node:assert";
 import { compilePhase0 } from "../../../src/api";
 
 test("simple while loop", async () => {
-  const result = await compilePhase0(`(program (function foo () null) (while true (foo)))`, { enableTsc: false });
+  const result = await compilePhase0(`(program (fn foo () null) (while true (foo)))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
   assert.ok(result.tsSource.includes("while (true)"));
   assert.ok(result.tsSource.includes("foo()"));
@@ -16,7 +16,7 @@ test("simple while loop", async () => {
 test("while with variable condition", async () => {
   const result = await compilePhase0(`
     (program
-      (function process () null)
+      (fn process () null)
       (let* ((running true))
         (while running
           (process))))
@@ -28,9 +28,9 @@ test("while with variable condition", async () => {
 test("while with multiple body statements", async () => {
   const result = await compilePhase0(`
     (program
-      (function a () null)
-      (function b () null)
-      (function c () null)
+      (fn a () null)
+      (fn b () null)
+      (fn c () null)
       (while true
         (a)
         (b)
@@ -43,7 +43,7 @@ test("while with multiple body statements", async () => {
 });
 
 test("while with call condition", async () => {
-  const result = await compilePhase0(`(program (function hasMore () true) (function process () null) (while (hasMore) (process)))`, { enableTsc: false });
+  const result = await compilePhase0(`(program (fn hasMore () true) (fn process () null) (while (hasMore) (process)))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
   assert.ok(result.tsSource.includes("while (hasMore())"));
 });

@@ -7,32 +7,32 @@ import assert from "node:assert";
 import { compilePhase0 } from "../../../src/api";
 
 test("named function with no params", async () => {
-  const result = await compilePhase0(`(program (function print (x) x) (function sayHello () (print "hello")))`, { enableTsc: false });
+  const result = await compilePhase0(`(program (fn print (x) x) (fn sayHello () (print "hello")))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
   assert.ok(result.tsSource.includes("function sayHello()"));
   assert.ok(result.tsSource.includes('print("hello")'));
 });
 
 test("named function with params", async () => {
-  const result = await compilePhase0(`(program (function foo (a b) a) (function add (a b) (foo a b)))`, { enableTsc: false });
+  const result = await compilePhase0(`(program (fn foo (a b) a) (fn add (a b) (foo a b)))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
   assert.ok(result.tsSource.includes("function add(a, b)"));
 });
 
 test("function with return", async () => {
-  const result = await compilePhase0(`(program (function double (x) (return x)))`, { enableTsc: false });
+  const result = await compilePhase0(`(program (fn double (x) (return x)))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
   assert.ok(result.tsSource.includes("return x"));
 });
 
 test("function with empty return", async () => {
-  const result = await compilePhase0(`(program (function doNothing () (return)))`, { enableTsc: false });
+  const result = await compilePhase0(`(program (fn doNothing () (return)))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
   assert.ok(result.tsSource.includes("return;"));
 });
 
 test("anonymous function (lambda)", async () => {
-  const result = await compilePhase0(`(program (function foo (x) x) (fn (x) (foo x)))`, { enableTsc: false });
+  const result = await compilePhase0(`(program (fn foo (x) x) (fn (x) (foo x)))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
   assert.ok(result.tsSource.includes("(x) =>"));
 });
@@ -52,9 +52,9 @@ test("lambda as callback", async () => {
 test("function with multiple statements in body", async () => {
   const result = await compilePhase0(`
     (program
-      (function foo (x) x)
-      (function bar (x) x)
-      (function process (x)
+      (fn foo (x) x)
+      (fn bar (x) x)
+      (fn process (x)
         (foo x)
         (bar x)
         (return x)))
