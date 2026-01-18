@@ -22,11 +22,11 @@ test("extended type nodes and type-alias", async () => {
   `, { enableTsc: true });
 
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.match(result.tsSource, /type Foo = { x: number, y: string }/);
-  assert.match(result.tsSource, /type Fn = (number, string) => boolean/);
-  assert.match(result.tsSource, /(v as Foo)/);
-  assert.match(result.tsSource, /(true as boolean)/);
-  assert.match(result.tsSource, /(null as null)/);
-  assert.match(result.tsSource, /(undefined as undefined)/);
-    assert.match(result.tsSource, /("hi" as "hi")/);
+  assert.match(result.tsSource, /type Foo = \{ x: number, y: string \}/);
+  assert.match(result.tsSource, /type Fn = \(number, string\) => boolean/);
+  assert.match(result.tsSource, /\(v as Foo\)/);
+  assert.match(result.tsSource, /\(true as boolean\)/);
+  assert.match(result.tsSource, /\(null as null\)/);
+  assert.match(result.tsSource, /\(undefined as undefined\)/);
+    assert.match(result.tsSource, /\("hi" as "hi"\)/);
 });

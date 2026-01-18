@@ -11,55 +11,55 @@ const nonTsc = (errors: any[]) => errors.filter(e => e.phase !== "tsc");
 test("arithmetic operators", async () => {
   const add = await compilePhase0(`(program (+ 1 2))`, { enableTsc: true });
   assert.strictEqual(nonTsc(add.errors).length, 0);
-  assert.match(add.tsSource, /(1 + 2)/);
+  assert.match(add.tsSource, /\(1 \+ 2\)/);
 
   const sub = await compilePhase0(`(program (- 5 3))`, { enableTsc: true });
   assert.strictEqual(nonTsc(sub.errors).length, 0);
-  assert.match(sub.tsSource, /(5 - 3)/);
+  assert.match(sub.tsSource, /\(5 - 3\)/);
 
   const mul = await compilePhase0(`(program (* 4 5))`, { enableTsc: true });
   assert.strictEqual(nonTsc(mul.errors).length, 0);
-  assert.match(mul.tsSource, /(4 * 5)/);
+  assert.match(mul.tsSource, /\(4 \* 5\)/);
 
   const div = await compilePhase0(`(program (/ 10 2))`, { enableTsc: true });
   assert.strictEqual(nonTsc(div.errors).length, 0);
-  assert.match(div.tsSource, /(10 / 2)/);
+  assert.match(div.tsSource, /\(10 \/ 2\)/);
 
   const mod = await compilePhase0(`(program (% 7 3))`, { enableTsc: true });
   assert.strictEqual(nonTsc(mod.errors).length, 0);
-  assert.match(mod.tsSource, /(7 % 3)/);
+  assert.match(mod.tsSource, /\(7 % 3\)/);
 });
 
 test("comparison operators", async () => {
   const lt = await compilePhase0(`(program (< 1 2))`, { enableTsc: true });
   assert.strictEqual(nonTsc(lt.errors).length, 0);
-  assert.match(lt.tsSource, /(1 < 2)/);
+  assert.match(lt.tsSource, /\(1 < 2\)/);
 
   const gt = await compilePhase0(`(program (> 5 3))`, { enableTsc: true });
   assert.strictEqual(nonTsc(gt.errors).length, 0);
-  assert.match(gt.tsSource, /(5 > 3)/);
+  assert.match(gt.tsSource, /\(5 > 3\)/);
 
   const eq = await compilePhase0(`(program (let* ((a 1) (b 2)) (== a b)))`, { enableTsc: true });
   assert.strictEqual(nonTsc(eq.errors).length, 0);
-  assert.match(eq.tsSource, /(a == b)/);
+  assert.match(eq.tsSource, /\(a == b\)/);
 
   const seq = await compilePhase0(`(program (let* ((a 1) (b 2)) (=== a b)))`, { enableTsc: true });
   assert.strictEqual(nonTsc(seq.errors).length, 0);
-  assert.match(seq.tsSource, /(a === b)/);
+  assert.match(seq.tsSource, /\(a === b\)/);
 });
 
 test("logical operators", async () => {
   const and = await compilePhase0(`(program (&& true false))`, { enableTsc: true });
   assert.strictEqual(nonTsc(and.errors).length, 0);
-  assert.match(and.tsSource, /(true && false)/);
+  assert.match(and.tsSource, /\(true && false\)/);
 
   const or = await compilePhase0(`(program (|| true false))`, { enableTsc: true });
   assert.strictEqual(nonTsc(or.errors).length, 0);
-  assert.match(or.tsSource, /(true || false)/);
+  assert.match(or.tsSource, /\(true \|\| false\)/);
 
   const not = await compilePhase0(`(program (! true))`, { enableTsc: true });
   assert.strictEqual(nonTsc(not.errors).length, 0);
-  assert.match(not.tsSource, /(!true)/);
+  assert.match(not.tsSource, /\(!true\)/);
 });
 
 test("unary typeof", async () => {
@@ -71,7 +71,7 @@ test("unary typeof", async () => {
 test("nested operators", async () => {
   const result = await compilePhase0(`(program (* (+ 1 2) (- 4 3)))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.match(result.tsSource, /((1 + 2) * (4 - 3))/);
+  assert.match(result.tsSource, /\(\(1 \+ 2\) \* \(4 - 3\)\)/);
 });
 
 test("operators in function", async () => {
@@ -81,12 +81,12 @@ test("operators in function", async () => {
         (return (+ a b))))
   `, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.match(result.tsSource, /return (a + b)/);
+  assert.match(result.tsSource, /return \(a \+ b\)/);
 });
 
 test("operator with wrong arity becomes regular call", async () => {
   const result = await compilePhase0(`(program (+ 1 2 3))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
   // 3 args means it's treated as a regular function call
-  assert.match(result.tsSource, /+(1, 2, 3)/);
+  assert.match(result.tsSource, /\+\(1, 2, 3\)/);
 });

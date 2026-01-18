@@ -12,11 +12,10 @@ test('T2_DEBUG_PARSE prints parsed AST in phase0', async () => {
     assert.match(captured, /SANITY/);
     try {
         process.env.T2_DEBUG_PARSE = '1';
-        oldErr('ENV_PARSE=' + process.env.T2_DEBUG_PARSE);
         await compilePhase0('(program)', { dumpAst: false });
         // print captured for diagnosis using original console
         oldErr('DEBUGOUTPUT_PARSED:' + captured);
-        assert.match(captured, /[DEBUG] Parsed AST/, 'expected debug parsed AST output');
+        assert.match(captured, /\[DEBUG\] Parsed AST/, 'expected debug parsed AST output');
     } finally {
         if (old === undefined) delete process.env.T2_DEBUG_PARSE;
         else process.env.T2_DEBUG_PARSE = old;
@@ -37,7 +36,7 @@ test('T2_DEBUG_CODEGEN prints codegen output in phase0', async () => {
         await compilePhase0('(program)', { dumpAst: false });
         oldErr('DEBUGOUTPUT_CODEGEN:' + captured);
         // codegen runs but we only assert debug log happened
-        assert.match(captured, /[DEBUG] Codegen output/, 'expected debug codegen output');
+        assert.match(captured, /\[DEBUG\] Codegen output/, 'expected debug codegen output');
     } finally {
         if (old === undefined) delete process.env.T2_DEBUG_CODEGEN;
         else process.env.T2_DEBUG_CODEGEN = old;

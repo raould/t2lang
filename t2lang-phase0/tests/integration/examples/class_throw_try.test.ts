@@ -31,8 +31,8 @@ test("class with method", async () => {
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /class Greeter/);
-  assert.match(result.tsSource, /greet()/);
-  assert.match(result.tsSource, /console.log/);
+  assert.match(result.tsSource, /greet\(\)/);
+  assert.match(result.tsSource, /console\.log/);
 });
 
 test("class with method params", async () => {
@@ -45,8 +45,8 @@ test("class with method params", async () => {
   `, { enableTsc: false });
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
-  assert.match(result.tsSource, /add(a, b)/);
-  assert.match(result.tsSource, /return (a + b)/);
+  assert.match(result.tsSource, /add\(a, b\)/);
+  assert.match(result.tsSource, /return \(a \+ b\)/);
 });
 
 test("class with field and method", async () => {
@@ -60,27 +60,27 @@ test("class with field and method", async () => {
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /count = 0/);
-  assert.match(result.tsSource, /increment()/);
+  assert.match(result.tsSource, /increment\(\)/);
 });
 
 // Type assert tests
 test("simple type assert", async () => {
   const result = await compilePhase0(`(program (let* ((x 1)) (type-assert x "number")))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.match(result.tsSource, /(x as number)/);
+  assert.match(result.tsSource, /\(x as number\)/);
 });
 
 test("type assert on expression", async () => {
   const result = await compilePhase0(`(program (fn getValue () "ok") (type-assert (getValue) "string"))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.match(result.tsSource, /(getValue() as string)/);
+  assert.match(result.tsSource, /\(getValue\(\) as string\)/);
 });
 
 // Throw tests
 test("throw error", async () => {
   const result = await compilePhase0(`(program (let* ((Error (fn (x) x))) (throw (new Error "oops"))))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.match(result.tsSource, /throw new Error("oops")/);
+  assert.match(result.tsSource, /throw new Error\("oops"\)/);
 });
 
 test("throw variable", async () => {
@@ -101,10 +101,10 @@ test("simple try-catch", async () => {
             (log e)))))
   `, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.match(result.tsSource, /try {/);
-  assert.match(result.tsSource, /riskyOp()/);
-  assert.match(result.tsSource, /catch (e)/);
-  assert.match(result.tsSource, /log(e)/);
+  assert.match(result.tsSource, /try \{/);
+  assert.match(result.tsSource, /riskyOp\(\)/);
+  assert.match(result.tsSource, /catch \(e\)/);
+  assert.match(result.tsSource, /log\(e\)/);
 });
 
 test("try-catch with finally", async () => {
@@ -121,10 +121,10 @@ test("try-catch with finally", async () => {
             (close)))))
   `, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.match(result.tsSource, /try {/);
-  assert.match(result.tsSource, /catch (e)/);
-  assert.match(result.tsSource, /finally {/);
-  assert.match(result.tsSource, /close()/);
+  assert.match(result.tsSource, /try \{/);
+  assert.match(result.tsSource, /catch \(e\)/);
+  assert.match(result.tsSource, /finally \{/);
+  assert.match(result.tsSource, /close\(\)/);
 });
 
 test("try-catch with multiple statements", async () => {
@@ -142,10 +142,10 @@ test("try-catch with multiple statements", async () => {
             (recover)))))
   `, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.match(result.tsSource, /step1()/);
-  assert.match(result.tsSource, /step2()/);
-  assert.match(result.tsSource, /log(err)/);
-  assert.match(result.tsSource, /recover()/);
+  assert.match(result.tsSource, /step1\(\)/);
+  assert.match(result.tsSource, /step2\(\)/);
+  assert.match(result.tsSource, /log\(err\)/);
+  assert.match(result.tsSource, /recover\(\)/);
 });
 
 test("try-catch with empty catch body still emits catch", async () => {
@@ -157,6 +157,6 @@ test("try-catch with empty catch body still emits catch", async () => {
           (catch e))))
   `, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.match(result.tsSource, /try {/);
-  assert.match(result.tsSource, /catch (e)/);
+  assert.match(result.tsSource, /try \{/);
+  assert.match(result.tsSource, /catch \(e\)/);
 });

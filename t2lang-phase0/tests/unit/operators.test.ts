@@ -12,8 +12,8 @@ test("arithmetic operators emit infix and typecheck", async () => {
   `;
     const res = await compilePhase0(src, { enableTsc: false });
     // Ensure emitted TS contains infix operators
-    assert.match(res.tsSource, /(1 + 2)") || res.tsSource.includes("1 + 2/);
-    assert.match(res.tsSource, /(2 ** 3)") || res.tsSource.includes("2 ** 3/);
+    assert.match(res.tsSource, /\(1 \+ 2\)/);
+    assert.match(res.tsSource, /\(2 \*\* 3\)/);
     assert.strictEqual(res.errors.length, 0);
 });
 
@@ -28,7 +28,7 @@ test("boolean logic and/or/not/xor", async () => {
   `;
     const res = await compilePhase0(src, { enableTsc: false });
     assert.strictEqual(res.errors.length, 0);
-    assert.match(res.tsSource, /&&") || res.tsSource.includes("and/);
+    assert.match(res.tsSource, /&&/);
 });
 
 test("plus should not concatenate strings", async () => {
@@ -39,7 +39,7 @@ test("plus should not concatenate strings", async () => {
   `;
     const res = await compilePhase0(src, { enableTsc: false });
     // Expect a typecheck error for string operands to '+'
-    assert.match(res.errors.length > 0, `Expected type errors but got none; tsSource:\n${res.tsSource}`);
+    assert.ok(res.errors.length > 0, `Expected type errors but got none; tsSource:\n${res.tsSource}`);
 });
 
 test("double-bang (!!) coerces to boolean and emits !!", async () => {
@@ -52,5 +52,5 @@ test("double-bang (!!) coerces to boolean and emits !!", async () => {
   `;
     const res = await compilePhase0(src, { enableTsc: false });
     assert.strictEqual(res.errors.length, 0);
-    assert.ok(res.tsSource, /!!/);
+    assert.match(res.tsSource, /!!/);
 });

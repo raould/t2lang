@@ -1,7 +1,7 @@
-type TypeA = {};
-type TypeB = {};
-type TypeC = {};
-type TypeD = {};
+type TypeA = object;
+type TypeB = object;
+type TypeC = object;
+type TypeD = object;
 type AllowedElements = { video: TypeA; audio: TypeB; canvas: TypeC };
 type Languages = {
   de: TypeD;
@@ -12,10 +12,10 @@ type Languages = {
   ja: TypeD;
 };
 function isAvailable(obj: any, key: any): unknown {
-  return obj.hasOwnProperty(key);
+  return Object.prototype.hasOwnProperty.call(obj, key);
 }
 function isNotAvailable(obj: any, key: any): unknown {
-  if (obj.hasOwnProperty(key)) {
+  if (Object.prototype.hasOwnProperty.call(obj, key)) {
     return false;
   } else {
     return true;
@@ -36,3 +36,10 @@ function selectElement(collection: any, elem: any): unknown {
   }
 }
 console.log("hello world");
+
+// reference types and functions to avoid unused-variable lint errors in example
+const _typeRef: AllowedElements | Languages = {} as any;
+void _typeRef;
+void isNotAvailable;
+void loadLanguage;
+void selectElement;

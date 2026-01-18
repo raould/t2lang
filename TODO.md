@@ -1,3 +1,8 @@
+# bugs
+
+* there are tests still trying to use --enable-tsc which has been removed.
+* make sure t2ct (compile .t2 to .ts) and t2cj (compile .t2 to .ts and then invoke tsc on .ts) are working correctly.
+
 # todo
 
 * done: refactor the t2lang keyword "function", which is like lisp's defun, to just "fn" please.

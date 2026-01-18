@@ -10,28 +10,28 @@ test("boolean literal true", async () => {
   const result = await compilePhase0(`(program (fn foo (x) x) (foo true))`, { enableTsc: true });
   const nonTscErrors = result.errors.filter(e => e.phase !== "tsc");
   assert.strictEqual(nonTscErrors.length, 0);
-  assert.match(result.tsSource, /foo(true)/);
+  assert.match(result.tsSource, /foo\(true\)/);
 });
 
 test("boolean literal false", async () => {
   const result = await compilePhase0(`(program (fn foo (x) x) (foo false))`, { enableTsc: true });
   const nonTscErrors = result.errors.filter(e => e.phase !== "tsc");
   assert.strictEqual(nonTscErrors.length, 0);
-  assert.match(result.tsSource, /foo(false)/);
+  assert.match(result.tsSource, /foo\(false\)/);
 });
 
 test("null literal", async () => {
   const result = await compilePhase0(`(program (fn foo (x) x) (foo null))`, { enableTsc: true });
   const nonTscErrors = result.errors.filter(e => e.phase !== "tsc");
   assert.strictEqual(nonTscErrors.length, 0);
-  assert.match(result.tsSource, /foo(null)/);
+  assert.match(result.tsSource, /foo\(null\)/);
 });
 
 test("undefined literal", async () => {
   const result = await compilePhase0(`(program (fn foo (x) x) (foo undefined))`, { enableTsc: true });
   const nonTscErrors = result.errors.filter(e => e.phase !== "tsc");
   assert.strictEqual(nonTscErrors.length, 0);
-  assert.match(result.tsSource, /foo(undefined)/);
+  assert.match(result.tsSource, /foo\(undefined\)/);
 });
 
 test("mixed literals in let binding", async () => {

@@ -23,7 +23,7 @@ test('runCli --ast prints AST dump to stderr', async () => {
         };
         await runCli('Test', compileFn, { pretty: 'newlines', newlines: 'newlines', ugly: 'ugly' }, './package.json');
         assert.match(captured, /--- AST/);
-        assert.match(captured, /(?:"test"\s*:\s*true|\(object\s+\(field\s+test\s+true\)\))/);
+        assert.match(captured, /\(object \(field test true\)\)/);
     } finally {
         try { fs.unlinkSync(tmpPath); } catch (e) { void e; };
         process.argv = oldArgv;

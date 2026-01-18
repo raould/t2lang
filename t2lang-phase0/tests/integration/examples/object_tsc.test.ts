@@ -11,7 +11,7 @@ const nonTsc = (errors: any[]) => errors.filter(e => e.phase !== "tsc");
 test("empty object", async () => {
   const result = await compilePhase0(`(program (obj))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.match(result.tsSource, /{  }/);
+  assert.match(result.tsSource, /\{  \}/);
 });
 
 test("object with string value", async () => {
@@ -58,7 +58,7 @@ test("object with array field", async () => {
         (field "items" (array 1 2 3))))
   `, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.match(result.tsSource, /"items": [1, 2, 3]/);
+  assert.match(result.tsSource, /"items": \[1, 2, 3\]/);
 });
 
 test("object assigned to variable", async () => {
@@ -69,5 +69,5 @@ test("object assigned to variable", async () => {
         (foo person)))
   `, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.match(result.tsSource, /const person = { "name": "John" }/);
+  assert.match(result.tsSource, /const person = \{ "name": "John" \}/);
 });

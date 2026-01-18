@@ -11,7 +11,7 @@ test("nullish coalescing emits ?? and types", async () => {
   `;
     const res = await compilePhase0(src, { enableTsc: false });
     assert.strictEqual(res.errors.length, 0);
-    assert.match(res.tsSource, /??/, `Expected tsSource to include '??' but got:\n${res.tsSource}`);
+    assert.match(res.tsSource, /\?\?/, `Expected tsSource to include '??' but got:\n${res.tsSource}`);
 });
 
 test("ternary emits ?:", async () => {
@@ -22,7 +22,7 @@ test("ternary emits ?:", async () => {
   `;
     const res = await compilePhase0(src, { enableTsc: false });
     assert.strictEqual(res.errors.length, 0);
-    assert.match(res.tsSource, /?") && res.tsSource.includes(":/, `Expected ternary emission but got:\n${res.tsSource}`);
+    assert.match(res.tsSource, /\?/, `Expected ternary emission but got:\n${res.tsSource}`);
 });
 
 test("nullish assignment emits ??=", async () => {
@@ -33,5 +33,5 @@ test("nullish assignment emits ??=", async () => {
   `;
     const res = await compilePhase0(src, { enableTsc: false });
     assert.strictEqual(res.errors.length, 0);
-    assert.match(res.tsSource, /??=/, `Expected tsSource to include '??=' but got:\n${res.tsSource}`);
+    assert.match(res.tsSource, /\?\?=/, `Expected tsSource to include '??=' but got:\n${res.tsSource}`);
 });

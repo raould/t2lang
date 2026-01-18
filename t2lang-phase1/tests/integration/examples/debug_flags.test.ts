@@ -11,7 +11,7 @@ test('T2_DEBUG_EXPAND prints expanded AST', async () => {
         process.env.T2_DEBUG_EXPAND = '1';
         const src = '(program)';
         await compilePhase1(src, { dumpAst: false });
-        assert.match(captured, /[DEBUG] Expanded AST/, 'expected debug expanded AST output');
+        assert.match(captured, /\[DEBUG\] Expanded AST/, 'expected debug expanded AST output');
     } finally {
         if (old === undefined) delete process.env.T2_DEBUG_EXPAND;
         else process.env.T2_DEBUG_EXPAND = old;
@@ -28,7 +28,7 @@ test('T2_DEBUG_PARSE prints parsed AST', async () => {
         process.env.T2_DEBUG_PARSE = '1';
         const src = '(program)';
         await compilePhase1(src, { dumpAst: false });
-        assert.match(captured, /[DEBUG] Parsed AST/, 'expected debug parsed AST output');
+        assert.match(captured, /\[DEBUG\] Parsed AST/, 'expected debug parsed AST output');
     } finally {
         if (old === undefined) delete process.env.T2_DEBUG_PARSE;
         else process.env.T2_DEBUG_PARSE = old;

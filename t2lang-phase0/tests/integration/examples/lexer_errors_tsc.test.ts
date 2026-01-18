@@ -13,7 +13,7 @@ const nonTsc = (errors: any[]) => errors.filter(e => e.phase !== "tsc");
 
 test("unexpected bracket produces error", async () => {
   const result = await compilePhase0(`(program ([ 1 2))`, { enableTsc: true });
-  assert.match(nonTsc(result.errors).length > 0);
+  assert.ok(nonTsc(result.errors).length > 0);
 });
 
 test("unexpected curly brace produces error", async () => {
@@ -25,31 +25,31 @@ test("valid operators still work after lexer fix", async () => {
   // Ensure we didn't break valid operator parsing
   const result = await compilePhase0(`(program (+ 1 2))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.ok(result.tsSource, /(1 + 2)/);
+  assert.match(result.tsSource, /\(1 \+ 2\)/);
 });
 
 test("ampersand operator works", async () => {
   const result = await compilePhase0(`(program (&& true false))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.match(result.tsSource, /(true && false)/);
+  assert.match(result.tsSource, /\(true && false\)/);
 });
 
 test("pipe operator works", async () => {
   const result = await compilePhase0(`(program (|| true false))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.match(result.tsSource, /(true || false)/);
+  assert.match(result.tsSource, /\(true \|\| false\)/);
 });
 
 test("caret operator works", async () => {
   const result = await compilePhase0(`(program (^ 5 3))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.match(result.tsSource, /(5 ^ 3)/);
+  assert.match(result.tsSource, /\(5 \^ 3\)/);
 });
 
 test("tilde operator works", async () => {
   const result = await compilePhase0(`(program (~ 5))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.match(result.tsSource, /(~5)/);
+  assert.match(result.tsSource, /\(~5\)/);
 });
 
 test("unterminated string produces error", async () => {

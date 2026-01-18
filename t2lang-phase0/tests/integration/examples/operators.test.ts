@@ -11,44 +11,44 @@ import { compilePhase0 } from "../../../src/api";
 
 test("arithmetic operators", async () => {
   const add = await compilePhase0(`(program (+ 1 2))`, { enableTsc: false });
-  assert.match(add.tsSource, /(1 + 2)/);
+  assert.match(add.tsSource, /\(1 \+ 2\)/);
 
   const sub = await compilePhase0(`(program (- 5 3))`, { enableTsc: false });
-  assert.match(sub.tsSource, /(5 - 3)/);
+  assert.match(sub.tsSource, /\(5 - 3\)/);
 
   const mul = await compilePhase0(`(program (* 4 5))`, { enableTsc: false });
-  assert.match(mul.tsSource, /(4 * 5)/);
+  assert.match(mul.tsSource, /\(4 \* 5\)/);
 
   const div = await compilePhase0(`(program (/ 10 2))`, { enableTsc: false });
-  assert.match(div.tsSource, /(10 / 2)/);
+  assert.match(div.tsSource, /\(10 \/ 2\)/);
 
   const mod = await compilePhase0(`(program (% 7 3))`, { enableTsc: false });
-  assert.match(mod.tsSource, /(7 % 3)/);
+  assert.match(mod.tsSource, /\(7 % 3\)/);
 });
 
 test("comparison operators", async () => {
   const lt = await compilePhase0(`(program (< 1 2))`, { enableTsc: false });
-  assert.match(lt.tsSource, /(1 < 2)/);
+  assert.match(lt.tsSource, /\(1 < 2\)/);
 
   const gt = await compilePhase0(`(program (> 5 3))`, { enableTsc: false });
-  assert.match(gt.tsSource, /(5 > 3)/);
+  assert.match(gt.tsSource, /\(5 > 3\)/);
 
   const eq = await compilePhase0(`(program (let* ((a 1) (b 2)) (== a b)))`, { enableTsc: false });
-  assert.match(eq.tsSource, /(a == b)/);
+  assert.match(eq.tsSource, /\(a == b\)/);
 
   const seq = await compilePhase0(`(program (let* ((a 1) (b 2)) (=== a b)))`, { enableTsc: false });
-  assert.match(seq.tsSource, /(a === b)/);
+  assert.match(seq.tsSource, /\(a === b\)/);
 });
 
 test("logical operators", async () => {
   const and = await compilePhase0(`(program (&& true false))`, { enableTsc: false });
-  assert.match(and.tsSource, /(true && false)/);
+  assert.match(and.tsSource, /\(true && false\)/);
 
   const or = await compilePhase0(`(program (|| true false))`, { enableTsc: false });
-  assert.match(or.tsSource, /(true || false)/);
+  assert.match(or.tsSource, /\(true \|\| false\)/);
 
   const not = await compilePhase0(`(program (! true))`, { enableTsc: false });
-  assert.match(not.tsSource, /(!true)/);
+  assert.match(not.tsSource, /\(!true\)/);
 });
 
 test("unary typeof", async () => {
@@ -58,7 +58,7 @@ test("unary typeof", async () => {
 
 test("nested operators", async () => {
   const result = await compilePhase0(`(program (* (+ 1 2) (- 4 3)))`, { enableTsc: false });
-  assert.match(result.tsSource, /((1 + 2) * (4 - 3))/);
+  assert.match(result.tsSource, /\(\(1 \+ 2\) \* \(4 - 3\)\)/);
 });
 
 test("operators in function", async () => {
@@ -67,11 +67,11 @@ test("operators in function", async () => {
       (fn add (a b)
         (return (+ a b))))
   `, { enableTsc: false });
-  assert.match(result.tsSource, /return (a + b)/);
+  assert.match(result.tsSource, /return \(a \+ b\)/);
 });
 
 test("operator with wrong arity becomes regular call", async () => {
   const result = await compilePhase0(`(program (+ 1 2 3))`, { enableTsc: false });
   // 3 args means it's treated as a regular function call
-  assert.match(result.tsSource, /+(1, 2, 3)/);
+  assert.match(result.tsSource, /\+\(1, 2, 3\)/);
 });
