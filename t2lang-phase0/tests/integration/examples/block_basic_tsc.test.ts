@@ -29,7 +29,7 @@ test("block with nested let and call", async () => {
   assert.strictEqual(nonTsc(result.errors).length, 0);
 
   const ts = result.tsSource.trim();
-  assert.ok(ts.includes("foo(y)"));
+  assert.match(ts, /foo(y)/);
 
   const resolveDump = result.events.find(e => e.kind === "resolveDump");
   const ast = (resolveDump?.data as { ast: Program })?.ast;

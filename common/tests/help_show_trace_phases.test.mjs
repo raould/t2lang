@@ -13,5 +13,5 @@ test('showHelp lists supported trace phases', () => {
         console.log = orig;
     }
     const joined = logs.join('\n');
-    assert.ok(joined.includes('parse, expand, resolve, typeCheck, codegen, tsc'), 'expected help to list supported trace phases');
+    assert.match(joined, /parse, expand, resolve, typeCheck, codegen, tsc/, 'expected help to list supported trace phases');
 });

@@ -9,25 +9,25 @@ import { compilePhase0 } from "../../../src/api";
 test("boolean literal true", async () => {
   const result = await compilePhase0(`(program (fn foo (x) x) (foo true))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes("foo(true)"));
+  assert.match(result.tsSource, /foo(true)/);
 });
 
 test("boolean literal false", async () => {
   const result = await compilePhase0(`(program (fn foo (x) x) (foo false))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes("foo(false)"));
+  assert.match(result.tsSource, /foo(false)/);
 });
 
 test("null literal", async () => {
   const result = await compilePhase0(`(program (fn foo (x) x) (foo null))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes("foo(null)"));
+  assert.match(result.tsSource, /foo(null)/);
 });
 
 test("undefined literal", async () => {
   const result = await compilePhase0(`(program (fn foo (x) x) (foo undefined))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes("foo(undefined)"));
+  assert.match(result.tsSource, /foo(undefined)/);
 });
 
 test("mixed literals in let binding", async () => {
@@ -41,10 +41,10 @@ test("mixed literals in let binding", async () => {
         (foo a b c d)))
   `, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes("let a = true"));
-  assert.ok(result.tsSource.includes("let b = false"));
-  assert.ok(result.tsSource.includes("let c = null"));
-  assert.ok(result.tsSource.includes("let d = undefined"));
+  assert.match(result.tsSource, /let a = true/);
+  assert.match(result.tsSource, /let b = false/);
+  assert.match(result.tsSource, /let c = null/);
+  assert.match(result.tsSource, /let d = undefined/);
 });
 
 test("string literal escapes", async () => {
@@ -55,6 +55,6 @@ test("string literal escapes", async () => {
     )
   `, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes("\\n"));
-  assert.ok(result.tsSource.includes("\\\"line2\\\""));
+  assert.match(result.tsSource, /\\n/);
+  assert.match(result.tsSource, /\\\"line2\\\"/);
 });

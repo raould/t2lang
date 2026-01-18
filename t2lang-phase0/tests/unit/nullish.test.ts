@@ -12,5 +12,5 @@ test("nullish coalescing currently unsupported (placeholder test)", async () => 
     // Current behavior: nullish coalescing is not implemented as an operator in Phase0
     // and is emitted as a regular call-head `??(...)`. Assert that emission occurs.
     assert.strictEqual(res.errors.length, 0);
-    assert.ok(res.tsSource.includes("??"), `Expected tsSource to include '??' but got:\n${res.tsSource}`);
+    assert.match(res.tsSource, /??/, `Expected tsSource to include '??' but got:\n${res.tsSource}`);
 });

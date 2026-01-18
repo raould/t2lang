@@ -11,8 +11,8 @@ const nonTsc = (errors: any[]) => errors.filter(e => e.phase !== "tsc");
 test("simple while loop", async () => {
   const result = await compilePhase0(`(program (fn foo () null) (while true (foo)))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.ok(result.tsSource.includes("while (true)"));
-  assert.ok(result.tsSource.includes("foo()"));
+  assert.match(result.tsSource, /while (true)/);
+  assert.match(result.tsSource, /foo()/);
 });
 
 test("while with variable condition", async () => {
@@ -24,7 +24,7 @@ test("while with variable condition", async () => {
           (process))))
   `, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.ok(result.tsSource.includes("while (running)"));
+  assert.match(result.tsSource, /while (running)/);
 });
 
 test("while with multiple body statements", async () => {
@@ -39,13 +39,13 @@ test("while with multiple body statements", async () => {
         (c)))
   `, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.ok(result.tsSource.includes("a()"));
-  assert.ok(result.tsSource.includes("b()"));
-  assert.ok(result.tsSource.includes("c()"));
+  assert.match(result.tsSource, /a()/);
+  assert.match(result.tsSource, /b()/);
+  assert.match(result.tsSource, /c()/);
 });
 
 test("while with call condition", async () => {
   const result = await compilePhase0(`(program (fn hasMore () true) (fn process () null) (while (hasMore) (process)))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
-  assert.ok(result.tsSource.includes("while (hasMore())"));
+  assert.match(result.tsSource, /while (hasMore())/);
 });

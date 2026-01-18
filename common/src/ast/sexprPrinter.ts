@@ -103,6 +103,16 @@ export function printSexpr(node: any, opts: PrintOpts = {}): string {
             return '(' + parts.join(' ') + ')';
         }
 
+        // If we have a plain object with arbitrary string keys, print as
+        // an (object (field name value) ...) sexpr rather than JSON.
+        if (isPlainObject(n)) {
+            const fields = Object.keys(n)
+                .filter(k => k !== 'location')
+                .map(k => `(field ${atomToString(k)} ${inner((n as any)[k])})`)
+                .join(' ');
+            return `(object ${fields})`;
+        }
+
         // Fallback: dump JSON as atom
         return escapeString(JSON.stringify(n));
     }

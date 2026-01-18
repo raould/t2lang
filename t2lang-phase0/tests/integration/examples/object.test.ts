@@ -9,19 +9,19 @@ import { compilePhase0 } from "../../../src/api";
 test("empty object", async () => {
   const result = await compilePhase0(`(program (obj))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes("{  }"));
+  assert.match(result.tsSource, /{  }/);
 });
 
 test("object with string value", async () => {
   const result = await compilePhase0(`(program (obj (field "name" "John")))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes('"name": "John"'));
+  assert.match(result.tsSource, /"name": "John"/);
 });
 
 test("object with number value", async () => {
   const result = await compilePhase0(`(program (obj (field "age" 30)))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes('"age": 30'));
+  assert.match(result.tsSource, /"age": 30/);
 });
 
 test("object with multiple fields", async () => {
@@ -33,9 +33,9 @@ test("object with multiple fields", async () => {
         (field "active" true)))
   `, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes('"name": "John"'));
-  assert.ok(result.tsSource.includes('"age": 30'));
-  assert.ok(result.tsSource.includes('"active": true'));
+  assert.match(result.tsSource, /"name": "John"/);
+  assert.match(result.tsSource, /"age": 30/);
+  assert.match(result.tsSource, /"active": true/);
 });
 
 test("nested object", async () => {
@@ -45,8 +45,8 @@ test("nested object", async () => {
         (field "user" (obj (field "name" "John")))))
   `, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes('"user":'));
-  assert.ok(result.tsSource.includes('"name": "John"'));
+  assert.match(result.tsSource, /"user":/);
+  assert.match(result.tsSource, /"name": "John"/);
 });
 
 test("object with array field", async () => {
@@ -56,7 +56,7 @@ test("object with array field", async () => {
         (field "items" (array 1 2 3))))
   `, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes('"items": [1, 2, 3]'));
+  assert.match(result.tsSource, /"items": [1, 2, 3]/);
 });
 
 test("object assigned to variable", async () => {
@@ -67,5 +67,5 @@ test("object assigned to variable", async () => {
         (foo person)))
   `, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes('const person = { "name": "John" }'));
+  assert.match(result.tsSource, /const person = { "name": "John" }/);
 });

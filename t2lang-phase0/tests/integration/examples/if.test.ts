@@ -9,17 +9,17 @@ import { compilePhase0 } from "../../../src/api";
 test("if with then only", async () => {
   const result = await compilePhase0(`(program (fn foo (x) x) (if true (foo 1)))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes("if (true)"));
-  assert.ok(result.tsSource.includes("foo(1)"));
+  assert.match(result.tsSource, /if (true)/);
+  assert.match(result.tsSource, /foo(1)/);
 });
 
 test("if with then and else", async () => {
   const result = await compilePhase0(`(program (fn foo (x) x) (fn bar (x) x) (if false (foo 1) (bar 2)))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes("if (false)"));
-  assert.ok(result.tsSource.includes("foo(1)"));
-  assert.ok(result.tsSource.includes("else"));
-  assert.ok(result.tsSource.includes("bar(2)"));
+  assert.match(result.tsSource, /if (false)/);
+  assert.match(result.tsSource, /foo(1)/);
+  assert.match(result.tsSource, /else/);
+  assert.match(result.tsSource, /bar(2)/);
 });
 
 test("if with identifier condition", async () => {
@@ -31,13 +31,13 @@ test("if with identifier condition", async () => {
         (if x (foo 1) (bar 2))))
   `, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes("if (x)"));
+  assert.match(result.tsSource, /if (x)/);
 });
 
 test("if with call condition", async () => {
   const result = await compilePhase0(`(program (fn isReady () true) (fn go () null) (if (isReady) (go)))`, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes("if (isReady())"));
+  assert.match(result.tsSource, /if (isReady())/);
 });
 
 test("nested if expressions", async () => {
@@ -51,8 +51,8 @@ test("nested if expressions", async () => {
         (c)))
   `, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes("if (true)"));
-  assert.ok(result.tsSource.includes("if (false)"));
+  assert.match(result.tsSource, /if (true)/);
+  assert.match(result.tsSource, /if (false)/);
 });
 
 test("if with block branches", async () => {
@@ -69,8 +69,8 @@ test("if with block branches", async () => {
           (baz 3))))
   `, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.tsSource.includes("if (true)"));
-  assert.ok(result.tsSource.includes("foo(1)"));
-  assert.ok(result.tsSource.includes("bar(2)"));
-  assert.ok(result.tsSource.includes("baz(3)"));
+  assert.match(result.tsSource, /if (true)/);
+  assert.match(result.tsSource, /foo(1)/);
+  assert.match(result.tsSource, /bar(2)/);
+  assert.match(result.tsSource, /baz(3)/);
 });

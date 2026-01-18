@@ -10,7 +10,7 @@ test('parseArgs validates trace phases', () => {
     } catch (e) {
         threw = true;
         assert.ok(e instanceof Error);
-        assert.ok(e.message.includes('Unknown trace phase'));
+        assert.match(e.message, /Unknown trace phase/);
     }
     assert.ok(threw, 'Expected parseArgs to throw for unknown trace phase');
 });
