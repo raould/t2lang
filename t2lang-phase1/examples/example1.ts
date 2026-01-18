@@ -11,20 +11,24 @@ type Languages = {
   fr: TypeD;
   ja: TypeD;
 };
-function isAvailable(obj, key) {
+function isAvailable(obj: any, key: any): unknown {
   return obj.hasOwnProperty(key);
 }
-function isNotAvailable(obj, key) {
-  return not(obj.hasOwnProperty, key);
+function isNotAvailable(obj: any, key: any): unknown {
+  if (obj.hasOwnProperty(key)) {
+    return false;
+  } else {
+    return true;
+  }
 }
-function loadLanguage(collection, lang) {
+function loadLanguage(collection: any, lang: any): unknown {
   if (isAvailable(collection, lang)) {
     return collection[lang];
   } else {
     return null;
   }
 }
-function selectElement(collection, elem) {
+function selectElement(collection: any, elem: any): unknown {
   if (isAvailable(collection, elem)) {
     return collection[elem];
   } else {

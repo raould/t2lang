@@ -369,11 +369,15 @@ function genProp(node: PropExpr, options: TsCodegenOptions): string {
 function genFunction(node: FunctionExpr, options: TsCodegenOptions): string {
   const params = node.params
     .map((p) => {
-      if (options.emitTypes && options.typeTable && p.typeId !== null && p.typeId !== undefined) {
-        const t = options.typeTable.get(p.typeId);
-        if (t.kind !== "unknown") {
-          return `${p.name}: ${typeToString(t)}`;
+      if (options.emitTypes) {
+        if (options.typeTable && p.typeId !== null && p.typeId !== undefined) {
+          const t = options.typeTable.get(p.typeId);
+          if (t.kind !== "unknown") {
+            return `${p.name}: ${typeToString(t)}`;
+          }
         }
+        // emit explicit `any` when no type info is available
+        return `${p.name}: any`;
       }
       return p.name;
     })
