@@ -8,7 +8,7 @@ test("recursive macro expansion expands nested macro calls", async () => {
     (program
       (defmacro mkadd (n) (quote (+ ~n ~n)))
       (mkadd (mkadd 2)))
-  `, { enableTsc: false });
+  `, {});
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   // Expect nested expansion: ((2 + 2) + (2 + 2)) or similar (infix form)
@@ -21,7 +21,7 @@ test("unquote-splice inserts array elements into call args", async () => {
     (program
       (defmacro call-with-list (lst) (quote (call (prop console "log") ~@lst)))
       (call-with-list (array 1 2 3)))
-  `, { enableTsc: false });
+  `, {});
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   // Should produce console.log(1, 2, 3)
@@ -38,7 +38,7 @@ test("nested gensym hygiene prevents capture across nested scopes", async () => 
       (let* ((tmp 999))
         (make-temp-fn 42)
         tmp))
-  `, { enableTsc: false });
+  `, {});
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   // The generated tmp should have the prefix 'tmp' but be unique (e.g., tmp1), and outer tmp should remain 999

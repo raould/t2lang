@@ -15,7 +15,7 @@ test("nested unquote-splice two levels deep expands correctly", async () => {
     (program
       (defmacro mkdeep (a) (quote (call foo (array (array ~@a)))))
       (call (prop console "log") (mkdeep (array 4 5))))
-  `, { enableTsc: false });
+  `, {});
     expectNoErrors(result, "mkdeep");
     // Expect inner array to include 4, 5
     assert(result.tsSource.includes("4, 5") || result.tsSource.includes("4,5"));
@@ -26,7 +26,7 @@ test("unquote-splice with non-array inside nested array treated as single value"
     (program
       (defmacro s (x) (quote (array (array 0 ~@x 9))))
       (call (prop console "log") (s 5)))
-  `, { enableTsc: false });
+  `, {});
     expectNoErrors(result, "s-non-array-nested");
     assert(result.tsSource.includes("0, 5, 9") || result.tsSource.includes("0,5,9"));
 });
@@ -37,7 +37,7 @@ test("gensym uniqueness across multiple macros", async () => {
       (defmacro a () (let* ((x (gensym "t"))) (quote (array ~x))))
       (defmacro b () (let* ((x (gensym "t"))) (quote (array ~x))))
       (call (prop console "log") (a) (b)))
-  `, { enableTsc: false });
+  `, {});
     expectNoErrors(result, "gensym-across");
     const matches = (result.tsSource.match(/t\d+/g) || []);
     const uniq = new Set(matches);
@@ -54,7 +54,7 @@ test("gensym doesn't capture outer variable with same base name", async () => {
       (let* ((val 42) (temp 999))
         (with-temp val)
         temp))
-  `, { enableTsc: false });
+  `, {});
     expectNoErrors(result, "gensym-capture");
     // Should contain a generated name like val1 and still reference outer temp
     assert(result.tsSource.match(/val\d+/));
@@ -66,7 +66,7 @@ test("unquote-splice expands into let bindings when splicing binding lists", asy
     (program
       (defmacro mkbinds (lst) (quote (let* (~@lst) (array x y))))
       (mkbinds (array (call x 1) (call y 2))))
-  `, { enableTsc: false });
+  `, {});
     // The splice into let bindings may trigger typechecking errors, but expansion should produce bindings
     // Check TS output contains a let and references to x and y
     assert(result.tsSource.includes("let") || result.tsSource.includes("let*"));
@@ -78,7 +78,7 @@ test("unquote-splice in call args followed by literal preserves order", async ()
     (program
       (defmacro mkcall (a) (quote (call (prop console "log") ~@a 99)))
       (call (prop console "log") (mkcall (array 1 2))))
-  `, { enableTsc: false });
+  `, {});
     expectNoErrors(result, "mkcall-order");
     assert(result.tsSource.includes("1, 2, 99") || result.tsSource.includes("1,2,99"));
 });

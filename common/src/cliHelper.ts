@@ -25,7 +25,7 @@ export interface CliOptions {
     logLevel: "none" | "debug";
 }
 
-const SUPPORTED_TRACE_PHASES = ['parse', 'expand', 'resolve', 'typeCheck', 'codegen', 'tsc'];
+const SUPPORTED_TRACE_PHASES = ['parse', 'expand', 'resolve', 'typeCheck', 'codegen'];
 
 export function parseArgs(args: string[]): CliOptions {
     const options: CliOptions = {
@@ -77,8 +77,6 @@ export function parseArgs(args: string[]): CliOptions {
             options.astAfterExpand = true;
         } else if (arg === "--emit-types") {
             options.emitTypes = true;
-        } else if (arg === "--enable-tsc") {
-            options.enableTsc = true;
         } else if (arg === "--seed") {
             i++;
             if (i >= args.length) {
@@ -165,8 +163,7 @@ Options:
     --ast-before-expand   Print AST dump to stderr just before macro expansion
     --ast-after-expand    Print AST dump to stderr just after macro expansion
     --pretty-option <ugly|pretty>  Set pretty mode (default: pretty)
-  --emit-types          Emit TypeScript type annotations in output
-  --enable-tsc          Run TypeScript compiler on emitted output (enableTsc)
+    --emit-types          Emit TypeScript type annotations in output
   --seed <string>       Set compiler seed value
   --trace <p1,p2>       Comma-separated trace phases (supported: parse, expand, resolve, typeCheck, codegen, tsc)
   --log-level <none|debug>  Set logging verbosity
@@ -279,7 +276,6 @@ export async function runCli(
         seed: options.seed ?? "default",
         tracePhases: options.trace ?? [],
         emitTypes: options.emitTypes
-        , enableTsc: options.enableTsc ?? false
     });
 
     // Print ASTs according to requested flags. If `--ast` was given, print

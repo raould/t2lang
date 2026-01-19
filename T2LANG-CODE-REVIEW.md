@@ -209,15 +209,6 @@ Source (.t2)
 // Search for: --enable-tsc
 ```
 
-### 2. **CLI Naming Confusion**
-**TODO.md says:** "make sure t2ct (compile .t2 to .ts) and t2cj (compile .t2 to .ts and then invoke tsc on .ts) are working correctly"
-
-But the actual binaries are named:
-- `t2tc` (not t2ct)
-- `t2jc` (not t2cj)
-
-Documentation refers to both naming conventions inconsistently.
-
 ### 3. **Type Object Field Parsing Complexity**
 The sugar for `(.name: Type)` goes through multiple transformation layers:
 1. `sugarRewrite.ts` - structural preprocessing

@@ -15,7 +15,7 @@ test("MacroExpander output contains no defmacro or gensym nodes", () => {
       (with-temp 42 (call (prop console "log") temp)))
   `;
 
-  const ctx: CompilerContext = { config: { logLevel: "none", prettyOutput: "newlines", dumpAst: false, seed: "default", tracePhases: [], emitTypes: false, enableTsc: false }, eventSink: new ArrayEventSink() };
+  const ctx: CompilerContext = { config: { logLevel: "none", prettyOutput: "newlines", dumpAst: false, seed: "default", tracePhases: [], emitTypes: false }, eventSink: new ArrayEventSink() };
   const parser = new Parser("input.t2", src, ctx as any);
   const ast = parser.parseProgram();
   const expander = new MacroExpander(ctx as any);

@@ -9,7 +9,7 @@ test("runCli passes CompilerConfig flags to compileFn", async () => {
 
     const oldArgv = process.argv;
     try {
-        process.argv = ["node", "t2c", tmp, "--ast", "--emit-types", "--enable-tsc", "--seed", "myseed", "--trace", "parse,expand", "--log-level", "debug", "--pretty-option", "ugly"];
+        process.argv = ["node", "t2c", tmp, "--ast", "--emit-types", "--seed", "myseed", "--trace", "parse,expand", "--log-level", "debug", "--pretty-option", "ugly"];
 
         let capturedConfig: any = null;
         const compileFn = async (source: string, config?: Partial<any>) => {
@@ -22,7 +22,7 @@ test("runCli passes CompilerConfig flags to compileFn", async () => {
         assert.ok(capturedConfig, 'compileFn was called');
         assert.strictEqual(capturedConfig.dumpAst, true);
         assert.strictEqual(capturedConfig.emitTypes, true);
-        assert.strictEqual(capturedConfig.enableTsc, true);
+        // enableTsc flag was removed; tsc is not run by t2c itself
         assert.strictEqual(capturedConfig.seed, 'myseed');
         assert.deepStrictEqual(capturedConfig.tracePhases, ['parse', 'expand']);
         assert.strictEqual(capturedConfig.logLevel, 'debug');
