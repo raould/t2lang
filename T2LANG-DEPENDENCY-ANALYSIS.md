@@ -6,8 +6,6 @@ The codebase has **moderate technical debt** with several concerning patterns:
 - done: **3 copies of cliHelper.ts** with different implementations
 - done: **10 dynamic `await import()` calls** causing runtime complexity
 - done: **53 `as any` type assertions** undermining type safety
-- **Orphaned debug code** in core compiler files
-- **Unnecessary indirection** layers between packages
 
 ---
 
@@ -25,99 +23,9 @@ The codebase has **moderate technical debt** with several concerning patterns:
 | `resolver.ts` | 366 lines | - | 14 lines | OK - thin subclass |
 | `tsCodegen.ts` | 641 lines | - | 3 lines (re-export) | OK - proper delegation |
 
-
-**Problems:**
-
-- cliHelper.ts has an **orphaned console.error** statement:
-   ```typescript
-   console.error("Run 't2tc --help' for usage information");
-   ```
-   This line executes on module load - a bug!
-
 **Status:**
 
 - Fixed: `CliOptions` now uses `pretty: "ugly" | "pretty"` (the `newlines` mode was removed).
-
----
-
-### 🔴 CRITICAL: sexprPrinter.ts Hack
-
-```typescript
-// t2lang-phase1/src/util/sexprPrinter.ts
-let impl: ((n: any) => string) | null = null;
-try {
-    const url = new URL('../../../common/src/ast/sexprPrinter.js', import.meta.url).href;
-    const mod = await import(url);
-    impl = (mod && (mod.printSexpr || mod.default)) as any;
-} catch (e) {
-    throw new Error('Failed to load common sexprPrinter at runtime: ' + String(e));
-}
-export const printSexpr: (n: any, opts?: any) => string = impl as any;
-```
-
-**Problems:**
-1. Builds a URL string and imports it at runtime
-2. Falls back through multiple property accesses
-3. Casts to `any` twice
-4. Top-level await in module
-5. Error handling throws generic error
-
-**Fix:** Just `export { printSexpr } from "t2lang-common/ast/sexprPrinter.js"` or configure package.json exports properly.
-
----
-
-## 3. TYPE SAFETY ISSUES
-
-### `as any` Assertions: 53 instances
-
-**Breakdown by file:**
-
-| File | Count | Severity |
-|------|-------|----------|
-| `t2lang-phase0/src/lib/substitute.ts` | 15+ | HIGH - core macro logic |
-| `common/src/ast/sexprPrinter.ts` | 5 | MEDIUM |
-| `common/src/t2jc.ts` | 5 | LOW - CLI tool |
-| `t2lang-phase1/src/expand/macroExpander.ts` | 8 | HIGH - core logic |
-| `t2lang-phase1/src/cli.ts` | 10+ | MEDIUM |
-
-**Worst examples:**
-
-```typescript
-// substitute.ts:50 - casting result and accessing .location
-return { kind: "array", elements: (converted as SpliceMarker).items, 
-         location: (quoted as any).location } as any;
-
-// substitute.ts:60-62 - triple any cast chain
-return { kind: "__splice", items: [evaluated], 
-         location: (expr as any).location } as unknown as any;
-```
-
-**Root cause:** The quoted/unquoted AST transformation doesn't have proper types for intermediate states.
-
-**Fix:** Define proper intermediate types for macro expansion states.
-
----
-
-## 4. DEBUG CODE IN PRODUCTION
-
-### Console statements in non-CLI code
-
-| File | Line | Code | Issue |
-|------|------|------|-------|
-| `t2lang-phase0/src/cliHelper.ts` | 113 | `console.error("Run 't2tc --help'...")` | **EXECUTES ON IMPORT** |
-| `t2lang-phase0/src/api.ts` | 65,82,91,112 | `console.error("[DEBUG]...")` | Debug logging |
-| `t2lang-phase0/src/parse/parser.ts` | 153 | `console.error('parseList: unexpected...')` | Debug logging |
-| `t2lang-phase0/src/parse/parser.ts` | 279 | `console.error('parseLetOrConst: saw...')` | Debug logging |
-| `t2lang-phase1/src/api.ts` | 81,99,116,126,146 | `console.error("[DEBUG]...")` | Debug logging |
-
-**The api.ts debug logging IS properly gated:**
-```typescript
-if (process.env.T2_DEBUG_PARSE === "1") {
-    console.error(`[DEBUG] Parsed AST: nodeCount=${nodeCount}`);
-}
-```
-
-But **parser.ts has ungated debug output** that will print during normal compilation.
 
 ---
 
