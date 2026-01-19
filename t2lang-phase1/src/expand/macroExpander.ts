@@ -9,7 +9,8 @@
  * 3. Expands them by substituting parameters and evaluating quote/unquote
  */
 
-import {
+import { GensymGenerator, QuotedToAstConverter, Substitutor } from "t2lang-phase0";
+import type {
   Program,
   Statement,
   Expr,
@@ -36,100 +37,50 @@ import {
   ThrowExpr,
   TryCatchExpr,
   BlockStmt,
-  MacroDef,
-  QuoteExpr,
-  UnquoteExpr,
-  UnquoteSpliceExpr,
-  LiteralExpr,
-  SourceLocation
+  MacroDef
 } from "../ast/nodes.js";
 
-// Return type of the expander is a Phase0 Program (AST normalized to Phase0 shape)
-import type { Phase0Program } from "../ast/nodes.js";
-import { CompilerContext } from "../api.js";
-import { GensymGenerator, QuotedToAstConverter, Substitutor } from "t2lang-phase0";
-
-interface MacroRegistry {
-  macros: Map<string, MacroDef>;
-}
-
-// Internal splice marker used during quote evaluation. This is not part of the
-// public AST but helps the expander represent unquote-splice results until they
-// are converted back into multiple AST nodes by convertQuotedToAst.
-interface SpliceMarker {
-  kind: "__splice";
-  items: Expr[];
-  location: SourceLocation;
-}
-
 export class MacroExpander {
-  private registry: MacroRegistry = { macros: new Map() };
-  // Use shared gensym generator from Phase0 to centralize gensym behavior
-  private gensymGen = new GensymGenerator();
-  private quotedConverter: QuotedToAstConverter;
+  ctx: any;
+  registry: { macros: Map<string, MacroDef> } = { macros: new Map() };
+  gensymGen = new GensymGenerator();
+  quotedConverter: QuotedToAstConverter;
+  substitutor = new Substitutor();
 
-  constructor(private readonly ctx: CompilerContext) {
+  constructor(ctx: any) {
+    this.ctx = ctx;
     this.quotedConverter = new QuotedToAstConverter();
   }
 
-  /**
-   * Public helper: perform one-step macro expansion on a form.
-   * If `expr` is a macro call, evaluate the macro body once and return
-   * the raw expansion result (do not recursively macro-expand the result).
-   */
-  public macroexpand1(expr: Expr): Expr {
+  macroexpand1(expr: Expr): Expr {
     if (expr.kind !== 'call') return expr;
     const call = expr as CallExpr;
-    // Only consider simple identifier callees for macroexpand-1
     if (call.callee.kind !== 'identifier') return expr;
     const name = (call.callee as Identifier).name;
     const macro = this.registry.macros.get(name);
     if (!macro) return expr;
-
-    // Build env mapping params -> raw arg ASTs (no expansion)
     const env = new Map<string, Expr>();
     for (let i = 0; i < macro.params.length; i++) {
       const param = macro.params[i];
-      const arg = call.args[i] || ({ kind: 'literal', value: null, location: call.location } as Expr);
-      env.set(param.name, arg);
+      const arg = call.args[i] || ({ kind: 'literal', value: null, location: call.location } as any);
+      env.set(param.name, arg as Expr);
     }
-
-    // Evaluate macro body expressions in this env, returning the last value
-    let result: Expr = { kind: 'literal', value: null, location: call.location } as Expr;
+    let result: Expr = { kind: 'literal', value: null, location: call.location } as any;
     for (const bodyExpr of macro.body) {
-      result = this.evalMacroExpr(bodyExpr, env);
+      result = this.evalMacroExpr(bodyExpr, env) as Expr;
     }
     return result;
   }
 
-  /**
-   * Public helper: fully macro-expand a form until steady-state.
-   * Delegates to the internal expander which already performs recursive expansion.
-   */
-  public macroexpand(expr: Expr): Expr {
+  macroexpand(expr: Expr): Expr {
     return this.expandExpr(expr);
   }
 
-
-  /**
-   * Generate a unique symbol name (like Clojure's gensym)
-   */
-  // Gensym generation delegated to Phase0's GensymGenerator
-
-
-  /**
-   * Main entry point: expand all macros in a program
-   */
-  expandProgram(program: Program): Phase0Program {
-    // First pass: collect all macro definitions
+  expandProgram(program: Program) {
     this.collectMacros(program);
-
-    // Second pass: expand macro calls
-    // First, convert legacy call-style defmacro expressions (exprStmt with a call to `defmacro`)
-    // into proper MacroDef statements so subsequent passes can handle them uniformly.
-    const preprocessedBody: Statement[] = program.body.map(stmt => {
-      if (stmt.kind === "exprStmt" && stmt.expr.kind === "call") {
-        const call = stmt.expr as CallExpr;
+    const preprocessedBody = program.body.map((stmt: Statement) => {
+      if (stmt.kind === "exprStmt" && (stmt as any).expr && (stmt as any).expr.kind === "call") {
+        const call = (stmt as any).expr as CallExpr;
         if (call.callee.kind === "identifier" && (call.callee as Identifier).name === "defmacro") {
           const nameArg = call.args[0];
           const paramsArg = call.args[1];
@@ -140,266 +91,186 @@ export class MacroExpander {
             if (paramsArg && paramsArg.kind === "call") {
               const paramsCall = paramsArg as CallExpr;
               if (paramsCall.callee && paramsCall.callee.kind === "identifier") params.push(paramsCall.callee as Identifier);
-              for (const p of paramsCall.args) {
-                if (p.kind === "identifier") params.push(p as Identifier);
-              }
+              for (const p of paramsCall.args) if (p.kind === "identifier") params.push(p as Identifier);
             }
-            return { kind: "defmacro", name: nameId, params, body: bodyArgs, location: stmt.location } as MacroDef;
+            return { kind: "defmacro", name: nameId, params, body: bodyArgs, location: (stmt as any).location } as MacroDef;
           }
         }
       }
       return stmt;
     });
 
-    const expandedBody = this.expandStatements(preprocessedBody);
-
-    // Filter out macro definitions from output. Also remove legacy-style defmacro
-    // represented as an exprStmt whose expr is a call to `defmacro`.
-    const filteredBody = expandedBody.filter(stmt => {
+    const expandedBody = this.expandStatements(preprocessedBody as Statement[]);
+    const filteredBody = expandedBody.filter((stmt: Statement) => {
       if (stmt.kind === "defmacro") return false;
-      if (stmt.kind === "exprStmt" && stmt.expr) {
-        const inner = stmt.expr as unknown as { kind?: string };
+      if (stmt.kind === "exprStmt" && (stmt as any).expr) {
+        const inner = (stmt as any).expr;
         if (inner.kind === "defmacro") return false;
       }
-      if (stmt.kind === "exprStmt" && stmt.expr.kind === "call") {
-        const call = stmt.expr as CallExpr;
+      if (stmt.kind === "exprStmt" && (stmt as any).expr && (stmt as any).expr.kind === "call") {
+        const call = (stmt as any).expr as CallExpr;
         if (call.callee.kind === "identifier" && (call.callee as Identifier).name === "defmacro") return false;
       }
       return true;
     });
 
-    // Normalize output to Phase0-compatible nodes (remove gensym nodes)
-    const normalizedBody: Phase0Statement[] = filteredBody.map(stmt => this.normalizeStatement(stmt));
-
-    // Normalize any type nodes within the normalized body so `type-object`
-    // ergonomic forms are canonicalized everywhere (not just top-level
-    // type-alias statements).
-    this.normalizeTypesInProgram(normalizedBody);
-
-    this.ctx.eventSink.emit({
-      phase: "expand",
-      kind: "macroExpansionDone",
-      data: { macroCount: this.registry.macros.size }
-    });
-
-    // The normalized body conforms to the Phase0 AST shape; cast to Phase0Program for the public API
-    return ({
-      ...program,
-      body: normalizedBody
-    } as unknown) as Phase0Program;
+    const normalizedBody = filteredBody.map((stmt: Statement) => this.normalizeStatement(stmt as any));
+    this.normalizeTypesInProgram(normalizedBody as any[]);
+    this.ctx.eventSink.emit({ phase: "expand", kind: "macroExpansionDone", data: { macroCount: this.registry.macros.size } });
+    return { ...program, body: normalizedBody as Phase0Statement[] } as any;
   }
 
-  /**
-   * Normalize statements to remove macro-only nodes (gensym -> identifier) so
-   * the output Program is Phase0-compatible.
-   */
-  private normalizeStatement(stmt: Statement): Phase0Statement {
+  normalizeStatement(stmt: Statement): Phase0Statement {
     switch (stmt.kind) {
       case "exprStmt":
-        return { ...stmt, expr: this.normalizeExpr(stmt.expr) } as Phase0Statement;
+        return { ...stmt, expr: this.normalizeExpr((stmt as any).expr) } as any;
       case "block":
-        return { ...stmt, body: stmt.body.map(e => this.normalizeExpr(e)) } as Phase0Statement;
+        return { ...stmt, body: (stmt as any).body.map((e: Expr) => this.normalizeExpr(e)) } as any;
       case "let*":
-        return {
-          ...stmt,
-          bindings: stmt.bindings.map(b => ({ ...b, init: this.normalizeExpr(b.init) })),
-          body: stmt.body.map(e => this.normalizeExpr(e))
-        } as Phase0Statement;
-      // defmacro should already be filtered out
+        return { ...(stmt as any), bindings: (stmt as any).bindings.map((b: any) => ({ ...b, init: this.normalizeExpr(b.init) })), body: (stmt as any).body.map((e: Expr) => this.normalizeExpr(e)) } as any;
       default:
-        return stmt as Phase0Statement;
+        return stmt as any;
     }
   }
 
-  private normalizeExpr(expr: Expr): Phase0Expr {
+  normalizeExpr(expr: Expr): Phase0Expr {
     switch (expr.kind) {
       case "gensym":
-        return this.expandGensym(expr as GensymExpr) as Phase0Expr;
+        return this.expandGensym(expr as GensymExpr) as any;
       case "call": {
         const call = expr as CallExpr;
-        return {
-          ...call,
-          callee: this.normalizeExpr(call.callee),
-          args: call.args.map(a => this.normalizeExpr(a))
-        } as Phase0Expr;
+        return { ...call, callee: this.normalizeExpr(call.callee) as any, args: call.args.map(a => this.normalizeExpr(a) as any) } as any;
       }
       case "let*": {
         const let_ = expr as LetStarExpr;
-        return {
-          ...let_,
-          bindings: let_.bindings.map(b => ({ ...b, init: this.normalizeExpr(b.init) })),
-          body: let_.body.map(e => this.normalizeExpr(e))
-        };
+        return { ...let_, bindings: let_.bindings.map(b => ({ ...b, init: this.normalizeExpr(b.init) })), body: let_.body.map(e => this.normalizeExpr(e)) } as any;
       }
       case "array": {
         const arr = expr as ArrayExpr;
-        return { ...arr, elements: arr.elements.map(e => this.normalizeExpr(e)) };
+        return { ...arr, elements: arr.elements.map(e => this.normalizeExpr(e)) } as any;
       }
       case "object": {
         const obj = expr as ObjectExpr;
-        return { ...obj, fields: obj.fields.map(f => ({ ...f, value: this.normalizeExpr(f.value) })) };
+        return { ...obj, fields: obj.fields.map(f => ({ ...f, value: this.normalizeExpr(f.value) })) } as any;
       }
       case "block": {
         const block = expr as BlockStmt;
-        return { ...block, body: block.body.map(e => this.normalizeExpr(e)) };
+        return { ...block, body: block.body.map(e => this.normalizeExpr(e)) } as any;
       }
       case "if": {
         const if_ = expr as IfExpr;
-        return {
-          ...if_,
-          condition: this.normalizeExpr(if_.condition),
-          thenBranch: this.normalizeExpr(if_.thenBranch),
-          elseBranch: if_.elseBranch ? this.normalizeExpr(if_.elseBranch) : null
-        };
+        return { ...if_, condition: this.normalizeExpr(if_.condition) as any, thenBranch: this.normalizeExpr(if_.thenBranch) as any, elseBranch: if_.elseBranch ? this.normalizeExpr(if_.elseBranch) as any : null } as any;
       }
       case "prop": {
         const prop = expr as PropExpr;
-        return { ...prop, object: this.normalizeExpr(prop.object) };
+        return { ...prop, object: this.normalizeExpr(prop.object) } as any;
       }
       case "function": {
         const fn = expr as FunctionExpr;
-        return { ...fn, body: fn.body.map(e => this.normalizeExpr(e)) };
+        return { ...fn, body: fn.body.map(e => this.normalizeExpr(e)) } as any;
       }
       case "return": {
         const ret = expr as ReturnExpr;
-        return { ...ret, value: ret.value ? this.normalizeExpr(ret.value) : null };
+        return { ...ret, value: ret.value ? this.normalizeExpr(ret.value as any) : null } as any;
       }
       case "while": {
         const w = expr as WhileExpr;
-        return { ...w, condition: this.normalizeExpr(w.condition), body: w.body.map(e => this.normalizeExpr(e)) };
+        return { ...w, condition: this.normalizeExpr(w.condition) as any, body: w.body.map(e => this.normalizeExpr(e)) } as any;
       }
       case "assign": {
         const a = expr as AssignExpr;
-        return { ...a, target: this.normalizeExpr(a.target), value: this.normalizeExpr(a.value) };
+        return { ...a, target: this.normalizeExpr(a.target), value: this.normalizeExpr(a.value) } as any;
       }
       case "index": {
         const idx = expr as IndexExpr;
-        return { ...idx, object: this.normalizeExpr(idx.object), index: this.normalizeExpr(idx.index) };
+        return { ...idx, object: this.normalizeExpr(idx.object), index: this.normalizeExpr(idx.index) } as any;
       }
       case "new": {
         const n = expr as NewExpr;
-        return { ...n, callee: this.normalizeExpr(n.callee), args: n.args.map(a => this.normalizeExpr(a)) };
+        return { ...n, callee: this.normalizeExpr(n.callee), args: n.args.map(a => this.normalizeExpr(a)) } as any;
       }
       case "class": {
         const c = expr as ClassExpr;
-        return {
-          ...c,
-          fields: c.fields.map(f => ({ ...f, initializer: f.initializer ? this.normalizeExpr(f.initializer) : null })),
-          methods: c.methods.map(m => ({ ...m, body: m.body.map(e => this.normalizeExpr(e)) }))
-        };
+        return { ...c, fields: c.fields.map(f => ({ ...f, initializer: f.initializer ? this.normalizeExpr(f.initializer) : null })), methods: c.methods.map(m => ({ ...m, body: m.body.map(e => this.normalizeExpr(e)) })) } as any;
       }
       case "type-assert": {
         const ta = expr as TypeAssertExpr;
-        return { ...ta, expr: this.normalizeExpr(ta.expr) };
+        return { ...ta, expr: this.normalizeExpr(ta.expr) } as any;
       }
       case "throw": {
         const t = expr as ThrowExpr;
-        return { ...t, value: this.normalizeExpr(t.value) };
+        return { ...t, value: this.normalizeExpr(t.value) } as any;
       }
       case "try-catch": {
         const tc = expr as TryCatchExpr;
-        return { ...tc, tryBody: tc.tryBody.map(e => this.normalizeExpr(e)), catchBody: tc.catchBody.map(e => this.normalizeExpr(e)), finallyBody: tc.finallyBody.map(e => this.normalizeExpr(e)) } as Phase0Expr;
+        return { ...tc, tryBody: tc.tryBody.map(e => this.normalizeExpr(e)), catchBody: tc.catchBody.map(e => this.normalizeExpr(e)), finallyBody: tc.finallyBody.map(e => this.normalizeExpr(e)) } as any;
       }
       case "for": {
         const f = expr as ForExpr;
-        return { ...f, init: f.init ? this.normalizeExpr(f.init) : null, condition: f.condition ? this.normalizeExpr(f.condition) : null, update: f.update ? this.normalizeExpr(f.update) : null, body: f.body.map(e => this.normalizeExpr(e)) } as Phase0Expr;
+        return { ...f, init: f.init ? this.normalizeExpr(f.init) : null, condition: f.condition ? this.normalizeExpr(f.condition) : null, update: f.update ? this.normalizeExpr(f.update) : null, body: f.body.map(e => this.normalizeExpr(e)) } as any;
       }
       case "identifier": {
         const id = expr as Identifier;
         if (id.name.indexOf('.') !== -1) {
           const parts = id.name.split('.');
-          let node: Expr = { kind: 'identifier', name: parts[0], location: id.location } as Identifier;
-          for (let i = 1; i < parts.length; i++) {
-            node = { kind: 'prop', object: node, property: parts[i], location: id.location } as unknown as PropExpr;
-          }
-          return node as Phase0Expr;
+          let node: any = { kind: 'identifier', name: parts[0], location: id.location };
+          for (let i = 1; i < parts.length; i++) node = { kind: 'prop', object: node, property: parts[i], location: id.location };
+          return node as any;
         }
-        return expr as Phase0Expr;
+        return expr as any;
       }
       case "literal":
-        return expr as Phase0Expr;
+        return expr as any;
       case "quote": {
-        const quoted = (expr as QuoteExpr).expr;
-        const converted = this.convertQuotedToAst(quoted);
-        if (this.isSplice(converted)) {
-          return { kind: "array", elements: converted.items, location: quoted.location } as ArrayExpr as Phase0Expr;
-        }
-        return this.normalizeExpr(converted as Expr);
+        const quoted = (expr as any).expr;
+        const converted = this.convertQuotedToAst(quoted as any);
+        if (this.isSplice(converted)) return { kind: "array", elements: (converted as any).items, location: quoted.location } as any;
+        return this.normalizeExpr(converted as any);
       }
       case "unquote":
-        return this.normalizeExpr((expr as UnquoteExpr).expr);
+        return this.normalizeExpr((expr as any).expr as any);
       case "unquote-splice":
-        return this.normalizeExpr((expr as UnquoteSpliceExpr).expr);
+        return this.normalizeExpr((expr as any).expr as any);
       default:
-        // Defensive cast: some Phase1-only nodes (like internal splice markers)
-        // may reach here; treat them as unknown when asserting Phase0 shape.
-        return expr as unknown as Phase0Expr;
+        return expr as any;
     }
   }
 
-  private normalizeTypesInProgram(body: Phase0Statement[]): void {
+  normalizeTypesInProgram(body: any[]) {
     const walk = (obj: any) => {
       if (!obj || typeof obj !== 'object') return;
-      if (Array.isArray(obj)) {
-        for (const e of obj) walk(e);
-        return;
-      }
-      // If this object has a typeAnnotation, normalize it
-      if (obj.typeAnnotation) {
-        obj.typeAnnotation = this.normalizeTypeNode(obj.typeAnnotation);
-      }
-      // If this object is a TypeAliasStmt, ensure its typeAnnotation normalized
-      if (obj.kind === 'type-alias' && obj.typeAnnotation) {
-        obj.typeAnnotation = this.normalizeTypeNode(obj.typeAnnotation);
-      }
-      // Recurse into known child arrays/objects
+      if (Array.isArray(obj)) { for (const e of obj) walk(e); return; }
+      if (obj.typeAnnotation) obj.typeAnnotation = this.normalizeTypeNode(obj.typeAnnotation);
+      if (obj.kind === 'type-alias' && obj.typeAnnotation) obj.typeAnnotation = this.normalizeTypeNode(obj.typeAnnotation);
       for (const k of Object.keys(obj)) {
         if (k === 'typeAnnotation') continue;
         const v = obj[k];
-        if (Array.isArray(v)) {
-          for (const it of v) walk(it);
-        } else if (v && typeof v === 'object') {
-          walk(v);
-        }
+        if (Array.isArray(v)) for (const it of v) walk(it); else if (v && typeof v === 'object') walk(v);
       }
     };
-
-    for (const stmt of body) walk(stmt as unknown);
+    for (const stmt of body) walk(stmt);
   }
 
-  private collectMacros(program: Program): void {
+  collectMacros(program: Program) {
     for (const stmt of program.body) {
-      // Handle direct defmacro statements (if parser emits them as top-level statements)
       if (stmt.kind === "defmacro") {
         const macro = stmt as MacroDef;
         this.registry.macros.set(macro.name.name, macro);
-        this.ctx.eventSink.emit({
-          phase: "expand",
-          kind: "macroRegistered",
-          data: { name: macro.name.name, params: macro.params.map(p => p.name) }
-        });
+        this.ctx.eventSink.emit({ phase: "expand", kind: "macroRegistered", data: { name: macro.name.name, params: macro.params.map(p => p.name) } });
         continue;
       }
-
-      // Handle defmacro emitted INSIDE an exprStmt like: (defmacro name (params) body...)
-      // Some parsers produce this as an exprStmt whose expr is a defmacro node. Support that.
-      if (stmt.kind === "exprStmt" && stmt.expr) {
-        const inner = stmt.expr as unknown as { kind?: string };
+      if (stmt.kind === "exprStmt" && (stmt as any).expr) {
+        const inner = (stmt as any).expr;
         if (inner.kind === "defmacro") {
-          const macroExpr = stmt.expr as unknown as MacroDef;
+          const macroExpr = (stmt as any).expr as MacroDef;
           this.registry.macros.set(macroExpr.name.name, macroExpr);
           this.ctx.eventSink.emit({ phase: "expand", kind: "macroRegistered", data: { name: macroExpr.name.name, params: macroExpr.params.map((p: Identifier) => p.name) } });
           continue;
         }
       }
-
-      // Also support legacy-style macro definitions represented as an exprStmt whose
-      // expr is a call to the identifier `defmacro`. Some programs may still use this
-      // form (especially during parsing re-exports), so detect and register them here.
-      if (stmt.kind === "exprStmt" && stmt.expr.kind === "call") {
-        const call = stmt.expr as CallExpr;
+      if (stmt.kind === "exprStmt" && (stmt as any).expr && (stmt as any).expr.kind === "call") {
+        const call = (stmt as any).expr as CallExpr;
         if (call.callee.kind === "identifier" && (call.callee as Identifier).name === "defmacro") {
-          // Expect: (defmacro name (params...) body...)
           const nameArg = call.args[0];
           const paramsArg = call.args[1];
           const bodyArgs = call.args.slice(2);
@@ -409,11 +280,9 @@ export class MacroExpander {
             if (paramsArg && paramsArg.kind === "call") {
               const paramsCall = paramsArg as CallExpr;
               if (paramsCall.callee && paramsCall.callee.kind === "identifier") params.push(paramsCall.callee as Identifier);
-              for (const p of paramsCall.args) {
-                if (p.kind === "identifier") params.push(p as Identifier);
-              }
+              for (const p of paramsCall.args) if (p.kind === "identifier") params.push(p as Identifier);
             }
-            const macro: MacroDef = { kind: "defmacro", name: nameId, params, body: bodyArgs, location: stmt.location };
+            const macro = { kind: "defmacro", name: nameId, params, body: bodyArgs, location: (stmt as any).location } as MacroDef;
             this.registry.macros.set(macro.name.name, macro);
             this.ctx.eventSink.emit({ phase: "expand", kind: "macroRegistered", data: { name: macro.name.name, params: macro.params.map(p => p.name) } });
           }
@@ -422,431 +291,392 @@ export class MacroExpander {
     }
   }
 
-  private expandStatements(stmts: Statement[]): Statement[] {
-    const result: Statement[] = [];
-    for (const stmt of stmts) {
-      result.push(this.expandStatement(stmt));
-    }
-    return result;
-  }
+  expandStatements(stmts: Statement[]): Statement[] { const result: Statement[] = []; for (const stmt of stmts) result.push(this.expandStatement(stmt)); return result; }
 
-  private expandStatement(stmt: Statement): Statement {
+  expandStatement(stmt: Statement): Statement {
     switch (stmt.kind) {
-      case "exprStmt":
-        return {
-          ...stmt,
-          expr: this.toPhase0(this.expandExpr(stmt.expr))
-        };
-      case "block":
-        return {
-          ...stmt,
-          body: stmt.body.map(e => this.toPhase0(this.expandExpr(e)))
-        };
-      case "let*":
-        return this.expandLet(stmt as LetStarExpr);
-      case "type-alias":
-        return this.expandTypeAlias(stmt);
-      case "defmacro":
-        return stmt; // Keep as-is, will be filtered out later
-      default:
-        return stmt;
+      case "exprStmt": return { ...stmt, expr: this.toPhase0(this.expandExpr((stmt as any).expr)) } as any;
+      case "block": return { ...stmt, body: (stmt as any).body.map((e: Expr) => this.toPhase0(this.expandExpr(e))) } as any;
+      case "let*": return this.expandLet(stmt as any);
+      case "type-alias": return this.expandTypeAlias(stmt as any);
+      case "defmacro": return stmt;
+      default: return stmt;
     }
   }
 
-  private expandTypeAlias(stmt: any): any {
-    // Normalize the type annotation for TypeAlias statements so that any
-    // ergonomic forms (dot-sigil names, colon shorthand) are canonicalized.
-    const normalized = { ...stmt };
-    if (normalized.typeAnnotation) {
-      normalized.typeAnnotation = this.normalizeTypeNode(normalized.typeAnnotation);
-    }
-    return normalized;
-  }
+  expandTypeAlias(stmt: any) { const normalized = { ...stmt }; if (normalized.typeAnnotation) normalized.typeAnnotation = this.normalizeTypeNode(normalized.typeAnnotation); return normalized; }
 
-  private normalizeTypeNode(node: any): any {
+  normalizeTypeNode(node: any) {
     if (!node || typeof node !== 'object') return node;
     if (node.kind === 'type-object' && Array.isArray(node.fields)) {
       const fields = node.fields.map((f: any) => {
-        // Support legacy shapes where field.name might include a leading '.' or trailing ':'
         let name = f.name;
-        if (typeof name === 'string') {
-          name = name.replace(/^\./, '').replace(/[:]$/, '');
-        } else if (name && typeof name === 'object' && name.name) {
-          name = String(name.name).replace(/^\./, '').replace(/[:]$/, '');
-        }
-
+        if (typeof name === 'string') name = name.replace(/^\./, '').replace(/[:]$/, '');
+        else if (name && typeof name === 'object' && name.name) name = String(name.name).replace(/^\./, '').replace(/[:]$/, '');
         const typeNode = this.normalizeTypeNode(f.type || f[1] || f);
         return { name, type: typeNode };
       });
       return { ...node, fields };
     }
-    // recurse into composed types
-    if (node.kind === 'type-array') {
-      return { ...node, element: this.normalizeTypeNode(node.element) };
-    }
-    if (node.kind === 'type-function') {
-      return { ...node, params: node.params.map((p: any) => this.normalizeTypeNode(p)), returns: this.normalizeTypeNode(node.returns) };
-    }
-    if (node.kind === 'type-union' || node.kind === 'type-intersection') {
-      return { ...node, types: node.types.map((t: any) => this.normalizeTypeNode(t)) };
-    }
+    if (node.kind === 'type-array') return { ...node, element: this.normalizeTypeNode(node.element) };
+    if (node.kind === 'type-function') return { ...node, params: node.params.map((p: any) => this.normalizeTypeNode(p)), returns: this.normalizeTypeNode(node.returns) };
+    if (node.kind === 'type-union' || node.kind === 'type-intersection') return { ...node, types: node.types.map((t: any) => this.normalizeTypeNode(t)) };
     return node;
   }
 
-  private expandExpr(expr: Expr): Expr {
+  expandExpr(expr: Expr): Expr {
     switch (expr.kind) {
-      case "call":
-        return this.expandCall(expr as CallExpr);
-      case "identifier":
-        return expr;
-      case "literal":
-        return expr;
-      case "let*":
-        return this.expandLet(expr as LetStarExpr);
-      case "if":
-        return this.expandIf(expr as IfExpr);
-      case "prop":
-        return this.expandProp(expr as PropExpr);
-      case "function":
-        return this.expandFunction(expr as FunctionExpr);
-      case "gensym":
-        return this.expandGensym(expr as GensymExpr);
-      case "return":
-        return this.expandReturn(expr as ReturnExpr);
-      case "while":
-        return this.expandWhile(expr as WhileExpr);
-      case "array":
-        return this.expandArray(expr as ArrayExpr);
-      case "object":
-        return this.expandObject(expr as ObjectExpr);
-      case "assign":
-        return this.expandAssign(expr as AssignExpr);
-      case "for":
-        return this.expandFor(expr as ForExpr);
-      case "index":
-        return this.expandIndex(expr as IndexExpr);
-      case "new":
-        return this.expandNew(expr as NewExpr);
-      case "class":
-        return this.expandClass(expr as ClassExpr);
-      case "type-assert":
-        return this.expandTypeAssert(expr as TypeAssertExpr);
-      case "throw":
-        return this.expandThrow(expr as ThrowExpr);
-      case "try-catch":
-        return this.expandTryCatch(expr as TryCatchExpr);
-      case "block":
-        return this.expandBlock(expr as BlockStmt);
-      case "quote":
-        // Quote returns its contents as-is (but gensyms are expanded)
-        return this.expandQuotedExpr((expr as QuoteExpr).expr);
-      case "unquote":
-        // Unquote outside of quote context just expands its contents
-        return this.toPhase0(this.expandExpr((expr as UnquoteExpr).expr));
-      case "unquote-splice":
-        // Unquote-splice outside of quote context just expands its contents
-        return this.toPhase0(this.expandExpr((expr as UnquoteSpliceExpr).expr));
-      default:
-        return expr;
+      case "call": return this.expandCall(expr as CallExpr);
+      case "identifier": return expr;
+      case "literal": return expr;
+      case "let*": return this.expandLet(expr as any) as any;
+      case "if": return this.expandIf(expr as any) as any;
+      case "prop": return this.expandProp(expr as any) as any;
+      case "function": return this.expandFunction(expr as any) as any;
+      case "gensym": return this.expandGensym(expr as any) as any;
+      case "return": return this.expandReturn(expr as any) as any;
+      case "while": return this.expandWhile(expr as any) as any;
+      case "array": return this.expandArray(expr as any) as any;
+      case "object": return this.expandObject(expr as any) as any;
+      case "assign": return this.expandAssign(expr as any) as any;
+      case "for": return this.expandFor(expr as any) as any;
+      case "index": return this.expandIndex(expr as any) as any;
+      case "new": return this.expandNew(expr as any) as any;
+      case "class": return this.expandClass(expr as any) as any;
+      case "type-assert": return this.expandTypeAssert(expr as any) as any;
+      case "throw": return this.expandThrow(expr as any) as any;
+      case "try-catch": return this.expandTryCatch(expr as any) as any;
+      case "block": return this.expandBlock(expr as any) as any;
+      case "quote": return this.expandQuotedExpr((expr as any).expr as Expr) as any;
+      case "unquote": return this.toPhase0(this.expandExpr((expr as any).expr as Expr));
+      case "unquote-splice": return this.toPhase0(this.expandExpr((expr as any).expr as Expr));
+      default: return expr;
     }
   }
 
-  /**
-   * Expand a call expression, checking if it's a macro call
-   */
-  private expandCall(call: CallExpr): Expr {
-    // First expand the callee and args
+  expandCall(call: CallExpr): Expr {
     const expandedCallee = this.expandExpr(call.callee);
     const expandedArgs = call.args.map(a => this.expandExpr(a));
-
-    // Check if this is a macro call
     if (expandedCallee.kind === "identifier") {
       const name = (expandedCallee as Identifier).name;
       const macro = this.registry.macros.get(name);
-      if (macro) {
-        return this.expandMacroCall(macro, expandedArgs, call.location);
-      }
+      if (macro) return this.expandMacroCall(macro, expandedArgs, call.location);
     }
-
-    return {
-      ...call,
-      callee: this.toPhase0(expandedCallee),
-      args: expandedArgs.map(a => this.toPhase0(a))
-    };
+    return { ...call, callee: this.toPhase0(expandedCallee), args: expandedArgs.map(a => this.toPhase0(a)) } as any;
   }
 
-  /**
-   * Expand a macro call by EVALUATING the macro body at compile time
-   */
-  private expandMacroCall(macro: MacroDef, args: Expr[], location: SourceLocation): Expr {
-    // Build parameter -> argument mapping
-    // Arguments are AST nodes (unevaluated code)
+  expandMacroCall(macro: MacroDef, args: Expr[], location: any): Expr {
     const env = new Map<string, Expr>();
     for (let i = 0; i < macro.params.length; i++) {
       const param = macro.params[i];
-      const arg = args[i] || { kind: "literal", value: null, location } as Expr;
-      env.set(param.name, arg);
+      const arg = args[i] || ({ kind: "literal", value: null, location } as any);
+      env.set(param.name, arg as Expr);
     }
-
-    this.ctx.eventSink.emit({
-      phase: "expand",
-      kind: "macroExpanding",
-      location,
-      data: { name: macro.name.name, argCount: args.length }
-    });
-
-    // EVALUATE the macro body at compile time
-    // Multiple body expressions: evaluate each, return last
-    let result: Expr = { kind: "literal", value: null, location } as Expr;
-    for (const bodyExpr of macro.body) {
-      result = this.evalMacroExpr(bodyExpr, env);
-    }
-
-    // Expansion result (recursive expansion follows)
-
-
-    // Recursively expand in case the result contains more macro calls
+    this.ctx.eventSink.emit({ phase: "expand", kind: "macroExpanding", location, data: { name: macro.name.name, argCount: args.length } });
+    let result: Expr = { kind: "literal", value: null, location } as any;
+    for (const bodyExpr of macro.body) result = this.evalMacroExpr(bodyExpr, env) as Expr;
     return this.expandExpr(result);
   }
 
-  /**
-   * Evaluate an expression in the macro at compile time.
-   * This is different from runtime evaluation - we're building AST.
-   * 
-   * - let*: Evaluate init expressions and extend environment
-   * - gensym: Generate a unique identifier
-   * - quote: Return the quoted AST with unquotes evaluated
-   * - Parameters: Return the bound AST
-   */
-  private evalMacroExpr(expr: Expr, env: Map<string, Expr>): Expr {
+  evalMacroExpr(expr: Expr, env: Map<string, Expr>): Expr | any {
     switch (expr.kind) {
       case "identifier": {
         const id = expr as Identifier;
         const bound = env.get(id.name);
-
-        if (bound) {
-          // Return a COPY to avoid mutation issues
-          return this.cloneExpr(bound);
-        }
-        // Unknown identifier - keep as-is (might be a runtime reference)
+        if (bound) return this.cloneExpr(bound) as Expr;
         return expr;
       }
-      case "literal":
-        return expr;
-      case "gensym":
-        return this.expandGensym(expr as GensymExpr);
-      case "unquote": {
-        // Evaluate the unquoted expression
-        return this.evalMacroExpr((expr as UnquoteExpr).expr, env);
-      }
+      case "literal": return expr;
+      case "gensym": return this.expandGensym(expr as GensymExpr);
+      case "unquote": return this.evalMacroExpr((expr as any).expr, env);
       case "unquote-splice": {
-        const us = expr as UnquoteSpliceExpr;
+        const us = expr as any;
         const evaluated = this.evalMacroExpr(us.expr, env);
-        if (evaluated && evaluated.kind === "array") {
-          return { kind: "__splice", items: (evaluated as ArrayExpr).elements, location: expr.location } as unknown as Expr;
-        }
-        return { kind: "__splice", items: [evaluated], location: expr.location } as unknown as Expr;
+        if (evaluated && (evaluated as any).kind === "array") return { kind: "__splice", items: (evaluated as any).elements, location: expr.location } as any;
+        return { kind: "__splice", items: [evaluated], location: expr.location } as any;
       }
       case "quote": {
-        // Evaluate unquotes inside the quote
-        const evaluatedQuoted = this.evalQuote((expr as QuoteExpr).expr, env);
-        if (this.isSplice(evaluatedQuoted)) {
-          // Convert top-level splice into an array expression
-          return { kind: "array", elements: evaluatedQuoted.items, location: expr.location } as ArrayExpr;
-        }
-        return evaluatedQuoted as Expr;
+        const evaluatedQuoted = this.evalQuote((expr as any).expr, env);
+        if (this.isSplice(evaluatedQuoted)) return { kind: "array", elements: (evaluatedQuoted as any).items, location: expr.location } as any;
+        return evaluatedQuoted;
       }
       case "let*": {
         const let_ = expr as LetStarExpr;
-        // Create new environment with bindings
         const newEnv = new Map(env);
         for (const binding of let_.bindings) {
-          const value = this.evalMacroExpr(binding.init, newEnv);
-          newEnv.set(binding.name.name, value);
+          const value = this.evalMacroExpr(binding.init as any, newEnv);
+          newEnv.set(binding.name.name, value as Expr);
         }
-        // Evaluate body in new environment
-        let result: Expr = { kind: "literal", value: null, location: expr.location } as Expr;
-        for (const bodyExpr of let_.body) {
-          result = this.evalMacroExpr(bodyExpr, newEnv);
-        }
+        let result: Expr = { kind: "literal", value: null, location: expr.location } as any;
+        for (const bodyExpr of let_.body) result = this.evalMacroExpr(bodyExpr, newEnv) as Expr;
         return result;
       }
       case "if": {
-        // For compile-time if, we'd need to evaluate condition
-        // For now, just substitute in all branches
         const if_ = expr as IfExpr;
-        return {
-          ...if_,
-          condition: this.toPhase0(this.evalMacroExpr(if_.condition, env)),
-          thenBranch: this.toPhase0(this.evalMacroExpr(if_.thenBranch, env)),
-          elseBranch: if_.elseBranch ? this.toPhase0(this.evalMacroExpr(if_.elseBranch, env)) : null
-        };
+        return { ...if_, condition: this.toPhase0(this.evalMacroExpr(if_.condition as any, env)), thenBranch: this.toPhase0(this.evalMacroExpr(if_.thenBranch as any, env)), elseBranch: if_.elseBranch ? this.toPhase0(this.evalMacroExpr(if_.elseBranch as any, env)) : null } as any;
       }
       case "call": {
         const call = expr as CallExpr;
-        const evaluatedCallee = this.evalMacroExpr(call.callee, env);
-        const evaluatedArgs = call.args.map(a => this.evalMacroExpr(a, env));
-
-        // Handle call-form gensym: (gensym "prefix") -> Identifier
+        const evaluatedCallee = this.evalMacroExpr(call.callee as any, env);
+        const evaluatedArgs = call.args.map(a => this.evalMacroExpr(a as any, env));
         if (evaluatedCallee.kind === "identifier" && (evaluatedCallee as Identifier).name === "gensym") {
           const prefixArg = evaluatedArgs[0];
-          let prefix: string | undefined = undefined;
-          if (prefixArg && prefixArg.kind === "literal" && typeof (prefixArg as LiteralExpr).value === "string") {
-            prefix = (prefixArg as LiteralExpr).value as string;
-          }
-          return this.expandGensym({ kind: "gensym", prefix, location: expr.location } as GensymExpr);
+          let prefix = undefined;
+          if (prefixArg && prefixArg.kind === "literal" && typeof (prefixArg as any).value === "string") prefix = (prefixArg as any).value;
+          return this.expandGensym({ kind: "gensym", prefix, location: expr.location } as any);
         }
-
-        // Handle call-form quote: (quote X)
         if (evaluatedCallee.kind === "identifier" && (evaluatedCallee as Identifier).name === "quote") {
           const quoted = call.args[0];
-          const evaluatedQuoted = this.evalQuote(quoted, env);
-          if (this.isSplice(evaluatedQuoted)) {
-            return { kind: "array", elements: evaluatedQuoted.items, location: expr.location } as ArrayExpr;
-          }
-          return evaluatedQuoted as Expr;
+          const evaluatedQuoted = this.evalQuote(quoted as any, env);
+          if (this.isSplice(evaluatedQuoted)) return { kind: "array", elements: (evaluatedQuoted as any).items, location: expr.location } as any;
+          return evaluatedQuoted;
         }
-
-        // If callee is the `array` constructor, evaluate to an ArrayExpr at compile time
         if (evaluatedCallee.kind === "identifier" && (evaluatedCallee as Identifier).name === "array") {
-          return {
-            kind: "array",
-            elements: evaluatedArgs.map(a => this.toPhase0(a)),
-            location: expr.location
-          } as ArrayExpr;
+          return { kind: "array", elements: evaluatedArgs.map(a => this.toPhase0(a)), location: expr.location } as any;
         }
-        return {
-          ...call,
-          callee: this.toPhase0(evaluatedCallee),
-          args: evaluatedArgs.map(a => this.toPhase0(a))
-        };
+        return { ...call, callee: this.toPhase0(evaluatedCallee), args: evaluatedArgs.map(a => this.toPhase0(a)) } as any;
       }
       default:
-        // For other expressions, recursively process
-        return this.substituteAndExpand(expr, env);
+        return this.substituteAndExpand(expr as any, env) as any;
     }
   }
 
-  /**
-   * Evaluate a quoted expression - process unquotes
-   */
-  private evalQuote(expr: Expr, env: Map<string, Expr>): Expr | SpliceMarker {
-    switch (expr.kind) {
-      case "unquote": {
-        // Evaluate the unquoted expression
-        const unquote = expr as UnquoteExpr;
-        return this.evalMacroExpr(unquote.expr, env);
-      }
+  evalQuote(expr: Expr, env: Map<string, Expr>): Expr | any {
+    switch ((expr as any).kind) {
+      case "unquote": return this.evalMacroExpr((expr as any).expr, env);
       case "unquote-splice": {
-        // Evaluate the spliced expression at compile time.
-        // If it evaluates to an ArrayExpr, return a splice marker with its elements.
-        // If it evaluates to a non-array value, treat it as a single-item splice
-        // so it will be flattened as a single element in the surrounding list.
-        const us = expr as UnquoteSpliceExpr;
+        const us = expr as any;
         const evaluated = this.evalMacroExpr(us.expr, env);
-        if (evaluated && evaluated.kind === "array") {
-          // Return a lightweight splice marker (not part of the public AST)
-          return { kind: "__splice", items: (evaluated as ArrayExpr).elements, location: expr.location };
-        }
-        // Wrap non-arrays in a single-item splice marker so callers flatten it
-        // consistently into the surrounding list.
-        return { kind: "__splice", items: [evaluated], location: expr.location } as SpliceMarker;
+        if (evaluated && (evaluated as any).kind === "array") return { kind: "__splice", items: (evaluated as any).elements, location: expr.location } as any;
+        return { kind: "__splice", items: [evaluated], location: expr.location } as any;
       }
       case "identifier": {
-        // Support shorthand unquote/unquote-splice inside quotes: identifiers
-        // beginning with `~` or `~@` should behave like (unquote ...) and
-        // (unquote-splice ...).
         const id = expr as Identifier;
         if (typeof id.name === "string" && id.name.startsWith("~@")) {
           const remainder = id.name.slice(2);
-          let inner: Expr = { kind: "identifier", name: remainder, location: id.location } as Identifier;
-          // numeric shorthand (~@1) -> number literal
-          if (/^-?\d+$/.test(remainder)) {
-            inner = { kind: "literal", value: Number(remainder), location: id.location } as LiteralExpr;
-          }
-          return this.evalMacroExpr({ kind: "unquote-splice", expr: inner, location: id.location } as UnquoteSpliceExpr, env);
+          let inner: any = { kind: "identifier", name: remainder, location: id.location };
+          if (/^-?\d+$/.test(remainder)) inner = { kind: "literal", value: Number(remainder), location: id.location };
+          return this.evalMacroExpr({ kind: "unquote-splice", expr: inner, location: id.location } as any, env);
         }
         if (typeof id.name === "string" && id.name.startsWith("~")) {
           const remainder = id.name.slice(1);
-          let inner: Expr = { kind: "identifier", name: remainder, location: id.location } as Identifier;
-          if (/^-?\d+$/.test(remainder)) {
-            inner = { kind: "literal", value: Number(remainder), location: id.location } as LiteralExpr;
-          }
-          return this.evalMacroExpr({ kind: "unquote", expr: inner, location: id.location } as UnquoteExpr, env);
+          let inner: any = { kind: "identifier", name: remainder, location: id.location };
+          if (/^-?\d+$/.test(remainder)) inner = { kind: "literal", value: Number(remainder), location: id.location };
+          return this.evalMacroExpr({ kind: "unquote", expr: inner, location: id.location } as any, env);
         }
-        // Identifiers in quote are literal unless they are macro parameters
-        // bound in the environment (convenience: allow bare params without ~)
         const bound = env.get(id.name);
-        if (bound) {
-          return this.cloneExpr(bound);
-        }
+        if (bound) return this.cloneExpr(bound) as Expr;
         return expr;
       }
-      case "literal":
-        return expr;
-      case "gensym":
-        // Gensyms are evaluated even in quote
-        return this.expandGensym(expr as GensymExpr);
+      case "literal": return expr;
+      case "gensym": return this.expandGensym(expr as any);
       case "function": {
         const fn = expr as FunctionExpr;
-        const nameExpr = fn.name ? this.evalQuote(fn.name, env) : null;
-        const nameId = nameExpr && (nameExpr as Expr).kind === "identifier" ? (nameExpr as Identifier) : null;
-        const body = this.flattenQuotedArgs(fn.body.map(b => this.evalQuote(b, env)) as Array<Expr | SpliceMarker>);
-        return { kind: "function", name: nameId, params: fn.params, body, isDeclaration: fn.isDeclaration, location: fn.location } as FunctionExpr;
+        const nameExpr = fn.name ? this.evalQuote(fn.name as any, env) : null;
+        const nameId = nameExpr && (nameExpr as any).kind === "identifier" ? nameExpr as Identifier : null;
+        const body = this.flattenQuotedArgs(fn.body.map(b => this.evalQuote(b as any, env)) as any);
+        return { kind: "function", name: nameId, params: fn.params, body, isDeclaration: fn.isDeclaration, location: fn.location } as any;
       }
       case "call": {
         const call = expr as CallExpr;
-        // Recursively process for unquotes
-        const processedCallee = this.evalQuote(call.callee, env);
-        const processedArgs = call.args.map(a => this.evalQuote(a, env));
-        // Now convert back to proper AST
-        const calleeAst = this.convertQuotedToAstSingle(processedCallee as Expr | SpliceMarker);
-        const argsAst = this.flattenQuotedArgs(processedArgs as Array<Expr | SpliceMarker>);
-
-        // Special-case: quoted `array` constructor -> ArrayExpr
-        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "array") {
-          return { kind: "array", elements: argsAst, location: call.location } as ArrayExpr;
-        }
-
-
-
-        // Special-case: quoted `fn` form: (fn name (params) body...)
+        const processedCallee = this.evalQuote(call.callee as any, env);
+        const processedArgs = call.args.map(a => this.evalQuote(a as any, env));
+        const calleeAst = this.convertQuotedToAstSingle(processedCallee);
+        const argsAst = this.flattenQuotedArgs(processedArgs as any);
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "array") return { kind: "array", elements: argsAst, location: call.location } as any;
         if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === 'fn') {
-          // Use processed args (after evalQuote) so unquotes are already evaluated
-          const nameArg = processedArgs[0] as Expr | SpliceMarker | undefined;
+          const nameArg = processedArgs[0] as any | undefined;
+          const paramsArg = processedArgs[1] as any | undefined;
+          let name: Identifier | null = null;
+          if (nameArg && !this.isSplice(nameArg) && (nameArg as any).kind === "identifier") name = nameArg as Identifier;
+          const params: Identifier[] = [];
+          if (paramsArg && !this.isSplice(paramsArg) && (paramsArg as any).kind === "array") {
+            const arr = paramsArg as ArrayExpr;
+            for (const el of arr.elements) if (el.kind === "identifier") params.push(el as Identifier);
+          }
+          const body = this.flattenQuotedArgs((processedArgs as any[]).slice(2) as any);
+          return { kind: "function", name, params, body, isDeclaration: false, location: call.location } as any;
+        }
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "return") return { kind: "return", value: argsAst[0] ? argsAst[0] : null, location: call.location } as any;
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "block") return { kind: "block", body: argsAst, location: call.location } as any;
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "assign") return { kind: "assign", target: argsAst[0], value: argsAst[1], location: call.location } as any;
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "index") return { kind: "index", object: argsAst[0], index: argsAst[1], location: call.location } as any;
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "prop") {
+          const obj = argsAst[0] ? argsAst[0] : { kind: "identifier", name: "undefined", location: call.location } as any;
+          let propName = "";
+          const propArg = argsAst[1];
+          if (propArg && (propArg as any).kind === "literal") {
+            const lit = propArg as any;
+            if (typeof lit.value === "string") propName = lit.value; else propName = String(lit.value);
+          }
+          return { kind: "prop", object: obj, property: propName, location: call.location } as any;
+        }
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "if") return { kind: "if", condition: argsAst[0], thenBranch: argsAst[1], elseBranch: argsAst[2] || null, location: call.location } as any;
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "type-assert") {
+          const typeArg = call.args[1];
+          let typeNode: any = { kind: "type-ref", name: "any", location: call.location };
+          if (typeArg && (typeArg as any).kind === "call") {
+            const typeCall = typeArg as CallExpr;
+            const typeCallee = typeCall.callee;
+            if (typeCallee.kind === "identifier" && (typeCallee as Identifier).name === "type-ref") {
+              const nameLit = typeCall.args[0];
+              if (nameLit && (nameLit as any).kind === "literal") typeNode = { kind: "type-ref", name: (nameLit as any).value as string, location: call.location };
+            }
+          }
+          return { kind: "type-assert", expr: argsAst[0], typeAnnotation: typeNode, location: call.location } as any;
+        }
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "new") {
+          const calleeExpr = argsAst[0] ? argsAst[0] : { kind: "identifier", name: "undefined", location: call.location } as any;
+          let newArgs = argsAst.slice(1);
+          if (newArgs.length === 1 && (newArgs[0] as any).kind === "array") newArgs = (newArgs[0] as ArrayExpr).elements;
+          return { kind: "new", callee: calleeExpr, args: newArgs, location: call.location } as any;
+        }
+        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "call") {
+          const calleeArg = argsAst[0] ? argsAst[0] : { kind: "identifier", name: "undefined", location: call.location } as any;
+          const outArgs = argsAst.slice(1);
+          return { kind: "call", callee: calleeArg, args: outArgs, location: call.location } as any;
+        }
+        return { kind: "call", callee: calleeAst, args: argsAst, location: call.location } as any;
+      }
+      case "return": {
+        const ret = expr as ReturnExpr;
+        if (ret.value) {
+          const processed = this.evalQuote(ret.value as any, env as any);
+          if (this.isSplice(processed)) return { kind: "array", elements: (processed as any).items, location: ret.location } as any;
+          return { kind: "return", value: processed as any, location: ret.location } as any;
+        }
+        return { kind: "return", value: null, location: ret.location } as any;
+      }
+      case "assign": {
+        const assign = expr as AssignExpr;
+        const target = this.evalQuote(assign.target as any, env as any);
+        const value = this.evalQuote(assign.value as any, env as any);
+        return { kind: "assign", target: this.convertQuotedToAstSingle(target), value: this.convertQuotedToAstSingle(value), location: assign.location } as any;
+      }
+      case "index": {
+        const idx = expr as IndexExpr;
+        const object = this.evalQuote(idx.object as any, env as any);
+        const index = this.evalQuote(idx.index as any, env as any);
+        return { kind: "index", object: this.convertQuotedToAstSingle(object), index: this.convertQuotedToAstSingle(index), location: idx.location } as any;
+      }
+      case "prop": {
+        const prop = expr as PropExpr;
+        const object = this.evalQuote(prop.object as any, env as any);
+        return { kind: "prop", object: this.convertQuotedToAstSingle(object), property: prop.property, location: prop.location } as any;
+      }
+      case "if": {
+        const if_ = expr as IfExpr;
+        const cond = this.evalQuote(if_.condition as any, env as any);
+        const thenBranch = this.evalQuote(if_.thenBranch as any, env as any);
+        const elseBranch = if_.elseBranch ? this.evalQuote(if_.elseBranch as any, env as any) : null;
+        return { kind: "if", condition: this.convertQuotedToAstSingle(cond), thenBranch: this.convertQuotedToAstSingle(thenBranch), elseBranch: elseBranch ? this.convertQuotedToAstSingle(elseBranch) : null, location: if_.location } as any;
+      }
+      case "type-assert": {
+        const ta = expr as TypeAssertExpr;
+        const processed = this.evalQuote(ta.expr as any, env as any);
+        return { kind: "type-assert", expr: this.convertQuotedToAstSingle(processed), typeAnnotation: ta.typeAnnotation, location: ta.location } as any;
+      }
+      case "new": {
+        const n = expr as NewExpr;
+        const callee = this.evalQuote(n.callee as any, env as any);
+        const args = n.args.map(a => this.evalQuote(a as any, env as any));
+        let argsAst = this.flattenQuotedArgs(args as any);
+        if (argsAst.length === 1 && (argsAst[0] as any).kind === "array") argsAst = (argsAst[0] as ArrayExpr).elements;
+        return { kind: "new", callee: this.convertQuotedToAstSingle(callee), args: argsAst, location: n.location } as any;
+      }
+      case "array": {
+        const arr = expr as ArrayExpr;
+        const processed = arr.elements.map(e => this.evalQuote(e as any, env as any));
+        return { ...arr, elements: this.flattenQuotedArgs(processed as any) } as any;
+      }
+      case "block": {
+        const block = expr as BlockStmt;
+        const processed = block.body.map(e => this.evalQuote(e as any, env as any));
+        const body = this.flattenQuotedArgs(processed as any);
+        return { kind: "block", body, location: block.location } as any;
+      }
+      case "let*": {
+        const let_ = expr as LetStarExpr;
+        const bindings: LetBinding[] = [] as any;
+        for (const b of let_.bindings) {
+          const nameExpr = this.evalQuote(b.name as any, env as any);
+          const nameAst = this.convertQuotedToAstSingle(nameExpr);
+          const initExpr = this.evalQuote(b.init as any, env as any);
+          const initAst = this.convertQuotedToAstSingle(initExpr);
+          if (nameAst && (nameAst as any).kind === "identifier") bindings.push({ name: nameAst as Identifier, init: initAst } as any);
+          else bindings.push({ name: b.name, init: initAst } as any);
+        }
+        const processed = let_.body.map(e => this.evalQuote(e as any, env as any));
+        return { kind: "let*", bindings, body: this.flattenQuotedArgs(processed as any), isConst: let_.isConst, location: let_.location } as any;
+      }
+      default: return expr as any;
+    }
+  }
+
+  substituteAndExpand(expr: Expr, bindings: Map<string, Expr>) { return this.substitutor.substituteAndExpand(expr as any, bindings as any) as any; }
+
+  expandGensym(gensym: GensymExpr) { return this.gensymGen.expandGensym({ prefix: (gensym as any).prefix, generatedName: (gensym as any).generatedName, location: gensym.location } as any) as any; }
+
+  cloneExpr(expr: any) { return JSON.parse(JSON.stringify(expr)); }
+
+  toPhase0<T>(e: T): T { return e; }
+
+  isSplice(node: any) { return this.quotedConverter.isSplice(node); }
+  convertQuotedToAstSingle(node: any) { const r = this.quotedConverter.convertQuotedToAst(node); if (this.quotedConverter.isSplice(r)) return this.toPhase0({ kind: "array", elements: (r as any).items, location: (r as any).location } as any); return this.toPhase0(r as any); }
+  flattenQuotedArgs(nodes: any[]) { return this.quotedConverter.flattenQuotedArgs(nodes); }
+  convertQuotedToAst(expr: any) { return this.quotedConverter.convertQuotedToAst(expr); }
+
+  expandQuotedExpr(expr: Expr) { if ((expr as any).kind === "gensym") return this.expandGensym(expr as any); return this.walkAndExpandGensyms(expr as any); }
+
+  walkAndExpandGensyms(expr: any) {
+    switch (expr.kind) {
+      case "gensym": return this.expandGensym(expr as any);
+      case "call": {
+        const call = expr as CallExpr;
+        return { ...call, callee: this.toPhase0(this.walkAndExpandGensyms(call.callee)), args: call.args.map(a => this.toPhase0(this.walkAndExpandGensyms(a))) } as any;
+      }
+      case "let*": {
+        const let_ = expr as LetStarExpr;
+        return { ...let_, bindings: let_.bindings.map(b => ({ ...b, init: this.toPhase0(this.walkAndExpandGensyms(b.init)) })), body: let_.body.map(e => this.toPhase0(this.walkAndExpandGensyms(e))) } as any;
+      }
+      case "array": {
+        const arr = expr as ArrayExpr;
+        return { ...arr, elements: arr.elements.map(e => this.toPhase0(this.walkAndExpandGensyms(e))) } as any;
+      }
+      default: return expr;
+    }
+  }
+
+  expandLet(let_: LetStarExpr) { return { ...let_, bindings: let_.bindings.map(b => ({ ...b, init: this.toPhase0(this.expandExpr(b.init)) })), body: let_.body.map(e => this.toPhase0(this.expandExpr(e))) } as any; }
+  expandIf(if_: IfExpr) { return { ...if_, condition: this.toPhase0(this.expandExpr(if_.condition)), thenBranch: this.toPhase0(this.expandExpr(if_.thenBranch)), elseBranch: if_.elseBranch ? this.toPhase0(this.expandExpr(if_.elseBranch)) : null } as any; }
+  expandProp(prop: PropExpr) { return { ...prop, object: this.toPhase0(this.expandExpr(prop.object)) } as any; }
+  expandFunction(fn: FunctionExpr) { return { ...fn, body: fn.body.map(e => this.toPhase0(this.expandExpr(e))) } as any; }
+  expandReturn(ret: ReturnExpr) { return { ...ret, value: ret.value ? this.toPhase0(this.expandExpr(ret.value)) : null } as any; }
+  expandWhile(w: WhileExpr) { return { ...w, condition: this.toPhase0(this.expandExpr(w.condition)), body: w.body.map(e => this.toPhase0(this.expandExpr(e))) } as any; }
+  expandArray(arr: ArrayExpr) { return { ...arr, elements: arr.elements.map(e => this.toPhase0(this.expandExpr(e))) } as any; }
+  expandObject(obj: ObjectExpr) { return { ...obj, fields: obj.fields.map(f => ({ ...f, value: this.toPhase0(this.expandExpr(f.value)) })) } as any; }
+  expandAssign(assign: AssignExpr) { return { ...assign, target: this.toPhase0(this.expandExpr(assign.target)), value: this.toPhase0(this.expandExpr(assign.value)) } as any; }
+  expandFor(for_: ForExpr) { return { ...for_, init: for_.init ? this.toPhase0(this.expandExpr(for_.init)) : null, condition: for_.condition ? this.toPhase0(this.expandExpr(for_.condition)) : null, update: for_.update ? this.toPhase0(this.expandExpr(for_.update)) : null, body: for_.body.map(e => this.toPhase0(this.expandExpr(e))) } as any; }
+  expandIndex(index: IndexExpr) { return { ...index, object: this.toPhase0(this.expandExpr(index.object)), index: this.toPhase0(this.expandExpr(index.index)) } as any; }
+  expandNew(n: NewExpr) { return { ...n, callee: this.toPhase0(this.expandExpr(n.callee)), args: n.args.map(a => this.toPhase0(this.expandExpr(a))) } as any; }
+  expandClass(c: ClassExpr) { return { ...c, fields: c.fields.map(f => ({ ...f, initializer: f.initializer ? this.toPhase0(this.expandExpr(f.initializer)) : null })), methods: c.methods.map(m => ({ ...m, body: m.body.map(e => this.toPhase0(this.expandExpr(e))) })) } as any; }
+  expandTypeAssert(ta: TypeAssertExpr) { return { ...ta, expr: this.toPhase0(this.expandExpr(ta.expr)) } as any; }
+  expandThrow(t: ThrowExpr) { return { ...t, value: this.toPhase0(this.expandExpr(t.value)) } as any; }
+  expandTryCatch(tc: TryCatchExpr) { return { ...tc, tryBody: tc.tryBody.map(e => this.toPhase0(this.expandExpr(e))), catchBody: tc.catchBody.map(e => this.toPhase0(this.expandExpr(e))), finallyBody: tc.finallyBody.map(e => this.toPhase0(this.expandExpr(e))) } as any; }
+  expandBlock(block: BlockStmt) { return { ...block, body: block.body.map(e => this.toPhase0(this.expandExpr(e))) } as any; }
           const paramsArg = processedArgs[1] as Expr | SpliceMarker | undefined;
           let name: Identifier | null = null;
-          if (nameArg && !this.isSplice(nameArg) && (nameArg as Expr).kind === "identifier") {
+          if (nameArg && !this.quoteEvaluator.isSplice(nameArg) && (nameArg as Expr).kind === "identifier") {
             name = nameArg as Identifier;
           }
           const params: Identifier[] = [];
-          if (paramsArg && !this.isSplice(paramsArg) && (paramsArg as Expr).kind === "array") {
+          if (paramsArg && !this.quoteEvaluator.isSplice(paramsArg) && (paramsArg as Expr).kind === "array") {
             const arr = paramsArg as ArrayExpr;
             for (const el of arr.elements) {
               if (el.kind === "identifier") params.push(el as Identifier);
             }
           }
-          const body = this.flattenQuotedArgs(processedArgs.slice(2) as Array<Expr | SpliceMarker>);
-          return { kind: "function", name, params, body, isDeclaration: false, location: call.location } as FunctionExpr;
-        }
-
-        // Special-case: quoted `fn` form: (fn name (params) body...)
-        if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === 'fn') {
-          // Use processed args (after evalQuote) so unquotes are already evaluated
-          const nameArg = processedArgs[0] as Expr | SpliceMarker | undefined;
-          const paramsArg = processedArgs[1] as Expr | SpliceMarker | undefined;
-          let name: Identifier | null = null;
-          if (nameArg && !this.isSplice(nameArg) && (nameArg as Expr).kind === "identifier") {
-            name = nameArg as Identifier;
-          }
-          const params: Identifier[] = [];
-          if (paramsArg && !this.isSplice(paramsArg) && (paramsArg as Expr).kind === "array") {
-            const arr = paramsArg as ArrayExpr;
-            for (const el of arr.elements) {
-              if (el.kind === "identifier") params.push(el as Identifier);
-            }
-          }
-          const body = this.flattenQuotedArgs(processedArgs.slice(2) as Array<Expr | SpliceMarker>);
+          const body = this.quoteEvaluator.flattenQuotedArgs(processedArgs.slice(2) as Array<Expr | SpliceMarker>);
           return { kind: "function", name, params, body, isDeclaration: false, location: call.location } as FunctionExpr;
         }
 
@@ -925,8 +755,8 @@ export class MacroExpander {
       case "return": {
         const ret = expr as ReturnExpr;
         if (ret.value) {
-          const processed = this.evalQuote(ret.value, env);
-          if (this.isSplice(processed)) {
+          const processed = this.quoteEvaluator.evalQuote(ret.value, env);
+          if (this.quoteEvaluator.isSplice(processed)) {
             return { kind: "array", elements: processed.items, location: ret.location } as ArrayExpr;
           }
           return { kind: "return", value: processed as Expr, location: ret.location } as ReturnExpr;
@@ -936,44 +766,44 @@ export class MacroExpander {
 
       case "assign": {
         const assign = expr as AssignExpr;
-        const target = this.evalQuote(assign.target, env);
-        const value = this.evalQuote(assign.value, env);
-        return { kind: "assign", target: this.convertQuotedToAstSingle(target as Expr | SpliceMarker), value: this.convertQuotedToAstSingle(value as Expr | SpliceMarker), location: assign.location } as AssignExpr;
+        const target = this.quoteEvaluator.evalQuote(assign.target, env);
+        const value = this.quoteEvaluator.evalQuote(assign.value, env);
+        return { kind: "assign", target: this.quoteEvaluator.convertQuotedToAstSingle(target as Expr | SpliceMarker), value: this.quoteEvaluator.convertQuotedToAstSingle(value as Expr | SpliceMarker), location: assign.location } as AssignExpr;
       }
 
       case "index": {
         const idx = expr as IndexExpr;
-        const object = this.evalQuote(idx.object, env);
-        const index = this.evalQuote(idx.index, env);
-        return { kind: "index", object: this.convertQuotedToAstSingle(object as Expr | SpliceMarker), index: this.convertQuotedToAstSingle(index as Expr | SpliceMarker), location: idx.location } as IndexExpr;
+        const object = this.quoteEvaluator.evalQuote(idx.object, env);
+        const index = this.quoteEvaluator.evalQuote(idx.index, env);
+        return { kind: "index", object: this.quoteEvaluator.convertQuotedToAstSingle(object as Expr | SpliceMarker), index: this.quoteEvaluator.convertQuotedToAstSingle(index as Expr | SpliceMarker), location: idx.location } as IndexExpr;
       }
 
       case "prop": {
         const prop = expr as PropExpr;
-        const object = this.evalQuote(prop.object, env);
+        const object = this.quoteEvaluator.evalQuote(prop.object, env);
         // Property is a string in AST; leave as-is or evaluate if it came from unquote
-        return { kind: "prop", object: this.convertQuotedToAstSingle(object as Expr | SpliceMarker), property: prop.property, location: prop.location } as PropExpr;
+        return { kind: "prop", object: this.quoteEvaluator.convertQuotedToAstSingle(object as Expr | SpliceMarker), property: prop.property, location: prop.location } as PropExpr;
       }
 
       case "if": {
         const if_ = expr as IfExpr;
-        const cond = this.evalQuote(if_.condition, env);
-        const thenBranch = this.evalQuote(if_.thenBranch, env);
-        const elseBranch = if_.elseBranch ? this.evalQuote(if_.elseBranch, env) : null;
-        return { kind: "if", condition: this.convertQuotedToAstSingle(cond as Expr | SpliceMarker), thenBranch: this.convertQuotedToAstSingle(thenBranch as Expr | SpliceMarker), elseBranch: elseBranch ? this.convertQuotedToAstSingle(elseBranch as Expr | SpliceMarker) : null, location: if_.location } as IfExpr;
+        const cond = this.quoteEvaluator.evalQuote(if_.condition, env);
+        const thenBranch = this.quoteEvaluator.evalQuote(if_.thenBranch, env);
+        const elseBranch = if_.elseBranch ? this.quoteEvaluator.evalQuote(if_.elseBranch, env) : null;
+        return { kind: "if", condition: this.quoteEvaluator.convertQuotedToAstSingle(cond as Expr | SpliceMarker), thenBranch: this.quoteEvaluator.convertQuotedToAstSingle(thenBranch as Expr | SpliceMarker), elseBranch: elseBranch ? this.quoteEvaluator.convertQuotedToAstSingle(elseBranch as Expr | SpliceMarker) : null, location: if_.location } as IfExpr;
       }
 
       case "type-assert": {
         const ta = expr as TypeAssertExpr;
-        const processed = this.evalQuote(ta.expr, env);
-        return { kind: "type-assert", expr: this.convertQuotedToAstSingle(processed as Expr | SpliceMarker), typeAnnotation: ta.typeAnnotation, location: ta.location } as TypeAssertExpr;
+        const processed = this.quoteEvaluator.evalQuote(ta.expr, env);
+        return { kind: "type-assert", expr: this.quoteEvaluator.convertQuotedToAstSingle(processed as Expr | SpliceMarker), typeAnnotation: ta.typeAnnotation, location: ta.location } as TypeAssertExpr;
       }
 
       case "new": {
         const n = expr as NewExpr;
-        const callee = this.evalQuote(n.callee, env);
-        const args = n.args.map(a => this.evalQuote(a, env) as Expr | SpliceMarker);
-        let argsAst = this.flattenQuotedArgs(args);
+        const callee = this.quoteEvaluator.evalQuote(n.callee, env);
+        const args = n.args.map(a => this.quoteEvaluator.evalQuote(a, env) as Expr | SpliceMarker);
+        let argsAst = this.quoteEvaluator.flattenQuotedArgs(args as any);
         if (argsAst.length === 1 && argsAst[0].kind === "array") {
           argsAst = (argsAst[0] as ArrayExpr).elements;
         }
@@ -982,17 +812,17 @@ export class MacroExpander {
 
       case "array": {
         const arr = expr as ArrayExpr;
-        const processed = arr.elements.map(e => this.evalQuote(e, env) as Expr | SpliceMarker);
+        const processed = arr.elements.map(e => this.quoteEvaluator.evalQuote(e, env) as Expr | SpliceMarker);
         return {
           ...arr,
-          elements: this.flattenQuotedArgs(processed)
+          elements: this.quoteEvaluator.flattenQuotedArgs(processed as any)
         };
       }
 
       case "block": {
         const block = expr as BlockStmt;
-        const processed = block.body.map(e => this.evalQuote(e, env) as Expr | SpliceMarker);
-        const body = this.flattenQuotedArgs(processed);
+        const processed = block.body.map(e => this.quoteEvaluator.evalQuote(e, env) as Expr | SpliceMarker);
+        const body = this.quoteEvaluator.flattenQuotedArgs(processed as any);
         return { kind: "block", body, location: block.location } as BlockStmt;
       }
 
@@ -1000,10 +830,10 @@ export class MacroExpander {
         const let_ = expr as LetStarExpr;
         const bindings: LetBinding[] = [];
         for (const b of let_.bindings) {
-          const nameExpr = this.evalQuote(b.name, env);
-          const nameAst = this.convertQuotedToAstSingle(nameExpr as Expr | SpliceMarker);
-          const initExpr = this.evalQuote(b.init, env);
-          const initAst = this.convertQuotedToAstSingle(initExpr as Expr | SpliceMarker);
+          const nameExpr = this.quoteEvaluator.evalQuote(b.name, env);
+            const nameAst = this.quoteEvaluator.convertQuotedToAstSingle(nameExpr as Expr | SpliceMarker);
+            const initExpr = this.quoteEvaluator.evalQuote(b.init, env);
+            const initAst = this.quoteEvaluator.convertQuotedToAstSingle(initExpr as Expr | SpliceMarker);
           if (nameAst.kind === "identifier") {
             bindings.push({ name: nameAst as Identifier, init: initAst });
           } else {
@@ -1011,8 +841,8 @@ export class MacroExpander {
             bindings.push({ name: b.name, init: initAst });
           }
         }
-        const processed = let_.body.map(e => this.evalQuote(e, env) as Expr | SpliceMarker);
-        return { kind: "let*", bindings, body: this.flattenQuotedArgs(processed), isConst: let_.isConst, location: let_.location } as LetStarExpr;
+        const processed = let_.body.map(e => this.quoteEvaluator.evalQuote(e, env) as Expr | SpliceMarker);
+        return { kind: "let*", bindings, body: this.quoteEvaluator.flattenQuotedArgs(processed as any), isConst: let_.isConst, location: let_.location } as LetStarExpr;
       }
 
       default:
@@ -1020,22 +850,15 @@ export class MacroExpander {
     }
   }
 
-  /**
-   * Substitute parameters and handle quote/unquote
-   */
-  private substitutor = new Substitutor();
-
   private substituteAndExpand(expr: Expr, bindings: Map<string, Expr>): Expr {
-    // Delegate to shared substitutor and cast result to Expr when needed
-    return this.substitutor.substituteAndExpand(expr, bindings) as Expr;
+    return this.substitutor.substituteAndExpand(expr as any, bindings) as Expr;
   }
 
   /**
    * Expand gensym to produce a unique identifier
    */
   private expandGensym(gensym: GensymExpr): Identifier {
-    // Delegate gensym expansion to Phase0 helper to ensure consistent naming
-    return this.gensymGen.expandGensym({ prefix: gensym.prefix, generatedName: gensym.generatedName, location: gensym.location });
+    return this.gensymFacade.expandGensym(gensym);
   }
 
   /**
@@ -1063,23 +886,19 @@ export class MacroExpander {
 
 
   private isSplice(node: unknown): node is SpliceMarker {
-    return this.quotedConverter.isSplice(node);
+    return this.quoteEvaluator.isSplice(node);
   }
 
   private convertQuotedToAstSingle(node: Expr | SpliceMarker): Phase0Expr {
-    const r = this.quotedConverter.convertQuotedToAst(node);
-    if (this.quotedConverter.isSplice(r)) {
-      return this.toPhase0({ kind: "array", elements: r.items, location: r.location } as ArrayExpr);
-    }
-    return this.toPhase0(r as Expr);
+    return this.quoteEvaluator.convertQuotedToAstSingle(node as any);
   }
 
   private flattenQuotedArgs(nodes: Array<Expr | SpliceMarker>): Phase0Expr[] {
-    return this.quotedConverter.flattenQuotedArgs(nodes);
+    return this.quoteEvaluator.flattenQuotedArgs(nodes as any) as Phase0Expr[];
   }
 
   private convertQuotedToAst(expr: Expr | SpliceMarker): Expr | SpliceMarker {
-    return this.quotedConverter.convertQuotedToAst(expr);
+    return this.quoteEvaluator.convertQuotedToAst(expr as any) as any;
   }
 
 
@@ -1088,46 +907,11 @@ export class MacroExpander {
    * Expand quoted expression (handles gensyms)
    */
   private expandQuotedExpr(expr: Expr): Expr {
-    if (expr.kind === "gensym") {
-      return this.expandGensym(expr as GensymExpr);
-    }
-    // For other expressions, recursively check for gensyms
-    return this.walkAndExpandGensyms(expr);
+    return this.gensymFacade.expandQuotedExpr(expr);
   }
 
   private walkAndExpandGensyms(expr: Expr): Expr {
-    switch (expr.kind) {
-      case "gensym":
-        return this.expandGensym(expr as GensymExpr);
-      case "call": {
-        const call = expr as CallExpr;
-        return {
-          ...call,
-          callee: this.toPhase0(this.walkAndExpandGensyms(call.callee)),
-          args: call.args.map(a => this.toPhase0(this.walkAndExpandGensyms(a)))
-        };
-      }
-      case "let*": {
-        const let_ = expr as LetStarExpr;
-        return {
-          ...let_,
-          bindings: let_.bindings.map(b => ({
-            ...b,
-            init: this.toPhase0(this.walkAndExpandGensyms(b.init))
-          })),
-          body: let_.body.map(e => this.toPhase0(this.walkAndExpandGensyms(e)))
-        };
-      }
-      case "array": {
-        const arr = expr as ArrayExpr;
-        return {
-          ...arr,
-          elements: arr.elements.map(e => this.toPhase0(this.walkAndExpandGensyms(e)))
-        };
-      }
-      default:
-        return expr;
-    }
+    return this.gensymFacade.walkAndExpandGensyms(expr);
   }
 
   // Helper methods for expanding various expression types
