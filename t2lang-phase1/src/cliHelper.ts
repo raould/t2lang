@@ -9,7 +9,5 @@ export async function runCli(
     prettyEnum: { pretty: any; ugly: any },
     pkgPath?: string
 ): Promise<void> {
-    // Build a compatibility object including `newlines` for older type declarations
-    const compat = { ...prettyEnum, newlines: prettyEnum.pretty } as { pretty: any; newlines: any; ugly: any };
-    return common.runCli(notice, compileFn, compat, pkgPath);
+    return common.runCli(notice, compileFn, prettyEnum, pkgPath);
 }

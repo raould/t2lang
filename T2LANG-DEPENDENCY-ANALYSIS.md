@@ -5,7 +5,7 @@
 The codebase has **moderate technical debt** with several concerning patterns:
 - done: **3 copies of cliHelper.ts** with different implementations
 - done: **10 dynamic `await import()` calls** causing runtime complexity
-- **53 `as any` type assertions** undermining type safety
+- done: **53 `as any` type assertions** undermining type safety
 - **Orphaned debug code** in core compiler files
 - **Unnecessary indirection** layers between packages
 
@@ -33,9 +33,10 @@ The codebase has **moderate technical debt** with several concerning patterns:
    console.error("Run 't2tc --help' for usage information");
    ```
    This line executes on module load - a bug!
-   
-- `CliOptions` interface must be:
-   - `pretty: "ugly" | "pretty"` (no "newlines")
+
+**Status:**
+
+- Fixed: `CliOptions` now uses `pretty: "ugly" | "pretty"` (the `newlines` mode was removed).
 
 ---
 

@@ -33,9 +33,4 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-await runCli(
-	"Phase0",
-	compilePhase0,
-	{ pretty: PrettyOption.pretty, newlines: PrettyOption.pretty, ugly: PrettyOption.ugly },
-	path.join(__dirname, "..", "package.json")
-);
+await runCli("Phase0", compilePhase0, PrettyOption, path.join(__dirname, "..", "package.json"));
