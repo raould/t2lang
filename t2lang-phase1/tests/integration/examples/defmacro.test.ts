@@ -1,1 +1,0 @@
-// defmacro.test.ts removed: tests relying on `enableTsc` were deleted.
