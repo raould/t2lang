@@ -20,7 +20,7 @@ statement ::=
 * (return expr?)  
 * (let* identifier expr)  
 * (const identifier expr)  
-* (assign expr expr)  
+* (assign expr expr) # TODO: support (set! expr expr)
 * (expr expr)  
 * (fn name params block type?)  
 * (class name class-body)  
