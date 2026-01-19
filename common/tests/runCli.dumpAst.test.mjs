@@ -21,7 +21,7 @@ test('runCli --ast prints AST dump to stderr', async () => {
                 events: [{ phase: 'parse', kind: 'astDump', data: { ast: { test: true } } }]
             };
         };
-        await runCli('Test', compileFn, { pretty: 'newlines', newlines: 'newlines', ugly: 'ugly' }, './package.json');
+        await runCli('Test', compileFn, { pretty: 'pretty', ugly: 'ugly' }, './package.json');
         assert.match(captured, /--- AST/);
         assert.match(captured, /\(object \(field test true\)\)/);
     } finally {

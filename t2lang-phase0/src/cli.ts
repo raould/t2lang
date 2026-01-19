@@ -19,7 +19,7 @@
  *   -o, --output <file>   Output file path (default: input with .ts extension)
  *   --stdout              Print output to stdout instead of file
  *   --ast                 Print AST dump to stderr
- *   --pretty-option       <ugly|newlines|pretty>  Set pretty mode (default: newlines)
+ *   --pretty-option       <ugly|pretty>  Set pretty mode (default: pretty)
  *   -h, --help            Show this help message
  *   -v, --version         Show version
  */
@@ -33,4 +33,9 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-await runCli("Phase0", compilePhase0, PrettyOption, path.join(__dirname, "..", "package.json"));
+await runCli(
+	"Phase0",
+	compilePhase0,
+	{ pretty: PrettyOption.pretty, newlines: PrettyOption.pretty, ugly: PrettyOption.ugly },
+	path.join(__dirname, "..", "package.json")
+);

@@ -18,7 +18,7 @@ test('type-object edge cases: nested/quoted/mixed forms', () => {
     )
   `;
 
-  const ctx: CompilerContext = { config: { logLevel: 'none', prettyOutput: 'newlines', dumpAst: false, seed: 'default', tracePhases: [], emitTypes: false }, eventSink: new ArrayEventSink() };
+  const ctx: CompilerContext = { config: { logLevel: 'none', prettyOutput: 'pretty', dumpAst: false, seed: 'default', tracePhases: [], emitTypes: false }, eventSink: new ArrayEventSink() };
   const parser = new Parser('input.t2', src, ctx);
   const ast = parser.parseProgram();
   const expander = new MacroExpander(ctx);

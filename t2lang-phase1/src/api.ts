@@ -34,7 +34,7 @@ export async function compilePhase1(
 ): Promise<CompileResult> {
   const fullConfig: LocalCompilerConfig = {
     logLevel: "none",
-    prettyOutput: PrettyOption.newlines,
+    prettyOutput: PrettyOption.pretty,
     // Legacy single flag kept for convenience; Phase1 supports finer-grained
     // AST dumps before and after macro expansion.
     dumpAst: true,

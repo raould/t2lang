@@ -19,7 +19,7 @@
  *   -o, --output <file>   Output file path (default: input with .ts extension)
  *   --stdout              Print output to stdout instead of file
  *   --ast                 Print AST dump to stderr
- *   --pretty-option       <ugly|newlines|pretty>  Set pretty mode (default: newlines)
+ *   --pretty-option       <ugly|pretty>  Set pretty mode (default: pretty)
  *   -h, --help            Show this help message
  *   -v, --version         Show version
  */

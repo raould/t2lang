@@ -34,7 +34,6 @@ import { createRequire } from "module";
 
 export enum PrettyOption {
   ugly = "ugly",
-  newlines = "newlines",
   pretty = "pretty"
 }
 
@@ -125,9 +124,6 @@ export async function genProgram(program: Program, options: TsCodegenOptions, ty
   switch (options.pretty) {
     case PrettyOption.ugly:
       code = result.tsSource;
-      break;
-    case PrettyOption.newlines:
-      code = result.tsSource + "\n";
       break;
     case PrettyOption.pretty: {
       const require = createRequire(import.meta.url);

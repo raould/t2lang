@@ -38,7 +38,7 @@ export async function compilePhase0(
 ): Promise<CompileResult> {
   const fullConfig: CompilerConfig = {
     logLevel: "none",
-    prettyOutput: PrettyOption.newlines,
+    prettyOutput: PrettyOption.pretty,
     dumpAst: true,
     seed: "default",
     tracePhases: [],
