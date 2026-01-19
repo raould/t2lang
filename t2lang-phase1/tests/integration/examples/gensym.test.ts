@@ -12,7 +12,7 @@ test("gensym in macro produces unique identifier", async () => {
           (quote (let* ((~temp 42))
             ~body))))
       (with-temp (+ temp1 1)))
-  `, { enableTsc: false });
+  `, {});
   if (result.errors.length > 0) { console.error(result.errors); }
   // The macro should expand with a unique temp variable
   assert.strictEqual(result.errors.length, 0);
@@ -27,7 +27,7 @@ test("gensym with prefix", async () => {
         (let* ((x (gensym "myvar")))
           (quote ~x)))
       (test-macro))
-  `, { enableTsc: false });
+  `, {});
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   // Generated identifier should have the prefix

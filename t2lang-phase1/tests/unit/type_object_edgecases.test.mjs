@@ -7,7 +7,7 @@ import { ArrayEventSink } from '../../src/events/eventSink.js';
 import type { CompilerContext } from '../../src/api.js';
 
 test('type-object edge cases: nested/quoted/mixed forms', () => {
-    const src = `
+  const src = `
     (program
       ;; parenthesized sigil with parenthesized type
       (type-alias T1 (type-object (.a: (type-ref "TypeA"))))
@@ -18,24 +18,24 @@ test('type-object edge cases: nested/quoted/mixed forms', () => {
     )
   `;
 
-    const ctx: CompilerContext = { config: { logLevel: 'none', prettyOutput: 'newlines', dumpAst: false, seed: 'default', tracePhases: [], emitTypes: false }, eventSink: new ArrayEventSink() };
-    const parser = new Parser('input.t2', src, ctx as any);
-    const ast = parser.parseProgram();
-    const expander = new MacroExpander(ctx as any);
-    const out = expander.expandProgram(ast as any);
+  const ctx: CompilerContext = { config: { logLevel: 'none', prettyOutput: 'newlines', dumpAst: false, seed: 'default', tracePhases: [], emitTypes: false }, eventSink: new ArrayEventSink() };
+  const parser = new Parser('input.t2', src, ctx as any);
+  const ast = parser.parseProgram();
+  const expander = new MacroExpander(ctx as any);
+  const out = expander.expandProgram(ast as any);
 
-    const names = out.body.filter((s: any) => s.kind === 'type-alias').map((s: any) => s.name.name);
-    assert.deepStrictEqual(names.sort(), ['T1', 'T2', 'T3'].sort());
+  const names = out.body.filter((s: any) => s.kind === 'type-alias').map((s: any) => s.name.name);
+  assert.deepStrictEqual(names.sort(), ['T1', 'T2', 'T3'].sort());
 
-    // Ensure each type-alias has a type-object with normalized field names
-    for (const ta of out.body.filter((s: any) => s.kind === 'type-alias')) {
-        const t = ta.typeAnnotation;
-        assert.strictEqual(t.kind, 'type-object');
-        for (const f of t.fields) {
-            assert.strictEqual(typeof f.name, 'string');
-            // name should not include leading dot or trailing colon
-            assert(!f.name.startsWith('.'));
-            assert(!f.name.endsWith(':'));
-        }
+  // Ensure each type-alias has a type-object with normalized field names
+  for (const ta of out.body.filter((s: any) => s.kind === 'type-alias')) {
+    const t = ta.typeAnnotation;
+    assert.strictEqual(t.kind, 'type-object');
+    for (const f of t.fields) {
+      assert.strictEqual(typeof f.name, 'string');
+      // name should not include leading dot or trailing colon
+      assert(!f.name.startsWith('.'));
+      assert(!f.name.endsWith(':'));
     }
+  }
 });
