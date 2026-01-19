@@ -25,50 +25,19 @@ The codebase has **moderate technical debt** with several concerning patterns:
 | `resolver.ts` | 366 lines | - | 14 lines | OK - thin subclass |
 | `tsCodegen.ts` | 641 lines | - | 3 lines (re-export) | OK - proper delegation |
 
-### 🔴 CRITICAL: cliHelper.ts Mess
-
-```
-common/src/cliHelper.ts     (365 lines) - MAIN implementation
-t2lang-phase0/src/cliHelper.ts (131 lines) - PARTIAL COPY + dynamic import to common
-t2lang-phase1/src/cliHelper.ts  (12 lines) - Wrapper that calls common
-```
 
 **Problems:**
-1. Phase0's cliHelper has its OWN `parseArgs()`, `showHelp()`, `showVersion()` that DIFFER from common's
-2. Phase0's cliHelper then dynamically imports common at runtime for `runCli()`
-3. Line 113 in Phase0's cliHelper.ts has an **orphaned console.error** statement:
+
+- cliHelper.ts has an **orphaned console.error** statement:
    ```typescript
    console.error("Run 't2tc --help' for usage information");
    ```
    This line executes on module load - a bug!
-
-4. Different `CliOptions` interfaces:
-   - Phase0: `pretty: "ugly" | "newlines" | "pretty"` 
-   - Common: `pretty: "ugly" | "pretty"` (no "newlines"!)
-
-**Fix:** Delete Phase0's cliHelper.ts, have Phase0 import directly from common.
+   
+- `CliOptions` interface must be:
+   - `pretty: "ugly" | "pretty"` (no "newlines")
 
 ---
-
-## 2. DYNAMIC IMPORTS (Bad Style)
-
-Found **10 dynamic `await import()` calls** - these hurt:
-- Tree-shaking
-- Type safety
-- Startup time
-- Code readability
-
-### Inventory
-
-| File | Line | Import | Reason Given | Better Solution |
-|------|------|--------|--------------|-----------------|
-| `common/cliHelper.ts` | 334, 351 | `prettier` | Optional formatting | OK - optional dep |
-| `t2lang-phase0/cliHelper.ts` | 129 | `t2lang-common` | "Delegate to shared" | Static import |
-| `t2lang-phase1/cli.ts` | 43 | `../common/src/cliHelper.js` | "Prefer local" | Static import |
-| `t2lang-phase1/cli.ts` | 46 | `t2lang-common` | Fallback | Remove fallback pattern |
-| `t2lang-phase1/cli.ts` | 74, 124 | `node:fs` | ??? | Static import at top |
-| `t2lang-phase1/cli.ts` | 120, 128 | `prettier` | Optional formatting | OK - optional dep |
-| `t2lang-phase1/util/sexprPrinter.ts` | 10 | URL-based import | "Avoid rootDir issues" | **VERY BAD** |
 
 ### 🔴 CRITICAL: sexprPrinter.ts Hack
 

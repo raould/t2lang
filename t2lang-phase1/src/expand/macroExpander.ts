@@ -157,7 +157,10 @@ export class MacroExpander {
     // represented as an exprStmt whose expr is a call to `defmacro`.
     const filteredBody = expandedBody.filter(stmt => {
       if (stmt.kind === "defmacro") return false;
-      if (stmt.kind === "exprStmt" && (stmt as any).expr && ((stmt as any).expr.kind === "defmacro")) return false;
+      if (stmt.kind === "exprStmt" && stmt.expr) {
+        const inner = stmt.expr as unknown as { kind?: string };
+        if (inner.kind === "defmacro") return false;
+      }
       if (stmt.kind === "exprStmt" && stmt.expr.kind === "call") {
         const call = stmt.expr as CallExpr;
         if (call.callee.kind === "identifier" && (call.callee as Identifier).name === "defmacro") return false;
@@ -343,11 +346,11 @@ export class MacroExpander {
       }
       // If this object has a typeAnnotation, normalize it
       if (obj.typeAnnotation) {
-        obj.typeAnnotation = this.normalizeTypeNode(obj.typeAnnotation as any);
+        obj.typeAnnotation = this.normalizeTypeNode(obj.typeAnnotation);
       }
       // If this object is a TypeAliasStmt, ensure its typeAnnotation normalized
       if (obj.kind === 'type-alias' && obj.typeAnnotation) {
-        obj.typeAnnotation = this.normalizeTypeNode(obj.typeAnnotation as any);
+        obj.typeAnnotation = this.normalizeTypeNode(obj.typeAnnotation);
       }
       // Recurse into known child arrays/objects
       for (const k of Object.keys(obj)) {
@@ -361,7 +364,7 @@ export class MacroExpander {
       }
     };
 
-    for (const stmt of body) walk(stmt as any);
+    for (const stmt of body) walk(stmt as unknown);
   }
 
   private collectMacros(program: Program): void {
@@ -380,15 +383,14 @@ export class MacroExpander {
 
       // Handle defmacro emitted INSIDE an exprStmt like: (defmacro name (params) body...)
       // Some parsers produce this as an exprStmt whose expr is a defmacro node. Support that.
-      if (stmt.kind === "exprStmt" && (stmt as any).expr && ((stmt as any).expr.kind === "defmacro")) {
-        const macroExpr = (stmt as any).expr as MacroDef;
-        this.registry.macros.set(macroExpr.name.name, macroExpr);
-        this.ctx.eventSink.emit({
-          phase: "expand",
-          kind: "macroRegistered",
-          data: { name: macroExpr.name.name, params: macroExpr.params.map((p: Identifier) => p.name) }
-        });
-        continue;
+      if (stmt.kind === "exprStmt" && stmt.expr) {
+        const inner = stmt.expr as unknown as { kind?: string };
+        if (inner.kind === "defmacro") {
+          const macroExpr = stmt.expr as unknown as MacroDef;
+          this.registry.macros.set(macroExpr.name.name, macroExpr);
+          this.ctx.eventSink.emit({ phase: "expand", kind: "macroRegistered", data: { name: macroExpr.name.name, params: macroExpr.params.map((p: Identifier) => p.name) } });
+          continue;
+        }
       }
 
       // Also support legacy-style macro definitions represented as an exprStmt whose
@@ -443,7 +445,7 @@ export class MacroExpander {
       case "let*":
         return this.expandLet(stmt as LetStarExpr);
       case "type-alias":
-        return this.expandTypeAlias(stmt as any);
+        return this.expandTypeAlias(stmt);
       case "defmacro":
         return stmt; // Keep as-is, will be filtered out later
       default:
@@ -898,7 +900,7 @@ export class MacroExpander {
               }
             }
           }
-          return { kind: "type-assert", expr: argsAst[0], typeAnnotation: typeNode, location: call.location } as any as TypeAssertExpr;
+          return { kind: "type-assert", expr: argsAst[0], typeAnnotation: typeNode, location: call.location } as TypeAssertExpr;
         }
 
         if (calleeAst.kind === "identifier" && (calleeAst as Identifier).name === "new") {
@@ -1024,8 +1026,8 @@ export class MacroExpander {
   private substitutor = new Substitutor();
 
   private substituteAndExpand(expr: Expr, bindings: Map<string, Expr>): Expr {
-    // Delegate to shared substitutor and cast result to Phase0-friendly form
-    return (this.substitutor as any).substituteAndExpand(expr as any, bindings as any) as Expr;
+    // Delegate to shared substitutor and cast result to Expr when needed
+    return this.substitutor.substituteAndExpand(expr, bindings) as Expr;
   }
 
   /**
@@ -1061,23 +1063,23 @@ export class MacroExpander {
 
 
   private isSplice(node: unknown): node is SpliceMarker {
-    return (this.quotedConverter as any).isSplice(node);
+    return this.quotedConverter.isSplice(node);
   }
 
   private convertQuotedToAstSingle(node: Expr | SpliceMarker): Phase0Expr {
-    const r = (this.quotedConverter as any).convertQuotedToAst(node as any) as any;
-    if ((this.quotedConverter as any).isSplice(r)) {
+    const r = this.quotedConverter.convertQuotedToAst(node);
+    if (this.quotedConverter.isSplice(r)) {
       return this.toPhase0({ kind: "array", elements: r.items, location: r.location } as ArrayExpr);
     }
     return this.toPhase0(r as Expr);
   }
 
   private flattenQuotedArgs(nodes: Array<Expr | SpliceMarker>): Phase0Expr[] {
-    return (this.quotedConverter as any).flattenQuotedArgs(nodes as any) as Phase0Expr[];
+    return this.quotedConverter.flattenQuotedArgs(nodes);
   }
 
   private convertQuotedToAst(expr: Expr | SpliceMarker): Expr | SpliceMarker {
-    return (this.quotedConverter as any).convertQuotedToAst(expr as any) as any;
+    return this.quotedConverter.convertQuotedToAst(expr);
   }
 
 

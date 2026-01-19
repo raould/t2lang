@@ -4,16 +4,23 @@ import type {
     ArrayExpr,
     CallExpr,
     LetStarExpr,
+    LetBinding,
     IfExpr,
     PropExpr,
     FunctionExpr,
     ReturnExpr,
     BlockStmt,
     LiteralExpr,
+    ObjectField,
+    ObjectExpr,
+    NewExpr,
     // Macro-related node types
     UnquoteExpr,
     UnquoteSpliceExpr,
-    GensymExpr
+    GensymExpr,
+    SpliceExpr,
+    QuoteExpr,
+    SourceLocation
 } from "../ast/nodes.js";
 import { QuotedToAstConverter } from "./convertQuotedToAst.js";
 import { GensymGenerator } from "./gensym.js";
@@ -21,21 +28,21 @@ import { GensymGenerator } from "./gensym.js";
 export interface SpliceMarker {
     kind: "__splice";
     items: Expr[];
-    location: any;
+    location: SourceLocation;
 }
 
 export class Substitutor {
     constructor(private readonly quotedConv: QuotedToAstConverter = new QuotedToAstConverter(), private readonly gensymGen: GensymGenerator = new GensymGenerator()) { }
 
-    cloneExpr(expr: any): any {
+    cloneExpr(expr: Expr): Expr {
         return JSON.parse(JSON.stringify(expr));
     }
 
     isSplice(node: unknown): node is SpliceMarker {
-        return this.quotedConv.isSplice(node as any);
+        return this.quotedConv.isSplice(node);
     }
 
-    substituteAndExpand(expr: any, bindings: Map<string, any>): any {
+    substituteAndExpand(expr: Expr, bindings: Map<string, Expr>): Expr | SpliceExpr {
         switch (expr.kind) {
             case "identifier": {
                 const id = expr as Identifier;
@@ -44,25 +51,28 @@ export class Substitutor {
                 return expr;
             }
             case "quote": {
-                const quoted = this.substituteInQuote((expr as any).expr, bindings);
-                const converted = this.quotedConv.convertQuotedToAst(quoted as any);
+                const q = expr as QuoteExpr;
+                const quoted = this.substituteInQuote(q.expr, bindings);
+                const converted = this.quotedConv.convertQuotedToAst(quoted);
                 if (this.quotedConv.isSplice(converted)) {
-                    return { kind: "array", elements: (converted as SpliceMarker).items, location: (quoted as any).location } as any;
+                    const sp = converted as SpliceMarker;
+                    return { kind: "array", elements: sp.items, location: sp.location } as Expr;
                 }
-                return converted as any;
+                return converted as Expr;
             }
             case "unquote":
-                return this.substituteAndExpand((expr as any).expr, bindings);
+                return this.substituteAndExpand((expr as UnquoteExpr).expr, bindings) as Expr;
             case "unquote-splice": {
-                const us = expr as any;
+                const us = expr as UnquoteSpliceExpr;
                 const evaluated = this.substituteAndExpand(us.expr, bindings);
-                if (evaluated && evaluated.kind === "array") {
-                    return { kind: "__splice", items: (evaluated as ArrayExpr).elements, location: (expr as any).location } as unknown as any;
+                const loc = (expr as UnquoteSpliceExpr).location as SourceLocation;
+                if (evaluated && (evaluated as Expr).kind === "array") {
+                    return { kind: "__splice", items: (evaluated as ArrayExpr).elements, location: loc } as SpliceExpr;
                 }
-                return { kind: "__splice", items: [evaluated], location: (expr as any).location } as unknown as any;
+                return { kind: "__splice", items: [evaluated as Expr], location: loc } as SpliceExpr;
             }
             case "gensym":
-                return this.gensymGen.expandGensym(expr as any) as unknown as any;
+                return this.gensymGen.expandGensym(expr as GensymExpr) as unknown as Expr;
             case "call": {
                 const call = expr as CallExpr;
                 return {
@@ -105,12 +115,12 @@ export class Substitutor {
                 return { ...block, body: block.body.map(e => this.substituteAndExpand(e, bindings)) } as Expr;
             }
             case "array": {
-                const arr = expr as any;
-                return { ...arr, elements: arr.elements.map((e: Expr) => this.substituteAndExpand(e, bindings)) } as Expr;
+                const arr = expr as ArrayExpr;
+                return { ...arr, elements: arr.elements.map((e: Expr) => this.substituteAndExpand(e, bindings) as Expr) } as Expr;
             }
             case "object": {
-                const obj: any = expr;
-                return { ...obj, fields: obj.fields.map((f: any) => ({ ...f, value: this.substituteAndExpand(f.value, bindings) })) } as Expr;
+                const obj = expr as ObjectExpr;
+                return { ...obj, fields: obj.fields.map((f: ObjectField) => ({ ...f, value: this.substituteAndExpand(f.value, bindings) as Expr })) } as Expr;
             }
             case "assign": {
                 const a: any = expr;
@@ -121,8 +131,8 @@ export class Substitutor {
                 return { ...idx, object: this.substituteAndExpand(idx.object, bindings), index: this.substituteAndExpand(idx.index, bindings) } as Expr;
             }
             case "new": {
-                const n: any = expr;
-                return { ...n, callee: this.substituteAndExpand(n.callee, bindings), args: n.args.map((a: Expr) => this.substituteAndExpand(a, bindings)) } as Expr;
+                const n = expr as NewExpr;
+                return { ...n, callee: this.substituteAndExpand(n.callee, bindings) as Expr, args: n.args.map((a: Expr) => this.substituteAndExpand(a, bindings) as Expr) } as Expr;
             }
             case "throw": {
                 const t: any = expr;
@@ -137,17 +147,17 @@ export class Substitutor {
         }
     }
 
-    substituteInQuote(expr: any, bindings: Map<string, any>): any {
+    substituteInQuote(expr: Expr, bindings: Map<string, Expr>): Expr {
         switch (expr.kind) {
             case "unquote":
-                return this.substituteAndExpand((expr as UnquoteExpr).expr, bindings);
+                return this.substituteAndExpand((expr as UnquoteExpr).expr, bindings) as Expr;
             case "unquote-splice": {
                 const us = expr as UnquoteSpliceExpr;
                 const evaluated = this.substituteAndExpand(us.expr, bindings);
-                if (evaluated && evaluated.kind === "array") {
-                    return { kind: "__splice", items: (evaluated as ArrayExpr).elements, location: expr.location } as SpliceMarker as Expr;
+                if (evaluated && (evaluated as Expr).kind === "array") {
+                    return { kind: "__splice", items: (evaluated as ArrayExpr).elements, location: expr.location } as SpliceExpr as Expr;
                 }
-                return { kind: "__splice", items: [evaluated], location: expr.location } as SpliceMarker as Expr;
+                return { kind: "__splice", items: [evaluated as Expr], location: expr.location } as SpliceExpr as Expr;
             }
             case "gensym":
                 return this.gensymGen.expandGensym(expr as GensymExpr) as unknown as Expr;
@@ -173,7 +183,7 @@ export class Substitutor {
                 const call = expr as CallExpr;
                 const callee = this.substituteInQuote(call.callee, bindings);
                 const args = call.args.map(a => this.substituteInQuote(a, bindings));
-                return { ...call, callee: this.quotedConv.convertQuotedToAstSingle(callee as any), args: this.quotedConv.flattenQuotedArgs(args as any) } as Expr;
+                return { ...call, callee: this.quotedConv.convertQuotedToAstSingle(callee), args: this.quotedConv.flattenQuotedArgs(args) } as Expr;
             }
             case "let*": {
                 const let_ = expr as LetStarExpr;
@@ -181,9 +191,9 @@ export class Substitutor {
                     ...let_,
                     bindings: let_.bindings.map(b => {
                         const nameExpr = this.substituteInQuote(b.name, bindings);
-                        const nameAst = this.quotedConv.convertQuotedToAstSingle(nameExpr as any);
+                        const nameAst = this.quotedConv.convertQuotedToAstSingle(nameExpr);
                         const nameId = nameAst.kind === "identifier" ? (nameAst as Identifier) : b.name;
-                        return { ...b, name: nameId, init: this.substituteInQuote(b.init, bindings) } as any;
+                        return { ...b, name: nameId, init: this.substituteInQuote(b.init, bindings) } as LetBinding;
                     }),
                     body: let_.body.map(e => this.substituteInQuote(e, bindings))
                 } as Expr;

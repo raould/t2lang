@@ -7,13 +7,13 @@ function escapeString(s: string): string {
     return '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
 }
 
-function isPlainObject(v: any): boolean {
-    return v && typeof v === 'object' && !Array.isArray(v);
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+    return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
 const idRegex = new RegExp('^[A-Za-z_\\-+*\\/<>=%][A-Za-z0-9_\\-+*\\/<>=%.]*$');
 
-function atomToString(v: any): string {
+function atomToString(v: unknown): string {
     if (v === null) return 'null';
     if (v === undefined) return 'undefined';
     if (typeof v === 'string') return idRegex.test(v) ? v : escapeString(v);
@@ -21,15 +21,15 @@ function atomToString(v: any): string {
     return escapeString(String(v));
 }
 
-export function printSexpr(node: any, opts: PrintOpts = {}): string {
+export function printSexpr(node: unknown, opts: PrintOpts = {}): string {
     // reference opts to avoid unused-parameter TS error in some build configs
     void opts;
     const seen = new WeakSet<any>();
 
-    function inner(n: any): string {
+    function inner(n: unknown): string {
         if (n === null || n === undefined) return atomToString(n);
         if (typeof n === 'string') {
-            const s = n as string;
+            const s = n;
             const t = s.trim();
             if ((t.startsWith('{') || t.startsWith('[')) && (t.endsWith('}') || t.endsWith(']'))) {
                 try {
@@ -59,34 +59,36 @@ export function printSexpr(node: any, opts: PrintOpts = {}): string {
         if (seen.has(n)) return '...';
         seen.add(n);
 
-        const kind = n.kind || n.type || n.nodeType || null;
+        const obj = n as Record<string, unknown>;
+        const kind = typeof obj.kind === 'string' ? obj.kind : (typeof obj.type === 'string' ? obj.type : (typeof obj.nodeType === 'string' ? obj.nodeType : null));
         if (kind === 'program') {
-            const body = (n.body || []).map(inner).join(' ');
-            return `(program ${body})`;
+            const body = (obj.body || []) as unknown[];
+            return `(program ${body.map(inner).join(' ')})`;
         }
         if (kind === 'call') {
-            const callee = inner(n.callee);
-            const args = (n.args || []).map(inner).join(' ');
-            return `(${callee} ${args})`;
+            const callee = inner(obj.callee);
+            const args = (obj.args || []) as unknown[];
+            return `(${callee} ${(args.map(inner).join(' '))})`;
         }
         if (kind === 'identifier') {
-            return String(n.name);
+            return String(obj.name);
         }
         if (kind === 'literal') {
-            return atomToString(n.value);
+            return atomToString(obj.value);
         }
         if (kind === 'array') {
-            const elems = (n.elements || []).map(inner).join(' ');
+            const elems = ((obj.elements || []) as unknown[]).map(inner).join(' ');
             return `(array ${elems})`;
         }
         if (kind === 'object') {
-            const fields = (n.fields || []).map((f: any) => `(field ${atomToString(f.name)} ${inner(f.value)})`).join(' ');
+            const fields = ((obj.fields || []) as Array<Record<string, unknown>>)
+                .map((f) => `(field ${atomToString(f.name)} ${inner(f.value)})`).join(' ');
             return `(object ${fields})`;
         }
 
         // Handle type-object field entries or generic { name: string, type: ... } shapes
-        if (isPlainObject(n) && typeof (n as any).name === 'string' && ('type' in n)) {
-            return `(field ${atomToString((n as any).name)} ${inner((n as any).type)})`;
+        if (isPlainObject(obj) && typeof obj.name === 'string' && ('type' in obj)) {
+            return `(field ${atomToString(obj.name)} ${inner(obj.type)})`;
         }
         if (kind === 'prop') {
             return `(prop ${inner(n.object)} ${atomToString(n.property)})`;
@@ -94,9 +96,9 @@ export function printSexpr(node: any, opts: PrintOpts = {}): string {
         if (kind && typeof kind === 'string') {
             // Generic object: print kind and its significant children
             const parts: string[] = [kind];
-            for (const k of Object.keys(n)) {
+            for (const k of Object.keys(obj)) {
                 if (k === 'kind' || k === 'location') continue;
-                const v = (n as any)[k];
+                const v = obj[k];
                 if (v === null || v === undefined) continue;
                 parts.push(`(${k} ${inner(v)})`);
             }
@@ -106,9 +108,9 @@ export function printSexpr(node: any, opts: PrintOpts = {}): string {
         // If we have a plain object with arbitrary string keys, print as
         // an (object (field name value) ...) sexpr rather than JSON.
         if (isPlainObject(n)) {
-            const fields = Object.keys(n)
+            const fields = Object.keys(obj)
                 .filter(k => k !== 'location')
-                .map(k => `(field ${atomToString(k)} ${inner((n as any)[k])})`)
+                .map(k => `(field ${atomToString(k)} ${inner(obj[k])})`)
                 .join(' ');
             return `(object ${fields})`;
         }

@@ -32,7 +32,7 @@ if (!fs.existsSync(t2tc)) {
 // Run t2tc to emit .ts
 const t2tcArgs = [input];
 console.error('Running t2tc', t2tcArgs.join(' '));
-let r = spawnSync(process.execPath, [t2tc, ...t2tcArgs], { stdio: 'inherit' });
+let r: SpawnResult = spawnSync(process.execPath, [t2tc, ...t2tcArgs], { stdio: 'inherit' });
 if (r.error) {
     console.error('Failed to run t2tc:', r.error);
     process.exit(1);
@@ -54,29 +54,43 @@ if (!tsFile) {
 const tscArgs = [tsFile, ...extraTsc];
 console.error('Running tsc', tscArgs.join(' '));
 
-function tryRun(cmd: string, args: string[]) {
+type SpawnResult = ReturnType<typeof spawnSync> | { error: unknown; status?: number };
+
+function tryRun(cmd: string, args: string[]): SpawnResult {
     try {
         return spawnSync(cmd, args, { stdio: 'inherit' });
     } catch (err) {
-        return { error: err } as any;
+        return { error: err };
     }
 }
 
 // 1) try npx
 r = tryRun('npx', ['tsc', ...tscArgs]);
-if ((r as any).error && (r as any).error.code === 'ENOENT') {
-    // 2) try local node_modules typescript bin via node
-    const tsBin = path.join(process.cwd(), 'node_modules', 'typescript', 'bin', 'tsc');
-    if (fs.existsSync(tsBin)) {
-        r = tryRun(process.execPath, [tsBin, ...tscArgs]);
-    } else {
-        // 3) try npm exec
-        r = tryRun('npm', ['exec', '--no', 'install', 'tsc', '--', ...tscArgs]);
+if ('error' in r) {
+    const maybeErr = (r as { error?: unknown }).error;
+    if (maybeErr && typeof maybeErr === 'object' && 'code' in maybeErr && (maybeErr as { code?: unknown }).code === 'ENOENT') {
+        // 2) try local node_modules typescript bin via node
+        const tsBin = path.join(process.cwd(), 'node_modules', 'typescript', 'bin', 'tsc');
+        if (fs.existsSync(tsBin)) {
+            r = tryRun(process.execPath, [tsBin, ...tscArgs]);
+        } else {
+            // 3) try npm exec
+            r = tryRun('npm', ['exec', '--no', 'install', 'tsc', '--', ...tscArgs]);
+        }
     }
 }
 
-if ((r as any).error) {
-    console.error('Failed to run tsc:', (r as any).error);
-    process.exit(1);
+if ('error' in r) {
+    const maybeErr = (r as { error?: unknown }).error;
+    if (maybeErr) {
+        console.error('Failed to run tsc:', maybeErr);
+        process.exit(1);
+    }
 }
-process.exit((r as any).status ?? 0);
+
+let finalStatus = 0;
+if (r && typeof r === 'object') {
+    const maybeStatus = (r as { status?: number | null }).status;
+    if (typeof maybeStatus === 'number') finalStatus = maybeStatus;
+}
+process.exit(finalStatus ?? 0);
