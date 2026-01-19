@@ -29,23 +29,14 @@ import { PrettyOption } from "./codegen/index.js";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { printSexpr } from './util/sexprPrinter.js';
+import * as fs from 'node:fs';
+
+// Static imports from the shared CLI helper to avoid runtime `import()` logic.
+import * as common from 't2lang-common';
+const { parseArgs, showHelp, showVersion, readStdin, getOutputPath, formatError } = (common as any);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Custom CLI: use common parser at runtime but print AST dumps as sexpr
-// Import the shared CLI helper. Prefer the local workspace build if present,
-// otherwise fall back to the installed package name. This makes development
-// flows (running from source) pick up local CLI helper changes.
-let parseArgs: any, showHelp: any, showVersion: any, readStdin: any, getOutputPath: any, formatError: any;
-try {
-    // @ts-expect-error - prefer local workspace helper when running from source
-    const local = await import('../common/src/cliHelper.js');
-    ({ parseArgs, showHelp, showVersion, readStdin, getOutputPath, formatError } = (local as any));
-} catch {
-    const mod = await import('t2lang-common');
-    ({ parseArgs, showHelp, showVersion, readStdin, getOutputPath, formatError } = (mod as any));
-}
 
 const args = process.argv.slice(2);
 const options = parseArgs(args);
@@ -71,7 +62,6 @@ if (options.input === "-") {
     if (!options.output) options.stdout = true;
     source = await readStdin();
 } else {
-    const fs = await import('node:fs');
     if (!fs.existsSync(options.input)) { console.error(`Error: File not found: ${options.input}`); process.exit(1); }
     source = fs.readFileSync(options.input, 'utf-8');
 }
@@ -121,7 +111,6 @@ if (options.stdout) {
     }
     console.log(out);
 } else {
-    const fs = await import('node:fs');
     const outputPath = options.output ?? getOutputPath(options.input);
     let out = result.tsSource;
     if (mappedPretty === PrettyOption.pretty) {

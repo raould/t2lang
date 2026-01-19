@@ -3,7 +3,7 @@
 ## Executive Summary
 
 The codebase has **moderate technical debt** with several concerning patterns:
-- **3 copies of cliHelper.ts** with different implementations
+- done: **3 copies of cliHelper.ts** with different implementations
 - **10 dynamic `await import()` calls** causing runtime complexity
 - **53 `as any` type assertions** undermining type safety
 - **Orphaned debug code** in core compiler files
@@ -17,7 +17,6 @@ The codebase has **moderate technical debt** with several concerning patterns:
 
 | File | Phase0 | Common | Phase1 | Issue |
 |------|--------|--------|--------|-------|
-| `cliHelper.ts` | 131 lines | 365 lines | 12 lines | **THREE different implementations** |
 | `compilerError.ts` | 17 lines | - | 2 lines (re-export) | OK - proper delegation |
 | `eventSink.ts` | 20 lines | - | 2 lines (re-export) | OK - proper delegation |
 | `nodes.ts` | 395 lines | - | 70 lines (extends) | OK - Phase1 adds macro nodes |
