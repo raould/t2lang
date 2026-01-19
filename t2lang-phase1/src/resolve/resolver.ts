@@ -9,6 +9,8 @@ export class Resolver extends ResolverBase {
 
   resolveProgram(program: Phase0Program): void {
     // Delegate to Phase0 resolver for standard resolution
-    super.resolveProgram(program as any);
+    type SuperParam = Parameters<ResolverBase["resolveProgram"]>[0];
+    const p = program as unknown as SuperParam;
+    super.resolveProgram(p);
   }
 }

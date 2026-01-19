@@ -96,7 +96,7 @@ function transform(node: Node): Node {
             if (out.length >= 2 && typeof out[1] === 'string') {
                 const nameTok = out[1] as string;
                 if (!/^".*"$/.test(nameTok) && !/^~/.test(nameTok)) {
-                    out[1] = `"${nameTok}"` as any;
+                    out[1] = `"${nameTok}"`;
                 }
             }
         }
@@ -105,7 +105,7 @@ function transform(node: Node): Node {
             if (out.length >= 3 && typeof out[2] === 'string') {
                 const keyTok = out[2] as string;
                 if (!/^".*"$/.test(keyTok) && !/^~/.test(keyTok)) {
-                    out[2] = `"${keyTok}"` as any;
+                    out[2] = `"${keyTok}"`;
                 }
             }
         }

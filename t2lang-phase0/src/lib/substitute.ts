@@ -14,6 +14,10 @@ import type {
     ObjectField,
     ObjectExpr,
     NewExpr,
+    AssignExpr,
+    IndexExpr,
+    ThrowExpr,
+    TypeAssertExpr,
     // Macro-related node types
     UnquoteExpr,
     UnquoteSpliceExpr,
@@ -72,7 +76,7 @@ export class Substitutor {
                 return { kind: "__splice", items: [evaluated as Expr], location: loc } as SpliceExpr;
             }
             case "gensym":
-                return this.gensymGen.expandGensym(expr as GensymExpr) as unknown as Expr;
+                return this.gensymGen.expandGensym(expr as GensymExpr);
             case "call": {
                 const call = expr as CallExpr;
                 return {
@@ -123,11 +127,11 @@ export class Substitutor {
                 return { ...obj, fields: obj.fields.map((f: ObjectField) => ({ ...f, value: this.substituteAndExpand(f.value, bindings) as Expr })) } as Expr;
             }
             case "assign": {
-                const a: any = expr;
+                const a = expr as AssignExpr;
                 return { ...a, target: this.substituteAndExpand(a.target, bindings), value: this.substituteAndExpand(a.value, bindings) } as Expr;
             }
             case "index": {
-                const idx: any = expr;
+                const idx = expr as IndexExpr;
                 return { ...idx, object: this.substituteAndExpand(idx.object, bindings), index: this.substituteAndExpand(idx.index, bindings) } as Expr;
             }
             case "new": {
@@ -135,11 +139,11 @@ export class Substitutor {
                 return { ...n, callee: this.substituteAndExpand(n.callee, bindings) as Expr, args: n.args.map((a: Expr) => this.substituteAndExpand(a, bindings) as Expr) } as Expr;
             }
             case "throw": {
-                const t: any = expr;
+                const t = expr as ThrowExpr;
                 return { ...t, value: this.substituteAndExpand(t.value, bindings) } as Expr;
             }
             case "type-assert": {
-                const ta: any = expr;
+                const ta = expr as TypeAssertExpr;
                 return { ...ta, expr: this.substituteAndExpand(ta.expr, bindings) } as Expr;
             }
             default:
@@ -160,7 +164,7 @@ export class Substitutor {
                 return { kind: "__splice", items: [evaluated as Expr], location: expr.location } as SpliceExpr as Expr;
             }
             case "gensym":
-                return this.gensymGen.expandGensym(expr as GensymExpr) as unknown as Expr;
+                return this.gensymGen.expandGensym(expr as GensymExpr);
             case "identifier": {
                 const id = expr as Identifier;
                 if (typeof id.name === "string" && id.name.startsWith("~@")) {
@@ -203,7 +207,7 @@ export class Substitutor {
                 return { ...if_, condition: this.substituteInQuote(if_.condition, bindings), thenBranch: this.substituteInQuote(if_.thenBranch, bindings), elseBranch: if_.elseBranch ? this.substituteInQuote(if_.elseBranch, bindings) : null } as Expr;
             }
             case "array": {
-                const arr: any = expr;
+                const arr = expr as ArrayExpr;
                 return { ...arr, elements: arr.elements.map((e: Expr) => this.substituteInQuote(e, bindings)) } as Expr;
             }
             case "block": {
@@ -213,7 +217,8 @@ export class Substitutor {
             case "function": {
                 const fn = expr as FunctionExpr;
                 const name = fn.name ? this.substituteInQuote(fn.name, bindings) : null;
-                const body = this.quotedConv.flattenQuotedArgs(fn.body.map(e => this.substituteInQuote(e, bindings)) as any);
+                const bodyArgs = fn.body.map(e => this.substituteInQuote(e, bindings));
+                const body = this.quotedConv.flattenQuotedArgs(bodyArgs);
                 return { kind: "function", name: name && (name as Expr).kind === "identifier" ? (name as Identifier) : null, params: fn.params, body, isDeclaration: fn.isDeclaration, location: fn.location } as Expr;
             }
             case "return": {

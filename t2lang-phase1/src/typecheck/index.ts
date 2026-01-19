@@ -12,6 +12,8 @@ export class TypeChecker extends TypeCheckerBase {
 
   // Explicitly accept Phase0Program to make the Phase1 -> Phase0 boundary clear
   checkProgram(program: Phase0Program): ReturnType<TypeCheckerBase["checkProgram"]> {
-    return super.checkProgram(program as any);
+    type SuperParam = Parameters<TypeCheckerBase["checkProgram"]>[0];
+    const p = program as unknown as SuperParam;
+    return super.checkProgram(p);
   }
 }

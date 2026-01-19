@@ -134,13 +134,13 @@ if (options.stdout) {
     if (mappedPretty === PrettyOption.pretty) {
         try {
             const prettier = await importOptional('prettier');
-                if (prettier) {
-                    const prettierAny = prettier as { format?: (text: string, opts?: { parser: string }) => string | Promise<string> };
-                    if (prettierAny.format) {
-                        const formatted: any = prettierAny.format(out, { parser: 'typescript' });
-                        out = (formatted && typeof formatted.then === 'function') ? await formatted : formatted;
-                    }
+            if (prettier) {
+                const prettierAny = prettier as { format?: (text: string, opts?: { parser: string }) => string | Promise<string> };
+                if (prettierAny.format) {
+                    const formatted: any = prettierAny.format(out, { parser: 'typescript' });
+                    out = (formatted && typeof formatted.then === 'function') ? await formatted : formatted;
                 }
+            }
         } catch { /* ignore formatting errors */ }
     }
     fs.writeFileSync(outputPath, out, 'utf-8');

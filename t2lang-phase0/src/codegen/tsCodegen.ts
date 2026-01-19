@@ -324,7 +324,7 @@ function genCall(node: CallExpr, options: TsCodegenOptions): string {
         return `typeof (${operand})`;
       }
       // Parenthesize the operand to ensure evaluation order is explicit
-      return `(${op}(${operand}))`;
+      return `${op}(${operand})`;
     }
   }
 
