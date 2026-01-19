@@ -4,7 +4,7 @@
 
 The codebase has **moderate technical debt** with several concerning patterns:
 - done: **3 copies of cliHelper.ts** with different implementations
-- **10 dynamic `await import()` calls** causing runtime complexity
+- done: **10 dynamic `await import()` calls** causing runtime complexity
 - **53 `as any` type assertions** undermining type safety
 - **Orphaned debug code** in core compiler files
 - **Unnecessary indirection** layers between packages

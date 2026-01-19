@@ -33,7 +33,7 @@ import * as fs from 'node:fs';
 
 // Static imports from the shared CLI helper to avoid runtime `import()` logic.
 import * as common from 't2lang-common';
-const { parseArgs, showHelp, showVersion, readStdin, getOutputPath, formatError } = (common as any);
+const { parseArgs, showHelp, showVersion, readStdin, getOutputPath, formatError, importOptional } = (common as any);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -107,14 +107,26 @@ if (result.errors.length > 0) {
 if (options.stdout) {
     let out = result.tsSource;
     if (mappedPretty === PrettyOption.pretty) {
-        try { const prettier = await import('prettier'); const formatted: any = prettier.format(out, { parser: 'typescript' }); out = (formatted && typeof formatted.then === 'function') ? await formatted : formatted; } catch { /* ignore formatting errors */ }
+        try {
+            const prettier = await importOptional('prettier');
+            if (prettier) {
+                const formatted: any = prettier.format(out, { parser: 'typescript' });
+                out = (formatted && typeof formatted.then === 'function') ? await formatted : formatted;
+            }
+        } catch { /* ignore formatting errors */ }
     }
     console.log(out);
 } else {
     const outputPath = options.output ?? getOutputPath(options.input);
     let out = result.tsSource;
     if (mappedPretty === PrettyOption.pretty) {
-        try { const prettier = await import('prettier'); const formatted: any = prettier.format(out, { parser: 'typescript' }); out = (formatted && typeof formatted.then === 'function') ? await formatted : formatted; } catch { /* ignore formatting errors */ }
+        try {
+            const prettier = await importOptional('prettier');
+            if (prettier) {
+                const formatted: any = prettier.format(out, { parser: 'typescript' });
+                out = (formatted && typeof formatted.then === 'function') ? await formatted : formatted;
+            }
+        } catch { /* ignore formatting errors */ }
     }
     fs.writeFileSync(outputPath, out, 'utf-8');
     console.error(`Compiled ${options.input} -> ${outputPath}`);

@@ -327,15 +327,18 @@ export async function runCli(
         // other grouping emitted by the compiler.
         if (mappedPretty === prettyEnum.pretty) {
             try {
-                const prettier = await import('prettier');
-                const formatted: any = prettier.format(out, { parser: 'typescript' });
-                if (formatted && typeof formatted.then === 'function') {
-                    out = await formatted;
-                } else {
-                    out = formatted;
+                const { importOptional } = await import('./importOptional.js');
+                const prettier = await importOptional('prettier');
+                if (prettier) {
+                    const formatted: any = prettier.format(out, { parser: 'typescript' });
+                    if (formatted && typeof formatted.then === 'function') {
+                        out = await formatted;
+                    } else {
+                        out = formatted;
+                    }
                 }
             } catch {
-                // ignore formatting errors
+                // ignore formatting/errors
             }
         }
         console.log(out);
@@ -344,15 +347,18 @@ export async function runCli(
         let out = result.tsSource;
         if (mappedPretty === prettyEnum.pretty) {
             try {
-                const prettier = await import('prettier');
-                const formatted: any = prettier.format(out, { parser: 'typescript' });
-                if (formatted && typeof formatted.then === 'function') {
-                    out = await formatted;
-                } else {
-                    out = formatted;
+                const { importOptional } = await import('./importOptional.js');
+                const prettier = await importOptional('prettier');
+                if (prettier) {
+                    const formatted: any = prettier.format(out, { parser: 'typescript' });
+                    if (formatted && typeof formatted.then === 'function') {
+                        out = await formatted;
+                    } else {
+                        out = formatted;
+                    }
                 }
             } catch {
-                // ignore formatting errors
+                // ignore formatting/errors
             }
         }
         fs.writeFileSync(outputPath, out, "utf-8");
