@@ -19,10 +19,10 @@ test('type-object edge cases: nested/quoted/mixed forms', () => {
   `;
 
   const ctx: CompilerContext = { config: { logLevel: 'none', prettyOutput: 'newlines', dumpAst: false, seed: 'default', tracePhases: [], emitTypes: false }, eventSink: new ArrayEventSink() };
-  const parser = new Parser('input.t2', src, ctx as any);
+  const parser = new Parser('input.t2', src, ctx);
   const ast = parser.parseProgram();
-  const expander = new MacroExpander(ctx as any);
-  const out = expander.expandProgram(ast as any);
+  const expander = new MacroExpander(ctx);
+  const out = expander.expandProgram(ast);
 
   const names = out.body.filter((s: any) => s.kind === 'type-alias').map((s: any) => s.name.name);
   assert.deepStrictEqual(names.sort(), ['T1', 'T2', 'T3'].sort());

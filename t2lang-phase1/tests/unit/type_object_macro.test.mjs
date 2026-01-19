@@ -14,10 +14,10 @@ test('type-object macro canonicalizes dot-sigil and colon shorthand', () => {
   `;
 
   const ctx: CompilerContext = { config: { logLevel: 'none', prettyOutput: 'newlines', dumpAst: false, seed: 'default', tracePhases: [], emitTypes: false }, eventSink: new ArrayEventSink() };
-  const parser = new Parser('input.t2', src, ctx as any);
+  const parser = new Parser('input.t2', src, ctx);
   const ast = parser.parseProgram();
-  const expander = new MacroExpander(ctx as any);
-  const out = expander.expandProgram(ast as any);
+  const expander = new MacroExpander(ctx);
+  const out = expander.expandProgram(ast);
 
   // Find AllowedElements type-alias
   const ta = out.body.find((s: any) => s.kind === 'type-alias' && s.name && s.name.name === 'AllowedElements');

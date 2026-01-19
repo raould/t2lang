@@ -16,9 +16,9 @@ test("MacroExpander output contains no defmacro or gensym nodes", () => {
   `;
 
   const ctx: CompilerContext = { config: { logLevel: "none", prettyOutput: "newlines", dumpAst: false, seed: "default", tracePhases: [], emitTypes: false }, eventSink: new ArrayEventSink() };
-  const parser = new Parser("input.t2", src, ctx as any);
+  const parser = new Parser("input.t2", src, ctx);
   const ast = parser.parseProgram();
-  const expander = new MacroExpander(ctx as any);
+  const expander = new MacroExpander(ctx);
   const out = expander.expandProgram(ast);
 
   // Ensure no defmacro statements
@@ -30,7 +30,7 @@ test("MacroExpander output contains no defmacro or gensym nodes", () => {
       if (walkStmt(s)) return true;
     }
     return false;
-  })(out.body as any[]);
+  })(out.body);
 
   function walkStmt(stmt: any): boolean {
     if (stmt.kind === "exprStmt") return walkExpr(stmt.expr);

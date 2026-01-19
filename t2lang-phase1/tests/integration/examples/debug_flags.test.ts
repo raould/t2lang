@@ -6,7 +6,8 @@ test('T2_DEBUG_EXPAND prints expanded AST', async () => {
     const old = process.env.T2_DEBUG_EXPAND;
     const oldErr = console.error;
     let captured = '';
-    (console as any).error = (...args: unknown[]) => { captured += args.join(' ') + '\n'; };
+    const _origError = console.error;
+    console.error = (...args: unknown[]) => { captured += args.join(' ') + '\n'; };
     try {
         process.env.T2_DEBUG_EXPAND = '1';
         const src = '(program)';
@@ -23,7 +24,7 @@ test('T2_DEBUG_PARSE prints parsed AST', async () => {
     const old = process.env.T2_DEBUG_PARSE;
     const oldErr = console.error;
     let captured = '';
-    (console as any).error = (...args: unknown[]) => { captured += args.join(' ') + '\n'; };
+    console.error = (...args: unknown[]) => { captured += args.join(' ') + '\n'; };
     try {
         process.env.T2_DEBUG_PARSE = '1';
         const src = '(program)';

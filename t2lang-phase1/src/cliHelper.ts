@@ -9,5 +9,5 @@ export async function runCli(
     prettyEnum: { pretty: any; newlines: any; ugly: any },
     pkgPath?: string
 ): Promise<void> {
-    return (common as any).runCli(notice, compileFn, prettyEnum, pkgPath);
+    return common.runCli(notice, compileFn, prettyEnum, pkgPath);
 }

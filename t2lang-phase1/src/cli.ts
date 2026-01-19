@@ -33,7 +33,16 @@ import * as fs from 'node:fs';
 
 // Static imports from the shared CLI helper to avoid runtime `import()` logic.
 import * as common from 't2lang-common';
-const { parseArgs, showHelp, showVersion, readStdin, getOutputPath, formatError, importOptional } = (common as any);
+type CommonCliImports = {
+    parseArgs: (args: string[]) => any;
+    showHelp: (notice?: string) => void;
+    showVersion: (pkgPath?: string) => void;
+    readStdin: () => Promise<string>;
+    getOutputPath: (input: string) => string;
+    formatError: (err: { message: string; location?: { file: string; line: number; column: number } }) => string;
+    importOptional: (mod: string) => Promise<unknown>;
+};
+const { parseArgs, showHelp, showVersion, readStdin, getOutputPath, formatError, importOptional } = common as unknown as CommonCliImports;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -82,18 +91,18 @@ const result = await compilePhase1(source, {
 } as any);
 
 if (options.ast || options.astBeforeExpand) {
-    const parseDump = (result.events as any).find((e: any) => e.kind === 'astDump' && e.phase === 'parse');
+    const parseDump = result.events.find((e: any) => e.kind === 'astDump' && e.phase === 'parse') as { data?: any } | undefined;
     if (parseDump) {
         console.error('--- AST (before macro expansion) ---');
-        try { console.error(printSexpr((parseDump as any).data.ast)); } catch (err) { console.error('AST print failed:', String(err)); }
+        try { console.error(printSexpr((parseDump.data && (parseDump.data.ast ?? parseDump.data)) || parseDump.data)); } catch (err) { console.error('AST print failed:', String(err)); }
         console.error('--- END AST ---');
     }
 }
 if (options.ast || options.astAfterExpand) {
-    const expandDump = (result.events as any).find((e: any) => e.kind === 'astDump' && e.phase === 'expand');
+    const expandDump = result.events.find((e: any) => e.kind === 'astDump' && e.phase === 'expand') as { data?: any } | undefined;
     if (expandDump) {
         console.error('--- AST (after macro expansion) ---');
-        try { console.error(printSexpr((expandDump as any).data.ast)); } catch (err) { console.error('AST print failed:', String(err)); }
+        try { console.error(printSexpr((expandDump.data && (expandDump.data.ast ?? expandDump.data)) || expandDump.data)); } catch (err) { console.error('AST print failed:', String(err)); }
         console.error('--- END AST ---');
     }
 }
@@ -110,8 +119,11 @@ if (options.stdout) {
         try {
             const prettier = await importOptional('prettier');
             if (prettier) {
-                const formatted: any = prettier.format(out, { parser: 'typescript' });
-                out = (formatted && typeof formatted.then === 'function') ? await formatted : formatted;
+                const prettierAny = prettier as { format?: (text: string, opts?: { parser: string }) => string | Promise<string> };
+                if (prettierAny.format) {
+                    const formatted: any = prettierAny.format(out, { parser: 'typescript' });
+                    out = (formatted && typeof formatted.then === 'function') ? await formatted : formatted;
+                }
             }
         } catch { /* ignore formatting errors */ }
     }
@@ -122,10 +134,13 @@ if (options.stdout) {
     if (mappedPretty === PrettyOption.pretty) {
         try {
             const prettier = await importOptional('prettier');
-            if (prettier) {
-                const formatted: any = prettier.format(out, { parser: 'typescript' });
-                out = (formatted && typeof formatted.then === 'function') ? await formatted : formatted;
-            }
+                if (prettier) {
+                    const prettierAny = prettier as { format?: (text: string, opts?: { parser: string }) => string | Promise<string> };
+                    if (prettierAny.format) {
+                        const formatted: any = prettierAny.format(out, { parser: 'typescript' });
+                        out = (formatted && typeof formatted.then === 'function') ? await formatted : formatted;
+                    }
+                }
         } catch { /* ignore formatting errors */ }
     }
     fs.writeFileSync(outputPath, out, 'utf-8');
