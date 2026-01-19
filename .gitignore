@@ -34,3 +34,6 @@ package-lock.json
 # Compiled test output
 *.t2.ts
 *.t2.ts.map
+
+example*.ts
+example*.js

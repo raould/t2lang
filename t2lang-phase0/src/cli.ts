@@ -25,7 +25,7 @@
  */
 
 import { compilePhase0 } from "./api.js";
-import { runCli } from "./cliHelper.js";
+import { runCli } from "t2lang-common";
 import { PrettyOption } from "./codegen/tsCodegen.js";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";

@@ -31,8 +31,8 @@ export {
   compilePhase0
 } from "./api.js";
 
-// CLI helper
-export { runCli } from "./cliHelper.js";
+// CLI helper (use canonical implementation from common workspace)
+export { runCli } from "t2lang-common";
 
 // Utilities
 export { GensymGenerator } from "./lib/gensym.js";
