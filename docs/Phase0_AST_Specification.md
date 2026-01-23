@@ -43,6 +43,9 @@ Equivalent to JavaScript’s `for`.
 
 Returns from the nearest function.
 
+Phase B normalizes every TypeScript `return` and any macro-generated final-expression rewrite into the canonical `ReturnExpr` node so this constructor always represents an explicit return site.
+This doc uses `return` as the human-friendly keyword, but every runtime representation uses `ReturnExpr` (with an optional `value` field). When we mention `return` elsewhere, assume it canonicalizes to `ReturnExpr` before diagnostics/typechecking.
+
 ## **Variable Declarations**
 
 (let* ((name1 expr1) (name2 expr2) ...) body...)
@@ -60,6 +63,21 @@ Lexical bindings. `let*` represents sequential bindings. `const` is for immutabl
 ## **Expression Statement**
 
 An expression evaluated for its side effects. In the `(program ...)` body, any expression that is not a statement is wrapped in an `ExprStmt` node.
+
+Phase B rewrites TypeScript expression statements and instrumentation/macro output into `ExprStmt`, ensuring Phase A only observes one statement wrapper for all side effects.
+`ExprStmt` is the canonical node name that appears in the Phase A AST; it simply wraps the expression and optionally carries metadata such as `typeId` or source location. Whenever other docs refer to expression statements, they should treat `ExprStmt` as the actual AST node.
+
+## **Await**
+
+`await` expressions compile to the canonical `AwaitExpr` node, which carries a single `argument` (the awaited operand).
+
+Phase B ensures `AwaitExpr` only appears inside `async` contexts, resolves the awaited operand (including helper calls and helper-generated temporaries), and strips any TypeScript sugar before Phase A sees the awaited node.
+
+## **Yield**
+
+`yield` and `yield*` compile to the canonical `YieldExpr` node with two fields: `argument` (the yielded value, which may be `null` for bare `yield`) and `delegate` (a boolean set when the original form was `yield*`).
+
+Phase B rewrites TypeScript generator bodies so any `yield`/`yield*` becomes this explicit node, and it resolves iterator helpers to ensure Phase A observes the already-lowered shape.
 
 ## **Function**
 
@@ -116,6 +134,12 @@ Equivalent to `object[index-expr]`.
 ## **Object Literal**
 
 (obj ("key1" expr1) ("key2" expr2) ...)
+
+## **Spread**
+
+Any `...` spread or rest position that survives into Phase A uses the canonical `SpreadExpr` node, which simply holds the expression being spread.
+
+Phase B rewrites array/object/object-pattern spreads so the surrounding container (`array`, `obj`, `let*` destructuring, etc.) includes a `SpreadExpr` entry instead of special syntax.
 
 ## **Throw**
 

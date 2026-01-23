@@ -53,6 +53,9 @@ Compiles to:
 
 return E
 
+Phase B normalizes every TypeScript `return` (including implicit final returns and instrumentation rewrites) into the canonical `ReturnExpr` node so these rules always target the same shape when rendering to TypeScript.
+When we describe `return` here, treat it as the `ReturnExpr` AST node—its optional payload corresponds to the expression emitted in TypeScript.
+
 ## **Let / Const**
 
 `(let* ((x e1) (y e2)) ...)` → `let x = e1; let y = e2; ...`
@@ -70,6 +73,21 @@ Compiles to:
 ## **Expression Statement**
 
 Any expression form that is not a statement is wrapped in an `ExprStmt` and terminated with a semicolon.
+
+Phase B rewrites TypeScript expression statements, macro-generated side-effect wrappers, and other sugar into `ExprStmt` before handing the AST to Phase A so the compiler can reason over a single statement form.
+`ExprStmt` is the canonical Phase A node; Phase B always emits it when the original code looked like an expression statement so downstream tools can rely on the explicit `ExprStmt` rather than guessing from wrappers.
+
+## **Await**
+
+`(await expr)` rewrites to the canonical `AwaitExpr` node, which simply awaits a single `expr` argument.
+
+Phase B limits `AwaitExpr` to async contexts and rewrites helper calls/vendors before each await reaches Phase A so the awaited value already respects the asynchronous control flow.
+
+## **Yield**
+
+`(yield expr?)` or `(yield* expr)` rewrites to `YieldExpr` with `argument` and `delegate` fields; `delegate` is `true` for `yield*` and the `argument` may be `null` for bare `yield`.
+
+Phase B lowers generator bodies into these nodes, auto-inserting iterator helpers so the Phase A AST receives a consistent generator shape.
 
 ## **Function**
 
@@ -122,6 +140,10 @@ Compiles to:
 Compiles to:
 
 `o.x`
+
+## **Spread**
+
+Spread/rest positions (array/object spreads, destructuring rest) compile into the canonical `SpreadExpr` node. Phase B rewrites the surrounding container to include `SpreadExpr` entries instead of special syntax so the Phase A AST directly sees the spread as a node.
 
 ## **Index Access**
 
