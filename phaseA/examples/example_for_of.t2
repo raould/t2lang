@@ -1,0 +1,8 @@
+(program
+  (let* ((values (array 2 4 6))
+         (total 0))
+    (for of
+      ((value) values)
+      (block
+        (assign total (call + total value))))
+    (return total)))

@@ -1,0 +1,5 @@
+(program
+  (let* ((counter 0))
+    (assign counter (call + counter 4))
+    (assign counter (call + counter 1))
+    (return counter)))

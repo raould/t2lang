@@ -5,6 +5,30 @@
       "category": "parse",
       "severity": "error",
       "docs": "https://example.com/docs/errors/0001"
+    },
+    "T2:0002": {
+      "message": "Invalid assignment target",
+      "category": "parse",
+      "severity": "error",
+      "docs": "https://example.com/docs/errors/0002"
+    },
+    "T2:0003": {
+      "message": "Unknown statement type",
+      "category": "parse",
+      "severity": "error",
+      "docs": "https://example.com/docs/errors/0003"
+    },
+    "T2:0004": {
+      "message": "Unknown expression type",
+      "category": "parse",
+      "severity": "error",
+      "docs": "https://example.com/docs/errors/0004"
+    },
+    "T2:0005": {
+      "message": "Unknown type node",
+      "category": "typecheck",
+      "severity": "error",
+      "docs": "https://example.com/docs/errors/0005"
     }
   }
 }

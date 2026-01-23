@@ -1,0 +1,24 @@
+(program
+  (type-alias Point (type-object ("x" (type-number)) ("y" (type-number))))
+  (type-alias PointOrNull (type-union (type-ref Point) (type-null)))
+  (type-alias Transformer
+    (typeparams
+      (T (extends (type-object ("value" (type-number)))))
+      (U (default (type-number))))
+    (type-function
+      (type-ref T)
+      (type-ref U)))
+  (type-alias LiteralRoles (type-literal "admin" "user"))
+  (type-alias ReadonlyMap
+    (type-mapped (Key)
+      (type-ref Transformer)
+      (type-literal "first" "second")
+      readonly
+      optional
+      (type-ref Point)))
+  (type-alias ArrayOfPoints
+    (type-app (type-ref Array) (type-ref Point)))
+  (return
+    (type-assert
+      (array (object ("x" 1) ("y" 2)))
+      (type-ref ArrayOfPoints))))

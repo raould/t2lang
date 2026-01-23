@@ -1,0 +1,8 @@
+(program
+  (let* ((values (array 1 2 3))
+         (acc 0))
+    (for await
+      ((value) values)
+      (block
+        (assign acc (call + acc value))))
+    (return acc)))

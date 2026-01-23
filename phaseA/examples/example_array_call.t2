@@ -1,0 +1,6 @@
+(program
+  (return
+    (array
+      (call + 1 2)
+      (call * 3 4)
+      (call - 10 4))))
