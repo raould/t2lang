@@ -857,8 +857,25 @@ export namespace A1 {
     span: Span;
   }
 
+  export type ClassMember =
+    | BlockStmt
+    | IfStmt
+    | WhileStmt
+    | LetStarExpr
+    | ForClassic
+    | ForOf
+    | ForAwait
+    | SwitchStmt
+    | AssignExpr
+    | ReturnExpr
+    | BreakStmt
+    | ContinueStmt
+    | ExprStmt
+    | FunctionExpr
+    | ClassExpr;
+
   export interface ClassBody {
-    statements: Statement[];
+    statements: ClassMember[];
   }
 
   /**
@@ -1013,8 +1030,10 @@ export namespace A1 {
     local: Identifier;
   }
 
+  export type ModuleSpecifier = Literal;
+
   export interface ImportSpec {
-    source: Expression;
+    source: ModuleSpecifier;
     defaultBinding?: Identifier;
     namespaceBinding?: Identifier;
     named?: NamedImport[];
@@ -1032,7 +1051,7 @@ export namespace A1 {
   }
 
   export interface ExportSpec {
-    source?: Expression;
+    source?: ModuleSpecifier;
     named?: NamedExport[];
     defaultExport?: Expression;
     namespaceExport?: Identifier;
@@ -1066,21 +1085,7 @@ export namespace A1 {
   // --- Union Types ---
 
   export type Statement =
-    | BlockStmt
-    | IfStmt
-    | WhileStmt
-    | LetStarExpr
-    | ForClassic
-    | ForOf
-    | ForAwait
-    | SwitchStmt
-    | AssignExpr
-    | ReturnExpr
-    | BreakStmt
-    | ContinueStmt
-    | ExprStmt
-    | FunctionExpr
-    | ClassExpr
+    | ClassMember
     // A1-only
     | ImportStmt
     | ExportStmt
