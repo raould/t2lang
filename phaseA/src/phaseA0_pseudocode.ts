@@ -129,11 +129,13 @@ function processStatement(statement: Statement, ctx: PhaseA0Context) {
           }
         }
         evaluateType(statement.type, ctx);
+        ctx.resolver.recordDeclaration(statement);
       break;
     case "type-interface":
         for (const member of statement.body) {
           evaluateType(member.type, ctx);
         }
+        ctx.resolver.recordDeclaration(statement);
       break;
     case "fn":
     case "class":
@@ -387,6 +389,11 @@ function resolvePattern(pattern: PatternNode, ctx: PhaseA0Context) {
         resolvePattern(pattern.rest, ctx);
       }
       break;
+    case "rest":
+      if (pattern.target) {
+        resolvePattern(pattern.target, ctx);
+      }
+      break;
     default:
       registerIdentifier(pattern.name, ctx, false);
   }
@@ -427,7 +434,7 @@ function handleLoop(loop: LoopNode, ctx: PhaseA0Context) {
         evaluateExpression(loop.update, ctx);
       }
     } else if (loop.type === "for-of" || loop.type === "for-await") {
-      declareBinding(loop.binding, ctx, true);
+      declareBinding(loop.binding, ctx, loop.binding.isConst ?? true);
       evaluateExpression(loop.collection, ctx);
     }
     processStatement(loop.body, ctx);
@@ -457,8 +464,8 @@ interface TypeChecker {}
 interface Scope {}
 interface Span { start: number; end: number; source: string; }
 interface Diagnostic { message: string; span: Span; }
-interface Binding { pattern?: PatternNode; name?: Identifier; init?: Expression; }
-interface PatternNode { type: string; elements?: PatternNode[]; fields?: { target: PatternNode }[]; rest?: PatternNode; name?: Identifier; }
+interface Binding { pattern?: PatternNode; name?: Identifier; init?: Expression; isConst?: boolean; }
+interface PatternNode { type: string; elements?: PatternNode[]; fields?: { target: PatternNode }[]; rest?: PatternNode; target?: PatternNode; name?: Identifier; }
 interface Identifier { type: "identifier"; name: string; span: Span; }
 interface Literal { type: "literal"; value: string | number | boolean | null; span: Span; }
 interface SpreadExpr { type: "spread"; expr: Expression; kind: "array" | "object" | "rest"; span: Span; }
