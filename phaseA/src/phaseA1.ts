@@ -25,13 +25,19 @@ export type Scope = A0.Scope;
 export type Identifier = A0.Identifier;
 export type Literal = A0.Literal;
 
+// Re-export for convenience
+export const Identifier = A0.Identifier;
+export const Literal = A0.Literal;
+
 // --- Binding Targets (A1 adds patterns) ---
 
-export interface ArrayPattern {
-  type: "array-pattern";
-  elements: BindingTarget[];
-  rest?: BindingTarget;
-  span: Span;
+export class ArrayPattern {
+  private readonly __brand!: "array-pattern";
+  constructor(
+    public elements: BindingTarget[],
+    public span: Span,
+    public rest?: BindingTarget
+  ) {}
 }
 
 export interface ObjectPatternField {
@@ -39,17 +45,21 @@ export interface ObjectPatternField {
   target: BindingTarget;
 }
 
-export interface ObjectPattern {
-  type: "object-pattern";
-  properties: ObjectPatternField[];
-  rest?: BindingTarget;
-  span: Span;
+export class ObjectPattern {
+  private readonly __brand!: "object-pattern";
+  constructor(
+    public properties: ObjectPatternField[],
+    public span: Span,
+    public rest?: BindingTarget
+  ) {}
 }
 
-export interface RestPattern {
-  type: "rest";
-  target: BindingTarget;
-  span: Span;
+export class RestPattern {
+  private readonly __brand!: "rest";
+  constructor(
+    public target: BindingTarget,
+    public span: Span
+  ) {}
 }
 
 export type BindingTarget = Identifier | ArrayPattern | ObjectPattern | RestPattern;
@@ -61,92 +71,75 @@ export interface Binding {
 
 // --- Statements ---
 
-/**
- * Conceptual expansion of A0.BlockStmt.
- * - statements uses A1.Statement
- */
-export interface BlockStmt {
-  type: "block";
-  statements: Statement[];
-  span: Span;
+export class BlockStmt {
+  private readonly __brand!: "block";
+  constructor(
+    public statements: Statement[],
+    public span: Span
+  ) {}
 }
 
-/**
- * Conceptual expansion of A0.IfStmt.
- * - test, consequent, alternate use A1 types
- */
-export interface IfStmt {
-  type: "if";
-  test: Expression;
-  consequent: Statement;
-  alternate?: Statement;
-  span: Span;
+export class IfStmt {
+  private readonly __brand!: "if";
+  constructor(
+    public test: Expression,
+    public consequent: Statement,
+    public span: Span,
+    public alternate?: Statement
+  ) {}
 }
 
-/**
- * Conceptual expansion of A0.WhileStmt.
- * - condition, body use A1 types
- */
-export interface WhileStmt {
-  type: "while";
-  condition: Expression;
-  body: Statement;
-  span: Span;
+export class WhileStmt {
+  private readonly __brand!: "while";
+  constructor(
+    public condition: Expression,
+    public body: Statement,
+    public span: Span
+  ) {}
 }
 
-/**
- * Conceptual expansion of A0.LetStarExpr.
- * - bindings uses A1.Binding (supports patterns)
- * - body uses A1.Statement
- */
-export interface LetStarExpr {
-  type: "let*";
-  isConst: boolean;
-  bindings: Binding[];
-  body: Statement[];
-  span: Span;
+export class LetStarExpr {
+  private readonly __brand!: "let*";
+  constructor(
+    public isConst: boolean,
+    public bindings: Binding[],
+    public body: Statement[],
+    public span: Span
+  ) {}
 }
 
-/**
- * Conceptual expansion of A0.ForClassic.
- * - init, condition, update, body use A1 types
- */
-export interface ForClassic {
-  type: "for-classic";
-  init?: Statement;
-  condition?: Expression;
-  update?: Expression;
-  body: Statement;
-  label?: string;
-  span: Span;
+export class ForClassic {
+  private readonly __brand!: "for-classic";
+  constructor(
+    public body: Statement,
+    public span: Span,
+    public init?: Statement,
+    public condition?: Expression,
+    public update?: Expression,
+    public label?: string
+  ) {}
 }
 
-/**
- * Conceptual expansion of A0.ForOf.
- * - binding uses A1.Binding (supports patterns)
- * - iterable, body use A1 types
- */
-export interface ForOf {
-  type: "for-of";
-  binding: Binding;
-  iterable: Expression;
-  body: Statement;
-  label?: string;
-  span: Span;
+export class ForOf {
+  private readonly __brand!: "for-of";
+  constructor(
+    public binding: Binding,
+    public iterable: Expression,
+    public body: Statement,
+    public span: Span,
+    public label?: string
+  ) {}
 }
 
-/**
- * Conceptual expansion of A0.ForAwait.
- * - binding uses A1.Binding (supports patterns)
- * - iterable, body use A1 types
- */
-export interface ForAwait {
-  type: "for-await";
-  binding: Binding;
-  iterable: Expression;
-  body: Statement;
-  label?: string;
-  span: Span;
+export class ForAwait {
+  private readonly __brand!: "for-await";
+  constructor(
+    public binding: Binding,
+    public iterable: Expression,
+    public body: Statement,
+    public span: Span,
+    public label?: string
+  ) {}
 }
 
 export interface SwitchCase {
@@ -154,142 +147,120 @@ export interface SwitchCase {
   consequent: Statement[];
 }
 
-/**
- * Conceptual expansion of A0.SwitchStmt.
- * - discriminant, cases use A1 types
- */
-export interface SwitchStmt {
-  type: "switch";
-  discriminant: Expression;
-  cases: SwitchCase[];
-  span: Span;
+export class SwitchStmt {
+  private readonly __brand!: "switch";
+  constructor(
+    public discriminant: Expression,
+    public cases: SwitchCase[],
+    public span: Span
+  ) {}
 }
 
-/**
- * Conceptual expansion of A0.AssignExpr.
- * - target, value use A1 types
- */
-export interface AssignExpr {
-  type: "assign";
-  target: Expression;
-  value: Expression;
-  span: Span;
+export class AssignExpr {
+  private readonly __brand!: "assign";
+  constructor(
+    public target: Expression,
+    public value: Expression,
+    public span: Span
+  ) {}
 }
 
-/**
- * Conceptual expansion of A0.ReturnExpr with:
- * - typeId for type tracking
- * - value uses A1.Expression
- */
-export interface ReturnExpr {
-  type: "return";
-  value?: Expression;
-  typeId?: number;
-  span: Span;
+export class ReturnExpr {
+  private readonly __brand!: "return";
+  constructor(
+    public span: Span,
+    public value?: Expression,
+    public typeId?: number
+  ) {}
 }
 
-export interface BreakStmt {
-  type: "break";
-  label?: Identifier;
-  span: Span;
+export class BreakStmt {
+  private readonly __brand!: "break";
+  constructor(
+    public span: Span,
+    public label?: Identifier
+  ) {}
 }
 
-export interface ContinueStmt {
-  type: "continue";
-  label?: Identifier;
-  span: Span;
+export class ContinueStmt {
+  private readonly __brand!: "continue";
+  constructor(
+    public span: Span,
+    public label?: Identifier
+  ) {}
 }
 
-/**
- * Conceptual expansion of A0.ExprStmt with:
- * - typeId for type tracking
- * - expr uses A1.Expression
- */
-export interface ExprStmt {
-  type: "exprStmt";
-  expr: Expression;
-  typeId?: number;
-  span: Span;
+export class ExprStmt {
+  private readonly __brand!: "exprStmt";
+  constructor(
+    public expr: Expression,
+    public span: Span,
+    public typeId?: number
+  ) {}
 }
 
 // --- Expressions ---
 
-/**
- * Conceptual expansion of A0.CallExpr.
- * - callee, args use A1 types
- */
-export interface CallExpr {
-  type: "call";
-  callee: Expression;
-  args: Expression[];
-  span: Span;
+export class CallExpr {
+  private readonly __brand!: "call";
+  constructor(
+    public callee: Expression,
+    public args: Expression[],
+    public span: Span
+  ) {}
 }
 
-/**
- * Conceptual expansion of A0.PropExpr with:
- * - maybeNull for optional chaining
- * - object uses A1.Expression
- */
-export interface PropExpr {
-  type: "prop";
-  object: Expression;
-  name: string;
-  maybeNull: boolean;
-  span: Span;
+export class PropExpr {
+  private readonly __brand!: "prop";
+  constructor(
+    public object: Expression,
+    public name: string,
+    public maybeNull: boolean,
+    public span: Span
+  ) {}
 }
 
-/**
- * Conceptual expansion of A0.IndexExpr with:
- * - maybeNull for optional chaining
- * - object, index use A1.Expression
- */
-export interface IndexExpr {
-  type: "index";
-  object: Expression;
-  index: Expression;
-  maybeNull: boolean;
-  span: Span;
+export class IndexExpr {
+  private readonly __brand!: "index";
+  constructor(
+    public object: Expression,
+    public index: Expression,
+    public maybeNull: boolean,
+    public span: Span
+  ) {}
 }
 
-/**
- * Conceptual expansion of A0.NewExpr.
- * - callee, args use A1 types
- */
-export interface NewExpr {
-  type: "new";
-  callee: Expression;
-  args: Expression[];
-  span: Span;
+export class NewExpr {
+  private readonly __brand!: "new";
+  constructor(
+    public callee: Expression,
+    public args: Expression[],
+    public span: Span
+  ) {}
 }
 
-/**
- * Conceptual expansion of A0.ArrayExpr.
- * - elements uses A1.Expression
- */
-export interface ArrayExpr {
-  type: "array";
-  elements: Expression[];
-  span: Span;
+export class ArrayExpr {
+  private readonly __brand!: "array";
+  constructor(
+    public elements: Expression[],
+    public span: Span
+  ) {}
 }
 
-/**
- * Conceptual expansion of A0.ObjectExpr.
- * - fields use A1.Expression
- */
-export interface ObjectExpr {
-  type: "object";
-  fields: { key: string; value: Expression }[];
-  span: Span;
+export class ObjectExpr {
+  private readonly __brand!: "object";
+  constructor(
+    public fields: { key: string; value: Expression }[],
+    public span: Span
+  ) {}
 }
 
-/**
- * Conceptual expansion of A0.ThrowExpr.
- * - argument uses A1.Expression
- */
-export interface ThrowExpr {
-  type: "throw";
-  argument: Expression;
-  span: Span;
+export class ThrowExpr {
+  private readonly __brand!: "throw";
+  constructor(
+    public argument: Expression,
+    public span: Span
+  ) {}
 }
 
 export interface CatchClause {
@@ -301,53 +272,36 @@ export interface FinallyClause {
   body: Statement[];
 }
 
-/**
- * Conceptual expansion of A0.TryCatchExpr.
- * - body, catchClause, finallyClause use A1 types
- * - catchClause.binding uses A1.Binding (supports patterns)
- */
-export interface TryCatchExpr {
-  type: "try";
-  body: Statement;
-  catchClause?: CatchClause;
-  finallyClause?: FinallyClause;
-  span: Span;
+export class TryCatchExpr {
+  private readonly __brand!: "try";
+  constructor(
+    public body: Statement,
+    public span: Span,
+    public catchClause?: CatchClause,
+    public finallyClause?: FinallyClause
+  ) {}
 }
 
-/**
- * Conceptual expansion of A0.FnParam with:
- * - typeAnnotation for type annotations
- */
 export interface FnParam {
   name: Identifier;
   typeAnnotation?: TypeNode;
 }
 
-/**
- * Conceptual expansion of A0.FnSignature with:
- * - returnType for return type annotation
- * - parameters uses A1.FnParam
- */
 export interface FnSignature {
   parameters: FnParam[];
   returnType?: TypeNode;
 }
 
-/**
- * Conceptual expansion of A0.FunctionExpr with:
- * - typeParams for generic type parameters
- * - async, generator flags
- * - signature uses A1.FnSignature
- * - body uses A1.Statement
- */
-export interface FunctionExpr {
-  type: "fn";
-  signature: FnSignature;
-  typeParams?: TypeParam[];
-  body: Statement[];
-  async?: boolean;
-  generator?: boolean;
-  span: Span;
+export class FunctionExpr {
+  private readonly __brand!: "fn";
+  constructor(
+    public signature: FnSignature,
+    public body: Statement[],
+    public span: Span,
+    public typeParams?: TypeParam[],
+    public async?: boolean,
+    public generator?: boolean
+  ) {}
 }
 
 export type ClassMember =
@@ -371,138 +325,190 @@ export interface ClassBody {
   statements: ClassMember[];
 }
 
-/**
- * Conceptual expansion of A0.ClassExpr with:
- * - decorators, extends, implements, constructor, staticBlocks
- * - body uses A1.ClassBody
- */
-export interface ClassExpr {
-  type: "class";
-  name?: Identifier;
-  body: ClassBody;
-  decorators?: Expression[];
-  extends?: Expression | null;
-  implements?: Expression[];
-  constructor?: Statement | null;
-  staticBlocks?: Statement[];
-  span: Span;
+export class ClassExpr {
+  private readonly __brand!: "class";
+  constructor(
+    public body: ClassBody,
+    public span: Span,
+    public name?: Identifier,
+    public decorators?: Expression[],
+    public extends_?: Expression | null,
+    public implements_?: Expression[],
+    public constructor_?: Statement | null,
+    public staticBlocks?: Statement[]
+  ) {}
+
+  // Getters for cleaner access
+  get extends(): Expression | null | undefined {
+    return this.extends_;
+  }
+  get implements(): Expression[] | undefined {
+    return this.implements_;
+  }
+  get constructorStmt(): Statement | null | undefined {
+    return this.constructor_;
+  }
 }
 
 // --- A1-only Expressions ---
 
-export interface SpreadExpr {
-  type: "spread";
-  expr: Expression;
-  kind: "array" | "object" | "rest";
-  span: Span;
+export class SpreadExpr {
+  private readonly __brand!: "spread";
+  constructor(
+    public expr: Expression,
+    public kind: "array" | "object" | "rest",
+    public span: Span
+  ) {}
 }
 
-export interface TernaryExpr {
-  type: "ternary";
-  test: Expression;
-  consequent: Expression;
-  alternate: Expression;
-  span: Span;
+export class TernaryExpr {
+  private readonly __brand!: "ternary";
+  constructor(
+    public test: Expression,
+    public consequent: Expression,
+    public alternate: Expression,
+    public span: Span
+  ) {}
 }
 
-export interface AwaitExpr {
-  type: "await";
-  argument: Expression;
-  span: Span;
+export class AwaitExpr {
+  private readonly __brand!: "await";
+  constructor(
+    public argument: Expression,
+    public span: Span
+  ) {}
 }
 
-export interface YieldExpr {
-  type: "yield";
-  argument?: Expression | null;
-  delegate: boolean;
-  span: Span;
+export class YieldExpr {
+  private readonly __brand!: "yield";
+  constructor(
+    public delegate: boolean,
+    public span: Span,
+    public argument?: Expression | null
+  ) {}
 }
 
-export interface TypeAssertExpr {
-  type: "type-assert";
-  expr: Expression;
-  assertedType: TypeNode;
-  span: Span;
+export class TypeAssertExpr {
+  private readonly __brand!: "type-assert";
+  constructor(
+    public expr: Expression,
+    public assertedType: TypeNode,
+    public span: Span
+  ) {}
 }
 
 // --- A1 Type System ---
 
-export interface TypeParam {
-  type: "type-param";
-  name: Identifier;
-  variance?: "in" | "out";
-  constraint?: TypeNode;
-  defaultType?: TypeNode;
-  span: Span;
+export class TypeParam {
+  private readonly __brand!: "type-param";
+  constructor(
+    public name: Identifier,
+    public span: Span,
+    public variance?: "in" | "out",
+    public constraint?: TypeNode,
+    public defaultType?: TypeNode
+  ) {}
 }
 
-export interface TypeField {
-  type: "type-field";
-  key: string;
-  fieldType: TypeNode;
-  span: Span;
+export class TypeField {
+  private readonly __brand!: "type-field";
+  constructor(
+    public key: string,
+    public fieldType: TypeNode,
+    public span: Span
+  ) {}
 }
 
-export interface TypePrimitive {
-  type: "type-string" | "type-number" | "type-boolean" | "type-null" | "type-undefined";
-  span: Span;
+export class TypePrimitive {
+  private readonly __brand!:
+    | "type-string"
+    | "type-number"
+    | "type-boolean"
+    | "type-null"
+    | "type-undefined";
+  constructor(
+    public kind: "type-string" | "type-number" | "type-boolean" | "type-null" | "type-undefined",
+    public span: Span
+  ) {
+    // TypeScript doesn't allow dynamic assignment to __brand, so we use a getter
+  }
+
+  get __brandValue(): string {
+    return this.kind;
+  }
 }
 
-export interface TypeRef {
-  type: "type-ref";
-  identifier: Identifier;
-  typeArgs?: TypeNode[];
-  span: Span;
+export class TypeRef {
+  private readonly __brand!: "type-ref";
+  constructor(
+    public identifier: Identifier,
+    public span: Span,
+    public typeArgs?: TypeNode[]
+  ) {}
 }
 
-export interface TypeFunction {
-  type: "type-function";
-  typeParams?: TypeParam[];
-  params: TypeNode[];
-  returns: TypeNode;
-  span: Span;
+export class TypeFunction {
+  private readonly __brand!: "type-function";
+  constructor(
+    public params: TypeNode[],
+    public returns: TypeNode,
+    public span: Span,
+    public typeParams?: TypeParam[]
+  ) {}
 }
 
-export interface TypeObject {
-  type: "type-object";
-  fields: TypeField[];
-  span: Span;
+export class TypeObject {
+  private readonly __brand!: "type-object";
+  constructor(
+    public fields: TypeField[],
+    public span: Span
+  ) {}
 }
 
-export interface TypeUnion {
-  type: "type-union";
-  types: TypeNode[];
-  span: Span;
+export class TypeUnion {
+  private readonly __brand!: "type-union";
+  constructor(
+    public types: TypeNode[],
+    public span: Span
+  ) {}
 }
 
-export interface TypeIntersection {
-  type: "type-intersection";
-  types: TypeNode[];
-  span: Span;
+export class TypeIntersection {
+  private readonly __brand!: "type-intersection";
+  constructor(
+    public types: TypeNode[],
+    public span: Span
+  ) {}
 }
 
-export interface TypeLiteral {
-  type: "type-literal";
-  value: Literal[];
-  span: Span;
+export class TypeLiteral {
+  private readonly __brand!: "type-literal";
+  constructor(
+    public value: Literal[],
+    public span: Span
+  ) {}
 }
 
-export interface TypeMapped {
-  type: "type-mapped";
-  typeParam: TypeParam;
-  valueType: TypeNode;
-  nameRemap?: TypeNode;
-  readonlyModifier?: "readonly" | "-readonly";
-  optionalModifier?: "optional" | "-optional";
-  via?: TypeNode;
-  span: Span;
+export class TypeMapped {
+  private readonly __brand!: "type-mapped";
+  constructor(
+    public typeParam: TypeParam,
+    public valueType: TypeNode,
+    public span: Span,
+    public nameRemap?: TypeNode,
+    public readonlyModifier?: "readonly" | "-readonly",
+    public optionalModifier?: "optional" | "-optional",
+    public via?: TypeNode
+  ) {}
 }
 
-export interface TypeApp {
-  type: "type-app";
-  expr: TypeNode;
-  typeArgs: TypeNode[];
-  span: Span;
+export class TypeApp {
+  private readonly __brand!: "type-app";
+  constructor(
+    public expr: TypeNode,
+    public typeArgs: TypeNode[],
+    public span: Span
+  ) {}
 }
 
 export type TypeNode =
@@ -532,10 +538,12 @@ export interface ImportSpec {
   named?: NamedImport[];
 }
 
-export interface ImportStmt {
-  type: "import";
-  spec: ImportSpec;
-  span: Span;
+export class ImportStmt {
+  private readonly __brand!: "import";
+  constructor(
+    public spec: ImportSpec,
+    public span: Span
+  ) {}
 }
 
 export interface NamedExport {
@@ -550,29 +558,35 @@ export interface ExportSpec {
   namespaceExport?: Identifier;
 }
 
-export interface ExportStmt {
-  type: "export";
-  spec: ExportSpec;
-  span: Span;
+export class ExportStmt {
+  private readonly __brand!: "export";
+  constructor(
+    public spec: ExportSpec,
+    public span: Span
+  ) {}
 }
 
-export interface TypeAliasStmt {
-  type: "type-alias";
-  name: Identifier;
-  typeParams?: TypeParam[];
-  typeValue: TypeNode;
-  span: Span;
+export class TypeAliasStmt {
+  private readonly __brand!: "type-alias";
+  constructor(
+    public name: Identifier,
+    public typeValue: TypeNode,
+    public span: Span,
+    public typeParams?: TypeParam[]
+  ) {}
 }
 
 export interface InterfaceBody {
   fields: TypeField[];
 }
 
-export interface InterfaceStmt {
-  type: "type-interface";
-  name: Identifier;
-  body: InterfaceBody;
-  span: Span;
+export class InterfaceStmt {
+  private readonly __brand!: "type-interface";
+  constructor(
+    public name: Identifier,
+    public body: InterfaceBody,
+    public span: Span
+  ) {}
 }
 
 // --- Union Types ---
@@ -605,10 +619,12 @@ export type Expression =
   | YieldExpr
   | TypeAssertExpr;
 
-export interface Program {
-  type: "program";
-  body: Statement[];
-  span: Span;
+export class Program {
+  private readonly __brand!: "program";
+  constructor(
+    public body: Statement[],
+    public span: Span
+  ) {}
 }
 
 // --- Context ---
@@ -649,28 +665,23 @@ export function createProcessor(ctx: Context) {
   }
 
   function resolveBindingTarget(target: BindingTarget, isConst: boolean): void {
-    switch (target.type) {
-      case "identifier":
-        registerIdentifier(target, isConst);
-        break;
-      case "array-pattern":
-        for (const el of target.elements) resolveBindingTarget(el, isConst);
-        if (target.rest) resolveBindingTarget(target.rest, isConst);
-        break;
-      case "object-pattern":
-        for (const prop of target.properties) resolveBindingTarget(prop.target, isConst);
-        if (target.rest) resolveBindingTarget(target.rest, isConst);
-        break;
-      case "rest":
-        resolveBindingTarget(target.target, isConst);
-        break;
+    if (target instanceof A0.Identifier) {
+      registerIdentifier(target, isConst);
+    } else if (target instanceof ArrayPattern) {
+      for (const el of target.elements) resolveBindingTarget(el, isConst);
+      if (target.rest) resolveBindingTarget(target.rest, isConst);
+    } else if (target instanceof ObjectPattern) {
+      for (const prop of target.properties) resolveBindingTarget(prop.target, isConst);
+      if (target.rest) resolveBindingTarget(target.rest, isConst);
+    } else if (target instanceof RestPattern) {
+      resolveBindingTarget(target.target, isConst);
     }
   }
 
   function processAssignmentTarget(target: Expression): void {
-    if (target.type === "identifier") {
+    if (target instanceof A0.Identifier) {
       // validate assignment
-    } else if (target.type === "prop" || target.type === "index") {
+    } else if (target instanceof PropExpr || target instanceof IndexExpr) {
       evaluateExpression(target);
     } else {
       ctx.diagnostics.push({
@@ -681,224 +692,165 @@ export function createProcessor(ctx: Context) {
   }
 
   function processStatement(stmt: Statement): void {
-    switch (stmt.type) {
-      case "block":
-        withScope(() => {
-          for (const s of stmt.statements) processStatement(s);
-        });
-        break;
-
-      case "if":
-        evaluateExpression(stmt.test);
-        processStatement(stmt.consequent);
-        if (stmt.alternate) processStatement(stmt.alternate);
-        break;
-
-      case "while":
-        evaluateExpression(stmt.condition);
-        withScope(() => processStatement(stmt.body));
-        break;
-
-      case "let*":
-        withScope(() => {
-          for (const b of stmt.bindings) {
-            declareBinding(b, stmt.isConst);
-          }
-          for (const s of stmt.body) processStatement(s);
-        });
-        break;
-
-      case "for-classic":
-        withScope(() => {
-          if (stmt.init) processStatement(stmt.init);
-          if (stmt.condition) evaluateExpression(stmt.condition);
-          if (stmt.update) evaluateExpression(stmt.update);
-          processStatement(stmt.body);
-        });
-        break;
-
-      case "for-of":
-      case "for-await":
-        withScope(() => {
-          declareBinding(stmt.binding, false);
-          evaluateExpression(stmt.iterable);
-          processStatement(stmt.body);
-        });
-        break;
-
-      case "switch":
-        evaluateExpression(stmt.discriminant);
-        for (const c of stmt.cases) {
-          if (c.test) evaluateExpression(c.test);
-          for (const s of c.consequent) processStatement(s);
+    if (stmt instanceof BlockStmt) {
+      withScope(() => {
+        for (const s of stmt.statements) processStatement(s);
+      });
+    } else if (stmt instanceof IfStmt) {
+      evaluateExpression(stmt.test);
+      processStatement(stmt.consequent);
+      if (stmt.alternate) processStatement(stmt.alternate);
+    } else if (stmt instanceof WhileStmt) {
+      evaluateExpression(stmt.condition);
+      withScope(() => processStatement(stmt.body));
+    } else if (stmt instanceof LetStarExpr) {
+      withScope(() => {
+        for (const b of stmt.bindings) {
+          declareBinding(b, stmt.isConst);
         }
-        break;
-
-      case "assign":
-        processAssignmentTarget(stmt.target);
-        evaluateExpression(stmt.value);
-        break;
-
-      case "return":
-        if (stmt.value) evaluateExpression(stmt.value);
-        break;
-
-      case "break":
-      case "continue":
-        // handled by resolver
-        break;
-
-      case "exprStmt":
-        evaluateExpression(stmt.expr);
-        break;
-
-      case "fn":
-      case "class":
-        evaluateExpression(stmt);
-        break;
-
-      // A1-only statements
-      case "import":
-        processImport(stmt);
-        break;
-
-      case "export":
-        processExport(stmt);
-        break;
-
-      case "type-alias":
-        processTypeAlias(stmt);
-        break;
-
-      case "type-interface":
-        processInterface(stmt);
-        break;
-
-      default: {
-        const _exhaustive: never = stmt;
-        ctx.diagnostics.push({
-          message: `Unknown statement type: ${(stmt as Statement).type}`,
-          span: (stmt as Statement).span,
-        });
+        for (const s of stmt.body) processStatement(s);
+      });
+    } else if (stmt instanceof ForClassic) {
+      withScope(() => {
+        if (stmt.init) processStatement(stmt.init);
+        if (stmt.condition) evaluateExpression(stmt.condition);
+        if (stmt.update) evaluateExpression(stmt.update);
+        processStatement(stmt.body);
+      });
+    } else if (stmt instanceof ForOf || stmt instanceof ForAwait) {
+      withScope(() => {
+        declareBinding(stmt.binding, false);
+        evaluateExpression(stmt.iterable);
+        processStatement(stmt.body);
+      });
+    } else if (stmt instanceof SwitchStmt) {
+      evaluateExpression(stmt.discriminant);
+      for (const c of stmt.cases) {
+        if (c.test) evaluateExpression(c.test);
+        for (const s of c.consequent) processStatement(s);
       }
+    } else if (stmt instanceof AssignExpr) {
+      processAssignmentTarget(stmt.target);
+      evaluateExpression(stmt.value);
+    } else if (stmt instanceof ReturnExpr) {
+      if (stmt.value) evaluateExpression(stmt.value);
+    } else if (stmt instanceof BreakStmt || stmt instanceof ContinueStmt) {
+      // handled by resolver
+    } else if (stmt instanceof ExprStmt) {
+      evaluateExpression(stmt.expr);
+    } else if (stmt instanceof FunctionExpr || stmt instanceof ClassExpr) {
+      evaluateExpression(stmt);
+    } else if (stmt instanceof ImportStmt) {
+      processImport(stmt);
+    } else if (stmt instanceof ExportStmt) {
+      processExport(stmt);
+    } else if (stmt instanceof TypeAliasStmt) {
+      processTypeAlias(stmt);
+    } else if (stmt instanceof InterfaceStmt) {
+      processInterface(stmt);
+    } else {
+      ctx.diagnostics.push({
+        message: `Unknown statement type`,
+        span: (stmt as Statement).span,
+      });
     }
   }
 
   function evaluateExpression(expr: Expression): Expression {
-    switch (expr.type) {
-      case "literal":
-      case "identifier":
-        return expr;
-
-      case "call":
-        evaluateExpression(expr.callee);
-        for (const a of expr.args) evaluateExpression(a);
-        return expr;
-
-      case "prop":
-        evaluateExpression(expr.object);
-        return expr;
-
-      case "index":
-        evaluateExpression(expr.object);
-        evaluateExpression(expr.index);
-        return expr;
-
-      case "new":
-        evaluateExpression(expr.callee);
-        for (const a of expr.args) evaluateExpression(a);
-        return expr;
-
-      case "array":
-        for (const e of expr.elements) evaluateExpression(e);
-        return expr;
-
-      case "object":
-        for (const f of expr.fields) evaluateExpression(f.value);
-        return expr;
-
-      case "throw":
-        evaluateExpression(expr.argument);
-        return expr;
-
-      case "try":
-        processStatement(expr.body);
-        if (expr.catchClause) {
-          withScope(() => {
-            if (expr.catchClause!.binding) {
-              declareBinding(expr.catchClause!.binding, true);
-            }
-            for (const s of expr.catchClause!.body) processStatement(s);
-          });
-        }
-        if (expr.finallyClause) {
-          for (const s of expr.finallyClause.body) processStatement(s);
-        }
-        return expr;
-
-      case "fn":
+    if (expr instanceof A0.Literal || expr instanceof A0.Identifier) {
+      return expr;
+    } else if (expr instanceof CallExpr) {
+      evaluateExpression(expr.callee);
+      for (const a of expr.args) evaluateExpression(a);
+      return expr;
+    } else if (expr instanceof PropExpr) {
+      evaluateExpression(expr.object);
+      return expr;
+    } else if (expr instanceof IndexExpr) {
+      evaluateExpression(expr.object);
+      evaluateExpression(expr.index);
+      return expr;
+    } else if (expr instanceof NewExpr) {
+      evaluateExpression(expr.callee);
+      for (const a of expr.args) evaluateExpression(a);
+      return expr;
+    } else if (expr instanceof ArrayExpr) {
+      for (const e of expr.elements) evaluateExpression(e);
+      return expr;
+    } else if (expr instanceof ObjectExpr) {
+      for (const f of expr.fields) evaluateExpression(f.value);
+      return expr;
+    } else if (expr instanceof ThrowExpr) {
+      evaluateExpression(expr.argument);
+      return expr;
+    } else if (expr instanceof TryCatchExpr) {
+      processStatement(expr.body);
+      if (expr.catchClause) {
         withScope(() => {
-          for (const p of expr.signature.parameters) {
-            registerIdentifier(p.name, false);
-            if (p.typeAnnotation) evaluateType(p.typeAnnotation);
+          if (expr.catchClause!.binding) {
+            declareBinding(expr.catchClause!.binding, true);
           }
-          if (expr.typeParams) {
-            for (const tp of expr.typeParams) evaluateTypeParam(tp);
-          }
-          if (expr.signature.returnType) {
-            evaluateType(expr.signature.returnType);
-          }
-          for (const s of expr.body) processStatement(s);
+          for (const s of expr.catchClause!.body) processStatement(s);
         });
-        return expr;
-
-      case "class":
-        withScope(() => {
-          if (expr.extends) evaluateExpression(expr.extends);
-          if (expr.implements) {
-            for (const impl of expr.implements) evaluateExpression(impl);
-          }
-          if (expr.decorators) {
-            for (const dec of expr.decorators) evaluateExpression(dec);
-          }
-          for (const s of expr.body.statements) processStatement(s);
-          if (expr.staticBlocks) {
-            for (const block of expr.staticBlocks) processStatement(block);
-          }
-        });
-        return expr;
-
-      // A1-only expressions
-      case "spread":
-        evaluateExpression(expr.expr);
-        return expr;
-
-      case "ternary":
-        evaluateExpression(expr.test);
-        evaluateExpression(expr.consequent);
-        evaluateExpression(expr.alternate);
-        return expr;
-
-      case "await":
-        evaluateExpression(expr.argument);
-        return expr;
-
-      case "yield":
-        if (expr.argument) evaluateExpression(expr.argument);
-        return expr;
-
-      case "type-assert":
-        evaluateExpression(expr.expr);
-        evaluateType(expr.assertedType);
-        return expr;
-
-      default: {
-        ctx.diagnostics.push({
-          message: `Unknown expression type: ${(expr as Expression).type}`,
-          span: (expr as Expression).span,
-        });
-        return expr;
       }
+      if (expr.finallyClause) {
+        for (const s of expr.finallyClause.body) processStatement(s);
+      }
+      return expr;
+    } else if (expr instanceof FunctionExpr) {
+      withScope(() => {
+        for (const p of expr.signature.parameters) {
+          registerIdentifier(p.name, false);
+          if (p.typeAnnotation) evaluateType(p.typeAnnotation);
+        }
+        if (expr.typeParams) {
+          for (const tp of expr.typeParams) evaluateTypeParam(tp);
+        }
+        if (expr.signature.returnType) {
+          evaluateType(expr.signature.returnType);
+        }
+        for (const s of expr.body) processStatement(s);
+      });
+      return expr;
+    } else if (expr instanceof ClassExpr) {
+      withScope(() => {
+        if (expr.extends) evaluateExpression(expr.extends);
+        if (expr.implements) {
+          for (const impl of expr.implements) evaluateExpression(impl);
+        }
+        if (expr.decorators) {
+          for (const dec of expr.decorators) evaluateExpression(dec);
+        }
+        for (const s of expr.body.statements) processStatement(s);
+        if (expr.staticBlocks) {
+          for (const block of expr.staticBlocks) processStatement(block);
+        }
+      });
+      return expr;
+    } else if (expr instanceof SpreadExpr) {
+      evaluateExpression(expr.expr);
+      return expr;
+    } else if (expr instanceof TernaryExpr) {
+      evaluateExpression(expr.test);
+      evaluateExpression(expr.consequent);
+      evaluateExpression(expr.alternate);
+      return expr;
+    } else if (expr instanceof AwaitExpr) {
+      evaluateExpression(expr.argument);
+      return expr;
+    } else if (expr instanceof YieldExpr) {
+      if (expr.argument) evaluateExpression(expr.argument);
+      return expr;
+    } else if (expr instanceof TypeAssertExpr) {
+      evaluateExpression(expr.expr);
+      evaluateType(expr.assertedType);
+      return expr;
+    } else {
+      ctx.diagnostics.push({
+        message: `Unknown expression type`,
+        span: (expr as Expression).span,
+      });
+      return expr;
     }
   }
 
@@ -956,58 +908,37 @@ export function createProcessor(ctx: Context) {
 
   // A1-only: Type evaluation
   function evaluateType(typeNode: TypeNode): void {
-    switch (typeNode.type) {
-      case "type-string":
-      case "type-number":
-      case "type-boolean":
-      case "type-null":
-      case "type-undefined":
-      case "type-literal":
-        // leaf nodes
-        break;
-
-      case "type-ref":
-        if (typeNode.typeArgs) {
-          for (const arg of typeNode.typeArgs) evaluateType(arg);
-        }
-        break;
-
-      case "type-union":
-      case "type-intersection":
-        for (const t of typeNode.types) evaluateType(t);
-        break;
-
-      case "type-function":
-        if (typeNode.typeParams) {
-          for (const p of typeNode.typeParams) evaluateTypeParam(p);
-        }
-        for (const p of typeNode.params) evaluateType(p);
-        evaluateType(typeNode.returns);
-        break;
-
-      case "type-object":
-        for (const f of typeNode.fields) evaluateType(f.fieldType);
-        break;
-
-      case "type-mapped":
-        evaluateTypeParam(typeNode.typeParam);
-        evaluateType(typeNode.valueType);
-        if (typeNode.nameRemap) evaluateType(typeNode.nameRemap);
-        if (typeNode.via) evaluateType(typeNode.via);
-        break;
-
-      case "type-app":
-        evaluateType(typeNode.expr);
-        for (const a of typeNode.typeArgs) evaluateType(a);
-        break;
-
-      default: {
-        const _exhaustive: never = typeNode;
-        ctx.diagnostics.push({
-          message: `Unknown type node: ${(typeNode as TypeNode).type}`,
-          span: (typeNode as TypeNode).span,
-        });
+    if (typeNode instanceof TypePrimitive) {
+      // leaf node
+    } else if (typeNode instanceof TypeRef) {
+      if (typeNode.typeArgs) {
+        for (const arg of typeNode.typeArgs) evaluateType(arg);
       }
+    } else if (typeNode instanceof TypeUnion || typeNode instanceof TypeIntersection) {
+      for (const t of typeNode.types) evaluateType(t);
+    } else if (typeNode instanceof TypeFunction) {
+      if (typeNode.typeParams) {
+        for (const p of typeNode.typeParams) evaluateTypeParam(p);
+      }
+      for (const p of typeNode.params) evaluateType(p);
+      evaluateType(typeNode.returns);
+    } else if (typeNode instanceof TypeObject) {
+      for (const f of typeNode.fields) evaluateType(f.fieldType);
+    } else if (typeNode instanceof TypeMapped) {
+      evaluateTypeParam(typeNode.typeParam);
+      evaluateType(typeNode.valueType);
+      if (typeNode.nameRemap) evaluateType(typeNode.nameRemap);
+      if (typeNode.via) evaluateType(typeNode.via);
+    } else if (typeNode instanceof TypeApp) {
+      evaluateType(typeNode.expr);
+      for (const a of typeNode.typeArgs) evaluateType(a);
+    } else if (typeNode instanceof TypeLiteral) {
+      // leaf node
+    } else {
+      ctx.diagnostics.push({
+        message: `Unknown type node`,
+        span: (typeNode as TypeNode).span,
+      });
     }
   }
 
