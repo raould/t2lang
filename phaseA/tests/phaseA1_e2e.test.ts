@@ -32,7 +32,7 @@ import {
   ClassExpr,
   type ClassBody,
   BlockStmt,
-} from "./src/phaseA1.ts";
+} from "../src/phaseA1.ts";
 
 const makeSpan = (label = "phaseA1"): Span => ({
   start: 0,

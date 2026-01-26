@@ -22,7 +22,7 @@ import {
   ReturnExpr,
   ClassExpr,
   FunctionExpr,
-} from "./src/phaseA0.ts";
+} from "../src/phaseA0.ts";
 
 const makeSpan = (label = "phaseA0"): Span => ({
   start: 0,
