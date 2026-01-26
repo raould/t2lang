@@ -1,6 +1,2 @@
-// npm run build
-// npx t2c hello_let.t2
-// npx tsc hello_let.ts
-// node hello_let.js
 (program (let* ((x 42)) x))
 

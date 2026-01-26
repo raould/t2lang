@@ -1,5 +1,10 @@
 # TODO
 
+# newer
+
+* debug logging/trace output, flags.
+* support comments.
+
 # now
 
 * Replace the “JSON-only” CLI stub: cli.ts currently expects a serialized AST from stdin. We need to rewire it so t2tc reads .t2 source, parses it, and emits .ts output (matching the user’s “t2tc hello_let.t2 → hello_let.ts” workflow). That means implementing input/output handling (stdin vs file, -o, --stdout, etc.) and flag parsing similar to cli.ts, but without importing Phase0 or Phase1 helpers since Phase A must be self-contained.
