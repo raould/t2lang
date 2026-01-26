@@ -32,7 +32,7 @@ export class Identifier {
   readonly name: string;
   readonly span: Span;
 
-  constructor(data: { name: string, span: Span }) {
+  constructor(data: { name: string; span: Span }) {
     this.name = data.name;
     this.span = data.span;
   }
@@ -440,7 +440,7 @@ export class Program {
 
 // --- Context ---
 
-export interface Scope { }
+export interface Scope {}
 
 export interface Context {
   diagnostics: Diagnostic[];

@@ -41,28 +41,28 @@ const makeSpan = (label = "phaseA1"): Span => ({
 });
 
 const mkIdentifier = (name: string, label = name): Identifier =>
-  new Identifier(name, makeSpan(`ident:${label}`));
+  new Identifier({ name, span: makeSpan(`ident:${label}`) });
 
 const mkLiteral = (
   value: string | number | boolean | null | undefined,
   label = "lit"
-): Literal => new Literal(value, makeSpan(`lit:${label}`));
+): Literal => new Literal({ value, span: makeSpan(`lit:${label}`) });
 
 const mkExprStmt = (expr: Expression, label = "expr"): ExprStmt =>
-  new ExprStmt(expr, makeSpan(`expr:${label}`));
+  new ExprStmt({ expr, span: makeSpan(`expr:${label}`) });
 
 const mkBlock = (statements: Statement[], label = "block"): BlockStmt =>
-  new BlockStmt(statements, makeSpan(`block:${label}`));
+  new BlockStmt({ statements, span: makeSpan(`block:${label}`) });
 
 const mkReturn = (value?: Expression): ReturnExpr =>
-  new ReturnExpr(makeSpan("return"), value);
+  new ReturnExpr({ span: makeSpan("return"), value });
 
 const mkTypePrimitive = (
   kind: "type-string" | "type-number" | "type-boolean" | "type-null" | "type-undefined"
-): TypePrimitive => new TypePrimitive(kind, makeSpan(`type:${kind}`));
+): TypePrimitive => new TypePrimitive({ kind, span: makeSpan(`type:${kind}`) });
 
 const mkTypeField = (key: string, fieldType: TypeNode): TypeField =>
-  new TypeField(key, fieldType, makeSpan(`field:${key}`));
+  new TypeField({ key, fieldType, span: makeSpan(`field:${key}`) });
 
 function mkTypeParam(
   name: string,
@@ -72,22 +72,22 @@ function mkTypeParam(
     defaultType?: TypeNode;
   }
 ): TypeParam {
-  return new TypeParam(
-    mkIdentifier(name, `type-param:${name}`),
-    makeSpan(`type-param:${name}`),
-    opts?.variance,
-    opts?.constraint,
-    opts?.defaultType
-  );
+  return new TypeParam({
+    name: mkIdentifier(name, `type-param:${name}`),
+    span: makeSpan(`type-param:${name}`),
+    variance: opts?.variance,
+    constraint: opts?.constraint,
+    defaultType: opts?.defaultType,
+  });
 }
 
 const mkTypeUnion = (types: TypeNode[]): TypeUnion =>
-  new TypeUnion(types, makeSpan("type-union"));
+  new TypeUnion({ types, span: makeSpan("type-union") });
 
 function runProgram(body: Statement[]) {
   const ctx: Context = { diagnostics: [], scopeStack: [] };
   const processor = createProcessor(ctx);
-  const program = new Program(body, makeSpan("program"));
+  const program = new Program({ body, span: makeSpan("program") });
   const result = processor.run(program);
   if (result.diagnostics.length > 0) {
     console.error(result.diagnostics);
@@ -96,95 +96,95 @@ function runProgram(body: Statement[]) {
 }
 
 test("phaseA1 binds array patterns inside let*", () => {
-  const arrayPattern = new ArrayPattern(
-    [mkIdentifier("first"), mkIdentifier("second")],
-    makeSpan("array-pattern"),
-    mkIdentifier("rest")
-  );
+  const arrayPattern = new ArrayPattern({
+    elements: [mkIdentifier("first"), mkIdentifier("second")],
+    span: makeSpan("array-pattern"),
+    rest: mkIdentifier("rest"),
+  });
   const binding: Binding = {
     target: arrayPattern,
     init: mkIdentifier("incoming"),
   };
-  const letStar = new LetStarExpr(
-    true,
-    [binding],
-    [mkExprStmt(mkIdentifier("rest"))],
-    makeSpan("let-array")
-  );
+  const letStar = new LetStarExpr({
+    isConst: true,
+    bindings: [binding],
+    body: [mkExprStmt(mkIdentifier("rest"))],
+    span: makeSpan("let-array"),
+  });
   const result = runProgram([letStar]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
 
 test("phaseA1 supports object pattern bindings", () => {
-  const objectPattern = new ObjectPattern(
-    [
+  const objectPattern = new ObjectPattern({
+    properties: [
       { key: "x", target: mkIdentifier("x") },
       { key: "y", target: mkIdentifier("y") },
     ],
-    makeSpan("object-pattern"),
-    mkIdentifier("restFields")
-  );
+    span: makeSpan("object-pattern"),
+    rest: mkIdentifier("restFields"),
+  });
   const binding: Binding = {
     target: objectPattern,
     init: mkIdentifier("source"),
   };
-  const letStar = new LetStarExpr(
-    false,
-    [binding],
-    [mkExprStmt(mkIdentifier("restFields"))],
-    makeSpan("let-object")
-  );
+  const letStar = new LetStarExpr({
+    isConst: false,
+    bindings: [binding],
+    body: [mkExprStmt(mkIdentifier("restFields"))],
+    span: makeSpan("let-object"),
+  });
   const result = runProgram([letStar]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
 
 test("phaseA1 visits spread expressions inside arrays", () => {
-  const spread = new SpreadExpr(
-    mkIdentifier("restItems"),
-    "array",
-    makeSpan("spread")
-  );
-  const arrayExpr = new ArrayExpr(
-    [spread, mkLiteral("tail")],
-    makeSpan("array-with-spread")
-  );
+  const spread = new SpreadExpr({
+    expr: mkIdentifier("restItems"),
+    kind: "array",
+    span: makeSpan("spread"),
+  });
+  const arrayExpr = new ArrayExpr({
+    elements: [spread, mkLiteral("tail")],
+    span: makeSpan("array-with-spread"),
+  });
   const result = runProgram([mkExprStmt(arrayExpr)]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
 
 test("phaseA1 evaluates ternary expressions", () => {
-  const ternary = new TernaryExpr(
-    mkLiteral(true),
-    mkLiteral("yes"),
-    mkLiteral("no"),
-    makeSpan("ternary")
-  );
+  const ternary = new TernaryExpr({
+    test: mkLiteral(true),
+    consequent: mkLiteral("yes"),
+    alternate: mkLiteral("no"),
+    span: makeSpan("ternary"),
+  });
   const result = runProgram([mkExprStmt(ternary)]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
 
 test("phaseA1 registers import bindings", () => {
-  const importStmt = new ImportStmt(
-    {
+  const importStmt = new ImportStmt({
+    spec: {
       source: mkLiteral("./mod"),
       defaultBinding: mkIdentifier("defaultExport"),
       named: [{ imported: "value", local: mkIdentifier("localValue") }],
     },
-    makeSpan("import")
-  );
+    span: makeSpan("import"),
+  });
   const result = runProgram([importStmt]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
 
 test("phaseA1 processes export statements", () => {
-  const exportStmt = new ExportStmt(
-    {
+  const exportStmt = new ExportStmt({
+    spec: {
       defaultExport: mkIdentifier("defaultValue"),
       named: [{ exported: "Named", local: mkIdentifier("internal") }],
       source: mkLiteral("./dep"),
     },
-    makeSpan("export")
-  );
+    span: makeSpan("export"),
+  });
   const result = runProgram([exportStmt]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
@@ -194,39 +194,39 @@ test("phaseA1 handles type aliases with parameters", () => {
     variance: "out",
     constraint: mkTypePrimitive("type-string"),
   });
-  const alias = new TypeAliasStmt(
-    mkIdentifier("Result"),
-    mkTypeUnion([mkTypePrimitive("type-string"), mkTypePrimitive("type-number")]),
-    makeSpan("type-alias"),
-    [typeParam]
-  );
+  const alias = new TypeAliasStmt({
+    name: mkIdentifier("Result"),
+    typeValue: mkTypeUnion([mkTypePrimitive("type-string"), mkTypePrimitive("type-number")]),
+    span: makeSpan("type-alias"),
+    typeParams: [typeParam],
+  });
   const result = runProgram([alias]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
 
 test("phaseA1 processes interface definitions", () => {
-  const shape = new InterfaceStmt(
-    mkIdentifier("Shape"),
-    {
+  const shape = new InterfaceStmt({
+    name: mkIdentifier("Shape"),
+    body: {
       fields: [
         mkTypeField("x", mkTypePrimitive("type-number")),
         mkTypeField("y", mkTypePrimitive("type-number")),
       ],
     },
-    makeSpan("interface")
-  );
+    span: makeSpan("interface"),
+  });
   const result = runProgram([shape]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
 
 test("phaseA1 accepts typed functions and asserts", () => {
-  const assertExpr = new TypeAssertExpr(
-    mkIdentifier("value"),
-    mkTypePrimitive("type-number"),
-    makeSpan("type-assert")
-  );
-  const fn = new FunctionExpr(
-    {
+  const assertExpr = new TypeAssertExpr({
+    expr: mkIdentifier("value"),
+    assertedType: mkTypePrimitive("type-number"),
+    span: makeSpan("type-assert"),
+  });
+  const fn = new FunctionExpr({
+    signature: {
       parameters: [
         {
           name: mkIdentifier("value"),
@@ -235,10 +235,10 @@ test("phaseA1 accepts typed functions and asserts", () => {
       ],
       returnType: mkTypePrimitive("type-number"),
     },
-    [mkExprStmt(assertExpr, "assert"), mkReturn(mkIdentifier("value", "return"))],
-    makeSpan("function"),
-    [mkTypeParam("T", { constraint: mkTypePrimitive("type-string") })]
-  );
+    body: [mkExprStmt(assertExpr, "assert"), mkReturn(mkIdentifier("value", "return"))],
+    span: makeSpan("function"),
+    typeParams: [mkTypeParam("T", { constraint: mkTypePrimitive("type-string") })],
+  });
   const result = runProgram([mkExprStmt(fn, "fn-expr")]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
@@ -247,16 +247,16 @@ test("phaseA1 traverses decorator-rich classes", () => {
   const classBody: ClassBody = {
     statements: [mkExprStmt(mkLiteral("member"))],
   };
-  const classExpr = new ClassExpr(
-    classBody,
-    makeSpan("class"),
-    mkIdentifier("Custom"),
-    [mkIdentifier("decorator")],
-    mkIdentifier("Base"),
-    [mkIdentifier("Interface")],
-    mkExprStmt(mkLiteral("ctor")),
-    [mkBlock([mkExprStmt(mkLiteral("static-block"))], "static-block")]
-  );
+  const classExpr = new ClassExpr({
+    body: classBody,
+    span: makeSpan("class"),
+    name: mkIdentifier("Custom"),
+    decorators: [mkIdentifier("decorator")],
+    extends: mkIdentifier("Base"),
+    implements: [mkIdentifier("Interface")],
+    constructorStmt: mkExprStmt(mkLiteral("ctor")),
+    staticBlocks: [mkBlock([mkExprStmt(mkLiteral("static-block"))], "static-block")],
+  });
   const result = runProgram([mkExprStmt(classExpr, "class-expr")]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
