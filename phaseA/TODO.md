@@ -4,7 +4,11 @@
 
 * Bootstrapping the pipeline: compilePhaseA (in api.ts) already runs the processor and produces diagnostics/snapshots, but it doesn’t parse actual .t2 text or generate TypeScript. We need to implement the missing pieces in Phase A:
     * Parser (Phase A only): consume .t2 text and produce phaseA1 AST nodes per phaseA/GRAMMAR.md and phaseA/AST-Spec-Draft.md (no Phase0/Phase1/common/OLD dependencies).
+        * Done: let*, const*, block, assign, return, if, while, basic array/call atoms.
+        * Next: for-classic/for-of/for-await, throw, try/catch/finally, switch, prop/index/object/new, import/export, type forms.
     * Codegen: walk the Phase A AST and emit TS, respecting pretty/ugly and emitTypes flags.
+        * Done: let/const bindings, assign, return, block, if, while; array/call/ident/literal.
+        * Next: for/try/throw/switch, prop/index/object/new, functions/classes, import/export, types, operator lowering.
     * Diagnostics/tracing: connect parser + processor so compilePhaseA emits diagnostics/events (AST dumps, trace events, snapshots) compatible with the CLI flags (--ast*, --log, --log-level).
 * CLI glue: once parsing and codegen exist, update cli.ts to:
     * Parse CLI arguments for input/output, AST dump flags, trace phases, pretty modes, etc.

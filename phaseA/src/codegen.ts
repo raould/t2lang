@@ -12,6 +12,8 @@ import {
   BlockStmt,
   AssignExpr,
   ReturnExpr,
+  IfStmt,
+  WhileStmt,
 } from "./phaseA1.js";
 
 export interface CompilerConfig {
@@ -118,6 +120,40 @@ async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
       mappings: [mappingFromSpan(stmt.span, 0)],
     };
   }
+  if (stmt instanceof IfStmt) {
+    const test = await emitExpression(stmt.test);
+    const consequent = await emitStatementBody(stmt.consequent);
+    const lines: string[] = [`if (${test}) {`];
+    for (const line of consequent.lines) {
+      lines.push(`  ${line}`);
+    }
+    lines.push("}");
+    if (stmt.alternate) {
+      const alternate = await emitStatementBody(stmt.alternate);
+      lines.push("else {");
+      for (const line of alternate.lines) {
+        lines.push(`  ${line}`);
+      }
+      lines.push("}");
+    }
+    return {
+      lines,
+      mappings: [mappingFromSpan(stmt.span, 0)],
+    };
+  }
+  if (stmt instanceof WhileStmt) {
+    const condition = await emitExpression(stmt.condition);
+    const body = await emitStatementBody(stmt.body);
+    const lines: string[] = [`while (${condition}) {`];
+    for (const line of body.lines) {
+      lines.push(`  ${line}`);
+    }
+    lines.push("}");
+    return {
+      lines,
+      mappings: [mappingFromSpan(stmt.span, 0)],
+    };
+  }
   if (stmt instanceof BlockStmt) {
     const lines: string[] = ["{"];
     const mappings: EmittedStatement["mappings"] = [];
@@ -139,6 +175,27 @@ async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
     return { lines, mappings };
   }
   return { lines: [""], mappings: [] };
+}
+
+async function emitStatementBody(stmt: Statement): Promise<EmittedStatement> {
+  if (stmt instanceof BlockStmt) {
+    const lines: string[] = [];
+    const mappings: EmittedStatement["mappings"] = [];
+    for (const inner of stmt.statements) {
+      const emitted = await emitStatement(inner);
+      const baseOffset = lines.length;
+      lines.push(...emitted.lines);
+      for (const mapping of emitted.mappings) {
+        mappings.push({
+          lineOffset: baseOffset + mapping.lineOffset,
+          original: mapping.original,
+          source: mapping.source,
+        });
+      }
+    }
+    return { lines, mappings };
+  }
+  return emitStatement(stmt);
 }
 
 async function renderBinding(binding: Binding, isConst: boolean): Promise<string> {

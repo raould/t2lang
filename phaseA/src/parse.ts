@@ -5,6 +5,8 @@ import {
   BlockStmt,
   AssignExpr,
   ReturnExpr,
+  IfStmt,
+  WhileStmt,
   Literal,
   Identifier,
   Binding,
@@ -265,6 +267,12 @@ class Parser {
         if (head.value === "block") {
           return this.buildBlock(node);
         }
+        if (head.value === "if") {
+          return this.buildIf(node);
+        }
+        if (head.value === "while") {
+          return this.buildWhile(node);
+        }
       }
     }
     return new ExprStmt({ expr: this.nodeToExpression(node), span: node.span });
@@ -320,6 +328,37 @@ class Parser {
     const span = node.span;
     const bodyNodes = node.elements.slice(1);
     const statements = bodyNodes.map((child) => this.nodeToStatement(child));
+    return new BlockStmt({ statements, span });
+  }
+
+  private buildIf(node: ListNode): IfStmt {
+    const span = node.span;
+    const [, testNode, consequentNode, alternateNode] = node.elements;
+    if (!testNode || !consequentNode) {
+      throw new Error("if requires a test and consequent statement");
+    }
+    const test = this.nodeToExpression(testNode);
+    const consequent = this.nodeToStatement(consequentNode);
+    const alternate = alternateNode ? this.nodeToStatement(alternateNode) : undefined;
+    return new IfStmt({ test, consequent, alternate, span });
+  }
+
+  private buildWhile(node: ListNode): WhileStmt {
+    const span = node.span;
+    const [, conditionNode, ...bodyNodes] = node.elements;
+    if (!conditionNode || bodyNodes.length === 0) {
+      throw new Error("while requires a condition and body");
+    }
+    const condition = this.nodeToExpression(conditionNode);
+    const body = this.buildStatementSequence(bodyNodes, span);
+    return new WhileStmt({ condition, body, span });
+  }
+
+  private buildStatementSequence(nodes: Node[], span: Span): Statement {
+    if (nodes.length === 1) {
+      return this.nodeToStatement(nodes[0]);
+    }
+    const statements = nodes.map((child) => this.nodeToStatement(child));
     return new BlockStmt({ statements, span });
   }
 
