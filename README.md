@@ -3,7 +3,7 @@
 ## quick start
 
 ```bash
-npm i && npm run demo
+cd OLD; npm i && npm run demo
 ```
 
 ## description
