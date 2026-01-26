@@ -3,9 +3,9 @@
 # now
 
 * Bootstrapping the pipeline: compilePhaseA (in api.ts) already runs the processor and produces diagnostics/snapshots, but it doesn’t parse actual .t2 text or generate TypeScript. We need to implement the missing pieces in Phase A:
-    * Parser: bring in or build a Phase A parser that consumes .t2 text and produces phaseA1 AST nodes (or reuse the existing Phase A parser once available) instead of relying on Phase0’s parser.
-    * Codegen: add a code generator that walks the Phase A AST and produces TypeScript text, respecting pretty/ugly modes and emitTypes flags. This will probably live near api.ts or a new codegen module.
-    * Diagnostics/tracing: connect the parser + processor so compilePhaseA delivers diagnostics/events just like Phase0 does today (AST dumps, trace events, snapshots). That ensures the CLI can still support --ast*, --trace, etc. without referencing other phases.
+    * Parser (Phase A only): consume .t2 text and produce phaseA1 AST nodes per phaseA/GRAMMAR.md and phaseA/AST-Spec-Draft.md (no Phase0/Phase1/common/OLD dependencies).
+    * Codegen: walk the Phase A AST and emit TS, respecting pretty/ugly and emitTypes flags.
+    * Diagnostics/tracing: connect parser + processor so compilePhaseA emits diagnostics/events (AST dumps, trace events, snapshots) compatible with the CLI flags (--ast*, --log, --log-level).
 * CLI glue: once parsing and codegen exist, update cli.ts to:
     * Parse CLI arguments for input/output, AST dump flags, trace phases, pretty modes, etc.
     * Call compilePhaseA with the parsed source and config, then write the generated TypeScript to the requested destination (file or stdout), handling Prettier when requested.
@@ -13,12 +13,19 @@
     * Reuse the serialization helpers for --dump-snapshot or replay hooks as needed.
 * Distribution packaging: keep the shebang and package bin entries so npx t2tc runs the Phase A CLI, and ensure tsc builds the CLI entry (maybe add a cli.js entry or hook into package.json scripts).
 
+* Next grammar implementation checklist (Phase A parser + codegen, aligned with phaseA/GRAMMAR.md and AST-Spec-Draft.md):
+    * program + stmt forms: program, exprStmt, block, let*, const*, assign, return, if, while, for-classic, for-of/for-await, throw, try/catch/finally, switch.
+    * core expr forms: call, prop (literal property only), index (computed), object, array, ternary, new, await, yield, spread.
+    * declarations: fn, class, method, field, interface, type-alias, import/export.
+    * operator lowering: recognize operator-call heads and emit infix/prefix TS (Phase B sugar stays separate).
+    * type AST parsing/emission: type-ref, type-literal, type-object, type-array, type-union, type-intersection, type-function, type-mapped, typeparams, type-app.
+
 # then
 
 * Trace/log/event plumbing – Spec mandates a standalone Phase A CLI that emits stage-tagged events (phaseA-parse, phaseA-typecheck, etc.), exposes ArrayEventSink-style traces, includes compiler stamp/UTC/seed info, and honors --trace/--log-level flags. Nothing in src currently interfaces with CLI or event sinks, so wiring Phase A processors into a traced runtime is top priority (matches your suggestion).
     * Add a lightweight PhaseAEventSink (mirroring Phase1’s ArrayEventSink) plus shared PhaseACompilerContext that stores { cacheStamp, seed, events: EventSink }. The processors in phaseA0.ts/phaseA1.ts will accept that context so they can emit events like emit({ phase: "parse", kind: "trace", data: {...}}) before/after each visitor run; these events should include the stage label (phaseA-parse, phaseA-typecheck, etc.), UTC timestamp, compiler stamp, and the current seed per the spec [PhaseA-PhaseB-Spec-Draft.md#CLI&DiagnosticSurface].
     * Extend the returned data from the processors’ run functions so they hand back the diagnostics plus any stage-specific metadata (e.g., parseTime, typecheckTime) so the CLI can populate event payloads for trace listeners.
-CLI integration (PhaseA CLI entry)
+* CLI integration (PhaseA CLI entry)
     * Introduce cli.ts (the future t2tc/t2jc driver) that parses the flags we listed (--trace, --log-level, --seed, --ast*, --emit-types, etc.) using the shared common/cliHelper. That CLI will create the compiler context (seed default, compiler stamp from .internal_id) and instantiate the event sink before it starts.
     * As each pipeline stage runs (parse, optional macro expand, resolve, typecheck, codegen), the CLI records begin/end events via the sink so consumers can filter them with --trace. The CLI also forwards the --log-level setting down to the context so diagnostics and processors can decide whether to emit debug vs. info messages.
     * Build a thin api.ts that wraps the AST processors, adds the new trace hooks, and exposes compilePhaseA(source, config) similar to Phase1’s compilePhase1. The API should:
@@ -37,52 +44,3 @@ CLI integration (PhaseA CLI entry)
 * Snapshot serialization per stage – The compiler must be able to serialize each stage (parse, after sugar/macro expand, resolve, typecheck, codegen) for replay. Phase A lacks any stage-tracking infrastructure or snapshot writers, so we’d need to add structured emitters tied to each event dump.
 * Pretty-printing of generated .ts – As above, until there’s a CLI that produces codegen output and optionally runs Prettier it’s not implemented.
 * Integrating diagnostics registry and namespaces (T2A:) – Diagnostics need to emit stage metadata plus per-phase prefixes, which requires wiring the spec’s registry into the future CLI.
-
-## Pseudocode for missing compiler stages
-
-```
-function parse(source: string): ProgramSnapshot {
-    const tokens = tokenize(source);
-    const ast = walkSexprs(tokens, createPhaseA1Nodes);
-    emitEvent('parse:start', { seed, stamp, span: ast.span });
-    if (cliFlags.ast || cliFlags.astBeforeExpand) {
-        dumpAst(ast);
-    }
-    emitEvent('parse:done', serialize(ast));
-    return { ast, serialized: serialize(ast) };
-}
-
-function resolve(program: Program, context: CompilerContext): ResolveResult {
-    pushScope();
-    for (const stmt of program.body) {
-        visitStatement(stmt, { resolve: true, context });
-    }
-    popScope();
-    emitEvent('resolve', { diagnostics: context.diagnostics.slice(), serialized: serialize(program)});
-    return { program, diagnostics: context.diagnostics };
-}
-
-function typecheck(program: Program, context: CompilerContext): TypecheckResult {
-    for (const stmt of program.body) {
-        typeCheckStatement(stmt, context);
-    }
-    emitEvent('typecheck', { diagnostics: context.diagnostics.slice(), serialized: serialize(program) });
-    return { program, diagnostics: context.diagnostics };
-}
-
-function codegen(program: Program, config: CompilerConfig): CodegenResult {
-    const tsSource = emitTs(program, config.prettyOutput);
-    const mappings = mapSpans(program, tsSource);
-    emitEvent('codegen', { tsSource, mappings, serialized: serialize(program) });
-    return { tsSource, mappings };
-}
-
-function gatherErrors(context: CompilerContext): CompilerError[] {
-    return context.diagnostics.map(d => ({ message: d.message, span: d.span, phase: d.phase || 'phaseA' }));
-}
-
-function emitEvent(phase: string, payload: unknown) {
-    if (!eventSink) return;
-    eventSink.emit({ phase, kind: 'trace', timestamp: Date.now(), stamp, seed, data: payload });
-}
-```
