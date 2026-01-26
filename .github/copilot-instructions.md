@@ -2,9 +2,11 @@
 * currently we are working on Phase A only.
 * Phase 0 and Phase 1 are for reference only.
 * when writing TypeScript code, keep it simple.
-* if you make edits to files in phase0, then "cd phase0; npm run lint; npm test" and fix any errors.
 * note that "npm test" already runs "npm build" first, so you do not have to run "npm build" separately.
-* if you make edits to files in phase1, then "cd phase1; npm run lint; npm test" and fix any errors.
+* if you make edits to files in phaseA, then "cd phaseA; npm run lint; npm test" and fix any errors.
+* if you make edits to files in phase0, then "cd OLD/phase0; npm run lint; npm test" and fix any errors.
+* if you make edits to files in phase1, then "cd OLD/phase1; npm run lint; npm test" and fix any errors.
+* if you make edits to files in common, then "cd OLD/common; npm run lint; npm test" and fix any errors.
 * t2lang's type checking is meant to be only for validating the basic structure of the source .t2 sexpr syntax. The type checker is not meant to implement TypeScript's type checking. Instead, t2lang can optionally run TypeScript immediately on the output from t2lang compiler in order to get full type checking of the original input program. (see the CompilerConfig.enableTsc flag.)
 * when creating or updating tests, make sure this line of code exists after the invocation of the compiler and before the test assertions. The idea is to output any errors the t2lang compiler raised.
 ```

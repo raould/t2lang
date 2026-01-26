@@ -2,6 +2,9 @@ import {
   Program,
   ExprStmt,
   LetStarExpr,
+  BlockStmt,
+  AssignExpr,
+  ReturnExpr,
   Literal,
   Identifier,
   Binding,
@@ -246,14 +249,28 @@ class Parser {
   private nodeToStatement(node: Node): Statement {
     if (node.type === "list" && node.elements.length > 0) {
       const head = node.elements[0];
-      if (head.type === "atom" && head.value === "let*") {
-        return this.buildLetStar(node);
+      if (head.type === "atom") {
+        if (head.value === "let*") {
+          return this.buildLetStar(node, false);
+        }
+        if (head.value === "const*") {
+          return this.buildLetStar(node, true);
+        }
+        if (head.value === "assign") {
+          return this.buildAssign(node);
+        }
+        if (head.value === "return") {
+          return this.buildReturn(node);
+        }
+        if (head.value === "block") {
+          return this.buildBlock(node);
+        }
       }
     }
     return new ExprStmt({ expr: this.nodeToExpression(node), span: node.span });
   }
 
-  private buildLetStar(node: ListNode): LetStarExpr {
+  private buildLetStar(node: ListNode, isConst: boolean): LetStarExpr {
     const span = node.span;
     const [, bindingsNode, ...body] = node.elements;
     if (!bindingsNode || bindingsNode.type !== "list") {
@@ -274,7 +291,36 @@ class Parser {
       };
     });
     const statements = body.map((child) => this.nodeToStatement(child));
-    return new LetStarExpr({ isConst: false, bindings, body: statements, span });
+    return new LetStarExpr({ isConst, bindings, body: statements, span });
+  }
+
+  private buildAssign(node: ListNode): AssignExpr {
+    const span = node.span;
+    const [, targetNode, valueNode] = node.elements;
+    if (!targetNode || !valueNode) {
+      throw new Error("assign requires target and value");
+    }
+    return new AssignExpr({
+      target: this.nodeToExpression(targetNode),
+      value: this.nodeToExpression(valueNode),
+      span,
+    });
+  }
+
+  private buildReturn(node: ListNode): ReturnExpr {
+    const span = node.span;
+    const [, valueNode] = node.elements;
+    return new ReturnExpr({
+      span,
+      value: valueNode ? this.nodeToExpression(valueNode) : undefined,
+    });
+  }
+
+  private buildBlock(node: ListNode): BlockStmt {
+    const span = node.span;
+    const bodyNodes = node.elements.slice(1);
+    const statements = bodyNodes.map((child) => this.nodeToStatement(child));
+    return new BlockStmt({ statements, span });
   }
 
   private nodeToExpression(node: Node): Expression {

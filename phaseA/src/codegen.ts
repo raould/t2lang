@@ -9,6 +9,9 @@ import {
   LetStarExpr,
   Binding,
   ArrayExpr,
+  BlockStmt,
+  AssignExpr,
+  ReturnExpr,
 } from "./phaseA1.js";
 
 export interface CompilerConfig {
@@ -77,7 +80,7 @@ async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
     const lines: string[] = [];
     const mappings: EmittedStatement["mappings"] = [];
     for (const binding of stmt.bindings) {
-      lines.push(await renderBinding(binding));
+      lines.push(await renderBinding(binding, stmt.isConst));
       mappings.push(mappingFromSpan(binding.target.span, lines.length - 1));
     }
     for (const inner of stmt.body) {
@@ -94,13 +97,55 @@ async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
     }
     return { lines, mappings };
   }
+  if (stmt instanceof AssignExpr) {
+    const target = await emitExpression(stmt.target);
+    const value = await emitExpression(stmt.value);
+    return {
+      lines: [`${target} = ${value};`],
+      mappings: [mappingFromSpan(stmt.span, 0)],
+    };
+  }
+  if (stmt instanceof ReturnExpr) {
+    if (stmt.value) {
+      const value = await emitExpression(stmt.value);
+      return {
+        lines: [`return ${value};`],
+        mappings: [mappingFromSpan(stmt.span, 0)],
+      };
+    }
+    return {
+      lines: ["return;"],
+      mappings: [mappingFromSpan(stmt.span, 0)],
+    };
+  }
+  if (stmt instanceof BlockStmt) {
+    const lines: string[] = ["{"];
+    const mappings: EmittedStatement["mappings"] = [];
+    for (const inner of stmt.statements) {
+      const emitted = await emitStatement(inner);
+      const baseOffset = lines.length;
+      for (const line of emitted.lines) {
+        lines.push(`  ${line}`);
+      }
+      for (const mapping of emitted.mappings) {
+        mappings.push({
+          lineOffset: baseOffset + mapping.lineOffset,
+          original: mapping.original,
+          source: mapping.source,
+        });
+      }
+    }
+    lines.push("}");
+    return { lines, mappings };
+  }
   return { lines: [""], mappings: [] };
 }
 
-async function renderBinding(binding: Binding): Promise<string> {
+async function renderBinding(binding: Binding, isConst: boolean): Promise<string> {
   const name = binding.target instanceof Identifier ? binding.target.name : "_";
   const init = binding.init ? await emitExpression(binding.init) : "undefined";
-  return `const ${name} = ${init};`;
+  const keyword = isConst ? "const" : "let";
+  return `${keyword} ${name} = ${init};`;
 }
 
 async function emitExpression(expr: Expression): Promise<string> {

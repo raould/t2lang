@@ -10,6 +10,6 @@ test("compilePhaseA parses/serializes/codegens simple let*", async () => {
   }
   assert.strictEqual(result.snapshots.length, 4);
   assert.strictEqual(result.events.length, 12);
-  assert.ok(result.tsSource.includes("const x = 42"));
+  assert.ok(result.tsSource.includes("let x = 42"));
   assert.ok(result.tsSource.includes("x"));
 });
