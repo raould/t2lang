@@ -3,8 +3,53 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { Command, CommanderError } from "commander";
 import { compilePhaseA } from "./api.js";
-import { CompilerEvent } from "./events.js";
+import { CompilerEvent, CompilerStage } from "./events.js";
+
+const VALID_TRACE_PHASES: CompilerStage[] = ["parse", "resolve", "typecheck", "codegen"];
+
+interface CliOptions {
+  output?: string;
+  stdout?: boolean;
+  trace?: boolean;
+  tracePhases?: string[];
+}
+
+function buildCommand(): Command {
+  const cmd = new Command();
+  cmd
+    .name("t2tc")
+    .description("Phase A t2 compiler")
+    .argument("<input>", "Input .t2 file path (use '-' for stdin)")
+    .option("-o, --output <path>", "Output file path")
+    .option("--stdout", "Write output to stdout")
+    .option("--trace", "Show trace events for every phase")
+    .option(
+      "--trace-phases <phases>",
+      "Comma-separated list of trace phases (parse, resolve, typecheck, codegen)",
+      parseTracePhaseList,
+      [] as string[]
+    )
+    .allowUnknownOption(false);
+  return cmd;
+}
+
+function parseTracePhaseList(value: string): string[] {
+  const phases = value
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (phases.length === 0) {
+    throw new CommanderError(1, "trace-phases", "--trace-phases requires at least one phase");
+  }
+  for (const phase of phases) {
+    if (!VALID_TRACE_PHASES.includes(phase as CompilerStage)) {
+      throw new CommanderError(1, "trace-phases", `Unknown trace phase '${phase}'`);
+    }
+  }
+  return phases;
+}
 
 async function readStdin(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -41,85 +86,35 @@ function formatDiagnostics(diags: Array<{ message: string; span?: { source?: str
 }
 
 export async function main(argv: string[]): Promise<void> {
-  const args = argv.slice(2);
-  let inputPath: string | null = null;
-  let outputPath: string | null = null;
-  let writeStdout = false;
-  const tracePhases = new Set<string>();
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === "-o" || arg === "--output") {
-      i++;
-      if (i >= args.length) {
-        console.error("Error: --output requires a file path");
-        process.exit(1);
+  const cmd = buildCommand();
+  try {
+    await cmd.parseAsync(argv);
+  } catch (err) {
+    if (err instanceof CommanderError) {
+      if (err.code !== "commander.helpDisplayed") {
+        console.error(err.message);
       }
-      outputPath = args[i];
-    } else if (arg === "--stdout") {
-      writeStdout = true;
-    } else if (arg === "--trace") {
-      i++;
-      if (i >= args.length) {
-        console.error("Error: --trace requires a comma-separated list of phases");
-        process.exit(1);
-      }
-      const phases = args[i].split(",").map((p) => p.trim()).filter(Boolean);
-      for (const phase of phases) {
-        tracePhases.add(phase);
-      }
-    } else if (arg.startsWith("-") && arg !== "-") {
-      console.error(`Unknown option '${arg}'`);
-      process.exit(1);
-    } else {
-      if (inputPath) {
-        console.error("Error: Multiple input files not supported");
-        process.exit(1);
-      }
-      inputPath = arg;
-    }
-  }
-
-  function logEvent(event: CompilerEvent): void {
-    if (tracePhases.size === 0) {
       return;
     }
-    if (!tracePhases.has("all") && !tracePhases.has(event.phase)) {
-      return;
-    }
-    const timestamp = new Date(event.timestamp).toISOString();
-    const payload = summarizeEventData(event);
-    console.error(`[trace] ${timestamp} ${event.phase} ${event.kind} seed=${event.seed} stamp=${event.stamp} ${payload}`);
+    throw err;
   }
 
-  function summarizeEventData(event: CompilerEvent): string {
-    if (!event.data) return "(no data)";
-    if (event.kind === "astDump" && typeof event.data === "object" && event.data !== null) {
-      const stage = (event.data as Record<string, unknown>).stage ?? event.data;
-      return `(snapshot ${JSON.stringify(stage, stringifyFilter)})`;
-    }
-    return JSON.stringify(event.data, stringifyFilter);
-  }
-
-  function stringifyFilter(_key: string, value: unknown): unknown {
-    if (typeof value === "function") {
-      return "<thunk>";
-    }
-    return value;
-  }
-
+  const options = cmd.opts<CliOptions>();
+  const inputPath = cmd.args[0];
   if (!inputPath) {
     console.error("Error: No input file specified (use '-' for stdin)");
     process.exit(1);
   }
 
-  const isStdin = inputPath === "-";
-  if (isStdin && !outputPath && !writeStdout) {
-    writeStdout = true;
+  const tracePhases = new Set<string>(options.tracePhases ?? []);
+  if (options.trace) {
+    tracePhases.add("all");
   }
-  if (outputPath === "-") {
+
+  const isStdin = inputPath === "-";
+  let writeStdout = Boolean(options.stdout) || isStdin;
+  if (options.output === "-") {
     writeStdout = true;
-    outputPath = null;
   }
 
   const source = await readSource(inputPath);
@@ -132,7 +127,7 @@ export async function main(argv: string[]): Promise<void> {
   }
 
   for (const event of result.events) {
-    logEvent(event);
+    logEvent(event, tracePhases);
   }
 
   if (writeStdout) {
@@ -140,10 +135,41 @@ export async function main(argv: string[]): Promise<void> {
     return;
   }
 
-  const target = outputPath ?? (isStdin ? "output.ts" : getDefaultOutput(inputPath));
+  const target = options.output ?? (isStdin ? "output.ts" : getDefaultOutput(inputPath));
   await fs.mkdir(path.dirname(target), { recursive: true });
   await fs.writeFile(target, result.tsSource, "utf8");
   console.log(`Compiled ${inputPath} -> ${target}`);
+}
+
+function logEvent(event: CompilerEvent, tracePhases: Set<string>): void {
+  if (tracePhases.size === 0) {
+    return;
+  }
+  if (!tracePhases.has("all") && !tracePhases.has(event.phase)) {
+    return;
+  }
+  const timestamp = new Date(event.timestamp).toISOString();
+  const payload = summarizeEventData(event);
+  console.error(
+    `[trace] ${timestamp} ${event.phase} ${event.kind} seed=${event.seed} stamp=${event.stamp} ${payload}`
+  );
+}
+
+function summarizeEventData(event: CompilerEvent): string {
+  if (!event.data) {
+    return "(no data)";
+  }
+  if (typeof event.data === "object" && event.data !== null && "stage" in event.data) {
+    return `(snapshot stage=${(event.data as { stage?: string }).stage ?? "unknown"})`;
+  }
+  return JSON.stringify(event.data, stringifyFilter);
+}
+
+function stringifyFilter(_key: string, value: unknown): unknown {
+  if (typeof value === "function") {
+    return "<thunk>";
+  }
+  return value;
 }
 
 if (fileURLToPath(import.meta.url) === process.argv[1]) {
