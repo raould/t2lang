@@ -25,7 +25,7 @@
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "clean": "node -e \"const fs=require('fs');['node_modules','dist'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p)}catch(e){}})\"",
-    "test": "npm run build && node --import tsx --test \"tests/**/*.test.ts\"",
+    "test": "npm run build && node ./scripts/run-tests.mjs",
     "lint": "eslint . --ext .ts",
     "prepublishOnly": "npm run build"
   },

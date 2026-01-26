@@ -26,6 +26,20 @@ export interface CompilePhaseAResult {
   events: CompilerEvent[];
 }
 
+export interface CompilePhase0CompatOptions {
+  prettyOutput?: boolean;
+  logLevel?: string;
+  enableTsc?: boolean;
+  dumpAst?: boolean;
+  emitTypes?: boolean;
+}
+
+export interface CompilePhase0CompatResult {
+  tsSource: string;
+  errors: Diagnostic[];
+  events: Array<{ kind: string; phase?: CompilerStage; data?: unknown }>;
+}
+
 const DEFAULT_CONFIG: CompilePhaseAConfig = {
   prettyOption: "pretty",
   emitTypes: false,
@@ -96,6 +110,36 @@ export async function compilePhaseA(source: string, config: CompilePhaseAConfig 
     diagnostics: ctx.diagnostics,
     snapshots,
     events: eventSink.events,
+  };
+}
+
+export async function compilePhase0(
+  source: string,
+  options: CompilePhase0CompatOptions = {}
+): Promise<CompilePhase0CompatResult> {
+  const result = await compilePhaseA(source, {
+    emitTypes: options.emitTypes,
+    prettyOption: options.prettyOutput === false ? "ugly" : "pretty",
+  });
+
+  const events: Array<{ kind: string; phase?: CompilerStage; data?: unknown }> = [];
+  const parseSnapshot = result.snapshots.find((entry) => entry.stage === "parse");
+  const resolveSnapshot = result.snapshots.find((entry) => entry.stage === "resolve");
+
+  if (options.dumpAst !== false && parseSnapshot) {
+    const ast = await parseSnapshot.program();
+    events.push({ kind: "astDump", phase: "parse", data: { ast } });
+  }
+
+  if (resolveSnapshot) {
+    const ast = await resolveSnapshot.program();
+    events.push({ kind: "resolveDump", phase: "resolve", data: { ast } });
+  }
+
+  return {
+    tsSource: result.tsSource,
+    errors: result.diagnostics,
+    events,
   };
 }
 
