@@ -2,7 +2,7 @@ export type CompilerStage = "parse" | "resolve" | "typecheck" | "codegen";
 
 export interface CompilerEvent {
   phase: CompilerStage;
-  kind: "astDump" | "trace" | "codegen";
+  kind: "snapshot" | "trace" | "codegen";
   timestamp: number;
   seed: string;
   stamp: string;

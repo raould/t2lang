@@ -17,6 +17,10 @@ interface Token {
   value: string;
   start: number;
   end: number;
+  startLine: number;
+  startColumn: number;
+  endLine: number;
+  endColumn: number;
 }
 
 type Node = AtomNode | ListNode;
@@ -35,15 +39,78 @@ interface ListNode {
 
 const isWhitespace = (ch: string): boolean => ch === " " || ch === "\n" || ch === "\r" || ch === "\t";
 
+function buildLineStarts(source: string): number[] {
+  const starts = [0];
+  for (let i = 0; i < source.length; i++) {
+    if (source[i] === "\n") {
+      starts.push(i + 1);
+    }
+  }
+  return starts;
+}
+
+function getLineColumn(pos: number, lineStarts: number[]): { line: number; column: number } {
+  let low = 0;
+  let high = lineStarts.length - 1;
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const start = lineStarts[mid];
+    const nextStart = mid + 1 < lineStarts.length ? lineStarts[mid + 1] : Number.MAX_SAFE_INTEGER;
+    if (pos < start) {
+      high = mid - 1;
+      continue;
+    }
+    if (pos >= nextStart) {
+      low = mid + 1;
+      continue;
+    }
+    return { line: mid + 1, column: pos - start + 1 };
+  }
+  return { line: 1, column: pos + 1 };
+}
+
 function tokenize(source: string): Token[] {
   const tokens: Token[] = [];
   let pos = 0;
   const length = source.length;
+  const lineStarts = buildLineStarts(source);
+
+  const makeToken = (type: Token["type"], value: string, start: number, end: number): Token => {
+    const startLoc = getLineColumn(start, lineStarts);
+    const endLoc = getLineColumn(end, lineStarts);
+    return {
+      type,
+      value,
+      start,
+      end,
+      startLine: startLoc.line,
+      startColumn: startLoc.column,
+      endLine: endLoc.line,
+      endColumn: endLoc.column,
+    };
+  };
 
   while (pos < length) {
     const ch = source[pos];
     if (isWhitespace(ch)) {
       pos++;
+      continue;
+    }
+    if (ch === "/" && source[pos + 1] === "/") {
+      pos += 2;
+      while (pos < length && source[pos] !== "\n") {
+        pos++;
+      }
+      continue;
+    }
+    if (ch === "/" && source[pos + 1] === "*") {
+      pos += 2;
+      while (pos < length && !(source[pos] === "*" && source[pos + 1] === "/")) {
+        pos++;
+      }
+      if (source[pos] === "*" && source[pos + 1] === "/") {
+        pos += 2;
+      }
       continue;
     }
     if (ch === ";") {
@@ -53,12 +120,12 @@ function tokenize(source: string): Token[] {
       continue;
     }
     if (ch === "(") {
-      tokens.push({ type: "paren", value: "(", start: pos, end: pos + 1 });
+      tokens.push(makeToken("paren", "(", pos, pos + 1));
       pos++;
       continue;
     }
     if (ch === ")") {
-      tokens.push({ type: "paren", value: ")", start: pos, end: pos + 1 });
+      tokens.push(makeToken("paren", ")", pos, pos + 1));
       pos++;
       continue;
     }
@@ -73,7 +140,7 @@ function tokenize(source: string): Token[] {
       if (source[pos] === '"') {
         pos++;
       }
-      tokens.push({ type: "string", value, start, end: pos });
+      tokens.push(makeToken("string", value, start, pos));
       continue;
     }
     const start = pos;
@@ -82,7 +149,7 @@ function tokenize(source: string): Token[] {
       value += source[pos];
       pos++;
     }
-    tokens.push({ type: "atom", value, start, end: pos });
+    tokens.push(makeToken("atom", value, start, pos));
   }
 
   return tokens;
@@ -123,7 +190,15 @@ class Parser {
     return {
       type: "atom",
       value: tok.value,
-      span: { start: tok.start, end: tok.end, source: this.file },
+      span: {
+        start: tok.start,
+        end: tok.end,
+        source: this.file,
+        startLine: tok.startLine,
+        startColumn: tok.startColumn,
+        endLine: tok.endLine,
+        endColumn: tok.endColumn,
+      },
     };
   }
 
@@ -138,7 +213,19 @@ class Parser {
       }
       if (tok.type === "paren" && tok.value === ")") {
         const close = this.advance();
-        return { type: "list", elements, span: { start, end: close.end, source: this.file } };
+        return {
+          type: "list",
+          elements,
+          span: {
+            start,
+            end: close.end,
+            source: this.file,
+            startLine: open.startLine,
+            startColumn: open.startColumn,
+            endLine: close.endLine,
+            endColumn: close.endColumn,
+          },
+        };
       }
       elements.push(this.parseNode());
     }

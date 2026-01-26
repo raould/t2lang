@@ -18,6 +18,10 @@ export interface Span {
   start: number;
   end: number;
   source: string;
+  startLine?: number;
+  startColumn?: number;
+  endLine?: number;
+  endColumn?: number;
 }
 
 export interface Diagnostic {

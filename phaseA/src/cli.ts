@@ -75,10 +75,28 @@ function getDefaultOutput(input: string): string {
   return path.join(parsed.dir, `${parsed.name}.ts`);
 }
 
-function formatDiagnostics(diags: Array<{ message: string; span?: { source?: string; start?: number; end?: number } }>): void {
+function formatDiagnostics(
+  diags: Array<{
+    message: string;
+    span?: {
+      source?: string;
+      start?: number;
+      end?: number;
+      startLine?: number;
+      startColumn?: number;
+      endLine?: number;
+      endColumn?: number;
+    };
+  }>
+): void {
   for (const diag of diags) {
     if (diag.span && diag.span.source) {
-      console.error(`${diag.span.source}:${diag.span.start ?? 0}-${diag.span.end ?? 0}: ${diag.message}`);
+      if (diag.span.startLine != null) {
+        const column = diag.span.startColumn ?? 1;
+        console.error(`${diag.span.source}:${diag.span.startLine}:${column}: ${diag.message}`);
+      } else {
+        console.error(`${diag.span.source}:${diag.span.start ?? 0}-${diag.span.end ?? 0}: ${diag.message}`);
+      }
     } else {
       console.error(diag.message);
     }
@@ -118,7 +136,7 @@ export async function main(argv: string[]): Promise<void> {
   }
 
   const source = await readSource(inputPath);
-  const result = await compilePhaseA(source);
+  const result = await compilePhaseA(source, { sourcePath: isStdin ? "stdin.t2" : inputPath });
 
   if (result.diagnostics.length > 0) {
     console.error("Compilation produced diagnostics:");
@@ -159,10 +177,25 @@ function summarizeEventData(event: CompilerEvent): string {
   if (!event.data) {
     return "(no data)";
   }
-  if (typeof event.data === "object" && event.data !== null && "stage" in event.data) {
-    return `(snapshot stage=${(event.data as { stage?: string }).stage ?? "unknown"})`;
+  switch (event.kind) {
+    case "trace": {
+      if (typeof event.data === "object" && event.data !== null) {
+        const trace = event.data as { stage?: string; event?: string };
+        return `(trace ${trace.stage ?? "unknown"}:${trace.event ?? "unknown"})`;
+      }
+      return JSON.stringify(event.data, stringifyFilter);
+    }
+    case "snapshot": {
+      if (typeof event.data === "object" && event.data !== null && "stage" in event.data) {
+        return `(snapshot stage=${(event.data as { stage?: string }).stage ?? "unknown"})`;
+      }
+      return JSON.stringify(event.data, stringifyFilter);
+    }
+    default: {
+      console.error("Unknown event kind, defaulting to json.", event.kind);
+      return JSON.stringify(event.data, stringifyFilter);
+    }
   }
-  return JSON.stringify(event.data, stringifyFilter);
 }
 
 function stringifyFilter(_key: string, value: unknown): unknown {

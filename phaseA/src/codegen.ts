@@ -18,39 +18,83 @@ export interface CompilerConfig {
 
 export interface CodegenResult {
   tsSource: string;
-  mappings: unknown[];
+  mappings: SourceMapping[];
+}
+
+export interface SourceMapping {
+  generated: { line: number; column: number };
+  original: { line: number; column: number };
+  source: string;
+}
+
+interface EmittedStatement {
+  lines: string[];
+  mappings: Array<{ lineOffset: number; original: { line: number; column: number }; source: string }>;
 }
 
 export async function generateCode(program: Program, config: CompilerConfig = {}): Promise<CodegenResult> {
   const lines: string[] = [];
+  const mappings: SourceMapping[] = [];
+  let generatedLine = 1;
   for (const stmt of program.body) {
-    const rendered = await emitStatement(stmt);
-    if (rendered.trim()) {
-      lines.push(rendered);
-    }
-  }
-  const tsSource = lines.join("\n");
-  return { tsSource, mappings: [] };
-}
-
-async function emitStatement(stmt: Statement): Promise<string> {
-  if (stmt instanceof ExprStmt) {
-    return `${await emitExpression(stmt.expr)};`;
-  }
-  if (stmt instanceof LetStarExpr) {
-    const declarations = await Promise.all(stmt.bindings.map(renderBinding));
-    const bodySegments = [];
-    for (const inner of stmt.body) {
-      const rendered = await emitStatement(inner);
-      if (rendered.trim()) {
-        bodySegments.push(rendered);
+    const emitted = await emitStatement(stmt);
+    const offsetMap: number[] = [];
+    let outputOffset = 0;
+    for (let i = 0; i < emitted.lines.length; i++) {
+      const line = emitted.lines[i];
+      if (line.trim()) {
+        lines.push(line);
+        offsetMap[i] = outputOffset;
+        outputOffset++;
+      } else {
+        offsetMap[i] = -1;
       }
     }
-    const declarationsBlock = declarations.join("\n");
-    const bodyBlock = bodySegments.join("\n");
-    return `${declarationsBlock}${bodyBlock ? "\n" + bodyBlock : ""}`;
+    for (const mapping of emitted.mappings) {
+      const mappedOffset = offsetMap[mapping.lineOffset];
+      if (mappedOffset >= 0) {
+        mappings.push({
+          generated: { line: generatedLine + mappedOffset, column: 1 },
+          original: mapping.original,
+          source: mapping.source,
+        });
+      }
+    }
+    generatedLine += outputOffset;
   }
-  return "";
+  const tsSource = lines.join("\n");
+  return { tsSource, mappings };
+}
+
+async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
+  if (stmt instanceof ExprStmt) {
+    return {
+      lines: [`${await emitExpression(stmt.expr)};`],
+      mappings: [mappingFromSpan(stmt.expr.span, 0)],
+    };
+  }
+  if (stmt instanceof LetStarExpr) {
+    const lines: string[] = [];
+    const mappings: EmittedStatement["mappings"] = [];
+    for (const binding of stmt.bindings) {
+      lines.push(await renderBinding(binding));
+      mappings.push(mappingFromSpan(binding.target.span, lines.length - 1));
+    }
+    for (const inner of stmt.body) {
+      const emitted = await emitStatement(inner);
+      const baseOffset = lines.length;
+      lines.push(...emitted.lines);
+      for (const mapping of emitted.mappings) {
+        mappings.push({
+          lineOffset: baseOffset + mapping.lineOffset,
+          original: mapping.original,
+          source: mapping.source,
+        });
+      }
+    }
+    return { lines, mappings };
+  }
+  return { lines: [""], mappings: [] };
 }
 
 async function renderBinding(binding: Binding): Promise<string> {
@@ -76,6 +120,17 @@ async function emitExpression(expr: Expression): Promise<string> {
     return `[${entries.join(", ")}]`;
   }
   return "undefined";
+}
+
+function mappingFromSpan(span: { source: string; startLine?: number; startColumn?: number }, lineOffset: number) {
+  return {
+    lineOffset,
+    original: {
+      line: span.startLine ?? 1,
+      column: span.startColumn ?? 1,
+    },
+    source: span.source,
+  };
 }
 
 async function formatLiteral(value: unknown): Promise<string> {

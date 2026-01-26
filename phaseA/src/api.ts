@@ -8,6 +8,7 @@ export interface CompilePhaseAConfig {
   prettyOption?: "pretty" | "ugly";
   emitTypes?: boolean;
   seed?: string;
+  sourcePath?: string;
 }
 
 export interface SnapshotRecord {
@@ -19,6 +20,7 @@ export interface SnapshotRecord {
 
 export interface CompilePhaseAResult {
   tsSource: string;
+  mappings: Array<{ generated: { line: number; column: number }; original: { line: number; column: number }; source: string }>;
   diagnostics: Diagnostic[];
   snapshots: SnapshotRecord[];
   events: CompilerEvent[];
@@ -46,7 +48,7 @@ export async function compilePhaseA(source: string, config: CompilePhaseAConfig 
     snapshots.push(snapshot);
     await eventSink.emit({
       phase: stage,
-      kind: "astDump",
+      kind: "snapshot",
       timestamp: Date.now(),
       seed,
       stamp,
@@ -54,20 +56,40 @@ export async function compilePhaseA(source: string, config: CompilePhaseAConfig 
     });
   };
 
-  const parsedProgram = await parseSource(source);
+  const emitTrace = async (stage: CompilerStage, event: "start" | "done"): Promise<void> => {
+    await eventSink.emit({
+      phase: stage,
+      kind: "trace",
+      timestamp: Date.now(),
+      seed,
+      stamp,
+      data: { stage, event },
+    });
+  };
+
+  await emitTrace("parse", "start");
+  const parsedProgram = await parseSource(source, finalConfig.sourcePath ?? "input.t2");
   await emitStage("parse", parsedProgram);
+  await emitTrace("parse", "done");
 
   const processor = await createProcessor(ctx);
+  await emitTrace("resolve", "start");
   const { program: resolvedProgram } = await processor.run(parsedProgram);
   await emitStage("resolve", resolvedProgram);
+  await emitTrace("resolve", "done");
 
+  await emitTrace("typecheck", "start");
   await emitStage("typecheck", resolvedProgram);
+  await emitTrace("typecheck", "done");
 
-  const { tsSource } = await generateCode(resolvedProgram, finalConfig);
+  await emitTrace("codegen", "start");
+  const { tsSource, mappings } = await generateCode(resolvedProgram, finalConfig);
   await emitStage("codegen", resolvedProgram);
+  await emitTrace("codegen", "done");
 
   return {
     tsSource,
+    mappings,
     diagnostics: ctx.diagnostics,
     snapshots,
     events: eventSink.events,
