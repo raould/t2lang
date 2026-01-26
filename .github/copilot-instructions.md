@@ -17,4 +17,5 @@
 * Do try to add more small integration tests in the relevant phase0 or phase1 when making changes or adding new features.
 * When making changes, also make sure all phase1/examples build and run correctly.
 * read the "help" text in the CLI (common/src/cliHelper.ts, phase1/src/cli.ts, phase0/src/cli.ts) to understand the intended usage of the compiler.
-
+* phaseA cannot depend on anything from phase 0 or phase 1. if there are features which need to be carried over, they must be re-implemented in phaseA without any kind of dependency on phase0 or phase1. 
+* functions in the compiler pipeline should always be written as "async" even if they don't do anything asynchronous yet. This is to make it easier to add async features later without breaking the API.

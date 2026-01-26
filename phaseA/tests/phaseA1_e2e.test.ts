@@ -84,18 +84,18 @@ function mkTypeParam(
 const mkTypeUnion = (types: TypeNode[]): TypeUnion =>
   new TypeUnion({ types, span: makeSpan("type-union") });
 
-function runProgram(body: Statement[]) {
+async function runProgram(body: Statement[]) {
   const ctx: Context = { diagnostics: [], scopeStack: [] };
-  const processor = createProcessor(ctx);
+  const processor = await createProcessor(ctx);
   const program = new Program({ body, span: makeSpan("program") });
-  const result = processor.run(program);
+  const result = await processor.run(program);
   if (result.diagnostics.length > 0) {
     console.error(result.diagnostics);
   }
   return result;
 }
 
-test("phaseA1 binds array patterns inside let*", () => {
+test("phaseA1 binds array patterns inside let*", async () => {
   const arrayPattern = new ArrayPattern({
     elements: [mkIdentifier("first"), mkIdentifier("second")],
     span: makeSpan("array-pattern"),
@@ -111,11 +111,11 @@ test("phaseA1 binds array patterns inside let*", () => {
     body: [mkExprStmt(mkIdentifier("rest"))],
     span: makeSpan("let-array"),
   });
-  const result = runProgram([letStar]);
+  const result = await runProgram([letStar]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
 
-test("phaseA1 supports object pattern bindings", () => {
+test("phaseA1 supports object pattern bindings", async () => {
   const objectPattern = new ObjectPattern({
     properties: [
       { key: "x", target: mkIdentifier("x") },
@@ -134,11 +134,11 @@ test("phaseA1 supports object pattern bindings", () => {
     body: [mkExprStmt(mkIdentifier("restFields"))],
     span: makeSpan("let-object"),
   });
-  const result = runProgram([letStar]);
+  const result = await runProgram([letStar]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
 
-test("phaseA1 visits spread expressions inside arrays", () => {
+test("phaseA1 visits spread expressions inside arrays", async () => {
   const spread = new SpreadExpr({
     expr: mkIdentifier("restItems"),
     kind: "array",
@@ -148,22 +148,22 @@ test("phaseA1 visits spread expressions inside arrays", () => {
     elements: [spread, mkLiteral("tail")],
     span: makeSpan("array-with-spread"),
   });
-  const result = runProgram([mkExprStmt(arrayExpr)]);
+  const result = await runProgram([mkExprStmt(arrayExpr)]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
 
-test("phaseA1 evaluates ternary expressions", () => {
+test("phaseA1 evaluates ternary expressions", async () => {
   const ternary = new TernaryExpr({
     test: mkLiteral(true),
     consequent: mkLiteral("yes"),
     alternate: mkLiteral("no"),
     span: makeSpan("ternary"),
   });
-  const result = runProgram([mkExprStmt(ternary)]);
+  const result = await runProgram([mkExprStmt(ternary)]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
 
-test("phaseA1 registers import bindings", () => {
+test("phaseA1 registers import bindings", async () => {
   const importStmt = new ImportStmt({
     spec: {
       source: mkLiteral("./mod"),
@@ -172,11 +172,11 @@ test("phaseA1 registers import bindings", () => {
     },
     span: makeSpan("import"),
   });
-  const result = runProgram([importStmt]);
+  const result = await runProgram([importStmt]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
 
-test("phaseA1 processes export statements", () => {
+test("phaseA1 processes export statements", async () => {
   const exportStmt = new ExportStmt({
     spec: {
       defaultExport: mkIdentifier("defaultValue"),
@@ -185,11 +185,11 @@ test("phaseA1 processes export statements", () => {
     },
     span: makeSpan("export"),
   });
-  const result = runProgram([exportStmt]);
+  const result = await runProgram([exportStmt]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
 
-test("phaseA1 handles type aliases with parameters", () => {
+test("phaseA1 handles type aliases with parameters", async () => {
   const typeParam = mkTypeParam("T", {
     variance: "out",
     constraint: mkTypePrimitive("type-string"),
@@ -200,11 +200,11 @@ test("phaseA1 handles type aliases with parameters", () => {
     span: makeSpan("type-alias"),
     typeParams: [typeParam],
   });
-  const result = runProgram([alias]);
+  const result = await runProgram([alias]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
 
-test("phaseA1 processes interface definitions", () => {
+test("phaseA1 processes interface definitions", async () => {
   const shape = new InterfaceStmt({
     name: mkIdentifier("Shape"),
     body: {
@@ -215,11 +215,11 @@ test("phaseA1 processes interface definitions", () => {
     },
     span: makeSpan("interface"),
   });
-  const result = runProgram([shape]);
+  const result = await runProgram([shape]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
 
-test("phaseA1 accepts typed functions and asserts", () => {
+test("phaseA1 accepts typed functions and asserts", async () => {
   const assertExpr = new TypeAssertExpr({
     expr: mkIdentifier("value"),
     assertedType: mkTypePrimitive("type-number"),
@@ -239,11 +239,11 @@ test("phaseA1 accepts typed functions and asserts", () => {
     span: makeSpan("function"),
     typeParams: [mkTypeParam("T", { constraint: mkTypePrimitive("type-string") })],
   });
-  const result = runProgram([mkExprStmt(fn, "fn-expr")]);
+  const result = await runProgram([mkExprStmt(fn, "fn-expr")]);
   assert.strictEqual(result.diagnostics.length, 0);
 });
 
-test("phaseA1 traverses decorator-rich classes", () => {
+test("phaseA1 traverses decorator-rich classes", async () => {
   const classBody: ClassBody = {
     statements: [mkExprStmt(mkLiteral("member"))],
   };
@@ -257,6 +257,6 @@ test("phaseA1 traverses decorator-rich classes", () => {
     constructorStmt: mkExprStmt(mkLiteral("ctor")),
     staticBlocks: [mkBlock([mkExprStmt(mkLiteral("static-block"))], "static-block")],
   });
-  const result = runProgram([mkExprStmt(classExpr, "class-expr")]);
+  const result = await runProgram([mkExprStmt(classExpr, "class-expr")]);
   assert.strictEqual(result.diagnostics.length, 0);
 });

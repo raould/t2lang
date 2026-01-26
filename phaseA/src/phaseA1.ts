@@ -498,129 +498,397 @@ export interface Context { diagnostics: Diagnostic[]; scopeStack: Scope[]; typeR
 
 // --- Processor ---
 
-export function createProcessor(ctx: Context) {
-  function pushScope(): void { ctx.scopeStack.push({}); }
-  function popScope(): void { ctx.scopeStack.pop(); }
-  function withScope<T>(action: () => T): T { pushScope(); const result = action(); popScope(); return result; }
-  function registerIdentifier(_id: Identifier, _isConst: boolean): void { /* stub */ }
+export async function createProcessor(ctx: Context) {
+  async function pushScope(): Promise<void> { ctx.scopeStack.push({}); }
+  async function popScope(): Promise<void> { ctx.scopeStack.pop(); }
+  async function withScope<T>(action: () => Promise<T>): Promise<T> {
+    await pushScope();
+    const result = await action();
+    await popScope();
+    return result;
+  }
+  async function registerIdentifier(_id: Identifier, _isConst: boolean): Promise<void> { /* stub */ }
 
-  function declareBinding(binding: Binding, isConst: boolean): void {
-    resolveBindingTarget(binding.target, isConst);
-    if (binding.init) evaluateExpression(binding.init);
+  async function declareBinding(binding: Binding, isConst: boolean): Promise<void> {
+    await resolveBindingTarget(binding.target, isConst);
+    if (binding.init) {
+      await evaluateExpression(binding.init);
+    }
   }
 
-  function resolveBindingTarget(target: BindingTarget, isConst: boolean): void {
-    if (target instanceof A0.Identifier) registerIdentifier(target, isConst);
-    else if (target instanceof ArrayPattern) { for (const el of target.elements) resolveBindingTarget(el, isConst); if (target.rest) resolveBindingTarget(target.rest, isConst); }
-    else if (target instanceof ObjectPattern) { for (const prop of target.properties) resolveBindingTarget(prop.target, isConst); if (target.rest) resolveBindingTarget(target.rest, isConst); }
-    else if (target instanceof RestPattern) resolveBindingTarget(target.target, isConst);
+  async function resolveBindingTarget(target: BindingTarget, isConst: boolean): Promise<void> {
+    if (target instanceof A0.Identifier) {
+      await registerIdentifier(target, isConst);
+    } else if (target instanceof ArrayPattern) {
+      for (const el of target.elements) {
+        await resolveBindingTarget(el, isConst);
+      }
+      if (target.rest) {
+        await resolveBindingTarget(target.rest, isConst);
+      }
+    } else if (target instanceof ObjectPattern) {
+      for (const prop of target.properties) {
+        await resolveBindingTarget(prop.target, isConst);
+      }
+      if (target.rest) {
+        await resolveBindingTarget(target.rest, isConst);
+      }
+    } else if (target instanceof RestPattern) {
+      await resolveBindingTarget(target.target, isConst);
+    }
   }
 
-  function processAssignmentTarget(target: Expression): void {
-    if (target instanceof A0.Identifier) { /* validate */ }
-    else if (target instanceof PropExpr || target instanceof IndexExpr) evaluateExpression(target);
-    else ctx.diagnostics.push({ message: "Invalid assignment target", span: target.span });
+  async function processAssignmentTarget(target: Expression): Promise<void> {
+    if (target instanceof A0.Identifier) {
+      return; /* validate */
+    }
+    if (target instanceof PropExpr || target instanceof IndexExpr) {
+      await evaluateExpression(target);
+      return;
+    }
+    ctx.diagnostics.push({ message: "Invalid assignment target", span: target.span });
   }
 
-  function processStatement(stmt: Statement): void {
-    if (stmt instanceof BlockStmt) withScope(() => { for (const s of stmt.statements) processStatement(s); });
-    else if (stmt instanceof IfStmt) { evaluateExpression(stmt.test); processStatement(stmt.consequent); if (stmt.alternate) processStatement(stmt.alternate); }
-    else if (stmt instanceof WhileStmt) { evaluateExpression(stmt.condition); withScope(() => processStatement(stmt.body)); }
-    else if (stmt instanceof LetStarExpr) withScope(() => { for (const b of stmt.bindings) declareBinding(b, stmt.isConst); for (const s of stmt.body) processStatement(s); });
-    else if (stmt instanceof ForClassic) withScope(() => { if (stmt.init) processStatement(stmt.init); if (stmt.condition) evaluateExpression(stmt.condition); if (stmt.update) evaluateExpression(stmt.update); processStatement(stmt.body); });
-    else if (stmt instanceof ForOf || stmt instanceof ForAwait) withScope(() => { declareBinding(stmt.binding, false); evaluateExpression(stmt.iterable); processStatement(stmt.body); });
-    else if (stmt instanceof SwitchStmt) { evaluateExpression(stmt.discriminant); for (const c of stmt.cases) { if (c.test) evaluateExpression(c.test); for (const s of c.consequent) processStatement(s); } }
-    else if (stmt instanceof AssignExpr) { processAssignmentTarget(stmt.target); evaluateExpression(stmt.value); }
-    else if (stmt instanceof ReturnExpr) { if (stmt.value) evaluateExpression(stmt.value); }
-    else if (stmt instanceof BreakStmt || stmt instanceof ContinueStmt) { /* resolver */ }
-    else if (stmt instanceof ExprStmt) evaluateExpression(stmt.expr);
-    else if (stmt instanceof FunctionExpr || stmt instanceof ClassExpr) evaluateExpression(stmt);
-    else if (stmt instanceof ImportStmt) processImport(stmt);
-    else if (stmt instanceof ExportStmt) processExport(stmt);
-    else if (stmt instanceof TypeAliasStmt) processTypeAlias(stmt);
-    else if (stmt instanceof InterfaceStmt) processInterface(stmt);
-    else ctx.diagnostics.push({ message: `Unknown statement type`, span: (stmt as Statement).span });
+  async function processStatement(stmt: Statement): Promise<void> {
+    if (stmt instanceof BlockStmt) {
+      await withScope(async () => {
+        for (const s of stmt.statements) {
+          await processStatement(s);
+        }
+      });
+    } else if (stmt instanceof IfStmt) {
+      await evaluateExpression(stmt.test);
+      await processStatement(stmt.consequent);
+      if (stmt.alternate) {
+        await processStatement(stmt.alternate);
+      }
+    } else if (stmt instanceof WhileStmt) {
+      await evaluateExpression(stmt.condition);
+      await withScope(async () => await processStatement(stmt.body));
+    } else if (stmt instanceof LetStarExpr) {
+      await withScope(async () => {
+        for (const b of stmt.bindings) {
+          await declareBinding(b, stmt.isConst);
+        }
+        for (const s of stmt.body) {
+          await processStatement(s);
+        }
+      });
+    } else if (stmt instanceof ForClassic) {
+      await withScope(async () => {
+        if (stmt.init) {
+          await processStatement(stmt.init);
+        }
+        if (stmt.condition) {
+          await evaluateExpression(stmt.condition);
+        }
+        if (stmt.update) {
+          await evaluateExpression(stmt.update);
+        }
+        await processStatement(stmt.body);
+      });
+    } else if (stmt instanceof ForOf || stmt instanceof ForAwait) {
+      await withScope(async () => {
+        await declareBinding(stmt.binding, false);
+        await evaluateExpression(stmt.iterable);
+        await processStatement(stmt.body);
+      });
+    } else if (stmt instanceof SwitchStmt) {
+      await evaluateExpression(stmt.discriminant);
+      for (const c of stmt.cases) {
+        if (c.test) {
+          await evaluateExpression(c.test);
+        }
+        for (const s of c.consequent) {
+          await processStatement(s);
+        }
+      }
+    } else if (stmt instanceof AssignExpr) {
+      await processAssignmentTarget(stmt.target);
+      await evaluateExpression(stmt.value);
+    } else if (stmt instanceof ReturnExpr) {
+      if (stmt.value) {
+        await evaluateExpression(stmt.value);
+      }
+    } else if (stmt instanceof BreakStmt || stmt instanceof ContinueStmt) {
+      return; /* resolver */
+    } else if (stmt instanceof ExprStmt) {
+      await evaluateExpression(stmt.expr);
+    } else if (stmt instanceof FunctionExpr || stmt instanceof ClassExpr) {
+      await evaluateExpression(stmt);
+    } else if (stmt instanceof ImportStmt) {
+      await processImport(stmt);
+    } else if (stmt instanceof ExportStmt) {
+      await processExport(stmt);
+    } else if (stmt instanceof TypeAliasStmt) {
+      await processTypeAlias(stmt);
+    } else if (stmt instanceof InterfaceStmt) {
+      await processInterface(stmt);
+    } else {
+      ctx.diagnostics.push({ message: `Unknown statement type`, span: (stmt as Statement).span });
+    }
   }
 
-  function evaluateExpression(expr: Expression): Expression {
-    if (expr instanceof A0.Literal || expr instanceof A0.Identifier) return expr;
-    else if (expr instanceof CallExpr) { evaluateExpression(expr.callee); for (const a of expr.args) evaluateExpression(a); return expr; }
-    else if (expr instanceof PropExpr) { evaluateExpression(expr.object); return expr; }
-    else if (expr instanceof IndexExpr) { evaluateExpression(expr.object); evaluateExpression(expr.index); return expr; }
-    else if (expr instanceof NewExpr) { evaluateExpression(expr.callee); for (const a of expr.args) evaluateExpression(a); return expr; }
-    else if (expr instanceof ArrayExpr) { for (const e of expr.elements) evaluateExpression(e); return expr; }
-    else if (expr instanceof ObjectExpr) { for (const f of expr.fields) evaluateExpression(f.value); return expr; }
-    else if (expr instanceof ThrowExpr) { evaluateExpression(expr.argument); return expr; }
-    else if (expr instanceof TryCatchExpr) {
-      processStatement(expr.body);
-      if (expr.catchClause) withScope(() => { if (expr.catchClause!.binding) declareBinding(expr.catchClause!.binding, true); for (const s of expr.catchClause!.body) processStatement(s); });
-      if (expr.finallyClause) for (const s of expr.finallyClause.body) processStatement(s);
+  async function evaluateExpression(expr: Expression): Promise<Expression> {
+    if (expr instanceof A0.Literal || expr instanceof A0.Identifier) {
       return expr;
     }
-    else if (expr instanceof FunctionExpr) {
-      withScope(() => {
-        for (const p of expr.signature.parameters) { registerIdentifier(p.name, false); if (p.typeAnnotation) evaluateType(p.typeAnnotation); }
-        if (expr.typeParams) for (const tp of expr.typeParams) evaluateTypeParam(tp);
-        if (expr.signature.returnType) evaluateType(expr.signature.returnType);
-        for (const s of expr.body) processStatement(s);
+    if (expr instanceof CallExpr) {
+      await evaluateExpression(expr.callee);
+      for (const a of expr.args) {
+        await evaluateExpression(a);
+      }
+      return expr;
+    }
+    if (expr instanceof PropExpr) {
+      await evaluateExpression(expr.object);
+      return expr;
+    }
+    if (expr instanceof IndexExpr) {
+      await evaluateExpression(expr.object);
+      await evaluateExpression(expr.index);
+      return expr;
+    }
+    if (expr instanceof NewExpr) {
+      await evaluateExpression(expr.callee);
+      for (const a of expr.args) {
+        await evaluateExpression(a);
+      }
+      return expr;
+    }
+    if (expr instanceof ArrayExpr) {
+      for (const e of expr.elements) {
+        await evaluateExpression(e);
+      }
+      return expr;
+    }
+    if (expr instanceof ObjectExpr) {
+      for (const f of expr.fields) {
+        await evaluateExpression(f.value);
+      }
+      return expr;
+    }
+    if (expr instanceof ThrowExpr) {
+      await evaluateExpression(expr.argument);
+      return expr;
+    }
+    if (expr instanceof TryCatchExpr) {
+      await processStatement(expr.body);
+      if (expr.catchClause) {
+        await withScope(async () => {
+          if (expr.catchClause!.binding) {
+            await declareBinding(expr.catchClause!.binding, true);
+          }
+          for (const s of expr.catchClause!.body) {
+            await processStatement(s);
+          }
+        });
+      }
+      if (expr.finallyClause) {
+        for (const s of expr.finallyClause.body) {
+          await processStatement(s);
+        }
+      }
+      return expr;
+    }
+    if (expr instanceof FunctionExpr) {
+      await withScope(async () => {
+        for (const p of expr.signature.parameters) {
+          await registerIdentifier(p.name, false);
+          if (p.typeAnnotation) {
+            await evaluateType(p.typeAnnotation);
+          }
+        }
+        if (expr.typeParams) {
+          for (const tp of expr.typeParams) {
+            await evaluateTypeParam(tp);
+          }
+        }
+        if (expr.signature.returnType) {
+          await evaluateType(expr.signature.returnType);
+        }
+        for (const s of expr.body) {
+          await processStatement(s);
+        }
       });
       return expr;
     }
-    else if (expr instanceof ClassExpr) {
-      withScope(() => {
-        if (expr.extends) evaluateExpression(expr.extends);
-        if (expr.implements) for (const impl of expr.implements) evaluateExpression(impl);
-        if (expr.decorators) for (const dec of expr.decorators) evaluateExpression(dec);
-        for (const s of expr.body.statements) processStatement(s);
-        if (expr.staticBlocks) for (const block of expr.staticBlocks) processStatement(block);
+    if (expr instanceof ClassExpr) {
+      await withScope(async () => {
+        if (expr.extends) {
+          await evaluateExpression(expr.extends);
+        }
+        if (expr.implements) {
+          for (const impl of expr.implements) {
+            await evaluateExpression(impl);
+          }
+        }
+        if (expr.decorators) {
+          for (const dec of expr.decorators) {
+            await evaluateExpression(dec);
+          }
+        }
+        for (const s of expr.body.statements) {
+          await processStatement(s);
+        }
+        if (expr.staticBlocks) {
+          for (const block of expr.staticBlocks) {
+            await processStatement(block);
+          }
+        }
       });
       return expr;
     }
-    else if (expr instanceof SpreadExpr) { evaluateExpression(expr.expr); return expr; }
-    else if (expr instanceof TernaryExpr) { evaluateExpression(expr.test); evaluateExpression(expr.consequent); evaluateExpression(expr.alternate); return expr; }
-    else if (expr instanceof AwaitExpr) { evaluateExpression(expr.argument); return expr; }
-    else if (expr instanceof YieldExpr) { if (expr.argument) evaluateExpression(expr.argument); return expr; }
-    else if (expr instanceof TypeAssertExpr) { evaluateExpression(expr.expr); evaluateType(expr.assertedType); return expr; }
-    else { ctx.diagnostics.push({ message: `Unknown expression type`, span: (expr as Expression).span }); return expr; }
+    if (expr instanceof SpreadExpr) {
+      await evaluateExpression(expr.expr);
+      return expr;
+    }
+    if (expr instanceof TernaryExpr) {
+      await evaluateExpression(expr.test);
+      await evaluateExpression(expr.consequent);
+      await evaluateExpression(expr.alternate);
+      return expr;
+    }
+    if (expr instanceof AwaitExpr) {
+      await evaluateExpression(expr.argument);
+      return expr;
+    }
+    if (expr instanceof YieldExpr) {
+      if (expr.argument) {
+        await evaluateExpression(expr.argument);
+      }
+      return expr;
+    }
+    if (expr instanceof TypeAssertExpr) {
+      await evaluateExpression(expr.expr);
+      await evaluateType(expr.assertedType);
+      return expr;
+    }
+    ctx.diagnostics.push({ message: `Unknown expression type`, span: (expr as Expression).span });
+    return expr;
   }
 
-  function processImport(stmt: ImportStmt): void {
-    if (stmt.spec.defaultBinding) registerIdentifier(stmt.spec.defaultBinding, false);
-    if (stmt.spec.namespaceBinding) registerIdentifier(stmt.spec.namespaceBinding, false);
-    if (stmt.spec.named) for (const n of stmt.spec.named) registerIdentifier(n.local, false);
-    evaluateExpression(stmt.spec.source);
+  async function processImport(stmt: ImportStmt): Promise<void> {
+    if (stmt.spec.defaultBinding) {
+      await registerIdentifier(stmt.spec.defaultBinding, false);
+    }
+    if (stmt.spec.namespaceBinding) {
+      await registerIdentifier(stmt.spec.namespaceBinding, false);
+    }
+    if (stmt.spec.named) {
+      for (const n of stmt.spec.named) {
+        await registerIdentifier(n.local, false);
+      }
+    }
+    await evaluateExpression(stmt.spec.source);
   }
 
-  function processExport(stmt: ExportStmt): void {
-    if (stmt.spec.defaultExport) evaluateExpression(stmt.spec.defaultExport);
-    if (stmt.spec.named) for (const n of stmt.spec.named) if (n.local) evaluateExpression(n.local);
-    if (stmt.spec.source) evaluateExpression(stmt.spec.source);
+  async function processExport(stmt: ExportStmt): Promise<void> {
+    if (stmt.spec.defaultExport) {
+      await evaluateExpression(stmt.spec.defaultExport);
+    }
+    if (stmt.spec.named) {
+      for (const n of stmt.spec.named) {
+        if (n.local) {
+          await evaluateExpression(n.local);
+        }
+      }
+    }
+    if (stmt.spec.source) {
+      await evaluateExpression(stmt.spec.source);
+    }
   }
 
-  function processTypeAlias(stmt: TypeAliasStmt): void {
-    if (stmt.typeParams) for (const p of stmt.typeParams) evaluateTypeParam(p);
-    evaluateType(stmt.typeValue);
+  async function processTypeAlias(stmt: TypeAliasStmt): Promise<void> {
+    if (stmt.typeParams) {
+      for (const p of stmt.typeParams) {
+        await evaluateTypeParam(p);
+      }
+    }
+    await evaluateType(stmt.typeValue);
   }
 
-  function processInterface(stmt: InterfaceStmt): void { for (const f of stmt.body.fields) evaluateType(f.fieldType); }
-  function evaluateTypeParam(param: TypeParam): void { if (param.constraint) evaluateType(param.constraint); if (param.defaultType) evaluateType(param.defaultType); }
-
-  function evaluateType(typeNode: TypeNode): void {
-    if (typeNode instanceof TypePrimitive) { /* leaf */ }
-    else if (typeNode instanceof TypeRef) { if (typeNode.typeArgs) for (const arg of typeNode.typeArgs) evaluateType(arg); }
-    else if (typeNode instanceof TypeUnion || typeNode instanceof TypeIntersection) { for (const t of typeNode.types) evaluateType(t); }
-    else if (typeNode instanceof TypeFunction) { if (typeNode.typeParams) for (const p of typeNode.typeParams) evaluateTypeParam(p); for (const p of typeNode.params) evaluateType(p); evaluateType(typeNode.returns); }
-    else if (typeNode instanceof TypeObject) { for (const f of typeNode.fields) evaluateType(f.fieldType); }
-    else if (typeNode instanceof TypeMapped) { evaluateTypeParam(typeNode.typeParam); evaluateType(typeNode.valueType); if (typeNode.nameRemap) evaluateType(typeNode.nameRemap); if (typeNode.via) evaluateType(typeNode.via); }
-    else if (typeNode instanceof TypeApp) { evaluateType(typeNode.expr); for (const a of typeNode.typeArgs) evaluateType(a); }
-    else if (typeNode instanceof TypeLiteral) { /* leaf */ }
-    else ctx.diagnostics.push({ message: `Unknown type node`, span: (typeNode as TypeNode).span });
+  async function processInterface(stmt: InterfaceStmt): Promise<void> {
+    for (const f of stmt.body.fields) {
+      await evaluateType(f.fieldType);
+    }
   }
 
-  function run(program: Program): { diagnostics: Diagnostic[]; program: Program } {
-    ctx.scopeStack.push({});
-    for (const stmt of program.body) processStatement(stmt);
-    ctx.scopeStack.pop();
+  async function evaluateTypeParam(param: TypeParam): Promise<void> {
+    if (param.constraint) {
+      await evaluateType(param.constraint);
+    }
+    if (param.defaultType) {
+      await evaluateType(param.defaultType);
+    }
+  }
+
+  async function evaluateType(typeNode: TypeNode): Promise<void> {
+    if (typeNode instanceof TypePrimitive) {
+      return;
+    }
+    if (typeNode instanceof TypeRef) {
+      if (typeNode.typeArgs) {
+        for (const arg of typeNode.typeArgs) {
+          await evaluateType(arg);
+        }
+      }
+      return;
+    }
+    if (typeNode instanceof TypeUnion || typeNode instanceof TypeIntersection) {
+      for (const t of typeNode.types) {
+        await evaluateType(t);
+      }
+      return;
+    }
+    if (typeNode instanceof TypeFunction) {
+      if (typeNode.typeParams) {
+        for (const p of typeNode.typeParams) {
+          await evaluateTypeParam(p);
+        }
+      }
+      for (const p of typeNode.params) {
+        await evaluateType(p);
+      }
+      await evaluateType(typeNode.returns);
+      return;
+    }
+    if (typeNode instanceof TypeObject) {
+      for (const f of typeNode.fields) {
+        await evaluateType(f.fieldType);
+      }
+      return;
+    }
+    if (typeNode instanceof TypeMapped) {
+      await evaluateTypeParam(typeNode.typeParam);
+      await evaluateType(typeNode.valueType);
+      if (typeNode.nameRemap) {
+        await evaluateType(typeNode.nameRemap);
+      }
+      if (typeNode.via) {
+        await evaluateType(typeNode.via);
+      }
+      return;
+    }
+    if (typeNode instanceof TypeApp) {
+      await evaluateType(typeNode.expr);
+      for (const a of typeNode.typeArgs) {
+        await evaluateType(a);
+      }
+      return;
+    }
+    if (typeNode instanceof TypeLiteral) {
+      return;
+    }
+    ctx.diagnostics.push({ message: `Unknown type node`, span: (typeNode as TypeNode).span });
+  }
+
+  async function run(program: Program): Promise<{ diagnostics: Diagnostic[]; program: Program }> {
+    await pushScope();
+    for (const stmt of program.body) {
+      await processStatement(stmt);
+    }
+    await popScope();
     return { diagnostics: ctx.diagnostics, program };
   }
 

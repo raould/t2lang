@@ -10,11 +10,11 @@ import {
   ArrayExpr,
   BlockStmt,
 } from "../src/phaseA1.js";
-import { serializeProgram } from "../src/serialization.js";
+import { serializeProgram, deserializeProgram } from "../src/serialization.js";
 
 const mkSpan = (label = "span") => ({ start: 0, end: 0, source: `phaseA-tests:${label}` });
 
-test("serialize program with literal expression", () => {
+test("serialize program with literal expression", async () => {
   const program = new Program({
     body: [
       new ExprStmt({
@@ -25,7 +25,7 @@ test("serialize program with literal expression", () => {
     span: mkSpan("program"),
   });
 
-  const serialized = serializeProgram(program);
+  const serialized = await serializeProgram(program);
   assert.deepStrictEqual(serialized, {
     kind: "program",
     span: mkSpan("program"),
@@ -43,7 +43,7 @@ test("serialize program with literal expression", () => {
   });
 });
 
-test("serialize for-of with array pattern binding", () => {
+test("serialize for-of with array pattern binding", async () => {
   const target = new ArrayPattern({
     elements: [
       new Identifier({ name: "first", span: mkSpan("first") }),
@@ -67,7 +67,7 @@ test("serialize for-of with array pattern binding", () => {
   });
 
   const program = new Program({ body: [forOf], span: mkSpan("program") });
-  const serialized = serializeProgram(program);
+  const serialized = await serializeProgram(program);
 
   assert.deepStrictEqual(serialized, {
     kind: "program",
@@ -107,4 +107,20 @@ test("serialize for-of with array pattern binding", () => {
       },
     ],
   });
+});
+
+test("serialize/deserialize roundtrip preserves AST shape", async () => {
+  const program = new Program({
+    body: [
+      new ExprStmt({
+        expr: new Literal({ value: "roundtrip", span: mkSpan("lit") }),
+        span: mkSpan("expr"),
+      }),
+    ],
+    span: mkSpan("program"),
+  });
+  const serialized = await serializeProgram(program);
+  const deserialized = await deserializeProgram(serialized);
+  const reserialized = await serializeProgram(deserialized);
+  assert.deepStrictEqual(reserialized, serialized);
 });
