@@ -3,17 +3,25 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { Command, CommanderError } from "commander";
+import { Command, CommanderError, Option } from "commander";
 import { compilePhaseA } from "./api.js";
 import { CompilerEvent, CompilerStage } from "./events.js";
 
-const VALID_TRACE_PHASES: CompilerStage[] = ["parse", "resolve", "typecheck", "codegen"];
+const VALID_LOG_PHASES: CompilerStage[] = ["parse", "resolve", "typecheck", "codegen"];
 
 interface CliOptions {
   output?: string;
   stdout?: boolean;
-  trace?: boolean;
-  tracePhases?: string[];
+  log?: boolean;
+  logPhases?: string[];
+  seed?: string;
+  emitTypes?: boolean;
+  prettyOption?: "pretty" | "ugly";
+  ast?: boolean;
+  astBeforeExpand?: boolean;
+  astAfterExpand?: boolean;
+  dumpSnapshots?: string;
+  logLevel?: "debug" | "info" | "warn" | "error";
 }
 
 function buildCommand(): Command {
@@ -24,28 +32,43 @@ function buildCommand(): Command {
     .argument("<input>", "Input .t2 file path (use '-' for stdin)")
     .option("-o, --output <path>", "Output file path")
     .option("--stdout", "Write output to stdout")
-    .option("--trace", "Show trace events for every phase")
+    .option("--seed <seed>", "Deterministic seed value", "default")
+    .option("--emit-types", "Emit TypeScript type annotations", false) // TODO: implement
+    .addOption( // TODO: implement
+      new Option("--pretty-option <style>", "Pretty print output")
+        .default("pretty")
+        .choices(["pretty", "ugly"])
+    )
+    .option("--ast-before-expand", "Print AST before expand (alias of parse)", false)
+    .option("--ast-after-expand", "Print AST after expand (alias of parse)", false)
+    .option("--dump-snapshots <dir>", "Write JSON snapshots to a directory")
+    .addOption(
+      new Option("--log-level <level>", "Log verbosity")
+      .default("info")
+      .choices(["debug", "info", "warn", "error"])
+    )
+    .option("--log", "Show log events for every phase")
     .option(
-      "--trace-phases <phases>",
-      "Comma-separated list of trace phases (parse, resolve, typecheck, codegen)",
-      parseTracePhaseList,
+      "--log-phases <phases>",
+      "Comma-separated list of logged phases (parse, resolve, typecheck, codegen)",
+      parseLogPhaseList,
       [] as string[]
     )
     .allowUnknownOption(false);
   return cmd;
 }
 
-function parseTracePhaseList(value: string): string[] {
+function parseLogPhaseList(value: string): string[] {
   const phases = value
     .split(",")
     .map((p) => p.trim())
     .filter(Boolean);
   if (phases.length === 0) {
-    throw new CommanderError(1, "trace-phases", "--trace-phases requires at least one phase");
+    throw new CommanderError(1, "log-phases", "--log-phases requires at least one phase");
   }
   for (const phase of phases) {
-    if (!VALID_TRACE_PHASES.includes(phase as CompilerStage)) {
-      throw new CommanderError(1, "trace-phases", `Unknown trace phase '${phase}'`);
+    if (!VALID_LOG_PHASES.includes(phase as CompilerStage)) {
+      throw new CommanderError(1, "log-phases", `Unknown log phase '${phase}'`);
     }
   }
   return phases;
@@ -124,10 +147,11 @@ export async function main(argv: string[]): Promise<void> {
     process.exit(1);
   }
 
-  const tracePhases = new Set<string>(options.tracePhases ?? []);
-  if (options.trace) {
-    tracePhases.add("all");
+  const logPhases = new Set<string>(options.logPhases ?? []);
+  if (options.log) {
+    logPhases.add("all");
   }
+  const logLevel = options.logLevel ?? "info";
 
   const isStdin = inputPath === "-";
   let writeStdout = Boolean(options.stdout) || isStdin;
@@ -136,7 +160,12 @@ export async function main(argv: string[]): Promise<void> {
   }
 
   const source = await readSource(inputPath);
-  const result = await compilePhaseA(source, { sourcePath: isStdin ? "stdin.t2" : inputPath });
+  const result = await compilePhaseA(source, {
+    sourcePath: isStdin ? "stdin.t2" : inputPath,
+    seed: options.seed,
+    emitTypes: options.emitTypes,
+    prettyOption: options.prettyOption,
+  });
 
   if (result.diagnostics.length > 0) {
     console.error("Compilation produced diagnostics:");
@@ -144,8 +173,22 @@ export async function main(argv: string[]): Promise<void> {
     process.exit(1);
   }
 
-  for (const event of result.events) {
-    logEvent(event, tracePhases);
+  if (shouldLog(logLevel)) {
+    for (const event of result.events) {
+      logEvent(event, logPhases);
+    }
+  }
+
+  if (options.astBeforeExpand || options.astAfterExpand) { // TODO: differentiate
+    const snapshot = result.snapshots.find((entry) => entry.stage === "parse");
+    if (snapshot) {
+      const serialized = await snapshot.program();
+      console.error(JSON.stringify(serialized, null, 2));
+    }
+  }
+
+  if (options.dumpSnapshots) {
+    await dumpSnapshots(options.dumpSnapshots, result.snapshots);
   }
 
   if (writeStdout) {
@@ -159,17 +202,30 @@ export async function main(argv: string[]): Promise<void> {
   console.log(`Compiled ${inputPath} -> ${target}`);
 }
 
-function logEvent(event: CompilerEvent, tracePhases: Set<string>): void {
-  if (tracePhases.size === 0) {
+function shouldLog(level: string): boolean {
+  return level === "debug" || level === "info";
+}
+
+async function dumpSnapshots(targetDir: string, snapshots: Array<{ stage: CompilerStage; program: () => Promise<unknown> }>): Promise<void> {
+  await fs.mkdir(targetDir, { recursive: true });
+  for (const snapshot of snapshots) {
+    const serialized = await snapshot.program();
+    const filePath = path.join(targetDir, `${snapshot.stage}.json`);
+    await fs.writeFile(filePath, JSON.stringify(serialized, null, 2), "utf8");
+  }
+}
+
+function logEvent(event: CompilerEvent, logPhases: Set<string>): void {
+  if (logPhases.size === 0) {
     return;
   }
-  if (!tracePhases.has("all") && !tracePhases.has(event.phase)) {
+  if (!logPhases.has("all") && !logPhases.has(event.phase)) {
     return;
   }
   const timestamp = new Date(event.timestamp).toISOString();
   const payload = summarizeEventData(event);
   console.error(
-    `[trace] ${timestamp} ${event.phase} ${event.kind} seed=${event.seed} stamp=${event.stamp} ${payload}`
+    `[log] ${timestamp} ${event.phase} ${event.kind} seed=${event.seed} stamp=${event.stamp} ${payload}`
   );
 }
 

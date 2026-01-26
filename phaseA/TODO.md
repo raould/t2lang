@@ -2,7 +2,6 @@
 
 # now
 
-* Replace the “JSON-only” CLI stub: cli.ts currently expects a serialized AST from stdin. We need to rewire it so t2tc reads .t2 source, parses it, and emits .ts output (matching the user’s “t2tc hello_let.t2 → hello_let.ts” workflow). That means implementing input/output handling (stdin vs file, -o, --stdout, etc.) and flag parsing similar to cli.ts, but without importing Phase0 or Phase1 helpers since Phase A must be self-contained.
 * Bootstrapping the pipeline: compilePhaseA (in api.ts) already runs the processor and produces diagnostics/snapshots, but it doesn’t parse actual .t2 text or generate TypeScript. We need to implement the missing pieces in Phase A:
     * Parser: bring in or build a Phase A parser that consumes .t2 text and produces phaseA1 AST nodes (or reuse the existing Phase A parser once available) instead of relying on Phase0’s parser.
     * Codegen: add a code generator that walks the Phase A AST and produces TypeScript text, respecting pretty/ugly modes and emitTypes flags. This will probably live near api.ts or a new codegen module.

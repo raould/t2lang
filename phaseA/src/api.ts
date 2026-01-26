@@ -83,7 +83,10 @@ export async function compilePhaseA(source: string, config: CompilePhaseAConfig 
   await emitTrace("typecheck", "done");
 
   await emitTrace("codegen", "start");
-  const { tsSource, mappings } = await generateCode(resolvedProgram, finalConfig);
+  const { tsSource, mappings } = await generateCode(resolvedProgram, {
+    prettyOutput: finalConfig.prettyOption,
+    emitTypes: finalConfig.emitTypes,
+  });
   await emitStage("codegen", resolvedProgram);
   await emitTrace("codegen", "done");
 
