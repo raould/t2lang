@@ -98,6 +98,7 @@ export type SerializedBindingTarget =
 export type SerializedTypeNode = { kind: string; span: SerializedSpan } & Record<string, any>;
 
 export type SerializedProgram = { kind: "program"; body: SerializedStatement[]; span: SerializedSpan };
+export type SerializedProgramThunk = () => Promise<SerializedProgram>;
 
 async function serializeSpan(span: Span): Promise<SerializedSpan> {
   return { start: span.start, end: span.end, source: span.source };
@@ -329,6 +330,16 @@ export async function serializeProgram(program: Program): Promise<SerializedProg
     kind: "program",
     body: await Promise.all(program.body.map(serializeStatement)),
     span: await serializeSpan(program.span),
+  };
+}
+
+export function serializeLazy(program: Program): SerializedProgramThunk {
+  let cached: Promise<SerializedProgram> | null = null;
+  return async (): Promise<SerializedProgram> => {
+    if (!cached) {
+      cached = serializeProgram(program);
+    }
+    return cached;
   };
 }
 

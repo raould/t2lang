@@ -1,6 +1,6 @@
 import { parseSource } from "./parse.js";
 import { generateCode } from "./codegen.js";
-import { serializeProgram, SerializedProgram } from "./serialization.js";
+import { serializeLazy, SerializedProgram, SerializedProgramThunk } from "./serialization.js";
 import { createProcessor, Context, Diagnostic, Program } from "./phaseA1.js";
 import { ArrayEventSink, CompilerEvent, CompilerStage } from "./events.js";
 
@@ -12,7 +12,7 @@ export interface CompilePhaseAConfig {
 
 export interface SnapshotRecord {
   stage: CompilerStage;
-  program: SerializedProgram;
+  program: SerializedProgramThunk;
   seed: string;
   stamp: string;
 }
@@ -41,8 +41,8 @@ export async function compilePhaseA(source: string, config: CompilePhaseAConfig 
   const snapshots: SnapshotRecord[] = [];
 
   const emitStage = async (stage: CompilerStage, program: Program): Promise<void> => {
-    const serialized = await serializeProgram(program);
-    const snapshot: SnapshotRecord = { stage, program: serialized, seed, stamp };
+    const lazyProgram = serializeLazy(program);
+    const snapshot: SnapshotRecord = { stage, program: lazyProgram, seed, stamp };
     snapshots.push(snapshot);
     await eventSink.emit({
       phase: stage,
@@ -72,4 +72,8 @@ export async function compilePhaseA(source: string, config: CompilePhaseAConfig 
     snapshots,
     events: eventSink.events,
   };
+}
+
+export async function evaluateSnapshot(snapshot: SnapshotRecord): Promise<SerializedProgram> {
+  return snapshot.program();
 }

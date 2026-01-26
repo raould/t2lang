@@ -4,6 +4,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { compilePhaseA } from "./api.js";
+import { CompilerEvent } from "./events.js";
 
 async function readStdin(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -44,6 +45,7 @@ export async function main(argv: string[]): Promise<void> {
   let inputPath: string | null = null;
   let outputPath: string | null = null;
   let writeStdout = false;
+  const tracePhases = new Set<string>();
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -56,6 +58,16 @@ export async function main(argv: string[]): Promise<void> {
       outputPath = args[i];
     } else if (arg === "--stdout") {
       writeStdout = true;
+    } else if (arg === "--trace") {
+      i++;
+      if (i >= args.length) {
+        console.error("Error: --trace requires a comma-separated list of phases");
+        process.exit(1);
+      }
+      const phases = args[i].split(",").map((p) => p.trim()).filter(Boolean);
+      for (const phase of phases) {
+        tracePhases.add(phase);
+      }
     } else if (arg.startsWith("-") && arg !== "-") {
       console.error(`Unknown option '${arg}'`);
       process.exit(1);
@@ -66,6 +78,34 @@ export async function main(argv: string[]): Promise<void> {
       }
       inputPath = arg;
     }
+  }
+
+  function logEvent(event: CompilerEvent): void {
+    if (tracePhases.size === 0) {
+      return;
+    }
+    if (!tracePhases.has("all") && !tracePhases.has(event.phase)) {
+      return;
+    }
+    const timestamp = new Date(event.timestamp).toISOString();
+    const payload = summarizeEventData(event);
+    console.error(`[trace] ${timestamp} ${event.phase} ${event.kind} seed=${event.seed} stamp=${event.stamp} ${payload}`);
+  }
+
+  function summarizeEventData(event: CompilerEvent): string {
+    if (!event.data) return "(no data)";
+    if (event.kind === "astDump" && typeof event.data === "object" && event.data !== null) {
+      const stage = (event.data as Record<string, unknown>).stage ?? event.data;
+      return `(snapshot ${JSON.stringify(stage, stringifyFilter)})`;
+    }
+    return JSON.stringify(event.data, stringifyFilter);
+  }
+
+  function stringifyFilter(_key: string, value: unknown): unknown {
+    if (typeof value === "function") {
+      return "<thunk>";
+    }
+    return value;
   }
 
   if (!inputPath) {
@@ -89,6 +129,10 @@ export async function main(argv: string[]): Promise<void> {
     console.error("Compilation produced diagnostics:");
     formatDiagnostics(result.diagnostics);
     process.exit(1);
+  }
+
+  for (const event of result.events) {
+    logEvent(event);
   }
 
   if (writeStdout) {
