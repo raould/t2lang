@@ -6,6 +6,10 @@ import {
   Literal,
   Identifier,
   CallExpr,
+  PropExpr,
+  IndexExpr,
+  ObjectExpr,
+  NewExpr,
   LetStarExpr,
   Binding,
   BindingTarget,
@@ -24,6 +28,10 @@ import {
   ThrowExpr,
   TryCatchExpr,
   SwitchStmt,
+  ImportStmt,
+  ExportStmt,
+  NamedImport,
+  NamedExport,
 } from "./phaseA1.js";
 export interface CompilerConfig {
   prettyOutput?: "pretty" | "ugly";
@@ -184,6 +192,55 @@ async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
       mappings: [mappingFromSpan(stmt.span, 0)],
     };
   }
+  if (stmt instanceof ImportStmt) {
+    const spec = stmt.spec;
+    const segments: string[] = [];
+    if (spec.defaultBinding) {
+      segments.push(spec.defaultBinding.name);
+    }
+    if (spec.named && spec.named.length > 0) {
+      const entries = spec.named.map(formatNamedImportEntry).join(", ");
+      segments.push(`{ ${entries} }`);
+    }
+    if (spec.namespaceBinding) {
+      segments.push(`* as ${spec.namespaceBinding.name}`);
+    }
+    const clause = segments.join(", ");
+    const source = await emitExpression(spec.source);
+    return {
+      lines: [`import ${clause} from ${source};`],
+      mappings: [mappingFromSpan(stmt.span, 0)],
+    };
+  }
+  if (stmt instanceof ExportStmt) {
+    const spec = stmt.spec;
+    if (spec.namespaceExport) {
+      const target = spec.namespaceExport.name;
+      const source = spec.source ? await emitExpression(spec.source) : undefined;
+      const fromClause = source ? ` from ${source}` : "";
+      return {
+        lines: [`export * as ${target}${fromClause};`],
+        mappings: [mappingFromSpan(stmt.span, 0)],
+      };
+    }
+    if (spec.defaultExport) {
+      const value = await emitExpression(spec.defaultExport);
+      return {
+        lines: [`export default ${value};`],
+        mappings: [mappingFromSpan(stmt.span, 0)],
+      };
+    }
+    if (spec.named && spec.named.length > 0) {
+      const entries = spec.named.map(formatNamedExportEntry).join(", ");
+      const source = spec.source ? await emitExpression(spec.source) : undefined;
+      const fromClause = source ? ` from ${source}` : "";
+      return {
+        lines: [`export { ${entries} }${fromClause};`],
+        mappings: [mappingFromSpan(stmt.span, 0)],
+      };
+    }
+    return { lines: ["export {};"], mappings: [mappingFromSpan(stmt.span, 0)] };
+  }
   if (stmt instanceof ForClassic) {
     const initClause = stmt.init ? await clauseFromStatement(stmt.init) : "";
     const condition = stmt.condition ? await emitExpression(stmt.condition) : "";
@@ -294,11 +351,71 @@ async function emitExpression(expr: Expression): Promise<string> {
     const entries = await Promise.all(expr.elements.map(emitExpression));
     return `[${entries.join(", ")}]`;
   }
+  if (expr instanceof PropExpr) {
+    const objectExpr = await emitExpression(expr.object);
+    if (isIdentifierName(expr.name)) {
+      const operator = expr.maybeNull ? "?." : ".";
+      return `${objectExpr}${operator}${expr.name}`;
+    }
+    const computed = expr.maybeNull ? "?[" : "[";
+    return `${objectExpr}${computed}${JSON.stringify(expr.name)}]`;
+  }
+  if (expr instanceof IndexExpr) {
+    const objectExpr = await emitExpression(expr.object);
+    const indexExpr = await emitExpression(expr.index);
+    const operator = expr.maybeNull ? "?.[" : "[";
+    return `${objectExpr}${operator}${indexExpr}]`;
+  }
+  if (expr instanceof ObjectExpr) {
+    if (expr.fields.length === 0) {
+      return "{}";
+    }
+    const entries = await Promise.all(
+      expr.fields.map(async (field) => {
+        const valueText = await emitExpression(field.value);
+        const keyText = formatObjectKey(field.key);
+        return `${keyText}: ${valueText}`;
+      })
+    );
+    return `{ ${entries.join(", ")} }`;
+  }
+  if (expr instanceof NewExpr) {
+    const calleeExpr = await emitExpression(expr.callee);
+    const args = await Promise.all(expr.args.map(emitExpression));
+    return `new ${calleeExpr}(${args.join(", ")})`;
+  }
   if (expr instanceof ThrowExpr) {
     const argument = await emitExpression(expr.argument);
     return `throw ${argument}`;
   }
   return "undefined";
+}
+
+const IDENTIFIER_REGEX = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+function isIdentifierName(name: string): boolean {
+  return IDENTIFIER_REGEX.test(name);
+}
+
+function formatObjectKey(key: string): string {
+  return isIdentifierName(key) ? key : JSON.stringify(key);
+}
+
+function formatNamedImportEntry(entry: NamedImport): string {
+  const localName = entry.local.name;
+  if (entry.imported === localName) {
+    return localName;
+  }
+  return `${entry.imported} as ${localName}`;
+}
+
+function formatNamedExportEntry(entry: NamedExport): string {
+  const localName = entry.local?.name ?? entry.exported;
+  const exportedName = entry.exported ?? localName;
+  if (localName === exportedName) {
+    return localName;
+  }
+  return `${localName} as ${exportedName}`;
 }
 
 async function clauseFromStatement(stmt: Statement): Promise<string> {

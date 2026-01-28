@@ -20,6 +20,10 @@ import {
   TryCatchExpr,
   Literal,
   Identifier,
+  ImportStmt,
+  ExportStmt,
+  NamedImport,
+  NamedExport,
   Binding,
   BindingTarget,
   ArrayPattern,
@@ -50,6 +54,7 @@ type Node = AtomNode | ListNode;
 interface AtomNode {
   type: "atom";
   value: string;
+  tokenType: Token["type"];
   span: Span;
 }
 
@@ -212,6 +217,7 @@ class Parser {
     return {
       type: "atom",
       value: tok.value,
+      tokenType: tok.type,
       span: {
         start: tok.start,
         end: tok.end,
@@ -295,6 +301,12 @@ class Parser {
         }
         if (head.value === "switch") {
           return this.buildSwitch(node);
+        }
+        if (head.value === "import-default" || head.value === "import-named" || head.value === "import-all") {
+          return this.buildImport(node);
+        }
+        if (head.value === "export" || head.value === "export-default") {
+          return this.buildExport(node);
         }
       }
     }
@@ -742,6 +754,113 @@ class Parser {
     return new SwitchStmt({ discriminant, cases, span });
   }
 
+  private buildImport(node: ListNode): ImportStmt {
+    const span = node.span;
+    const head = node.elements[0];
+    if (head.type !== "atom") {
+      throw new Error("Import statement must start with an atom");
+    }
+    const kind = head.value;
+    if (kind === "import-default") {
+      const nameNode = node.elements[1];
+      const sourceNode = node.elements[2];
+      if (!nameNode || !sourceNode) {
+        throw new Error("import-default requires a name and module specifier");
+      }
+      const name = this.nodeToIdentifier(nameNode, "import-default name");
+      const source = this.parseModuleSpecifier(sourceNode);
+      return new ImportStmt({ spec: { source, defaultBinding: name }, span });
+    }
+    if (kind === "import-named") {
+      const listNode = node.elements[1];
+      const sourceNode = node.elements[2];
+      if (!listNode || listNode.type !== "list" || !sourceNode) {
+        throw new Error("import-named requires a list of names and module specifier");
+      }
+      const named: NamedImport[] = listNode.elements.map((child) => this.parseNamedImport(child));
+      const source = this.parseModuleSpecifier(sourceNode);
+      return new ImportStmt({ spec: { source, named }, span });
+    }
+    if (kind === "import-all") {
+      const aliasNode = node.elements[1];
+      const sourceNode = node.elements[2];
+      if (!aliasNode || !sourceNode) {
+        throw new Error("import-all requires an alias and module specifier");
+      }
+      const alias = this.nodeToIdentifier(aliasNode, "import-all alias");
+      const source = this.parseModuleSpecifier(sourceNode);
+      return new ImportStmt({ spec: { source, namespaceBinding: alias }, span });
+    }
+    throw new Error(`Unknown import kind ${kind}`);
+  }
+
+  private buildExport(node: ListNode): ExportStmt {
+    const span = node.span;
+    const head = node.elements[0];
+    if (head.type !== "atom") {
+      throw new Error("Export statement must start with an atom");
+    }
+    if (head.value === "export-default") {
+      const declarationNode = node.elements[1];
+      if (!declarationNode) {
+        throw new Error("export-default requires an expression");
+      }
+      const declaration = this.nodeToExpression(declarationNode);
+      return new ExportStmt({ spec: { defaultExport: declaration }, span });
+    }
+    const nameNode = node.elements[1];
+    if (!nameNode) {
+      throw new Error("export requires a name");
+    }
+    const local = this.nodeToExpression(nameNode);
+    const identifier = this.ensureIdentifierExpression(local, "export name");
+    const named: NamedExport[] = [{ exported: identifier.name, local: identifier }];
+    return new ExportStmt({ spec: { named }, span });
+  }
+
+  private parseModuleSpecifier(node: Node): Literal {
+    const expr = this.nodeToExpression(node);
+    if (!(expr instanceof Literal)) {
+      throw new Error("Module specifier must be a literal");
+    }
+    return expr;
+  }
+
+  private parseNamedImport(node: Node): NamedImport {
+    if (node.type === "atom") {
+      const name = node.value;
+      const ident = new Identifier({ name, span: node.span });
+      return { imported: name, local: ident };
+    }
+    if (node.type === "list" && node.elements.length === 2) {
+      const [importedNode, localNode] = node.elements;
+      if (importedNode.type !== "atom" || localNode.type !== "atom") {
+        throw new Error("import-named alias entries must contain identifier atoms");
+      }
+      const localIdent = new Identifier({ name: localNode.value, span: localNode.span });
+      return { imported: importedNode.value, local: localIdent };
+    }
+    throw new Error("import-named entries must be identifiers or two-element lists");
+  }
+
+  private nodeToIdentifier(node: Node, label: string): Identifier {
+    if (node.type === "atom") {
+      return new Identifier({ name: node.value, span: node.span });
+    }
+    const expr = this.nodeToExpression(node);
+    if (expr instanceof Identifier) {
+      return expr;
+    }
+    throw new Error(`${label} must resolve to an identifier`);
+  }
+
+  private ensureIdentifierExpression(expr: Expression, label: string): Identifier {
+    if (expr instanceof Identifier) {
+      return expr;
+    }
+    throw new Error(`${label} must be an identifier`);
+  }
+
   private buildCatchClause(node: ListNode): CatchClause {
     const [, ...rest] = node.elements;
     let binding: Binding | undefined;
@@ -764,6 +883,9 @@ class Parser {
   private atomToValue(atom: AtomNode): Expression {
     const { value } = atom;
     const span = atom.span;
+    if (atom.tokenType === "string") {
+      return new Literal({ value, span });
+    }
     if (/^-?\d+(\.\d+)?$/.test(value)) {
       return new Literal({ value: Number.parseFloat(value), span });
     }
