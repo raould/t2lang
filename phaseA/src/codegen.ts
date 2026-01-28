@@ -8,14 +8,23 @@ import {
   CallExpr,
   LetStarExpr,
   Binding,
+  BindingTarget,
+  ArrayPattern,
+  ObjectPattern,
+  RestPattern,
   ArrayExpr,
   BlockStmt,
   AssignExpr,
   ReturnExpr,
   IfStmt,
   WhileStmt,
+  ForClassic,
+  ForOf,
+  ForAwait,
+  ThrowExpr,
+  TryCatchExpr,
+  SwitchStmt,
 } from "./phaseA1.js";
-
 export interface CompilerConfig {
   prettyOutput?: "pretty" | "ugly";
   emitTypes?: boolean;
@@ -31,7 +40,6 @@ export interface SourceMapping {
   original: { line: number; column: number };
   source: string;
 }
-
 interface EmittedStatement {
   lines: string[];
   mappings: Array<{ lineOffset: number; original: { line: number; column: number }; source: string }>;
@@ -73,6 +81,9 @@ export async function generateCode(program: Program, config: CompilerConfig = {}
 
 async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
   if (stmt instanceof ExprStmt) {
+    if (stmt.expr instanceof TryCatchExpr) {
+      return await emitTryCatchStatement(stmt.expr);
+    }
     return {
       lines: [`${await emitExpression(stmt.expr)};`],
       mappings: [mappingFromSpan(stmt.expr.span, 0)],
@@ -154,6 +165,68 @@ async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
       mappings: [mappingFromSpan(stmt.span, 0)],
     };
   }
+  if (stmt instanceof SwitchStmt) {
+    const discriminant = await emitExpression(stmt.discriminant);
+    const lines: string[] = [`switch (${discriminant}) {`];
+    for (const c of stmt.cases) {
+      const label = c.test ? `case ${await emitExpression(c.test)}:` : "default:";
+      lines.push(`  ${label}`);
+      for (const inner of c.consequent) {
+        const emitted = await emitStatement(inner);
+        for (const line of emitted.lines) {
+          lines.push(`    ${line}`);
+        }
+      }
+    }
+    lines.push("}");
+    return {
+      lines,
+      mappings: [mappingFromSpan(stmt.span, 0)],
+    };
+  }
+  if (stmt instanceof ForClassic) {
+    const initClause = stmt.init ? await clauseFromStatement(stmt.init) : "";
+    const condition = stmt.condition ? await emitExpression(stmt.condition) : "";
+    const update = stmt.update ? await emitExpression(stmt.update) : "";
+    const body = await emitStatementBody(stmt.body);
+    const lines: string[] = [`for (${initClause}; ${condition}; ${update}) {`];
+    for (const line of body.lines) {
+      lines.push(`  ${line}`);
+    }
+    lines.push("}");
+    return {
+      lines,
+      mappings: [mappingFromSpan(stmt.span, 0)],
+    };
+  }
+  if (stmt instanceof ForOf) {
+    const bindingClause = await emitBindingClause(stmt.binding);
+    const iterable = await emitExpression(stmt.iterable);
+    const body = await emitStatementBody(stmt.body);
+    const lines: string[] = [`for (let ${bindingClause} of ${iterable}) {`];
+    for (const line of body.lines) {
+      lines.push(`  ${line}`);
+    }
+    lines.push("}");
+    return {
+      lines,
+      mappings: [mappingFromSpan(stmt.span, 0)],
+    };
+  }
+  if (stmt instanceof ForAwait) {
+    const bindingClause = await emitBindingClause(stmt.binding);
+    const iterable = await emitExpression(stmt.iterable);
+    const body = await emitStatementBody(stmt.body);
+    const lines: string[] = [`for await (let ${bindingClause} of ${iterable}) {`];
+    for (const line of body.lines) {
+      lines.push(`  ${line}`);
+    }
+    lines.push("}");
+    return {
+      lines,
+      mappings: [mappingFromSpan(stmt.span, 0)],
+    };
+  }
   if (stmt instanceof BlockStmt) {
     const lines: string[] = ["{"];
     const mappings: EmittedStatement["mappings"] = [];
@@ -221,7 +294,103 @@ async function emitExpression(expr: Expression): Promise<string> {
     const entries = await Promise.all(expr.elements.map(emitExpression));
     return `[${entries.join(", ")}]`;
   }
+  if (expr instanceof ThrowExpr) {
+    const argument = await emitExpression(expr.argument);
+    return `throw ${argument}`;
+  }
   return "undefined";
+}
+
+async function clauseFromStatement(stmt: Statement): Promise<string> {
+  const emitted = await emitStatement(stmt);
+  const text = emitted.lines.map((line) => line.trim()).filter(Boolean).join(" ");
+  return stripTrailingSemicolon(text);
+}
+
+function stripTrailingSemicolon(text: string): string {
+  if (!text) {
+    return "";
+  }
+  if (text.endsWith(";")) {
+    return text.slice(0, -1);
+  }
+  return text;
+}
+
+async function emitBindingClause(binding: Binding): Promise<string> {
+  const targetText = await emitBindingTarget(binding.target);
+  if (binding.init) {
+    const initText = await emitExpression(binding.init);
+    return `${targetText} = ${initText}`;
+  }
+  return targetText;
+}
+
+async function emitBindingTarget(target: BindingTarget): Promise<string> {
+  if (target instanceof Identifier) {
+    return target.name;
+  }
+  if (target instanceof ArrayPattern) {
+    const parts = await Promise.all(target.elements.map(emitBindingTarget));
+    if (target.rest) {
+      const restText = await emitBindingTarget(target.rest);
+      parts.push(restText);
+    }
+    return `[${parts.join(", ")}]`;
+  }
+  if (target instanceof ObjectPattern) {
+    const fields = await Promise.all(
+      target.properties.map(async (property) => {
+        const valueText = await emitBindingTarget(property.target);
+        return valueText === property.key ? property.key : `${property.key}: ${valueText}`;
+      })
+    );
+    if (target.rest) {
+      const restText = await emitBindingTarget(target.rest);
+      fields.push(restText);
+    }
+    if (fields.length === 0) {
+      return "{}";
+    }
+    return `{ ${fields.join(", ")} }`;
+  }
+  if (target instanceof RestPattern) {
+    const inner = await emitBindingTarget(target.target);
+    return `...${inner}`;
+  }
+  throw new Error("Unsupported binding target in codegen");
+}
+
+async function emitTryCatchStatement(expr: TryCatchExpr): Promise<EmittedStatement> {
+  const lines: string[] = ["try {"];
+  const body = await emitStatementBody(expr.body);
+  for (const line of body.lines) {
+    lines.push(`  ${line}`);
+  }
+  lines.push("}");
+  if (expr.catchClause) {
+    const binding = expr.catchClause.binding ? await emitBindingTarget(expr.catchClause.binding.target) : undefined;
+    const header = binding ? `catch (${binding}) {` : "catch {";
+    lines.push(header);
+    for (const stmt of expr.catchClause.body) {
+      const emitted = await emitStatement(stmt);
+      for (const line of emitted.lines) {
+        lines.push(`  ${line}`);
+      }
+    }
+    lines.push("}");
+  }
+  if (expr.finallyClause) {
+    lines.push("finally {");
+    for (const stmt of expr.finallyClause.body) {
+      const emitted = await emitStatement(stmt);
+      for (const line of emitted.lines) {
+        lines.push(`  ${line}`);
+      }
+    }
+    lines.push("}");
+  }
+  return { lines, mappings: [mappingFromSpan(expr.span, 0)] };
 }
 
 function mappingFromSpan(span: { source: string; startLine?: number; startColumn?: number }, lineOffset: number) {

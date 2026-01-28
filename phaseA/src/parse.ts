@@ -7,13 +7,26 @@ import {
   ReturnExpr,
   IfStmt,
   WhileStmt,
+  ForClassic,
+  ForOf,
+  ForAwait,
+  SwitchStmt,
+  SwitchCase,
   PropExpr,
   IndexExpr,
   ObjectExpr,
   NewExpr,
+  ThrowExpr,
+  TryCatchExpr,
   Literal,
   Identifier,
   Binding,
+  BindingTarget,
+  ArrayPattern,
+  ObjectPattern,
+  RestPattern,
+  CatchClause,
+  FinallyClause,
   Expression,
   Statement,
   Span,
@@ -256,6 +269,9 @@ class Parser {
     if (node.type === "list" && node.elements.length > 0) {
       const head = node.elements[0];
       if (head.type === "atom") {
+        if (head.value === "for") {
+          return this.buildForLoop(node);
+        }
         if (head.value === "let*") {
           return this.buildLetStar(node, false);
         }
@@ -277,6 +293,9 @@ class Parser {
         if (head.value === "while") {
           return this.buildWhile(node);
         }
+        if (head.value === "switch") {
+          return this.buildSwitch(node);
+        }
       }
     }
     return new ExprStmt({ expr: this.nodeToExpression(node), span: node.span });
@@ -288,20 +307,7 @@ class Parser {
     if (!bindingsNode || bindingsNode.type !== "list") {
       throw new Error("let* requires a binding list");
     }
-    const bindings: Binding[] = bindingsNode.elements.map((bindingNode) => {
-      if (bindingNode.type !== "list" || bindingNode.elements.length < 2) {
-        throw new Error("Invalid let* binding");
-      }
-      const nameNode = bindingNode.elements[0];
-      if (nameNode.type !== "atom") {
-        throw new Error("Binding name must be an identifier");
-      }
-      const initNode = bindingNode.elements[1];
-      return {
-        target: new Identifier({ name: nameNode.value, span: nameNode.span }),
-        init: this.nodeToExpression(initNode),
-      };
-    });
+    const bindings: Binding[] = bindingsNode.elements.map((bindingNode) => this.nodeToBinding(bindingNode));
     const statements = body.map((child) => this.nodeToStatement(child));
     return new LetStarExpr({ isConst, bindings, body: statements, span });
   }
@@ -358,6 +364,189 @@ class Parser {
     return new WhileStmt({ condition, body, span });
   }
 
+  private buildForLoop(node: ListNode): Statement {
+    const kindNode = node.elements[1];
+    if (!kindNode || kindNode.type !== "atom") {
+      throw new Error("for loop requires a kind");
+    }
+    if (kindNode.value === "classic") {
+      return this.buildForClassic(node);
+    }
+    if (kindNode.value === "of") {
+      return this.buildForOf(node);
+    }
+    if (kindNode.value === "await") {
+      return this.buildForAwait(node);
+    }
+    throw new Error(`Unsupported for loop kind ${kindNode.value}`);
+  }
+
+  private buildForClassic(node: ListNode): ForClassic {
+    const span = node.span;
+    const args = node.elements.slice(2);
+    if (args.length === 0) {
+      throw new Error("for classic requires a body");
+    }
+    const bodyNode = args[args.length - 1];
+    const clauseNodes = args.slice(0, -1);
+    if (clauseNodes.length > 3) {
+      throw new Error("for classic accepts at most init, condition, and update");
+    }
+    const init = clauseNodes[0] ? this.nodeToStatement(clauseNodes[0]) : undefined;
+    const condition = clauseNodes[1] ? this.nodeToExpression(clauseNodes[1]) : undefined;
+    const update = clauseNodes[2] ? this.nodeToExpression(clauseNodes[2]) : undefined;
+    const body = this.nodeToStatement(bodyNode);
+    return new ForClassic({ init, condition, update, body, span });
+  }
+
+  private buildForOf(node: ListNode): ForOf {
+    const span = node.span;
+    const clauseNode = node.elements[2];
+    const bodyNode = node.elements[3];
+    if (!clauseNode || clauseNode.type !== "list") {
+      throw new Error("for-of requires a binding clause");
+    }
+    if (!bodyNode) {
+      throw new Error("for-of requires a body");
+    }
+    const [bindingNode, iterableNode] = clauseNode.elements;
+    if (!bindingNode || !iterableNode) {
+      throw new Error("for-of clause requires a binding target and iterable");
+    }
+    const binding = this.nodeToBinding(bindingNode);
+    const iterable = this.nodeToExpression(iterableNode);
+    const body = this.nodeToStatement(bodyNode);
+    return new ForOf({ binding, iterable, body, span });
+  }
+
+  private buildForAwait(node: ListNode): ForAwait {
+    const span = node.span;
+    const clauseNode = node.elements[2];
+    const bodyNode = node.elements[3];
+    if (!clauseNode || clauseNode.type !== "list") {
+      throw new Error("for-await requires a binding clause");
+    }
+    if (!bodyNode) {
+      throw new Error("for-await requires a body");
+    }
+    const [bindingNode, iterableNode] = clauseNode.elements;
+    if (!bindingNode || !iterableNode) {
+      throw new Error("for-await clause requires a binding target and iterable");
+    }
+    const binding = this.nodeToBinding(bindingNode);
+    const iterable = this.nodeToExpression(iterableNode);
+    const body = this.nodeToStatement(bodyNode);
+    return new ForAwait({ binding, iterable, body, span });
+  }
+
+  private nodeToBinding(node: Node): Binding {
+    if (node.type !== "list" || node.elements.length === 0) {
+      throw new Error("Invalid binding");
+    }
+    if (node.elements.length > 2) {
+      throw new Error("Binding can only have a target and optional initializer");
+    }
+    const targetNode = node.elements[0];
+    const initNode = node.elements[1];
+    return {
+      target: this.nodeToBindingTarget(targetNode),
+      init: initNode ? this.nodeToExpression(initNode) : undefined,
+    };
+  }
+
+  private nodeToBindingTarget(node: Node): BindingTarget {
+    if (node.type === "atom") {
+      return new Identifier({ name: node.value, span: node.span });
+    }
+    if (node.type === "list" && node.elements.length > 0) {
+      const head = node.elements[0];
+      if (head.type === "atom") {
+        if (head.value === "array-pattern") {
+          return this.buildArrayPattern(node);
+        }
+        if (head.value === "object-pattern") {
+          return this.buildObjectPattern(node);
+        }
+        if (head.value === "rest") {
+          return this.buildRestPattern(node);
+        }
+      }
+    }
+    throw new Error("Invalid binding target");
+  }
+
+  private isBindingCandidate(node: ListNode): boolean {
+    const head = node.elements[0];
+    if (head.type !== "atom") {
+      return false;
+    }
+    const expressionHeads = new Set([
+      "call",
+      "array",
+      "object",
+      "prop",
+      "index",
+      "new",
+      "throw",
+      "try",
+    ]);
+    if (expressionHeads.has(head.value)) {
+      return false;
+    }
+    return true;
+  }
+
+  private buildArrayPattern(node: ListNode): ArrayPattern {
+    const span = node.span;
+    const elements: BindingTarget[] = [];
+    let rest: BindingTarget | undefined;
+    for (const child of node.elements.slice(1)) {
+      if (child.type === "list" && child.elements.length > 0) {
+        const head = child.elements[0];
+        if (head.type === "atom" && head.value === "rest") {
+          rest = this.buildRestPattern(child);
+          continue;
+        }
+      }
+      elements.push(this.nodeToBindingTarget(child));
+    }
+    return new ArrayPattern({ elements, span, rest });
+  }
+
+  private buildObjectPattern(node: ListNode): ObjectPattern {
+    const span = node.span;
+    const properties: { key: string; target: BindingTarget }[] = [];
+    let rest: BindingTarget | undefined;
+    for (const child of node.elements.slice(1)) {
+      if (child.type === "list" && child.elements.length > 0) {
+        const head = child.elements[0];
+        if (head.type === "atom" && head.value === "rest") {
+          rest = this.buildRestPattern(child);
+          continue;
+        }
+      }
+      if (child.type !== "list" || child.elements.length < 2) {
+        throw new Error("object-pattern fields must be (key target)");
+      }
+      const keyNode = child.elements[0];
+      if (keyNode.type !== "atom") {
+        throw new Error("object-pattern field key must be a string literal");
+      }
+      const targetNode = child.elements[1];
+      properties.push({ key: keyNode.value, target: this.nodeToBindingTarget(targetNode) });
+    }
+    return new ObjectPattern({ properties, span, rest });
+  }
+
+  private buildRestPattern(node: ListNode): RestPattern {
+    const span = node.span;
+    const [, targetNode] = node.elements;
+    if (!targetNode) {
+      throw new Error("rest target requires a binding target");
+    }
+    return new RestPattern({ target: this.nodeToBindingTarget(targetNode), span });
+  }
+
   private buildStatementSequence(nodes: Node[], span: Span): Statement {
     if (nodes.length === 1) {
       return this.nodeToStatement(nodes[0]);
@@ -393,6 +582,12 @@ class Parser {
       }
       if (head.value === "call") {
         return this.buildCall(node);
+      }
+      if (head.value === "throw") {
+        return this.buildThrow(node);
+      }
+      if (head.value === "try") {
+        return this.buildTry(node);
       }
     }
     if (node.elements.length === 1) {
@@ -468,6 +663,102 @@ class Parser {
     const callee = this.nodeToExpression(calleeNode);
     const args = argNodes.map((child) => this.nodeToExpression(child));
     return new NewExpr({ callee, args, span });
+  }
+
+  private buildThrow(node: ListNode): ThrowExpr {
+    const span = node.span;
+    const [, argumentNode] = node.elements;
+    if (!argumentNode) {
+      throw new Error("throw requires an argument");
+    }
+    const argument = this.nodeToExpression(argumentNode);
+    return new ThrowExpr({ argument, span });
+  }
+
+  private buildTry(node: ListNode): TryCatchExpr {
+    const span = node.span;
+    const bodyNode = node.elements[1];
+    if (!bodyNode) {
+      throw new Error("try requires a body statement");
+    }
+    const body = this.nodeToStatement(bodyNode);
+    let catchClause: CatchClause | undefined;
+    let finallyClause: FinallyClause | undefined;
+    for (let i = 2; i < node.elements.length; i++) {
+      const child = node.elements[i];
+      if (child.type !== "list" || child.elements.length === 0) {
+        throw new Error("try child must be catch or finally");
+      }
+      const head = child.elements[0];
+      if (head.type !== "atom") {
+        throw new Error("try child must start with an atom");
+      }
+      if (head.value === "catch") {
+        catchClause = this.buildCatchClause(child);
+        continue;
+      }
+      if (head.value === "finally") {
+        finallyClause = this.buildFinallyClause(child);
+        continue;
+      }
+      throw new Error(`Unknown try child ${head.value}`);
+    }
+    return new TryCatchExpr({ body, span, catchClause, finallyClause });
+  }
+
+  private buildSwitch(node: ListNode): SwitchStmt {
+    const span = node.span;
+    const discriminantNode = node.elements[1];
+    if (!discriminantNode) {
+      throw new Error("switch requires a discriminant");
+    }
+    const discriminant = this.nodeToExpression(discriminantNode);
+    const cases: SwitchCase[] = [];
+    for (let i = 2; i < node.elements.length; i++) {
+      const child = node.elements[i];
+      if (child.type !== "list" || child.elements.length === 0) {
+        throw new Error("switch cases must be non-empty lists");
+      }
+      const head = child.elements[0];
+      if (head.type !== "atom") {
+        throw new Error("switch case head must be an atom");
+      }
+      if (head.value === "case") {
+        const testNode = child.elements[1];
+        if (!testNode) {
+          throw new Error("case requires an expression");
+        }
+        const statements = child.elements.slice(2).map((stmt) => this.nodeToStatement(stmt));
+        cases.push({ test: this.nodeToExpression(testNode), consequent: statements });
+        continue;
+      }
+      if (head.value === "default") {
+        const statements = child.elements.slice(1).map((stmt) => this.nodeToStatement(stmt));
+        cases.push({ test: null, consequent: statements });
+        continue;
+      }
+      throw new Error(`Unknown switch clause ${head.value}`);
+    }
+    return new SwitchStmt({ discriminant, cases, span });
+  }
+
+  private buildCatchClause(node: ListNode): CatchClause {
+    const [, ...rest] = node.elements;
+    let binding: Binding | undefined;
+    let bodyStartIndex = 1;
+    if (rest.length > 0 && rest[0].type === "list" && rest[0].elements.length <= 2 && this.isBindingCandidate(rest[0])) {
+      binding = this.nodeToBinding(rest[0]);
+      bodyStartIndex = 2;
+    }
+    const bodyNodes = node.elements.slice(bodyStartIndex);
+    const body = bodyNodes.map((stmt) => this.nodeToStatement(stmt));
+    return { binding, body };
+  }
+
+  private buildFinallyClause(node: ListNode): FinallyClause {
+    const [, ...bodyNodes] = node.elements;
+    const body = bodyNodes.map((child) => this.nodeToStatement(child));
+    return { body };
   }
 
   private atomToValue(atom: AtomNode): Expression {
