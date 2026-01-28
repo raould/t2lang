@@ -7,6 +7,10 @@ import {
   ReturnExpr,
   IfStmt,
   WhileStmt,
+  PropExpr,
+  IndexExpr,
+  ObjectExpr,
+  NewExpr,
   Literal,
   Identifier,
   Binding,
@@ -370,9 +374,26 @@ class Parser {
       return new ArrayExpr({ elements: [], span: node.span });
     }
     const head = node.elements[0];
-    if (head.type === "atom" && head.value === "array") {
-      const values = node.elements.slice(1).map((child) => this.nodeToExpression(child));
-      return new ArrayExpr({ elements: values, span: node.span });
+    if (head.type === "atom") {
+      if (head.value === "array") {
+        const values = node.elements.slice(1).map((child) => this.nodeToExpression(child));
+        return new ArrayExpr({ elements: values, span: node.span });
+      }
+      if (head.value === "object") {
+        return this.buildObject(node);
+      }
+      if (head.value === "prop") {
+        return this.buildProp(node);
+      }
+      if (head.value === "index") {
+        return this.buildIndex(node);
+      }
+      if (head.value === "new") {
+        return this.buildNew(node);
+      }
+      if (head.value === "call") {
+        return this.buildCall(node);
+      }
     }
     if (node.elements.length === 1) {
       return this.nodeToExpression(node.elements[0]);
@@ -380,6 +401,73 @@ class Parser {
     const callee = this.nodeToExpression(head);
     const args = node.elements.slice(1).map((child) => this.nodeToExpression(child));
     return new CallExpr({ callee, args, span: node.span });
+  }
+
+  private buildCall(node: ListNode): CallExpr {
+    const span = node.span;
+    const [, calleeNode, ...argNodes] = node.elements;
+    if (!calleeNode) {
+      throw new Error("call requires a callee");
+    }
+    const callee = this.nodeToExpression(calleeNode);
+    const args = argNodes.map((child) => this.nodeToExpression(child));
+    return new CallExpr({ callee, args, span });
+  }
+
+  private buildProp(node: ListNode): PropExpr {
+    const span = node.span;
+    const [, objectNode, nameNode] = node.elements;
+    if (!objectNode || !nameNode || nameNode.type !== "atom") {
+      throw new Error("prop requires an object and a literal property name");
+    }
+    return new PropExpr({
+      object: this.nodeToExpression(objectNode),
+      name: nameNode.value,
+      maybeNull: false,
+      span,
+    });
+  }
+
+  private buildIndex(node: ListNode): IndexExpr {
+    const span = node.span;
+    const [, objectNode, indexNode] = node.elements;
+    if (!objectNode || !indexNode) {
+      throw new Error("index requires object and index expressions");
+    }
+    return new IndexExpr({
+      object: this.nodeToExpression(objectNode),
+      index: this.nodeToExpression(indexNode),
+      maybeNull: false,
+      span,
+    });
+  }
+
+  private buildObject(node: ListNode): ObjectExpr {
+    const span = node.span;
+    const fieldNodes = node.elements.slice(1);
+    const fields = fieldNodes.map((fieldNode) => {
+      if (fieldNode.type !== "list" || fieldNode.elements.length < 2) {
+        throw new Error("object fields must be (key value)");
+      }
+      const keyNode = fieldNode.elements[0];
+      if (keyNode.type !== "atom") {
+        throw new Error("object field key must be a string literal");
+      }
+      const valueNode = fieldNode.elements[1];
+      return { key: keyNode.value, value: this.nodeToExpression(valueNode) };
+    });
+    return new ObjectExpr({ fields, span });
+  }
+
+  private buildNew(node: ListNode): NewExpr {
+    const span = node.span;
+    const [, calleeNode, ...argNodes] = node.elements;
+    if (!calleeNode) {
+      throw new Error("new requires a callee");
+    }
+    const callee = this.nodeToExpression(calleeNode);
+    const args = argNodes.map((child) => this.nodeToExpression(child));
+    return new NewExpr({ callee, args, span });
   }
 
   private atomToValue(atom: AtomNode): Expression {
