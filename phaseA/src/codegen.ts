@@ -465,9 +465,16 @@ async function emitExpression(expr: Expression): Promise<string> {
     return `(${value} as ${typeText})`;
   }
   if (expr instanceof TypeApp) {
+    // Safety check: The target of a TypeApp in an expression context must be an expression,
+    // not a static type node like TypeRef or TypePrimitive.
+    if (isTypeNodeValue(expr.expr)) {
+      throw new Error(
+        `Codegen Error: TypeApp in expression context has an invalid target: ${expr.expr.constructor.name}. Expected an expression.`
+      );
+    }
     const target = await emitExpression(expr.expr as Expression);
     const typeArgs = await Promise.all(expr.typeArgs.map(emitTypeNode));
-      return `${target}<${typeArgs.join(", ")}>`;
+    return `${target}<${typeArgs.join(", ")}>`;
   }
   if (expr instanceof PropExpr) {
     const objectExpr = await emitExpression(expr.object);

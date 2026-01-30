@@ -38,7 +38,7 @@
 | FunctionExpr | `fn` | `signature: FnSignature`, `typeParams?: TypeParam[]`, `body: Stmt[]`, `async?: boolean`, `generator?: boolean` | A1 | Covers both function declarations and expressions; Phase B records metadata for decorators, params, `this` annotation. |
 | ClassExpr | `class` | `name?: Identifier`, `body: ClassBody`, `decorators?: Expr[]`, `extends?: Expr | null`, `implements?: Expr[]`, `constructor?: Stmt | null`, `staticBlocks?: Stmt[]` | A1 | Includes metadata for TypeScript sugar (decorators, modifiers, implements). |
 | TypeAliasStmt | `type-alias` | `name: Identifier`, `typeParams?: TypeParam[]`, `type: TypeNode` | A1 | Represents TypeScript `type` declarations after Phase B rewrite. |
-| InterfaceExpr | `type-interface` | `name: Identifier`, `body: InterfaceBody` | A1 | Represents TypeScript `interface` declarations. |
+| InterfaceStmt | `type-interface` | `name: Identifier`, `body: InterfaceBody` | A1 | Represents TypeScript `interface` declarations. |
 | TypeAssertExpr | `type-assert` | `expr: Expr`, `type: TypeNode` | A1 | Phase B rewrites `as Type` expressions to this form. |
 | TypeFunction | `type-function` | `typeParams?: TypeParam[]`, `params: TypeNode[]`, `returns: TypeNode` | A1 | Canonical arrow/function type. |
 | TypeObject | `type-object` | `fields: TypeField[]` | A1 | Structured object type. |

@@ -32,7 +32,7 @@ Phase A keeps only a few canonical primitives per statement class so Phase B
 | `function` declarations/expressions | `function` | ✅ `FunctionExpr` metadata | ✅ expand decorators, parameter sugar | Phase B rewrites TS syntax into canonical shape. |
 | `class` | `class` | ✅ `ClassExpr` | ✅ rewrite decorators/modifiers | Phase B emits fields/methods metadata. |
 | `import` / `export` | `import` / `export` | ✅ canonical metadata | ✅ rewrite `import type`, namespace sugar | Matches Phase0 forms. |
-| `type-alias`, `interface` | `type-alias`, `interface` | ✅ `TypeAliasStmt`, `InterfaceExpr` | ✅ rewrite advanced TS sugar (`extends`, `implements`) | Phase B normalizes convenience syntax. |
+| `type-alias`, `interface` | `type-alias`, `interface` | ✅ `TypeAliasStmt`, `InterfaceStmt` | ✅ rewrite advanced TS sugar (`extends`, `implements`) | Phase B normalizes convenience syntax. |
 | `throw`, `try/catch/finally` | `throw`, `try-catch` | ✅ canonical nodes | ✅ rewrite optional clauses | `TryCatchExpr` already tracks bodies. |
 
 Entries not marked as ✅ in Phase A indicate we still need to decide whether to expand the canonical set or leave the behavior in Phase B (e.g., how best to represent `switch`). Use this table to determine the minimal primitives required before Phase B handles syntactic convenience.
@@ -59,7 +59,7 @@ Every Phase A node has a single canonical AST interface name and a fixed s-exp
 | `ImportStmt` | `import` | Handles named/default/all namespace imports plus TypeScript-specific aliases. |
 | `ExportStmt` | `export` | Reuses the Phase0 export shapes. |
 | `TypeAliasStmt` | `type-alias` | Type aliases with optional generics. |
-| `InterfaceExpr` | `type-interface` | Interface declarations with body expressions. |
+| `InterfaceStmt` | `type-interface` | Interface declarations with body expressions. |
 | `ThrowExpr` | `throw` | Expression-form throwing. |
 | `TryCatchExpr` | `try` | Try/catch/finally with optional catch binding. |
 | `ExprStmt` | `exprStmt` | Wraps expression statements so Phase A only sees explicit side-effect nodes (`assign`, `call`, etc.) instead of bare expressions. |
@@ -78,7 +78,7 @@ Whenever new nodes appear, extend this table so the canonical names remain autho
 - Module-level features (`namespace`, `import type`, `export type`, `export =`, `export * as`): Phase B rewrites these forms into the simple `import`/`export` nodes Phase A already exposes, carrying the canonical metadata needed for resolution and codegen.
 - Labels and control-transfer sugar (labeled `break`/`continue`, `try/catch/finally`): Phase B keeps the user-facing syntax but emits the canonical `break`, `continue`, and `try-catch` nodes, tagging optional label names when needed.
 - `return`/`yield`/`throw`: Implicit returns and generator/yield behavior are normalized by Phase B so Phase A only sees explicit `return`, `yield`, and `throw` nodes with resolved expressions.
-- Type declarations (`type` aliases, `interface`, `implements`, `type assertions`): Phase B rewrites these to `TypeAliasStmt`, `InterfaceExpr`, and `type-*` nodes, keeping Phase A focused on structural shape rather than TypeScript syntax.
+- Type declarations (`type` aliases, `interface`, `implements`, `type assertions`): Phase B rewrites these to `TypeAliasStmt`, `InterfaceStmt`, and `type-*` nodes, keeping Phase A focused on structural shape rather than TypeScript syntax.
 - `let`/`const` with destructuring and comma-separated bindings: Flattened into ordered entries in `LetStarExpr`, with `isConst` flags to distinguish the binding kind. Each entry is a `Binding` helper so destructuring patterns (`array-pattern`, `object-pattern`, `rest`) can appear directly in Phase A1 without Phase B inventing helper assignments.
 - `spread` / `rest` positions in arrays, objects, and destructuring: Phase B rewrites the `...` sugar into canonical `SpreadExpr` entries so Phase A only sees explicit container nodes with ordinal `spread` markers.
 
