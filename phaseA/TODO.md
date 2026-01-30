@@ -9,8 +9,9 @@
     * Codegen: walk the Phase A AST and emit TS, respecting pretty/ugly and emitTypes flags.
         * Done: let/const bindings, assign, return, block, if, while; array/call/ident/literal.
         * Done: for/try/throw/switch, prop/index/object/new, functions/classes, import/export, types, operator lowering.
-    * Next: Diagnostics/tracing: connect parser + processor so compilePhaseA emits diagnostics/events (AST dumps, trace events, snapshots) compatible with the CLI flags (--ast*, --log, --log-level).
-* CLI glue: once parsing and codegen exist, update cli.ts to:
+    * Done: Diagnostics/tracing: connect parser + processor so compilePhaseA emits diagnostics/events (AST dumps, trace events, snapshots) compatible with the CLI flags (--ast*, --log, --log-level).
+    * Next: Enrich event/diagnostic metadata (e.g., severity tags) so --log-level=warn/error can truly filter logs without disabling all event output.
+* Next: CLI glue: once parsing and codegen exist, update cli.ts to:
     * Parse CLI arguments for input/output, AST dump flags, trace phases, pretty modes, etc.
     * Call compilePhaseA with the parsed source and config, then write the generated TypeScript to the requested destination (file or stdout), handling Prettier when requested.
     * Emit AST dumps/traces via the new event stream.
@@ -25,6 +26,8 @@
     * type AST parsing/emission: type-ref, type-literal, type-object, type-array, type-union, type-intersection, type-function, type-mapped, typeparams, type-app.
 
 # then
+
+* Phase B macros must update --ast-before-expand and --ast-after-expand to be working before and after macros, repectively.
 
 * Trace/log/event plumbing – Spec mandates a standalone Phase A CLI that emits stage-tagged events (phaseA-parse, phaseA-typecheck, etc.), exposes ArrayEventSink-style traces, includes compiler stamp/UTC/seed info, and honors --trace/--log-level flags. Nothing in src currently interfaces with CLI or event sinks, so wiring Phase A processors into a traced runtime is top priority (matches your suggestion).
     * Add a lightweight PhaseAEventSink (mirroring Phase1’s ArrayEventSink) plus shared PhaseACompilerContext that stores { cacheStamp, seed, events: EventSink }. The processors in phaseA0.ts/phaseA1.ts will accept that context so they can emit events like emit({ phase: "parse", kind: "trace", data: {...}}) before/after each visitor run; these events should include the stage label (phaseA-parse, phaseA-typecheck, etc.), UTC timestamp, compiler stamp, and the current seed per the spec [PhaseA-PhaseB-Spec-Draft.md#CLI&DiagnosticSurface].

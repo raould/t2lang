@@ -22,6 +22,8 @@ interface CliOptions {
   astAfterExpand?: boolean;
   dumpSnapshots?: string;
   logLevel?: "debug" | "info" | "warn" | "error";
+  trace?: boolean;
+  tracePhases?: string[];
 }
 
 type SnapshotEntry = { stage: CompilerStage; program: () => Promise<unknown> };
@@ -54,14 +56,21 @@ function buildCommand(): Command {
     .option(
       "--log-phases <phases>",
       "Comma-separated list of logged phases (parse, resolve, typecheck, codegen)",
-      parseLogPhaseList,
+      parsePhaseList,
+      [] as string[]
+    )
+    .option("--trace", "Show trace events for every phase")
+    .option(
+      "--trace-phases <phases>",
+      "Comma-separated list of traced phases (parse, resolve, typecheck, codegen)",
+      parsePhaseList,
       [] as string[]
     )
     .allowUnknownOption(false);
   return cmd;
 }
 
-function parseLogPhaseList(value: string): string[] {
+function parsePhaseList(value: string): string[] {
   const phases = value
     .split(",")
     .map((p) => p.trim())
@@ -155,6 +164,10 @@ export async function main(argv: string[]): Promise<void> {
     logPhases.add("all");
   }
   const logLevel = options.logLevel ?? "info";
+  const tracePhases = new Set<string>(options.tracePhases ?? []);
+  if (options.trace) {
+    tracePhases.add("all");
+  }
 
   const isStdin = inputPath === "-";
   let writeStdout = Boolean(options.stdout) || isStdin;
@@ -163,11 +176,12 @@ export async function main(argv: string[]): Promise<void> {
   }
 
   const source = await readSource(inputPath);
+  const prettyOption = options.prettyOption ?? "pretty";
   const result = await compilePhaseA(source, {
     sourcePath: isStdin ? "stdin.t2" : inputPath,
     seed: options.seed,
     emitTypes: options.emitTypes,
-    prettyOption: options.prettyOption,
+    prettyOption,
   });
 
   if (result.diagnostics.length > 0) {
@@ -179,6 +193,12 @@ export async function main(argv: string[]): Promise<void> {
   if (shouldLog(logLevel)) {
     for (const event of result.events) {
       logEvent(event, logPhases);
+    }
+  }
+
+  if (tracePhases.size > 0) {
+    for (const event of result.events) {
+      logTraceEvent(event, tracePhases);
     }
   }
 
@@ -202,14 +222,16 @@ export async function main(argv: string[]): Promise<void> {
     await dumpSnapshots(options.dumpSnapshots, result.snapshots);
   }
 
+  const outputSource = await formatWithPrettier(result.tsSource, prettyOption);
+
   if (writeStdout) {
-    console.log(result.tsSource);
+    console.log(outputSource);
     return;
   }
 
   const target = options.output ?? (isStdin ? "output.ts" : getDefaultOutput(inputPath));
   await fs.mkdir(path.dirname(target), { recursive: true });
-  await fs.writeFile(target, result.tsSource, "utf8");
+  await fs.writeFile(target, outputSource, "utf8");
   console.log(`Compiled ${inputPath} -> ${target}`);
 }
 
@@ -238,16 +260,27 @@ async function printAstDump(title: string, stage: CompilerStage, snapshots: Map<
 }
 
 function logEvent(event: CompilerEvent, logPhases: Set<string>): void {
-  if (logPhases.size === 0) {
-    return;
-  }
-  if (!logPhases.has("all") && !logPhases.has(event.phase)) {
+  if (!shouldEmitForPhase(logPhases, event.phase)) {
     return;
   }
   const timestamp = new Date(event.timestamp).toISOString();
   const payload = summarizeEventData(event);
   console.error(
     `[log] ${timestamp} ${event.phase} ${event.kind} seed=${event.seed} stamp=${event.stamp} ${payload}`
+  );
+}
+
+function logTraceEvent(event: CompilerEvent, tracePhases: Set<string>): void {
+  if (event.kind !== "trace") {
+    return;
+  }
+  if (!shouldEmitForPhase(tracePhases, event.phase)) {
+    return;
+  }
+  const timestamp = new Date(event.timestamp).toISOString();
+  const payload = summarizeEventData(event);
+  console.error(
+    `[trace] ${timestamp} ${event.phase} seed=${event.seed} stamp=${event.stamp} ${payload}`
   );
 }
 
@@ -281,6 +314,36 @@ function stringifyFilter(_key: string, value: unknown): unknown {
     return "<thunk>";
   }
   return value;
+}
+
+function shouldEmitForPhase(phases: Set<string>, phase: CompilerStage): boolean {
+  if (phases.size === 0) {
+    return false;
+  }
+  if (phases.has("all")) {
+    return true;
+  }
+  return phases.has(phase);
+}
+
+async function formatWithPrettier(source: string, prettyOption: "pretty" | "ugly"): Promise<string> {
+  if (prettyOption !== "pretty") {
+    return source;
+  }
+  try {
+    const module = await import("prettier");
+    const formatFn = (module as { format?: (text: string, opts?: { parser: string }) => string | Promise<string> }).format
+      ?? (module as { default?: { format?: (text: string, opts?: { parser: string }) => string | Promise<string> } }).default?.format;
+    if (typeof formatFn === "function") {
+      const formatted = await formatFn(source, { parser: "typescript" });
+      if (typeof formatted === "string") {
+        return formatted;
+      }
+    }
+  } catch {
+    // Prettier missing or failed; fall back to raw output.
+  }
+  return source;
 }
 
 if (fileURLToPath(import.meta.url) === process.argv[1]) {
