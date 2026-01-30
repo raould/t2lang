@@ -81,7 +81,7 @@ test("phaseA0 reports diagnostics for invalid assignment targets", async () => {
   });
   const result = await runProgram([invalidAssign]);
   assert.strictEqual(result.diagnostics.length, 1);
-  assert.strictEqual(result.diagnostics[0].message, "Invalid assignment target");
+  assert.strictEqual(result.diagnostics[0].message, "T2A:Invalid assignment target");
 });
 
 test("phaseA0 runs let* bindings sequentially", async () => {

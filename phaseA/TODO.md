@@ -38,15 +38,6 @@
 # pt 4
 
 * CLI integration (PhaseA CLI entry)
-    * Introduce cli.ts (the future t2tc/t2jc driver) that parses the flags we listed (--trace, --log-level, --seed, --ast*, --emit-types, etc.) using the shared common/cliHelper. That CLI will create the compiler context (seed default, compiler stamp from .internal_id) and instantiate the event sink before it starts.
-    * As each pipeline stage runs (parse, optional macro expand, resolve, typecheck, codegen), the CLI records begin/end events via the sink so consumers can filter them with --trace. The CLI also forwards the --log-level setting down to the context so diagnostics and processors can decide whether to emit debug vs. info messages.
-    * Build a thin api.ts that wraps the AST processors, adds the new trace hooks, and exposes compilePhaseA(source, config) similar to Phase1’s compilePhase1. The API should:
-    * Parse the input (creating the Phase A AST with phaseA1 nodes). Emit phaseA-parse begin/end events (including AST dumps when --ast(-before/after)-expand is enabled).
-    * If macros exist in Phase A, run them (or else skip) and emit phaseA-expand.
-    * Run the phaseA1 processor for resolve/typecheck, emitting phaseA-resolve/phaseA-typecheck events and capturing diagnostics.
-    * Run codegen (eventual output) and emit phaseA-codegen.
-    * Each event should carry the current seed from the CLI (e.g., context.seed) and the compiler stamp so the trace log can reproduce the run exactly as the spec requests.
-    * Update the processors so they push diagnostics that include phase metadata (parse, resolve, typecheck) and use a Phase A–specific prefix (T2A:) from reg_errors.json.
     * When the CLI emits events, include the diagnostics array so observers can see what errors occurred in that stage; also log them at the requested verbosity level (--log-level).
     * Once tracing is wired, hooking up AST dumps, snapshots, and Prettier will reuse the same event stream: e.g., the CLI can write the AST to disk whenever the phaseA-parse event fires if --ast-before-expand is true, and it can call into a serializer to emit the JSON snapshot mentioned in the tooling section.
     * The CLI’s --trace flag will control which event kinds are printed, and --seed ensures every event payload (and snapshot) references the deterministic seed value.

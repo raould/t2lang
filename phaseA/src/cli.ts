@@ -5,7 +5,14 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError, Option } from "commander";
 import { compilePhaseA } from "./api.js";
-import { CompilerEvent, CompilerStage, EventSeverity, ArrayEventSink } from "./events.js";
+import {
+  CompilerEvent,
+  CompilerStage,
+  EventSeverity,
+  ArrayEventSink,
+  canEmitForLevel,
+  isEventSeverity,
+} from "./events.js";
 import { PhaseACompilerContext } from "./compilerContext.js";
 
 const VALID_LOG_PHASES: CompilerStage[] = ["parse", "resolve", "typecheck", "codegen"];
@@ -184,6 +191,7 @@ export async function main(argv: string[]): Promise<void> {
     events: new ArrayEventSink(),
     seed,
     stamp: compilerSerializerStamp,
+    logLevel,
   };
   const result = await compilePhaseA(source, {
     sourcePath: isStdin ? "stdin.t2" : inputPath,
@@ -191,6 +199,7 @@ export async function main(argv: string[]): Promise<void> {
     emitTypes: options.emitTypes,
     prettyOption,
     stamp: compilerSerializerStamp,
+    logLevel,
     compilerContext,
   });
 
@@ -334,20 +343,9 @@ function shouldEmitForPhase(phases: Set<string>, phase: CompilerStage): boolean 
   return phases.has(phase);
 }
 
-const SEVERITY_PRIORITY: Record<EventSeverity, number> = {
-  debug: 0,
-  info: 1,
-  warn: 2,
-  error: 3,
-};
-
 function shouldEmitForLevel(level: string, severity: EventSeverity): boolean {
-  const normalizedLevel = isSeverity(level) ? level : "info";
-  return SEVERITY_PRIORITY[severity] >= SEVERITY_PRIORITY[normalizedLevel];
-}
-
-function isSeverity(value: string): value is EventSeverity {
-  return value === "debug" || value === "info" || value === "warn" || value === "error";
+  const normalizedLevel = isEventSeverity(level) ? level : "info";
+  return canEmitForLevel(normalizedLevel, severity);
 }
 
 async function formatWithPrettier(source: string, prettyOption: "pretty" | "ugly"): Promise<string> {

@@ -5,6 +5,7 @@
 
 import * as A0 from "./phaseA0.js";
 import { emitPhaseATrace, PhaseACompilerContext } from "./compilerContext.js";
+import type { CompilerStage } from "./events.js";
 
 export type Span = A0.Span;
 export type Diagnostic = A0.Diagnostic;
@@ -504,6 +505,9 @@ export interface ProcessorMetadata {
 
 // --- Processor ---
 
+const RESOLVE_STAGE: CompilerStage = "resolve";
+const TYPECHECK_STAGE: CompilerStage = "typecheck";
+
 export async function createProcessor(ctx: Context) {
   let statementCount = 0;
   let expressionCount = 0;
@@ -582,7 +586,9 @@ export async function createProcessor(ctx: Context) {
       await evaluateExpression(target);
       return;
     }
-    ctx.diagnostics.push({ message: "Invalid assignment target", span: target.span });
+    ctx.diagnostics.push(
+      A0.createDiagnostic(RESOLVE_STAGE, "invalid-assignment-target", "Invalid assignment target", target.span)
+    );
   }
 
   async function processStatement(stmt: Statement): Promise<void> {
@@ -663,7 +669,9 @@ export async function createProcessor(ctx: Context) {
       } else if (stmt instanceof InterfaceStmt) {
         await processInterface(stmt);
       } else {
-        ctx.diagnostics.push({ message: `Unknown statement type`, span: (stmt as Statement).span });
+        ctx.diagnostics.push(
+          A0.createDiagnostic(RESOLVE_STAGE, "unknown-statement", `Unknown statement type`, (stmt as Statement).span)
+        );
       }
     } finally {
       await emitStatementTrace("end", stmt);
@@ -817,7 +825,9 @@ export async function createProcessor(ctx: Context) {
         await evaluateType(expr.assertedType);
         return expr;
       }
-      ctx.diagnostics.push({ message: `Unknown expression type`, span: (expr as Expression).span });
+      ctx.diagnostics.push(
+        A0.createDiagnostic(RESOLVE_STAGE, "unknown-expression", `Unknown expression type`, (expr as Expression).span)
+      );
       return expr;
     } finally {
       await emitExpressionTrace("end", expr);
@@ -938,7 +948,9 @@ export async function createProcessor(ctx: Context) {
     if (typeNode instanceof TypeLiteral) {
       return;
     }
-    ctx.diagnostics.push({ message: `Unknown type node`, span: (typeNode as TypeNode).span });
+    ctx.diagnostics.push(
+      A0.createDiagnostic(TYPECHECK_STAGE, "unknown-type", `Unknown type node`, (typeNode as TypeNode).span)
+    );
   }
 
   async function run(program: Program): Promise<{ diagnostics: Diagnostic[]; program: Program }> {

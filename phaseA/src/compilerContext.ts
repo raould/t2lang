@@ -1,9 +1,10 @@
-import { EventSink, CompilerEvent, CompilerStage, EventSeverity } from "./events.js";
+import { EventSink, CompilerEvent, CompilerStage, EventSeverity, canEmitForLevel } from "./events.js";
 
 export interface PhaseACompilerContext {
   events: EventSink;
   seed: string;
   stamp: string;
+  logLevel?: EventSeverity;
   cacheStamp?: string;
 }
 
@@ -15,6 +16,10 @@ export async function emitPhaseATrace(
   severity: EventSeverity = "debug"
 ): Promise<void> {
   if (!ctx) {
+    return;
+  }
+  const level = ctx.logLevel ?? "debug";
+  if (!canEmitForLevel(level, severity)) {
     return;
   }
   await ctx.events.emit({

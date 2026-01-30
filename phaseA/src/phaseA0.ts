@@ -8,6 +8,8 @@
  * - Easy copying via spread: new IfStmt({ ...existing, test: newTest })
  */
 
+import type { CompilerStage } from "./events.js";
+
 // ============================================================================
 // LAYER A0 - Core Runtime Calculus
 // ============================================================================
@@ -27,7 +29,30 @@ export interface Span {
 export interface Diagnostic {
   message: string;
   span: Span;
+  stage?: CompilerStage;
+  code?: string;
 }
+
+export const DIAGNOSTIC_NAMESPACE = "T2A";
+
+function formatDiagnosticMessage(message: string): string {
+  return `${DIAGNOSTIC_NAMESPACE}:${message}`;
+}
+
+function formatDiagnosticCode(code: string): string {
+  return `${DIAGNOSTIC_NAMESPACE}:${code}`;
+}
+
+export function createDiagnostic(stage: CompilerStage, code: string, message: string, span: Span): Diagnostic {
+  return {
+    message: formatDiagnosticMessage(message),
+    span,
+    stage,
+    code: formatDiagnosticCode(code),
+  };
+}
+
+const PARSE_STAGE: CompilerStage = "parse";
 
 // --- Atoms ---
 
@@ -483,7 +508,7 @@ export async function createProcessor(ctx: Context) {
       await evaluateExpression(target);
       return;
     }
-    ctx.diagnostics.push({ message: "Invalid assignment target", span: target.span });
+    ctx.diagnostics.push(createDiagnostic(PARSE_STAGE, "invalid-assignment-target", "Invalid assignment target", target.span));
   }
 
   async function processStatement(stmt: Statement): Promise<void> {
@@ -554,7 +579,7 @@ export async function createProcessor(ctx: Context) {
     } else if (stmt instanceof FunctionExpr || stmt instanceof ClassExpr) {
       await evaluateExpression(stmt);
     } else {
-      ctx.diagnostics.push({ message: `Unknown statement type`, span: (stmt as Statement).span });
+      ctx.diagnostics.push(createDiagnostic(PARSE_STAGE, "unknown-statement", `Unknown statement type`, (stmt as Statement).span));
     }
   }
 
@@ -639,7 +664,7 @@ export async function createProcessor(ctx: Context) {
       });
       return expr;
     }
-    ctx.diagnostics.push({ message: `Unknown expression type`, span: (expr as Expression).span });
+    ctx.diagnostics.push(createDiagnostic(PARSE_STAGE, "unknown-expression", `Unknown expression type`, (expr as Expression).span));
     return expr;
   }
 

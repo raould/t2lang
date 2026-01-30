@@ -2,7 +2,7 @@ import { parseSource } from "./parse.js";
 import { generateCode } from "./codegen.js";
 import { serializeLazy, SerializedProgram, SerializedProgramThunk } from "./serialization.js";
 import { createProcessor, Context, Diagnostic, Program } from "./phaseA1.js";
-import { ArrayEventSink, CompilerEvent, CompilerStage } from "./events.js";
+import { ArrayEventSink, CompilerEvent, CompilerStage, EventSeverity } from "./events.js";
 import { PhaseACompilerContext } from "./compilerContext.js";
 
 export interface CompilePhaseAConfig {
@@ -10,6 +10,7 @@ export interface CompilePhaseAConfig {
   emitTypes?: boolean;
   seed?: string;
   stamp?: string;
+  logLevel?: EventSeverity;
   compilerContext?: PhaseACompilerContext;
   sourcePath?: string;
 }
@@ -47,6 +48,7 @@ const DEFAULT_CONFIG: CompilePhaseAConfig = {
   prettyOption: "pretty",
   emitTypes: false,
   seed: "default",
+  logLevel: "debug",
 };
 
 export async function compilePhaseA(source: string, config: CompilePhaseAConfig = {}): Promise<CompilePhaseAResult> {
@@ -54,12 +56,18 @@ export async function compilePhaseA(source: string, config: CompilePhaseAConfig 
   const providedContext = finalConfig.compilerContext;
   const stamp = providedContext?.stamp ?? finalConfig.stamp ?? `${Date.now()}`;
   const seed = providedContext?.seed ?? finalConfig.seed!;
+  const logLevel = providedContext?.logLevel ?? finalConfig.logLevel ?? "debug";
   const defaultEvents = providedContext?.events ?? new ArrayEventSink();
   const compilerContext: PhaseACompilerContext = providedContext ?? {
     events: defaultEvents,
     seed,
     stamp,
+    logLevel,
   };
+  compilerContext.events = defaultEvents;
+  compilerContext.seed = seed;
+  compilerContext.stamp = stamp;
+  compilerContext.logLevel = logLevel;
   const ctx: Context = { diagnostics: [], scopeStack: [], compilerContext };
 
   const snapshots: SnapshotRecord[] = [];
@@ -87,7 +95,11 @@ export async function compilePhaseA(source: string, config: CompilePhaseAConfig 
       seed: compilerContext.seed,
       stamp: compilerContext.stamp,
       severity: "debug",
-      data: { stage, event },
+      data: {
+        stage,
+        event,
+        diagnostics: ctx.diagnostics.slice(),
+      },
     });
   };
 
