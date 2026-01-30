@@ -12,6 +12,16 @@ import {
   AssignExpr,
   CallExpr,
   ThrowExpr,
+  TypeAliasStmt,
+  TypeUnion,
+  TypeObject,
+  TypeLiteral,
+  TypeMapped,
+  TypeApp,
+  TypeParam,
+  TypePrimitive,
+  TypeRef,
+  TypeAssertExpr,
   TryCatchExpr,
   SwitchStmt,
   ImportStmt,
@@ -179,4 +189,80 @@ test("parseSource handles import/export statements", () => {
 
   assert.ok(exportDefault instanceof ExportStmt);
   assert.ok(exportDefault.spec.defaultExport instanceof CallExpr);
+});
+
+test("parseSource handles type expressions and assertions", () => {
+  const source = `(program
+    (type-alias OptionalValue
+      (typeparams (T (extends (type-string)) (default (type-number))))
+      (type-union
+        (type-ref T)
+        (type-null)))
+    (type-alias Point
+      (type-object
+        (x (type-number))
+        (y (type-number))))
+    (type-alias LiteralValues
+      (type-literal "foo" "bar"))
+    (type-alias MapIt
+      (type-mapped (T)
+        (type-ref Value)
+        (type-ref Identity)
+        readonly
+        optional
+        (type-null)))
+    (type-alias Boxed
+      (type-app
+        (type-ref Box)
+        (type-ref OptionalValue)))
+    (type-assert
+      (call wrap (call wrap2))
+      (type-ref Box)))`;
+
+  const program = parseSource(source);
+  const [optionalAlias, pointAlias, literalAlias, mappedAlias, boxedAlias, assertStmt] = program.body;
+
+  assert.ok(optionalAlias instanceof TypeAliasStmt);
+  assert.ok(optionalAlias.typeValue instanceof TypeUnion);
+  assert.strictEqual(optionalAlias.typeParams?.length, 1);
+  const optionalParam = optionalAlias.typeParams?.[0];
+  assert.ok(optionalParam);
+  assert.ok(optionalParam instanceof TypeParam);
+  assert.strictEqual(optionalParam.name.name, "T");
+  assert.ok(optionalParam.constraint instanceof TypePrimitive);
+  assert.ok(optionalParam.defaultType instanceof TypePrimitive);
+  assert.ok(optionalAlias.typeValue.types.some((member) => member instanceof TypeRef && member.identifier.name === "T"));
+  assert.ok(optionalAlias.typeValue.types.some((member) => member instanceof TypePrimitive && member.kind === "type-null"));
+
+  assert.ok(pointAlias instanceof TypeAliasStmt);
+  assert.ok(pointAlias.typeValue instanceof TypeObject);
+  assert.strictEqual(pointAlias.typeValue.fields.length, 2);
+  assert.strictEqual(pointAlias.typeValue.fields[0].key, "x");
+  assert.ok(pointAlias.typeValue.fields[0].fieldType instanceof TypePrimitive);
+
+  assert.ok(literalAlias instanceof TypeAliasStmt);
+  assert.ok(literalAlias.typeValue instanceof TypeLiteral);
+  assert.strictEqual(literalAlias.typeValue.value.length, 2);
+  assert.strictEqual(literalAlias.typeValue.value[0].value, "foo");
+
+  assert.ok(mappedAlias instanceof TypeAliasStmt);
+  assert.ok(mappedAlias.typeValue instanceof TypeMapped);
+  assert.strictEqual(mappedAlias.typeValue.typeParam.name.name, "T");
+  assert.ok(mappedAlias.typeValue.valueType instanceof TypeRef);
+  assert.ok(mappedAlias.typeValue.nameRemap instanceof TypeRef);
+  assert.strictEqual(mappedAlias.typeValue.readonlyModifier, "readonly");
+  assert.strictEqual(mappedAlias.typeValue.optionalModifier, "optional");
+  assert.ok(mappedAlias.typeValue.via instanceof TypePrimitive);
+
+  assert.ok(boxedAlias instanceof TypeAliasStmt);
+  assert.ok(boxedAlias.typeValue instanceof TypeApp);
+  assert.ok(boxedAlias.typeValue.expr instanceof TypeRef);
+  assert.strictEqual(boxedAlias.typeValue.typeArgs.length, 1);
+  assert.ok(boxedAlias.typeValue.typeArgs[0] instanceof TypeRef);
+
+  assert.ok(assertStmt instanceof ExprStmt);
+  const assertExpr = assertStmt.expr;
+  assert.ok(assertExpr instanceof TypeAssertExpr);
+  assert.ok(assertExpr.assertedType instanceof TypeRef);
+  assert.strictEqual(assertExpr.assertedType.identifier.name, "Box");
 });
