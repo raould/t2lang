@@ -430,10 +430,10 @@ export class TypeMapped {
 
 export class TypeApp {
   private readonly __brand!: "type-app";
-  readonly expr: TypeNode;
+  readonly expr: Expression | TypeNode;
   readonly typeArgs: TypeNode[];
   readonly span: Span;
-  constructor(data: { expr: TypeNode; typeArgs: TypeNode[]; span: Span }) { this.expr = data.expr; this.typeArgs = data.typeArgs; this.span = data.span; }
+  constructor(data: { expr: Expression | TypeNode; typeArgs: TypeNode[]; span: Span }) { this.expr = data.expr; this.typeArgs = data.typeArgs; this.span = data.span; }
 }
 
 export type TypeNode = TypePrimitive | TypeRef | TypeFunction | TypeObject | TypeUnion | TypeIntersection | TypeLiteral | TypeMapped | TypeApp;
@@ -485,7 +485,7 @@ export class InterfaceStmt {
 // --- Union Types ---
 
 export type Statement = ClassMember | ImportStmt | ExportStmt | TypeAliasStmt | InterfaceStmt;
-export type Expression = Literal | Identifier | CallExpr | PropExpr | IndexExpr | NewExpr | ArrayExpr | ObjectExpr | ThrowExpr | TryCatchExpr | FunctionExpr | ClassExpr | SpreadExpr | TernaryExpr | AwaitExpr | YieldExpr | TypeAssertExpr;
+export type Expression = Literal | Identifier | CallExpr | PropExpr | IndexExpr | NewExpr | ArrayExpr | ObjectExpr | ThrowExpr | TryCatchExpr | FunctionExpr | ClassExpr | SpreadExpr | TernaryExpr | AwaitExpr | YieldExpr | TypeAssertExpr | TypeApp;
 
 export class Program {
   private readonly __brand!: "program";
@@ -507,6 +507,17 @@ export async function createProcessor(ctx: Context) {
     await popScope();
     return result;
   }
+
+  const isTypeNodeValue = (value: unknown): value is TypeNode =>
+    value instanceof TypePrimitive ||
+    value instanceof TypeRef ||
+    value instanceof TypeFunction ||
+    value instanceof TypeObject ||
+    value instanceof TypeUnion ||
+    value instanceof TypeIntersection ||
+    value instanceof TypeLiteral ||
+    value instanceof TypeMapped ||
+    value instanceof TypeApp;
   async function registerIdentifier(_id: Identifier, _isConst: boolean): Promise<void> { /* stub */ }
 
   async function declareBinding(binding: Binding, isConst: boolean): Promise<void> {
@@ -759,6 +770,15 @@ export async function createProcessor(ctx: Context) {
       }
       return expr;
     }
+    if (expr instanceof TypeApp) {
+      if (!isTypeNodeValue(expr.expr)) {
+        await evaluateExpression(expr.expr as Expression);
+      }
+      for (const arg of expr.typeArgs) {
+        await evaluateType(arg);
+      }
+      return expr;
+    }
     if (expr instanceof TypeAssertExpr) {
       await evaluateExpression(expr.expr);
       await evaluateType(expr.assertedType);
@@ -871,7 +891,9 @@ export async function createProcessor(ctx: Context) {
       return;
     }
     if (typeNode instanceof TypeApp) {
-      await evaluateType(typeNode.expr);
+      if (isTypeNodeValue(typeNode.expr)) {
+        await evaluateType(typeNode.expr);
+      }
       for (const a of typeNode.typeArgs) {
         await evaluateType(a);
       }

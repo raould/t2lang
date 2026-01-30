@@ -36,6 +36,20 @@ import {
   Span,
   CallExpr,
   ArrayExpr,
+  TypeAliasStmt,
+  TypeAssertExpr,
+  TypeApp,
+  TypeField,
+  TypeFunction,
+  TypeIntersection,
+  TypeLiteral,
+  TypeMapped,
+  TypeNode,
+  TypeObject,
+  TypeParam,
+  TypePrimitive,
+  TypeRef,
+  TypeUnion,
 } from "./phaseA1.js";
 
 interface Token {
@@ -301,6 +315,9 @@ class Parser {
         }
         if (head.value === "switch") {
           return this.buildSwitch(node);
+        }
+        if (head.value === "type-alias") {
+          return this.buildTypeAlias(node);
         }
         if (head.value === "import-default" || head.value === "import-named" || head.value === "import-all") {
           return this.buildImport(node);
@@ -601,6 +618,12 @@ class Parser {
       if (head.value === "try") {
         return this.buildTry(node);
       }
+      if (head.value === "type-assert") {
+        return this.buildTypeAssert(node);
+      }
+      if (head.value === "type-app") {
+        return this.buildTypeApp(node, (child) => this.nodeToExpression(child));
+      }
     }
     if (node.elements.length === 1) {
       return this.nodeToExpression(node.elements[0]);
@@ -878,6 +901,258 @@ class Parser {
     const [, ...bodyNodes] = node.elements;
     const body = bodyNodes.map((child) => this.nodeToStatement(child));
     return { body };
+  }
+
+  private buildTypeRef(node: ListNode): TypeRef {
+    const span = node.span;
+    const [, nameNode, ...args] = node.elements;
+    if (!nameNode) {
+      throw new Error("type-ref requires an identifier");
+    }
+    const identifier = this.nodeToIdentifier(nameNode, "type-ref identifier");
+    const typeArgs = args.map((child) => this.nodeToType(child));
+    return new TypeRef({ identifier, span, typeArgs: typeArgs.length > 0 ? typeArgs : undefined });
+  }
+
+  private buildTypeFunction(node: ListNode): TypeFunction {
+    const span = node.span;
+    let entries = node.elements.slice(1);
+    let typeParams: TypeParam[] | undefined;
+    if (entries.length > 0 && this.isTypeParamsList(entries[0])) {
+      typeParams = this.parseTypeParams(entries[0]);
+      entries = entries.slice(1);
+    }
+    if (entries.length === 0) {
+      throw new Error("type-function requires at least a return type");
+    }
+    const returns = this.nodeToType(entries[entries.length - 1]);
+    const params = entries.slice(0, -1).map((child) => this.nodeToType(child));
+    return new TypeFunction({ typeParams, params, returns, span });
+  }
+
+  private buildTypeObject(node: ListNode): TypeObject {
+    const span = node.span;
+    const fields = node.elements.slice(1).map((child) => this.nodeToTypeField(child));
+    return new TypeObject({ fields, span });
+  }
+
+  private nodeToTypeField(node: Node): TypeField {
+    if (node.type !== "list" || node.elements.length < 2) {
+      throw new Error("type-object fields must be (key type)");
+    }
+    const keyNode = node.elements[0];
+    if (keyNode.type !== "atom") {
+      throw new Error("type-object field key must be an atom");
+    }
+    const valueNode = node.elements[1];
+    return new TypeField({ key: keyNode.value, fieldType: this.nodeToType(valueNode), span: node.span });
+  }
+
+  private buildTypeUnion(node: ListNode): TypeUnion {
+    const span = node.span;
+    const types = node.elements.slice(1).map((child) => this.nodeToType(child));
+    if (types.length === 0) {
+      throw new Error("type-union requires at least one member");
+    }
+    return new TypeUnion({ types, span });
+  }
+
+  private buildTypeIntersection(node: ListNode): TypeIntersection {
+    const span = node.span;
+    const types = node.elements.slice(1).map((child) => this.nodeToType(child));
+    if (types.length === 0) {
+      throw new Error("type-intersection requires at least one member");
+    }
+    return new TypeIntersection({ types, span });
+  }
+
+  private buildTypeLiteral(node: ListNode): TypeLiteral {
+    const span = node.span;
+    const values = node.elements.slice(1).map((child) => this.nodeToLiteral(child));
+    return new TypeLiteral({ value: values, span });
+  }
+
+  private nodeToLiteral(node: Node): Literal {
+    if (node.type === "atom") {
+      const value = this.atomToValue(node);
+      if (value instanceof Literal) {
+        return value;
+      }
+    }
+    throw new Error("Expected literal");
+  }
+
+  private buildTypeMapped(node: ListNode): TypeMapped {
+    const span = node.span;
+    const [, paramNode, valueNode, ...rest] = node.elements;
+    if (!paramNode || !valueNode) {
+      throw new Error("type-mapped requires a type param and a value type");
+    }
+    const typeParam = this.parseTypeParam(paramNode);
+    const valueType = this.nodeToType(valueNode);
+    let nameRemap: TypeNode | undefined;
+    let readonlyModifier: "readonly" | "-readonly" | undefined;
+    let optionalModifier: "optional" | "-optional" | undefined;
+    let via: TypeNode | undefined;
+    for (const child of rest) {
+      if (child.type === "atom") {
+        if (child.value === "readonly" || child.value === "-readonly") {
+          readonlyModifier = child.value as "readonly" | "-readonly";
+          continue;
+        }
+        if (child.value === "optional" || child.value === "-optional") {
+          optionalModifier = child.value as "optional" | "-optional";
+          continue;
+        }
+      }
+      if (!nameRemap) {
+        nameRemap = this.nodeToType(child);
+        continue;
+      }
+      if (!via) {
+        via = this.nodeToType(child);
+        continue;
+      }
+      throw new Error("type-mapped supports at most name remap, modifiers, and via");
+    }
+    return new TypeMapped({ typeParam, valueType, nameRemap, readonlyModifier, optionalModifier, via, span });
+  }
+
+  private buildTypeApp(node: ListNode, parseExpr: (node: Node) => Expression | TypeNode): TypeApp {
+    const span = node.span;
+    const [, exprNode, ...args] = node.elements;
+    if (!exprNode) {
+      throw new Error("type-app requires an expression");
+    }
+    if (args.length === 0) {
+      throw new Error("type-app requires type arguments");
+    }
+    const expr = parseExpr(exprNode);
+    const typeArgs = args.map((child) => this.nodeToType(child));
+    return new TypeApp({ expr, typeArgs, span });
+  }
+
+  private buildTypeAssert(node: ListNode): TypeAssertExpr {
+    const span = node.span;
+    const [, exprNode, typeNode] = node.elements;
+    if (!exprNode || !typeNode) {
+      throw new Error("type-assert requires an expression and a type");
+    }
+    return new TypeAssertExpr({ expr: this.nodeToExpression(exprNode), assertedType: this.nodeToType(typeNode), span });
+  }
+
+  private buildTypeAlias(node: ListNode): TypeAliasStmt {
+    const span = node.span;
+    const [, nameNode, ...rest] = node.elements;
+    if (!nameNode) {
+      throw new Error("type-alias requires a name");
+    }
+    const name = this.nodeToIdentifier(nameNode, "type-alias name");
+    let typeNodes = rest;
+    let typeParams: TypeParam[] | undefined;
+    if (typeNodes.length > 0 && this.isTypeParamsList(typeNodes[0])) {
+      typeParams = this.parseTypeParams(typeNodes[0]);
+      typeNodes = typeNodes.slice(1);
+    }
+    if (typeNodes.length !== 1) {
+      throw new Error("type-alias expects a single type expression");
+    }
+    const typeValue = this.nodeToType(typeNodes[0]);
+    return new TypeAliasStmt({ name, typeValue, typeParams, span });
+  }
+
+  private isTypeParamsList(node: Node): node is ListNode {
+    return (node.type === "list" && node.elements.length > 0 && node.elements[0].type === "atom" && node.elements[0].value === "typeparams");
+  }
+
+  private parseTypeParams(node: Node): TypeParam[] {
+    if (!this.isTypeParamsList(node)) {
+      throw new Error("typeparams list must start with typeparams");
+    }
+    return node.elements.slice(1).map((child) => this.parseTypeParam(child));
+  }
+
+  private parseTypeParam(node: Node): TypeParam {
+    if (node.type !== "list" || node.elements.length === 0) {
+      throw new Error("type-param must be a list with a name");
+    }
+    const [nameNode, ...rest] = node.elements;
+    const name = this.nodeToIdentifier(nameNode, "type-param name");
+    let variance: "in" | "out" | undefined;
+    let constraint: TypeNode | undefined;
+    let defaultType: TypeNode | undefined;
+    for (const attr of rest) {
+      if (attr.type === "atom" && (attr.value === "in" || attr.value === "out")) {
+        if (variance) {
+          throw new Error("type-param cannot declare multiple variances");
+        }
+        variance = attr.value as "in" | "out";
+        continue;
+      }
+      if (attr.type === "list" && attr.elements.length > 0 && attr.elements[0].type === "atom") {
+        const head = attr.elements[0].value;
+        if (head === "extends") {
+          if (attr.elements.length < 2) {
+            throw new Error("extends clause requires a type");
+          }
+          constraint = this.nodeToType(attr.elements[1]);
+          continue;
+        }
+        if (head === "default") {
+          if (attr.elements.length < 2) {
+            throw new Error("default clause requires a type");
+          }
+          defaultType = this.nodeToType(attr.elements[1]);
+          continue;
+        }
+      }
+      if (!constraint) {
+        constraint = this.nodeToType(attr);
+        continue;
+      }
+      if (!defaultType) {
+        defaultType = this.nodeToType(attr);
+        continue;
+      }
+      throw new Error("type-param contains too many entries");
+    }
+    return new TypeParam({ name, span: node.span, variance, constraint, defaultType });
+  }
+
+  private nodeToType(node: Node): TypeNode {
+    if (node.type !== "list" || node.elements.length === 0) {
+      throw new Error("Type expressions must be lists");
+    }
+    const head = node.elements[0];
+    if (head.type !== "atom") {
+      throw new Error("Type constructor must be an atom");
+    }
+    switch (head.value) {
+      case "type-string":
+      case "type-number":
+      case "type-boolean":
+      case "type-null":
+      case "type-undefined":
+        return new TypePrimitive({ kind: head.value as TypePrimitive["kind"], span: node.span });
+      case "type-ref":
+        return this.buildTypeRef(node);
+      case "type-function":
+        return this.buildTypeFunction(node);
+      case "type-object":
+        return this.buildTypeObject(node);
+      case "type-union":
+        return this.buildTypeUnion(node);
+      case "type-intersection":
+        return this.buildTypeIntersection(node);
+      case "type-literal":
+        return this.buildTypeLiteral(node);
+      case "type-mapped":
+        return this.buildTypeMapped(node);
+      case "type-app":
+        return this.buildTypeApp(node, (child) => this.nodeToType(child));
+      default:
+        throw new Error(`Unknown type constructor ${head.value}`);
+    }
   }
 
   private atomToValue(atom: AtomNode): Expression {

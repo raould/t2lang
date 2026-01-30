@@ -32,6 +32,20 @@ import {
   ExportStmt,
   NamedImport,
   NamedExport,
+  TypeAliasStmt,
+  TypeAssertExpr,
+  TypeApp,
+  TypeField,
+  TypeFunction,
+  TypeIntersection,
+  TypeLiteral,
+  TypeMapped,
+  TypeNode,
+  TypeObject,
+  TypeParam,
+  TypePrimitive,
+  TypeRef,
+  TypeUnion,
 } from "./phaseA1.js";
 export interface CompilerConfig {
   prettyOutput?: "pretty" | "ugly";
@@ -241,6 +255,9 @@ async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
     }
     return { lines: ["export {};"], mappings: [mappingFromSpan(stmt.span, 0)] };
   }
+  if (stmt instanceof TypeAliasStmt) {
+    return await emitTypeAlias(stmt);
+  }
   if (stmt instanceof ForClassic) {
     const initClause = stmt.init ? await clauseFromStatement(stmt.init) : "";
     const condition = stmt.condition ? await emitExpression(stmt.condition) : "";
@@ -350,6 +367,16 @@ async function emitExpression(expr: Expression): Promise<string> {
   if (expr instanceof ArrayExpr) {
     const entries = await Promise.all(expr.elements.map(emitExpression));
     return `[${entries.join(", ")}]`;
+  }
+  if (expr instanceof TypeAssertExpr) {
+    const value = await emitExpression(expr.expr);
+    const typeText = await emitTypeNode(expr.assertedType);
+    return `(${value} as ${typeText})`;
+  }
+  if (expr instanceof TypeApp) {
+    const target = await emitExpression(expr.expr as Expression);
+    const typeArgs = await Promise.all(expr.typeArgs.map(emitTypeNode));
+      return `${target}<${typeArgs.join(", ")}>`;
   }
   if (expr instanceof PropExpr) {
     const objectExpr = await emitExpression(expr.object);
@@ -509,6 +536,22 @@ async function emitTryCatchStatement(expr: TryCatchExpr): Promise<EmittedStateme
   }
   return { lines, mappings: [mappingFromSpan(expr.span, 0)] };
 }
+
+async function emitTypeAlias(stmt: TypeAliasStmt): Promise<EmittedStatement> {
+  const typeParams = await emitTypeParams(stmt.typeParams);
+  const text = await emitTypeNode(stmt.typeValue);
+  return {
+    lines: [`type ${stmt.name.name}${typeParams} = ${text};`],
+    mappings: [mappingFromSpan(stmt.span, 0)],
+  };
+}
+
+async function emitTypeParams(params?: TypeParam[]): Promise<string> {
+  if (!params || params.length === 0) {
+    return "";
+  }
+  const entries = await Promise.all(params.map(emitTypeParam));
+  return `<${entries.join(",
 
 function mappingFromSpan(span: { source: string; startLine?: number; startColumn?: number }, lineOffset: number) {
   return {
