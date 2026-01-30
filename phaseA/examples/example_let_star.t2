@@ -1,0 +1,5 @@
+(program
+  (let*
+    ((base 10)
+     (double (call + base base)))
+    (return double)))

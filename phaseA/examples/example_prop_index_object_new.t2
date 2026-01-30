@@ -1,0 +1,11 @@
+(program
+  (let* ((container (object ("count" 1)))
+         (items (array (object ("value" 10)) (object ("value" 20))))
+         (instance (new Date 0)))
+    (assign (prop container "count") (call + (prop container "count") 1))
+    (assign (index items 1) (object ("value" 42)))
+    (return
+      (object
+        ("instance" instance)
+        ("count" (prop container "count"))
+        ("entry" (index items 1))))))

@@ -1,0 +1,5 @@
+(program
+  (let* ((flag true))
+    (if flag
+      (return "fast-path")
+      (return "fallback"))))

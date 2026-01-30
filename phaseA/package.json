@@ -27,7 +27,8 @@
     "clean": "node -e \"const fs=require('fs');['node_modules','dist'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p)}catch(e){}})\"",
     "test": "npm run build && node ./scripts/run-tests.mjs",
     "lint": "eslint . --ext .ts",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "run-examples": "npm run build && node ./scripts/run-examples.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

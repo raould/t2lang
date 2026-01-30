@@ -1,0 +1,11 @@
+(program
+  (let* ((mode "auto")
+         (status "idle"))
+    (switch mode
+      (case "auto"
+        (assign status "automatic"))
+      (case "manual"
+        (assign status "manual"))
+      (default
+        (assign status "fallback")))
+    (return status)))

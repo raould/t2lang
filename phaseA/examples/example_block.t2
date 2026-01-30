@@ -1,0 +1,6 @@
+(program
+  (let* ((acc 1))
+    (block
+      (assign acc (call * acc 5))
+      (assign acc (call / acc 2)))
+    (return acc)))

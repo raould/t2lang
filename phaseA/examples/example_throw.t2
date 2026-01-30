@@ -1,0 +1,2 @@
+(program
+  (throw (object ("message" "boom") ("code" 500))))

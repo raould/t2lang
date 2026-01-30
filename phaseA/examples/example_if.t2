@@ -1,0 +1,5 @@
+(program
+  (let* ((value 5))
+    (if (call < value 5)
+      (return "small")
+      (return "big"))))

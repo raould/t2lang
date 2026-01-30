@@ -98,8 +98,20 @@ export async function generateCode(program: Program, config: CompilerConfig = {}
     }
     generatedLine += outputOffset;
   }
-  const tsSource = lines.join("\n");
-  return { tsSource, mappings };
+  const wrappedLines = [
+    "void (async () => {",
+    ...lines.map((line) => (line ? `  ${line}` : "")),
+    "})();",
+  ];
+  const shiftedMappings = mappings.map((mapping) => ({
+    ...mapping,
+    generated: {
+      line: mapping.generated.line + 1,
+      column: mapping.generated.column,
+    },
+  }));
+  const tsSource = wrappedLines.join("\n");
+  return { tsSource, mappings: shiftedMappings };
 }
 
 async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
@@ -347,10 +359,10 @@ async function emitStatementBody(stmt: Statement): Promise<EmittedStatement> {
 }
 
 async function renderBinding(binding: Binding, isConst: boolean): Promise<string> {
-  const name = binding.target instanceof Identifier ? binding.target.name : "_";
+  const targetText = await emitBindingTarget(binding.target);
   const init = binding.init ? await emitExpression(binding.init) : "undefined";
   const keyword = isConst ? "const" : "let";
-  return `${keyword} ${name} = ${init};`;
+  return `${keyword} ${targetText} = ${init};`;
 }
 
 async function emitExpression(expr: Expression): Promise<string> {
@@ -361,6 +373,17 @@ async function emitExpression(expr: Expression): Promise<string> {
     return expr.name;
   }
   if (expr instanceof CallExpr) {
+    if (expr.callee instanceof Identifier) {
+      const operator = OPERATOR_SYMBOLS[expr.callee.name];
+      if (operator) {
+        const args = await Promise.all(expr.args.map(emitExpression));
+        return formatOperatorExpression(operator, args);
+      }
+      if (expr.callee.name === "assign" && expr.args.length === 2) {
+        const [targetExpr, valueExpr] = await Promise.all(expr.args.map(emitExpression));
+        return `${targetExpr} = ${valueExpr}`;
+      }
+    }
     const callee = await emitExpression(expr.callee);
     const args = await Promise.all(expr.args.map(emitExpression));
     return `${callee}(${args.join(", ")})`;
@@ -683,6 +706,37 @@ function mappingFromSpan(span: { source: string; startLine?: number; startColumn
     },
     source: span.source,
   };
+}
+ 
+const OPERATOR_SYMBOLS: Record<string, string> = {
+  "+": "+",
+  "-": "-",
+  "*": "*",
+  "/": "/",
+  "<": "<",
+  ">": ">",
+  "<=": "<=",
+  ">=": ">=",
+  "==": "==",
+  "===": "===",
+  "!=": "!=",
+  "!==": "!==",
+  "&&": "&&",
+  "||": "||",
+  "??": "??",
+};
+
+function formatOperatorExpression(operator: string, operands: string[]): string {
+  if (operands.length === 0) {
+    return "";
+  }
+  if (operands.length === 1) {
+    if (operator === "-" || operator === "+") {
+      return `${operator}${operands[0]}`;
+    }
+    return operands[0];
+  }
+  return operands.slice(1).reduce((acc, current) => `(${acc} ${operator} ${current})`, operands[0]);
 }
 
 async function formatLiteral(value: unknown): Promise<string> {
