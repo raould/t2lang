@@ -200,6 +200,11 @@ Phase B rewrites `for await..of` into this node, capturing the async iterator se
 - Fields: `callee: Expr`, `args: Expr[]`
 - Notes: This is the only call form Phase A accepts; Phase B rewrites operator syntax, chained calls, and implicit forms into `(call ...)`.
 
+### `call-with-this`
+- Node: `CallWithThisExpr`
+- Fields: `fn: Expr`, `thisArg: Expr`, `args: Expr[]`
+- Notes: Captures calls that require an explicit `this` binding (method references, borrowed helpers, optional chaining callable checks). Phase B emits this primitive so the generated code can compile to `fn.call(thisArg, ...args)` when preserving the receiver is required.
+
 ### `ternary`
 - Node: `TernaryExpr`
 - Fields: `test: Expr`, `consequent: Expr`, `alternate: Expr`
