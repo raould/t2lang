@@ -66,6 +66,7 @@ export async function compilePhaseA(source: string, config: CompilePhaseAConfig 
       timestamp: Date.now(),
       seed,
       stamp,
+      severity: "info",
       data: snapshot,
     });
   };
@@ -77,6 +78,7 @@ export async function compilePhaseA(source: string, config: CompilePhaseAConfig 
       timestamp: Date.now(),
       seed,
       stamp,
+      severity: "debug",
       data: { stage, event },
     });
   };

@@ -1,11 +1,14 @@
 export type CompilerStage = "parse" | "resolve" | "typecheck" | "codegen";
 
+export type EventSeverity = "debug" | "info" | "warn" | "error";
+
 export interface CompilerEvent {
   phase: CompilerStage;
   kind: "snapshot" | "trace" | "codegen";
   timestamp: number;
   seed: string;
   stamp: string;
+  severity: EventSeverity;
   data: unknown;
 }
 

@@ -10,15 +10,15 @@
         * Done: let/const bindings, assign, return, block, if, while; array/call/ident/literal.
         * Done: for/try/throw/switch, prop/index/object/new, functions/classes, import/export, types, operator lowering.
     * Done: Diagnostics/tracing: connect parser + processor so compilePhaseA emits diagnostics/events (AST dumps, trace events, snapshots) compatible with the CLI flags (--ast*, --log, --log-level).
-    * Next: Enrich event/diagnostic metadata (e.g., severity tags) so --log-level=warn/error can truly filter logs without disabling all event output.
-* Next: CLI glue: once parsing and codegen exist, update cli.ts to:
+    * Done: Enrich event/diagnostic metadata (e.g., severity tags) so --log-level=warn/error can truly filter logs without disabling all event output.
+* Done: CLI glue: once parsing and codegen exist, update cli.ts to:
     * Parse CLI arguments for input/output, AST dump flags, trace phases, pretty modes, etc.
     * Call compilePhaseA with the parsed source and config, then write the generated TypeScript to the requested destination (file or stdout), handling Prettier when requested.
     * Emit AST dumps/traces via the new event stream.
     * Reuse the serialization helpers for --dump-snapshot or replay hooks as needed.
 * Distribution packaging: keep the shebang and package bin entries so npx t2tc runs the Phase A CLI, and ensure tsc builds the CLI entry (maybe add a cli.js entry or hook into package.json scripts).
 
-* Next grammar implementation checklist (Phase A parser + codegen, aligned with phaseA/GRAMMAR.md and AST-Spec-Draft.md):
+* Next: Grammar implementation checklist (Phase A parser + codegen, aligned with phaseA/GRAMMAR.md and AST-Spec-Draft.md):
     * program + stmt forms: program, exprStmt, block, let*, const*, assign, return, if, while, for-classic, for-of/for-await, throw, try/catch/finally, switch.
     * core expr forms: call, prop (literal property only), index (computed), object, array, ternary, new, await, yield, spread.
     * declarations: fn, class, method, field, interface, type-alias, import/export.

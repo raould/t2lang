@@ -5,7 +5,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError, Option } from "commander";
 import { compilePhaseA } from "./api.js";
-import { CompilerEvent, CompilerStage } from "./events.js";
+import { CompilerEvent, CompilerStage, EventSeverity } from "./events.js";
 
 const VALID_LOG_PHASES: CompilerStage[] = ["parse", "resolve", "typecheck", "codegen"];
 
@@ -190,16 +190,9 @@ export async function main(argv: string[]): Promise<void> {
     process.exit(1);
   }
 
-  if (shouldLog(logLevel)) {
-    for (const event of result.events) {
-      logEvent(event, logPhases);
-    }
-  }
-
-  if (tracePhases.size > 0) {
-    for (const event of result.events) {
-      logTraceEvent(event, tracePhases);
-    }
+  for (const event of result.events) {
+    logEvent(event, logPhases, logLevel);
+    logTraceEvent(event, tracePhases, logLevel);
   }
 
   const snapshotByStage = new Map<CompilerStage, SnapshotEntry>();
@@ -235,10 +228,6 @@ export async function main(argv: string[]): Promise<void> {
   console.log(`Compiled ${inputPath} -> ${target}`);
 }
 
-function shouldLog(level: string): boolean {
-  return level === "debug" || level === "info";
-}
-
 async function dumpSnapshots(targetDir: string, snapshots: SnapshotEntry[]): Promise<void> {
   await fs.mkdir(targetDir, { recursive: true });
   for (const snapshot of snapshots) {
@@ -259,8 +248,11 @@ async function printAstDump(title: string, stage: CompilerStage, snapshots: Map<
   console.error(`--- END ${title} (${stage}) ---`);
 }
 
-function logEvent(event: CompilerEvent, logPhases: Set<string>): void {
+function logEvent(event: CompilerEvent, logPhases: Set<string>, logLevel: string): void {
   if (!shouldEmitForPhase(logPhases, event.phase)) {
+    return;
+  }
+  if (!shouldEmitForLevel(logLevel, event.severity)) {
     return;
   }
   const timestamp = new Date(event.timestamp).toISOString();
@@ -270,11 +262,17 @@ function logEvent(event: CompilerEvent, logPhases: Set<string>): void {
   );
 }
 
-function logTraceEvent(event: CompilerEvent, tracePhases: Set<string>): void {
+function logTraceEvent(event: CompilerEvent, tracePhases: Set<string>, logLevel: string): void {
   if (event.kind !== "trace") {
     return;
   }
+  if (tracePhases.size === 0) {
+    return;
+  }
   if (!shouldEmitForPhase(tracePhases, event.phase)) {
+    return;
+  }
+  if (!shouldEmitForLevel(logLevel, event.severity)) {
     return;
   }
   const timestamp = new Date(event.timestamp).toISOString();
@@ -324,6 +322,22 @@ function shouldEmitForPhase(phases: Set<string>, phase: CompilerStage): boolean 
     return true;
   }
   return phases.has(phase);
+}
+
+const SEVERITY_PRIORITY: Record<EventSeverity, number> = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+};
+
+function shouldEmitForLevel(level: string, severity: EventSeverity): boolean {
+  const normalizedLevel = isSeverity(level) ? level : "info";
+  return SEVERITY_PRIORITY[severity] >= SEVERITY_PRIORITY[normalizedLevel];
+}
+
+function isSeverity(value: string): value is EventSeverity {
+  return value === "debug" || value === "info" || value === "warn" || value === "error";
 }
 
 async function formatWithPrettier(source: string, prettyOption: "pretty" | "ugly"): Promise<string> {
