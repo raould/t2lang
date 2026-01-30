@@ -223,7 +223,6 @@ export async function main(argv: string[]): Promise<void> {
   const target = options.output ?? (isStdin ? "output.ts" : getDefaultOutput(inputPath));
   await fs.mkdir(path.dirname(target), { recursive: true });
   await fs.writeFile(target, outputSource, "utf8");
-  console.log(`Compiled ${inputPath} -> ${target}`);
 }
 
 async function handleEventSideEffects(event: CompilerEvent, options: CliOptions): Promise<void> {

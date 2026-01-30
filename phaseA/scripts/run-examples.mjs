@@ -17,7 +17,9 @@ async function main() {
   }
 
   for (const file of entries) {
+    console.info(`=== Running example: ${file} ===`);
     const sourcePath = path.join(examplesDir, file);
+    console.info(`    Compiling example: ${file}`);
     run(process.execPath, [cliPath, sourcePath], `compile ${file}`);
     const tsFile = path.join(examplesDir, `${path.basename(file, ".t2")}.ts`);
     const tsContents = await readFile(tsFile, "utf8");
@@ -29,6 +31,7 @@ async function main() {
       console.info(`Skipping tsx run for ${path.basename(tsFile)} (contains throw).`);
       continue;
     }
+    console.info(`    Invoking tsx on example: ${file}`);
     run("tsx", [tsFile], `execute ${path.basename(tsFile)}`);
   }
 }
