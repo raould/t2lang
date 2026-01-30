@@ -38,7 +38,6 @@
 # pt 4
 
 * CLI integration (PhaseA CLI entry)
-    * When the CLI emits events, include the diagnostics array so observers can see what errors occurred in that stage; also log them at the requested verbosity level (--log-level).
     * Once tracing is wired, hooking up AST dumps, snapshots, and Prettier will reuse the same event stream: e.g., the CLI can write the AST to disk whenever the phaseA-parse event fires if --ast-before-expand is true, and it can call into a serializer to emit the JSON snapshot mentioned in the tooling section.
     * The CLI’s --trace flag will control which event kinds are printed, and --seed ensures every event payload (and snapshot) references the deterministic seed value.
     * Pretty vs. ugly output – The CLI must still run Prettier when --pretty-option pretty is requested, just like Phase1. Right now Phase A only contains AST/processors without any PrettyOption handling or CLI entry point.

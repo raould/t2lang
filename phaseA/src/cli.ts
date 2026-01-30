@@ -276,8 +276,9 @@ function logEvent(event: CompilerEvent, logPhases: Set<string>, logLevel: string
   }
   const timestamp = new Date(event.timestamp).toISOString();
   const payload = summarizeEventData(event);
+  const diagSummary = summarizeEventDiagnostics(event);
   console.error(
-    `[log] ${timestamp} ${event.phase} ${event.kind} seed=${event.seed} stamp=${event.stamp} ${payload}`
+    `[log] ${timestamp} ${event.phase} ${event.kind} seed=${event.seed} stamp=${event.stamp} ${payload}${diagSummary}`
   );
 }
 
@@ -296,8 +297,9 @@ function logTraceEvent(event: CompilerEvent, tracePhases: Set<string>, logLevel:
   }
   const timestamp = new Date(event.timestamp).toISOString();
   const payload = summarizeEventData(event);
+  const diagSummary = summarizeEventDiagnostics(event);
   console.error(
-    `[trace] ${timestamp} ${event.phase} seed=${event.seed} stamp=${event.stamp} ${payload}`
+    `[trace] ${timestamp} ${event.phase} seed=${event.seed} stamp=${event.stamp} ${payload}${diagSummary}`
   );
 }
 
@@ -324,6 +326,43 @@ function summarizeEventData(event: CompilerEvent): string {
       return JSON.stringify(event.data, stringifyFilter);
     }
   }
+}
+
+function summarizeEventDiagnostics(event: CompilerEvent): string {
+  const diagnostics = extractEventDiagnostics(event.data);
+  if (diagnostics.length === 0) {
+    return "";
+  }
+  const messages = diagnostics
+    .map((diag) => {
+      if (typeof diag === "string") {
+        return diag;
+      }
+      if (diag && typeof diag === "object" && "message" in diag && typeof (diag as { message?: unknown }).message === "string") {
+        return (diag as { message: string }).message;
+      }
+      try {
+        return JSON.stringify(diag);
+      } catch (err) {
+        return String(diag);
+      }
+    })
+    .filter(Boolean as unknown as (value: string) => boolean);
+  if (messages.length === 0) {
+    return "";
+  }
+  return ` diagnostics=[${messages.join("; ")}]`;
+}
+
+function extractEventDiagnostics(data: unknown): unknown[] {
+  if (!data || typeof data !== "object") {
+    return [];
+  }
+  const diagnostics = (data as { diagnostics?: unknown }).diagnostics;
+  if (!Array.isArray(diagnostics)) {
+    return [];
+  }
+  return diagnostics;
 }
 
 function stringifyFilter(_key: string, value: unknown): unknown {
