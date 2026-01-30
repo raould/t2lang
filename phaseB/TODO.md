@@ -1,13 +1,13 @@
 # Phase B Implementation Plan
 
 ## 1. Project Setup
-- [ ] Initialize `phaseB/package.json`
-- [ ] Initialize `phaseB/tsconfig.json` (reference common or Copy phaseA's config)
-- [ ] Set up `eslint` and test runner infrastructure.
+- [x] Initialize `phaseB/package.json`
+- [x] Initialize `phaseB/tsconfig.json` (reference common or Copy phaseA's config)
+- [x] Set up `eslint` and test runner infrastructure.
 
 ## 1.5 Tests
 
-- [ ] create `phaseB/tests`
+- [x] create `phaseB/tests`
 - [ ] run all tests after making code chagnes, fix any errors.
 - [ ] iteratively create new tests for any new functionalty.
 
@@ -58,7 +58,5 @@
 - [ ] Test error messages for all categories
 
 ## 9. Open Design Decisions
-- [ ] Finalize `set!` vs `assign` semantics (see SUGAR.md Section 0)
-- [ ] Decide on parallel vs sequential `let`/`const` (see SUGAR.md Section 4)
 - [ ] Specify infix operator precedence table (see SUGAR.md Section 2)
 - [ ] Define macro execution sandbox boundaries (see MACROS.md)
