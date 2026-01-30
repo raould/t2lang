@@ -1,6 +1,27 @@
 import test from "node:test";
 import assert from "node:assert";
 import { compilePhaseA } from "../src/api.js";
+import { generateCode } from "../src/codegen.js";
+import {
+  Program,
+  ExprStmt,
+  Identifier,
+  FunctionExpr,
+  ReturnExpr,
+  Span,
+} from "../src/phaseA1.js";
+
+const makeSpan = (label = "codegen"): Span => ({
+  start: 0,
+  end: label.length,
+  source: label,
+  startLine: 1,
+  startColumn: 1,
+  endLine: 1,
+  endColumn: label.length,
+});
+
+const mkIdentifier = (name: string): Identifier => new Identifier({ name, span: makeSpan(`ident:${name}`) });
 
 test("compilePhaseA parses/serializes/codegens simple let*", async () => {
   const source = `(program (let* ((x 42)) x))`;
@@ -93,4 +114,23 @@ test("compilePhaseA emits import/export statements", async () => {
   assert.ok(result.tsSource.includes("import * as Everything from \"./all\";"));
   assert.ok(result.tsSource.includes("export { Bar };"));
   assert.ok(result.tsSource.includes("export default Default(42);"));
+});
+
+test("generateCode emits function expressions", async () => {
+  const paramId = mkIdentifier("value");
+  const fn = new FunctionExpr({
+    signature: { parameters: [{ name: paramId }] },
+    body: [
+      new ReturnExpr({
+        span: makeSpan("return"),
+        value: mkIdentifier("value"),
+      }),
+    ],
+    span: makeSpan("function"),
+  });
+  const stmt = new ExprStmt({ expr: fn, span: makeSpan("expr") });
+  const program = new Program({ body: [stmt], span: makeSpan("program") });
+  const result = await generateCode(program);
+  assert.ok(result.tsSource.includes("function"));
+  assert.ok(result.tsSource.includes("return value;"));
 });

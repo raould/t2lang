@@ -26,6 +26,7 @@ import {
   ForOf,
   ForAwait,
   ThrowExpr,
+  FunctionExpr,
   TryCatchExpr,
   SwitchStmt,
   ImportStmt,
@@ -368,6 +369,9 @@ async function emitExpression(expr: Expression): Promise<string> {
     const entries = await Promise.all(expr.elements.map(emitExpression));
     return `[${entries.join(", ")}]`;
   }
+  if (expr instanceof FunctionExpr) {
+    return emitFunctionExpression(expr);
+  }
   if (expr instanceof TypeAssertExpr) {
     const value = await emitExpression(expr.expr);
     const typeText = await emitTypeNode(expr.assertedType);
@@ -416,6 +420,27 @@ async function emitExpression(expr: Expression): Promise<string> {
     return `throw ${argument}`;
   }
   return "undefined";
+}
+
+async function emitFunctionExpression(expr: FunctionExpr): Promise<string> {
+  const prefix = expr.async ? "async " : "";
+  const generator = expr.generator ? "*" : "";
+  const typeParams = await emitTypeParams(expr.typeParams);
+  const params = await Promise.all(
+    expr.signature.parameters.map(async (param) => {
+      const annotation = param.typeAnnotation ? `: ${await emitTypeNode(param.typeAnnotation)}` : "";
+      return `${param.name.name}${annotation}`;
+    })
+  );
+  const returnAnnotation = expr.signature.returnType ? `: ${await emitTypeNode(expr.signature.returnType)}` : "";
+  const bodyBlock = new BlockStmt({ statements: expr.body, span: expr.span });
+  const body = await emitStatementBody(bodyBlock);
+  const bodyLines = ["{"];
+  for (const line of body.lines) {
+    bodyLines.push(`  ${line}`);
+  }
+  bodyLines.push("}");
+  return `${prefix}function${generator}${typeParams}(${params.join(", ")})${returnAnnotation} ${bodyLines.join("\n")}`;
 }
 
 const IDENTIFIER_REGEX = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
