@@ -38,10 +38,6 @@
 # pt 4
 
 * CLI integration (PhaseA CLI entry)
-    * Once tracing is wired, hooking up AST dumps, snapshots, and Prettier will reuse the same event stream: e.g., the CLI can write the AST to disk whenever the phaseA-parse event fires if --ast-before-expand is true, and it can call into a serializer to emit the JSON snapshot mentioned in the tooling section.
-    * The CLI’s --trace flag will control which event kinds are printed, and --seed ensures every event payload (and snapshot) references the deterministic seed value.
-    * Pretty vs. ugly output – The CLI must still run Prettier when --pretty-option pretty is requested, just like Phase1. Right now Phase A only contains AST/processors without any PrettyOption handling or CLI entry point.
-    * Seed handling (--seed) – The spec says traces and diagnostics must record deterministic seeds. Phase A needs a CLI/api that accepts --seed and surfaces it to the trace/log infrastructure.
     * AST dumps (--ast, --ast-before-expand, --ast-after-expand) – These flags should print the AST at each pipeline milestone. The current Phase A code has no parser or CLI to generate those dumps, so building the parse/expand stages (and optional macro stage) plus hooks to log them is required.
     * Snapshot serialization per stage – The compiler must be able to serialize each stage (parse, after sugar/macro expand, resolve, typecheck, codegen) for replay. Phase A lacks any stage-tracking infrastructure or snapshot writers, so we’d need to add structured emitters tied to each event dump.
     * Pretty-printing of generated .ts – As above, until there’s a CLI that produces codegen output and optionally runs Prettier it’s not implemented.
