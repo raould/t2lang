@@ -49,6 +49,8 @@ While Phase A requires prefix operators `(call + a b)`, Phase B aims to support 
 (call || (call && x y) z)
 ```
 
+> Phase B fully parenthesizes every rewritten operator expression (so `1 + 2 * 3` yields `(call + 1 (call * 2 3))`) before any formatting step. The emitted TypeScript therefore never relies on Prettier’s precedence handling to preserve semantic order.
+
 *Status: To be implemented via a precedence-climbing parser or a specialized rewrite pass.*
 
 ## 3. Literal Shorthands
@@ -190,6 +192,7 @@ When the callable target is a method access (e.g., `obj.method?.(a, b)`), the re
 ```
 
 Explicit `async` keyword macros or rewrites produce the `FunctionExpr` with `async: true` metadata.
+Additional metadata on the generated `FunctionExpr` indicates it is async so downstream phases can treat `await` appropriately; the canonical form might look like `(fn (x) :async true (return (await ...)))` or similar depending on how Phase A records metadata, but the key point is that the node is decorated with `async: true` rather than requiring a separate sugar form.
 
 ## 9. Type Expression Syntax
 

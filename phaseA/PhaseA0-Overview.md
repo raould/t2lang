@@ -8,6 +8,7 @@ Core assumptions:
 - Programs are `(program ...)` wrappers containing statements or expressions.
 - Expressions include literals, identifiers, `(call …)`, `(prop …)`, `(index …)`, `(new …)`, `(throw …)`, `(try …)`, `(fn …)`, `(class …)`, and the small set of TypeScript-neutral type nodes (`type-string`, `type-function`, etc.).
 - Statements include `(block …)`, `(let* …)`, `(const* …)`, `(assign …)`, `(return …)`, `if`, `while`, `switch`, `break`, `continue` plus the three loop variants (`for-classic`, `for-of`, `for-await`).
+- The TypeScript emitter attached to Phase A is responsible for rendering every expression with explicit parentheses that mirror the canonical AST structure, so `call` nodes map to fully parenthesized subexpressions (e.g., `1 + (2 * 3)`) before any downstream formatting.
 - All metadata beyond immediate control flow (TDZ marks, hoist flags) attaches directly to existing nodes rather than inventing new constructs.
 
 Phase A0 deliberately omits:

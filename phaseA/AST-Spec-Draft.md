@@ -199,6 +199,7 @@ Phase B rewrites `for await..of` into this node, capturing the async iterator se
 - Node: `CallExpr`
 - Fields: `callee: Expr`, `args: Expr[]`
 - Notes: This is the only call form Phase A accepts; Phase B rewrites operator syntax, chained calls, and implicit forms into `(call ...)`.
+- Additional formatting guarantee: the Phase A emitter/codegen is responsible for emitting the equivalent TypeScript with explicit parentheses around every nested call so that no downstream formatter (e.g., Prettier) needs to reason about operator precedence. For example, a `(call + 1 (call * 2 3))` must output `1 + (2 * 3)` with the parentheses restored immediately before passing the string to any pretty-printer.
 
 ### `call-with-this`
 - Node: `CallWithThisExpr`
