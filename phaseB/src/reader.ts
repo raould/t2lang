@@ -1,0 +1,267 @@
+export interface SourceLoc {
+  file: string;
+  line: number;
+  column: number;
+  endLine: number;
+  endColumn: number;
+}
+
+export interface ExpansionFrame {
+  macroName: string;
+  callSite: SourceLoc;
+  macroDefSite: SourceLoc;
+}
+
+export interface BaseNode {
+  loc: SourceLoc;
+  expansionStack?: ExpansionFrame[];
+}
+
+export type SymbolNode = BaseNode & {
+  kind: "symbol";
+  name: string;
+};
+
+export type LiteralNode = BaseNode & {
+  kind: "literal";
+  value: string | number | boolean | null;
+};
+
+export type ListNode = BaseNode & {
+  kind: "list";
+  elements: SExprNode[];
+};
+
+export type SExprNode = SymbolNode | LiteralNode | ListNode;
+
+export class ParseError extends Error {
+  public readonly loc: SourceLoc;
+
+  constructor(message: string, loc: SourceLoc) {
+    super(`${message} (${loc.file}:${loc.line}:${loc.column})`);
+    this.loc = loc;
+    this.name = "ParseError";
+  }
+}
+
+interface ParserState {
+  source: string;
+  index: number;
+  length: number;
+  line: number;
+  column: number;
+  file: string;
+}
+
+export function parseSexpr(source: string, file = "<input>"): SExprNode[] {
+  const state: ParserState = {
+    source,
+    index: 0,
+    length: source.length,
+    line: 1,
+    column: 1,
+    file,
+  };
+
+  const nodes: SExprNode[] = [];
+  while (true) {
+    skipWhitespace(state);
+    if (state.index >= state.length) {
+      break;
+    }
+    nodes.push(readNode(state));
+  }
+  return nodes;
+}
+
+function readNode(state: ParserState): SExprNode {
+  skipWhitespace(state);
+  if (state.index >= state.length) {
+    throw createError(state, "unexpected end of input");
+  }
+  const char = peek(state);
+  if (!char) {
+    throw createError(state, "unexpected end of input");
+  }
+  if (char === "(") {
+    return readList(state);
+  }
+  if (char === ")") {
+    throw createError(state, "unexpected ')' encountered");
+  }
+  if (char === '"') {
+    return readString(state);
+  }
+  return readAtom(state);
+}
+
+function readList(state: ParserState): ListNode {
+  const startLine = state.line;
+  const startColumn = state.column;
+  readChar(state); // consume '('
+  const elements: SExprNode[] = [];
+  while (true) {
+    skipWhitespace(state);
+    const char = peek(state);
+    if (!char) {
+      throw createError(state, "unterminated list", startLine, startColumn);
+    }
+    if (char === ")") {
+      readChar(state);
+      const loc = makeLoc(state.file, startLine, startColumn, state.line, state.column);
+      return { kind: "list", elements, loc };
+    }
+    elements.push(readNode(state));
+  }
+}
+
+function readString(state: ParserState): LiteralNode {
+  const startLine = state.line;
+  const startColumn = state.column;
+  readChar(state); // consume '"'
+  let value = "";
+  while (true) {
+    const ch = peek(state);
+    if (!ch) {
+      throw createError(state, "unterminated string", startLine, startColumn);
+    }
+    if (ch === '"') {
+      readChar(state);
+      break;
+    }
+    if (ch === "\\") {
+      readChar(state);
+      const escaped = readChar(state);
+      value += translateEscape(escaped);
+      continue;
+    }
+    value += readChar(state);
+  }
+  const loc = makeLoc(state.file, startLine, startColumn, state.line, state.column);
+  return { kind: "literal", value, loc };
+}
+
+function readAtom(state: ParserState): SExprNode {
+  const startLine = state.line;
+  const startColumn = state.column;
+  let token = "";
+  while (true) {
+    const ch = peek(state);
+    if (!ch || isWhitespace(ch) || ch === "(" || ch === ")" || ch === '"') {
+      break;
+    }
+    token += readChar(state);
+  }
+  if (token.length === 0) {
+    throw createError(state, "expected atom", startLine, startColumn);
+  }
+  const value = parseLiteralValue(token);
+  const loc = makeLoc(state.file, startLine, startColumn, state.line, state.column);
+  if (typeof value === "string" && !isNumericToken(token)) {
+    return { kind: "symbol", name: token, loc };
+  }
+  return { kind: "literal", value, loc };
+}
+
+function parseLiteralValue(token: string): string | number | boolean | null {
+  if (token === "true") {
+    return true;
+  }
+  if (token === "false") {
+    return false;
+  }
+  if (token === "null") {
+    return null;
+  }
+  if (isNumericToken(token)) {
+    return Number(token);
+  }
+  return token;
+}
+
+function isNumericToken(token: string): boolean {
+  return /^-?(?:\d+|\d+\.\d+|\.\d+)$/.test(token);
+}
+
+function translateEscape(ch: string): string {
+  switch (ch) {
+    case "n":
+      return "\n";
+    case "r":
+      return "\r";
+    case "t":
+      return "\t";
+    case "\"":
+      return "\"";
+    case "\\":
+      return "\\";
+    default:
+      return ch;
+  }
+}
+
+function skipWhitespace(state: ParserState): void {
+  while (state.index < state.length) {
+    const ch = peek(state);
+    if (!ch) {
+      break;
+    }
+    if (isWhitespace(ch)) {
+      readChar(state);
+      continue;
+    }
+    if (ch === ";") {
+      readChar(state);
+      skipLineComment(state);
+      continue;
+    }
+    break;
+  }
+}
+
+function skipLineComment(state: ParserState): void {
+  while (state.index < state.length) {
+    const ch = readChar(state);
+    if (ch === "\n" || ch === "\r") {
+      break;
+    }
+  }
+}
+
+function createError(state: ParserState, message: string, startLine = state.line, startColumn = state.column): ParseError {
+  const loc = makeLoc(state.file, startLine, startColumn, state.line, state.column);
+  return new ParseError(message, loc);
+}
+
+function peek(state: ParserState): string {
+  return state.source[state.index];
+}
+
+function readChar(state: ParserState): string {
+  const ch = state.source[state.index];
+  state.index += 1;
+  if (ch === "\n") {
+    state.line += 1;
+    state.column = 1;
+  } else if (ch === "\r") {
+    state.line += 1;
+    state.column = 1;
+  } else {
+    state.column += 1;
+  }
+  return ch;
+}
+
+function isWhitespace(ch: string): boolean {
+  return ch === " " || ch === "\t" || ch === "\n" || ch === "\r";
+}
+
+function makeLoc(
+  file: string,
+  startLine: number,
+  startColumn: number,
+  endLine: number,
+  endColumn: number
+): SourceLoc {
+  return { file, line: startLine, column: startColumn, endLine, endColumn };
+}
