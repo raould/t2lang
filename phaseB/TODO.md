@@ -5,6 +5,12 @@
 - [ ] Initialize `phaseB/tsconfig.json` (reference common or Copy phaseA's config)
 - [ ] Set up `eslint` and test runner infrastructure.
 
+## 1.5 Tests
+
+- [ ] create `phaseB/tests`
+- [ ] run all tests after making code chagnes, fix any errors.
+- [ ] iteratively create new tests for any new functionalty.
+
 ## 2. Core Infrastructure
 - [ ] **AST Definitions**: Define the "Surface AST" (AST-B) which includes sugar nodes that don't exist in Phase A (e.g. `MacroDef`, `InfixExpr` if we allow mixed trees).
 - [ ] **Parser (Reader)**: Implement a reader that produces S-expressions (or AST-B nodes) from text.
