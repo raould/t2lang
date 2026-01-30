@@ -21,11 +21,11 @@
 # pt 2
 
 * Next: Grammar implementation checklist (Phase A parser + codegen, aligned with phaseA/GRAMMAR.md and AST-Spec-Draft.md):
-    * program + stmt forms: program, exprStmt, block, let*, const*, assign, return, if, while, for-classic, for-of/for-await, throw, try/catch/finally, switch.
-    * core expr forms: call, prop (literal property only), index (computed), object, array, ternary, new, await, yield, spread.
-    * declarations: fn, class, method, field, interface, type-alias, import/export.
-    * operator lowering: recognize operator-call heads and emit infix/prefix TS (Phase B sugar stays separate).
-    * type AST parsing/emission: type-ref, type-literal, type-object, type-array, type-union, type-intersection, type-function, type-mapped, typeparams, type-app.
+    * Done: program + stmt forms: program, exprStmt, block, let*, const*, assign, return, if, while, for-classic, for-of/for-await, throw, try/catch/finally, switch.
+    * Done: core expr forms: call, prop (literal property only), index (computed), object, array, ternary, new, await, yield, spread.
+    * Done: declarations: fn, class, method, field, interface, type-alias, import/export.
+    * Done: operator lowering: recognize operator-call heads and emit infix/prefix TS (Phase B sugar stays separate).
+    * Done: type AST parsing/emission: type-ref, type-literal, type-object, type-array, type-union, type-intersection, type-function, type-mapped, typeparams, type-app.
 
 # pt 3
 
