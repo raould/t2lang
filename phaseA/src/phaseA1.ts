@@ -4,6 +4,7 @@
  */
 
 import * as A0 from "./phaseA0.js";
+import { emitPhaseATrace, PhaseACompilerContext } from "./compilerContext.js";
 
 export type Span = A0.Span;
 export type Diagnostic = A0.Diagnostic;
@@ -494,11 +495,35 @@ export class Program {
   constructor(data: { body: Statement[]; span: Span }) { this.body = data.body; this.span = data.span; }
 }
 
-export interface Context { diagnostics: Diagnostic[]; scopeStack: Scope[]; typeRegistry?: Map<string, TypeNode>; }
+export interface Context { diagnostics: Diagnostic[]; scopeStack: Scope[]; typeRegistry?: Map<string, TypeNode>; compilerContext?: PhaseACompilerContext; }
+
+export interface ProcessorMetadata {
+  statementsProcessed: number;
+  expressionsProcessed: number;
+}
 
 // --- Processor ---
 
 export async function createProcessor(ctx: Context) {
+  let statementCount = 0;
+  let expressionCount = 0;
+
+  async function emitStatementTrace(action: "start" | "end", stmt: Statement) {
+    statementCount += action === "start" ? 1 : 0;
+    await emitPhaseATrace(ctx.compilerContext, "resolve", `phaseA-resolve:${action}-statement`, {
+      statement: stmt.constructor.name,
+      action,
+    });
+  }
+
+  async function emitExpressionTrace(action: "start" | "mid" | "end", expr: Expression) {
+    expressionCount += action === "start" ? 1 : 0;
+    await emitPhaseATrace(ctx.compilerContext, "resolve", `phaseA-resolve:${action}-expression`, {
+      expression: expr.constructor.name,
+      action,
+    });
+  }
+
   async function pushScope(): Promise<void> { ctx.scopeStack.push({}); }
   async function popScope(): Promise<void> { ctx.scopeStack.pop(); }
   async function withScope<T>(action: () => Promise<T>): Promise<T> {
@@ -561,231 +586,242 @@ export async function createProcessor(ctx: Context) {
   }
 
   async function processStatement(stmt: Statement): Promise<void> {
-    if (stmt instanceof BlockStmt) {
-      await withScope(async () => {
-        for (const s of stmt.statements) {
-          await processStatement(s);
+    await emitStatementTrace("start", stmt);
+    try {
+      if (stmt instanceof BlockStmt) {
+        await withScope(async () => {
+          for (const s of stmt.statements) {
+            await processStatement(s);
+          }
+        });
+      } else if (stmt instanceof IfStmt) {
+        await evaluateExpression(stmt.test);
+        await processStatement(stmt.consequent);
+        if (stmt.alternate) {
+          await processStatement(stmt.alternate);
         }
-      });
-    } else if (stmt instanceof IfStmt) {
-      await evaluateExpression(stmt.test);
-      await processStatement(stmt.consequent);
-      if (stmt.alternate) {
-        await processStatement(stmt.alternate);
-      }
-    } else if (stmt instanceof WhileStmt) {
-      await evaluateExpression(stmt.condition);
-      await withScope(async () => await processStatement(stmt.body));
-    } else if (stmt instanceof LetStarExpr) {
-      await withScope(async () => {
-        for (const b of stmt.bindings) {
-          await declareBinding(b, stmt.isConst);
+      } else if (stmt instanceof WhileStmt) {
+        await evaluateExpression(stmt.condition);
+        await withScope(async () => await processStatement(stmt.body));
+      } else if (stmt instanceof LetStarExpr) {
+        await withScope(async () => {
+          for (const b of stmt.bindings) {
+            await declareBinding(b, stmt.isConst);
+          }
+          for (const s of stmt.body) {
+            await processStatement(s);
+          }
+        });
+      } else if (stmt instanceof ForClassic) {
+        await withScope(async () => {
+          if (stmt.init) {
+            await processStatement(stmt.init);
+          }
+          if (stmt.condition) {
+            await evaluateExpression(stmt.condition);
+          }
+          if (stmt.update) {
+            await evaluateExpression(stmt.update);
+          }
+          await processStatement(stmt.body);
+        });
+      } else if (stmt instanceof ForOf || stmt instanceof ForAwait) {
+        await withScope(async () => {
+          await declareBinding(stmt.binding, false);
+          await evaluateExpression(stmt.iterable);
+          await processStatement(stmt.body);
+        });
+      } else if (stmt instanceof SwitchStmt) {
+        await evaluateExpression(stmt.discriminant);
+        for (const c of stmt.cases) {
+          if (c.test) {
+            await evaluateExpression(c.test);
+          }
+          for (const s of c.consequent) {
+            await processStatement(s);
+          }
         }
-        for (const s of stmt.body) {
-          await processStatement(s);
-        }
-      });
-    } else if (stmt instanceof ForClassic) {
-      await withScope(async () => {
-        if (stmt.init) {
-          await processStatement(stmt.init);
-        }
-        if (stmt.condition) {
-          await evaluateExpression(stmt.condition);
-        }
-        if (stmt.update) {
-          await evaluateExpression(stmt.update);
-        }
-        await processStatement(stmt.body);
-      });
-    } else if (stmt instanceof ForOf || stmt instanceof ForAwait) {
-      await withScope(async () => {
-        await declareBinding(stmt.binding, false);
-        await evaluateExpression(stmt.iterable);
-        await processStatement(stmt.body);
-      });
-    } else if (stmt instanceof SwitchStmt) {
-      await evaluateExpression(stmt.discriminant);
-      for (const c of stmt.cases) {
-        if (c.test) {
-          await evaluateExpression(c.test);
-        }
-        for (const s of c.consequent) {
-          await processStatement(s);
-        }
-      }
-    } else if (stmt instanceof AssignExpr) {
-      await processAssignmentTarget(stmt.target);
-      await evaluateExpression(stmt.value);
-    } else if (stmt instanceof ReturnExpr) {
-      if (stmt.value) {
+      } else if (stmt instanceof AssignExpr) {
+        await processAssignmentTarget(stmt.target);
         await evaluateExpression(stmt.value);
+      } else if (stmt instanceof ReturnExpr) {
+        if (stmt.value) {
+          await evaluateExpression(stmt.value);
+        }
+      } else if (stmt instanceof BreakStmt || stmt instanceof ContinueStmt) {
+        return; /* resolver */
+      } else if (stmt instanceof ExprStmt) {
+        await evaluateExpression(stmt.expr);
+      } else if (stmt instanceof FunctionExpr || stmt instanceof ClassExpr) {
+        await evaluateExpression(stmt);
+      } else if (stmt instanceof ImportStmt) {
+        await processImport(stmt);
+      } else if (stmt instanceof ExportStmt) {
+        await processExport(stmt);
+      } else if (stmt instanceof TypeAliasStmt) {
+        await processTypeAlias(stmt);
+      } else if (stmt instanceof InterfaceStmt) {
+        await processInterface(stmt);
+      } else {
+        ctx.diagnostics.push({ message: `Unknown statement type`, span: (stmt as Statement).span });
       }
-    } else if (stmt instanceof BreakStmt || stmt instanceof ContinueStmt) {
-      return; /* resolver */
-    } else if (stmt instanceof ExprStmt) {
-      await evaluateExpression(stmt.expr);
-    } else if (stmt instanceof FunctionExpr || stmt instanceof ClassExpr) {
-      await evaluateExpression(stmt);
-    } else if (stmt instanceof ImportStmt) {
-      await processImport(stmt);
-    } else if (stmt instanceof ExportStmt) {
-      await processExport(stmt);
-    } else if (stmt instanceof TypeAliasStmt) {
-      await processTypeAlias(stmt);
-    } else if (stmt instanceof InterfaceStmt) {
-      await processInterface(stmt);
-    } else {
-      ctx.diagnostics.push({ message: `Unknown statement type`, span: (stmt as Statement).span });
+    } finally {
+      await emitStatementTrace("end", stmt);
     }
   }
 
   async function evaluateExpression(expr: Expression): Promise<Expression> {
-    if (expr instanceof A0.Literal || expr instanceof A0.Identifier) {
-      return expr;
-    }
-    if (expr instanceof CallExpr) {
-      await evaluateExpression(expr.callee);
-      for (const a of expr.args) {
-        await evaluateExpression(a);
+    await emitExpressionTrace("start", expr);
+    try {
+      if (expr instanceof A0.Literal || expr instanceof A0.Identifier) {
+        return expr;
       }
-      return expr;
-    }
-    if (expr instanceof PropExpr) {
-      await evaluateExpression(expr.object);
-      return expr;
-    }
-    if (expr instanceof IndexExpr) {
-      await evaluateExpression(expr.object);
-      await evaluateExpression(expr.index);
-      return expr;
-    }
-    if (expr instanceof NewExpr) {
-      await evaluateExpression(expr.callee);
-      for (const a of expr.args) {
-        await evaluateExpression(a);
+      if (expr instanceof CallExpr) {
+        await emitExpressionTrace("mid", expr);
+        await evaluateExpression(expr.callee);
+        for (const a of expr.args) {
+          await evaluateExpression(a);
+        }
+        return expr;
       }
-      return expr;
-    }
-    if (expr instanceof ArrayExpr) {
-      for (const e of expr.elements) {
-        await evaluateExpression(e);
+      if (expr instanceof PropExpr) {
+        await evaluateExpression(expr.object);
+        return expr;
       }
-      return expr;
-    }
-    if (expr instanceof ObjectExpr) {
-      for (const f of expr.fields) {
-        await evaluateExpression(f.value);
+      if (expr instanceof IndexExpr) {
+        await evaluateExpression(expr.object);
+        await evaluateExpression(expr.index);
+        return expr;
       }
-      return expr;
-    }
-    if (expr instanceof ThrowExpr) {
-      await evaluateExpression(expr.argument);
-      return expr;
-    }
-    if (expr instanceof TryCatchExpr) {
-      await processStatement(expr.body);
-      if (expr.catchClause) {
-        await withScope(async () => {
-          if (expr.catchClause!.binding) {
-            await declareBinding(expr.catchClause!.binding, true);
+      if (expr instanceof NewExpr) {
+        await evaluateExpression(expr.callee);
+        for (const a of expr.args) {
+          await evaluateExpression(a);
+        }
+        return expr;
+      }
+      if (expr instanceof ArrayExpr) {
+        for (const e of expr.elements) {
+          await evaluateExpression(e);
+        }
+        return expr;
+      }
+      if (expr instanceof ObjectExpr) {
+        for (const f of expr.fields) {
+          await evaluateExpression(f.value);
+        }
+        return expr;
+      }
+      if (expr instanceof ThrowExpr) {
+        await evaluateExpression(expr.argument);
+        return expr;
+      }
+      if (expr instanceof TryCatchExpr) {
+        await processStatement(expr.body);
+        if (expr.catchClause) {
+          await withScope(async () => {
+            if (expr.catchClause!.binding) {
+              await declareBinding(expr.catchClause!.binding, true);
+            }
+            for (const s of expr.catchClause!.body) {
+              await processStatement(s);
+            }
+          });
+        }
+        if (expr.finallyClause) {
+          for (const s of expr.finallyClause.body) {
+            await processStatement(s);
           }
-          for (const s of expr.catchClause!.body) {
+        }
+        return expr;
+      }
+      if (expr instanceof FunctionExpr) {
+        await withScope(async () => {
+          for (const p of expr.signature.parameters) {
+            await registerIdentifier(p.name, false);
+            if (p.typeAnnotation) {
+              await evaluateType(p.typeAnnotation);
+            }
+          }
+          if (expr.typeParams) {
+            for (const tp of expr.typeParams) {
+              await evaluateTypeParam(tp);
+            }
+          }
+          if (expr.signature.returnType) {
+            await evaluateType(expr.signature.returnType);
+          }
+          for (const s of expr.body) {
             await processStatement(s);
           }
         });
+        return expr;
       }
-      if (expr.finallyClause) {
-        for (const s of expr.finallyClause.body) {
-          await processStatement(s);
-        }
+      if (expr instanceof ClassExpr) {
+        await withScope(async () => {
+          if (expr.extends) {
+            await evaluateExpression(expr.extends);
+          }
+          if (expr.implements) {
+            for (const impl of expr.implements) {
+              await evaluateExpression(impl);
+            }
+          }
+          if (expr.decorators) {
+            for (const dec of expr.decorators) {
+              await evaluateExpression(dec);
+            }
+          }
+          for (const s of expr.body.statements) {
+            await processStatement(s);
+          }
+          if (expr.staticBlocks) {
+            for (const block of expr.staticBlocks) {
+              await processStatement(block);
+            }
+          }
+        });
+        return expr;
       }
-      return expr;
-    }
-    if (expr instanceof FunctionExpr) {
-      await withScope(async () => {
-        for (const p of expr.signature.parameters) {
-          await registerIdentifier(p.name, false);
-          if (p.typeAnnotation) {
-            await evaluateType(p.typeAnnotation);
-          }
-        }
-        if (expr.typeParams) {
-          for (const tp of expr.typeParams) {
-            await evaluateTypeParam(tp);
-          }
-        }
-        if (expr.signature.returnType) {
-          await evaluateType(expr.signature.returnType);
-        }
-        for (const s of expr.body) {
-          await processStatement(s);
-        }
-      });
-      return expr;
-    }
-    if (expr instanceof ClassExpr) {
-      await withScope(async () => {
-        if (expr.extends) {
-          await evaluateExpression(expr.extends);
-        }
-        if (expr.implements) {
-          for (const impl of expr.implements) {
-            await evaluateExpression(impl);
-          }
-        }
-        if (expr.decorators) {
-          for (const dec of expr.decorators) {
-            await evaluateExpression(dec);
-          }
-        }
-        for (const s of expr.body.statements) {
-          await processStatement(s);
-        }
-        if (expr.staticBlocks) {
-          for (const block of expr.staticBlocks) {
-            await processStatement(block);
-          }
-        }
-      });
-      return expr;
-    }
-    if (expr instanceof SpreadExpr) {
-      await evaluateExpression(expr.expr);
-      return expr;
-    }
-    if (expr instanceof TernaryExpr) {
-      await evaluateExpression(expr.test);
-      await evaluateExpression(expr.consequent);
-      await evaluateExpression(expr.alternate);
-      return expr;
-    }
-    if (expr instanceof AwaitExpr) {
-      await evaluateExpression(expr.argument);
-      return expr;
-    }
-    if (expr instanceof YieldExpr) {
-      if (expr.argument) {
+      if (expr instanceof SpreadExpr) {
+        await evaluateExpression(expr.expr);
+        return expr;
+      }
+      if (expr instanceof TernaryExpr) {
+        await evaluateExpression(expr.test);
+        await evaluateExpression(expr.consequent);
+        await evaluateExpression(expr.alternate);
+        return expr;
+      }
+      if (expr instanceof AwaitExpr) {
         await evaluateExpression(expr.argument);
+        return expr;
       }
-      return expr;
-    }
-    if (expr instanceof TypeApp) {
-      if (!isTypeNodeValue(expr.expr)) {
-        await evaluateExpression(expr.expr as Expression);
+      if (expr instanceof YieldExpr) {
+        if (expr.argument) {
+          await evaluateExpression(expr.argument);
+        }
+        return expr;
       }
-      for (const arg of expr.typeArgs) {
-        await evaluateType(arg);
+      if (expr instanceof TypeApp) {
+        if (!isTypeNodeValue(expr.expr)) {
+          await evaluateExpression(expr.expr as Expression);
+        }
+        for (const arg of expr.typeArgs) {
+          await evaluateType(arg);
+        }
+        return expr;
       }
+      if (expr instanceof TypeAssertExpr) {
+        await evaluateExpression(expr.expr);
+        await evaluateType(expr.assertedType);
+        return expr;
+      }
+      ctx.diagnostics.push({ message: `Unknown expression type`, span: (expr as Expression).span });
       return expr;
+    } finally {
+      await emitExpressionTrace("end", expr);
     }
-    if (expr instanceof TypeAssertExpr) {
-      await evaluateExpression(expr.expr);
-      await evaluateType(expr.assertedType);
-      return expr;
-    }
-    ctx.diagnostics.push({ message: `Unknown expression type`, span: (expr as Expression).span });
-    return expr;
   }
 
   async function processImport(stmt: ImportStmt): Promise<void> {
