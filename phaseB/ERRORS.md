@@ -202,6 +202,30 @@ note: macro 'my-macro' expanded to:
    | ^^^^^^ not a recognized Phase A form
    |
    = help: valid forms include: fn, let*, if, call, prop, ...
+
+### 5. Type Expression Errors
+
+Errors encountered while parsing type annotations or validating the structured `t:*` nodes before Phase A consumes them. They reuse the `E400-E499` range reserved for type-related issues.
+
+| Error | Example | Message |
+|-------|---------|---------|
+| Malformed type | `x: [` | `error[E400]: malformed type expression; unexpected end of input` |
+| Invalid primitive | `x: int` | `error[E401]: unknown primitive type 'int'; did you mean 'number'?` |
+| Duplicate type param | `<T, T>` | `error[E402]: duplicate type parameter 'T'` |
+| Unbound type variable | `Array<X>` outside `<T>` | `error[E403]: type variable 'X' is unbound in this context` |
+| Unknown named type | `Foo` (undeclared) | `error[E404]: unknown type 'Foo'` |
+
+**Format:**
+
+```
+error[E400]: malformed type expression; unexpected end of input
+  --> src/app.t2:10:8
+  |
+10 |   (fn (x: [) body)
+  |        ^ incomplete type annotation
+```
+
+Type nodes carry spans so Phase B can attribute these diagnostics to the correct sugar site before Phase A proceeds.
 ```
 
 ## Error Message Format

@@ -87,7 +87,51 @@ Phase B may support `[...]` syntax if the tokenizer handles brackets.
 
 ## 4. Binding Forms
 
-Decide how `let` and `const` parallel bindings are to be implemented. Extending the compiler vs. sugar vs. macros.
+Phase B exposes `let`/`const` sugar as parallel bindings, but Phase A only understands the sequential `let*`/`const*` forms. To preserve correct semantics (e.g., `(let ((a b) (b a)) ...)` must swap using the *old* values), Phase B rewrites every `let`/`const` into a `let*` that evaluates every initializer into temporary `gensym` bindings before reassigning the user variables.
+
+Example:
+
+```lisp
+(let ((a b)
+      (b a))
+  body)
+```
+
+Rewrites to:
+
+```lisp
+(let* ((tmp_0 b)
+       (tmp_1 a)
+       (a tmp_0)
+       (b tmp_1))
+  body)
+```
+
+The emitted TypeScript therefore becomes:
+
+```typescript
+const tmp_0 = b;
+const tmp_1 = a;
+const a = tmp_0;
+const b = tmp_1;
+// body
+```
+
+The general rewrite is captured by the `expandParallelLet` helper described below:
+
+```typescript
+function expandParallelLet(bindings, body) {
+  const temps = bindings.map(([name, init], i) => [gensym(`let_tmp_${i}`), init]);
+  const rebinds = bindings.map(([name], i) => [name, temps[i][0]]);
+  return {
+    type: 'let*',
+    bindings: [...temps, ...rebinds],
+    body,
+  };
+}
+```
+
+This strategy guarantees that every `let`/`const` binding becomes a deterministic `let*` sequence where the initial values are fixed before the final bindings occur.
 
 Phase A strictly requires `let*` and `const*` with specific nesting. Phase B allows `let` and `const` which are parallel bindings.
 
@@ -107,7 +151,7 @@ Phase A strictly requires `let*` and `const*` with specific nesting. Phase B all
 (assign (prop obj "prop") 20)
 ```
 
-## 6. Function Definitons
+## 6. Function Definitions
 
 Support for TypeScript-style parameter lists with colons.
 
@@ -254,7 +298,7 @@ Phase B parses TypeScript-style type annotations and rewrites them to the struct
 **Sugar**:
 ```lisp
 (type Alias SomeType)
-(type Generic (Array))
+(type Generic <T> (Array<T>))
 ```
 
 **Rewrite**:

@@ -6,6 +6,7 @@ Phase B is the frontend layer of t2lang, responsible for ergonomics, macros, and
 
 - [Macro Specification](MACROS.md): Defines the macro system (hygiene, defmacro, quasiquotes).
 - [Sugar Specification](SUGAR.md): Defines syntactic sugar (properties, literals, rewrites).
+- [Error Specification](ERRORS.md): Defines error categories, formatting, and source tracking.
 - [Implementation Plan](TODO.md): Roadmap for building Phase B.
 
 ## Responsibilities

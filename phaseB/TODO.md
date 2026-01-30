@@ -26,6 +26,7 @@
     - Rewrite `(obj.method ...)` -> `(call (prop obj "method") ...)`
     - Rewrite `obj.prop` -> `(prop obj "prop")`
 - [ ] **Type Syntax**: Parse `(x: type)` sugar into `(x (type-ref ...))`.
+- [ ] **Parallel `let`/`const`**: Expand to `let*`/`const*` with temporary `gensym` bindings before reassigning targets.
 
 ## 5. Normalization
 - [ ] Ensure all output from Phase B is strictly compliant with Phase A AST types.
@@ -49,3 +50,9 @@
 - [ ] Implement error formatter (TTY, JSON, short)
 - [ ] Add `--error-format` CLI flag
 - [ ] Test error messages for all categories
+
+## 9. Open Design Decisions
+- [ ] Finalize `set!` vs `assign` semantics (see SUGAR.md Section 0)
+- [ ] Decide on parallel vs sequential `let`/`const` (see SUGAR.md Section 4)
+- [ ] Specify infix operator precedence table (see SUGAR.md Section 2)
+- [ ] Define macro execution sandbox boundaries (see MACROS.md)
