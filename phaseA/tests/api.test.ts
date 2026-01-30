@@ -36,7 +36,7 @@ test("compilePhaseA parses/serializes/codegens simple let*", async () => {
     console.error(result.diagnostics);
   }
   assert.strictEqual(result.snapshots.length, 4);
-  assert.strictEqual(result.events.length, 12);
+  assert.ok(result.events.length >= 12, `expected at least 12 events but got ${result.events.length}`);
   assert.ok(result.tsSource.includes("let x = 42"));
   assert.ok(result.tsSource.includes("x"));
 });

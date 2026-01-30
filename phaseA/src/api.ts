@@ -3,11 +3,14 @@ import { generateCode } from "./codegen.js";
 import { serializeLazy, SerializedProgram, SerializedProgramThunk } from "./serialization.js";
 import { createProcessor, Context, Diagnostic, Program } from "./phaseA1.js";
 import { ArrayEventSink, CompilerEvent, CompilerStage } from "./events.js";
+import { PhaseACompilerContext } from "./compilerContext.js";
 
 export interface CompilePhaseAConfig {
   prettyOption?: "pretty" | "ugly";
   emitTypes?: boolean;
   seed?: string;
+  stamp?: string;
+  compilerContext?: PhaseACompilerContext;
   sourcePath?: string;
 }
 
@@ -48,36 +51,41 @@ const DEFAULT_CONFIG: CompilePhaseAConfig = {
 
 export async function compilePhaseA(source: string, config: CompilePhaseAConfig = {}): Promise<CompilePhaseAResult> {
   const finalConfig = { ...DEFAULT_CONFIG, ...config };
-  const seed = finalConfig.seed!;
-  const stamp = `${Date.now()}`;
-
-  const eventSink = new ArrayEventSink();
-  const ctx: Context = { diagnostics: [], scopeStack: [] };
+  const providedContext = finalConfig.compilerContext;
+  const stamp = providedContext?.stamp ?? finalConfig.stamp ?? `${Date.now()}`;
+  const seed = providedContext?.seed ?? finalConfig.seed!;
+  const defaultEvents = providedContext?.events ?? new ArrayEventSink();
+  const compilerContext: PhaseACompilerContext = providedContext ?? {
+    events: defaultEvents,
+    seed,
+    stamp,
+  };
+  const ctx: Context = { diagnostics: [], scopeStack: [], compilerContext };
 
   const snapshots: SnapshotRecord[] = [];
 
   const emitStage = async (stage: CompilerStage, program: Program): Promise<void> => {
     const lazyProgram = serializeLazy(program);
-    const snapshot: SnapshotRecord = { stage, program: lazyProgram, seed, stamp };
+    const snapshot: SnapshotRecord = { stage, program: lazyProgram, seed: compilerContext.seed, stamp: compilerContext.stamp };
     snapshots.push(snapshot);
-    await eventSink.emit({
+    await compilerContext.events.emit({
       phase: stage,
       kind: "snapshot",
       timestamp: Date.now(),
-      seed,
-      stamp,
+      seed: compilerContext.seed,
+      stamp: compilerContext.stamp,
       severity: "info",
       data: snapshot,
     });
   };
 
   const emitTrace = async (stage: CompilerStage, event: "start" | "done"): Promise<void> => {
-    await eventSink.emit({
+    await compilerContext.events.emit({
       phase: stage,
       kind: "trace",
       timestamp: Date.now(),
-      seed,
-      stamp,
+      seed: compilerContext.seed,
+      stamp: compilerContext.stamp,
       severity: "debug",
       data: { stage, event },
     });
@@ -111,7 +119,7 @@ export async function compilePhaseA(source: string, config: CompilePhaseAConfig 
     mappings,
     diagnostics: ctx.diagnostics,
     snapshots,
-    events: eventSink.events,
+    events: compilerContext.events.events,
   };
 }
 

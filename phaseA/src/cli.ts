@@ -5,7 +5,8 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError, Option } from "commander";
 import { compilePhaseA } from "./api.js";
-import { CompilerEvent, CompilerStage, EventSeverity } from "./events.js";
+import { CompilerEvent, CompilerStage, EventSeverity, ArrayEventSink } from "./events.js";
+import { PhaseACompilerContext } from "./compilerContext.js";
 
 const VALID_LOG_PHASES: CompilerStage[] = ["parse", "resolve", "typecheck", "codegen"];
 
@@ -177,11 +178,20 @@ export async function main(argv: string[]): Promise<void> {
 
   const source = await readSource(inputPath);
   const prettyOption = options.prettyOption ?? "pretty";
+  const compilerSerializerStamp = await loadCompilerStamp();
+  const seed = options.seed ?? "default";
+  const compilerContext: PhaseACompilerContext = {
+    events: new ArrayEventSink(),
+    seed,
+    stamp: compilerSerializerStamp,
+  };
   const result = await compilePhaseA(source, {
     sourcePath: isStdin ? "stdin.t2" : inputPath,
     seed: options.seed,
     emitTypes: options.emitTypes,
     prettyOption,
+    stamp: compilerSerializerStamp,
+    compilerContext,
   });
 
   if (result.diagnostics.length > 0) {
@@ -358,6 +368,38 @@ async function formatWithPrettier(source: string, prettyOption: "pretty" | "ugly
     // Prettier missing or failed; fall back to raw output.
   }
   return source;
+}
+
+async function loadCompilerStamp(): Promise<string> {
+  const startPaths = [process.cwd(), path.dirname(fileURLToPath(import.meta.url))];
+  for (const startPath of startPaths) {
+    const found = await findFileAbove(startPath, ".internal_id");
+    if (found) {
+      const contents = (await fs.readFile(found, "utf8")).trim();
+      if (contents) {
+        return contents;
+      }
+      return `${Date.now()}`;
+    }
+  }
+  return `${Date.now()}`;
+}
+
+async function findFileAbove(start: string, name: string): Promise<string | null> {
+  let current = path.resolve(start);
+  while (true) {
+    const candidate = path.join(current, name);
+    try {
+      await fs.access(candidate);
+      return candidate;
+    } catch {
+      const parent = path.dirname(current);
+      if (parent === current) {
+        return null;
+      }
+      current = parent;
+    }
+  }
 }
 
 if (fileURLToPath(import.meta.url) === process.argv[1]) {
