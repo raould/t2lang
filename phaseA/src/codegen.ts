@@ -551,7 +551,103 @@ async function emitTypeParams(params?: TypeParam[]): Promise<string> {
     return "";
   }
   const entries = await Promise.all(params.map(emitTypeParam));
-  return `<${entries.join(",
+  return `<${entries.join(", ")}>`;
+}
+
+async function emitTypeParam(param: TypeParam): Promise<string> {
+  const parts: string[] = [param.name.name];
+  if (param.constraint) {
+    const constraint = await emitTypeNode(param.constraint);
+    parts.push(`extends ${constraint}`);
+  }
+  if (param.defaultType) {
+    const defaultText = await emitTypeNode(param.defaultType);
+    parts.push(`= ${defaultText}`);
+  }
+  return parts.join(" ");
+}
+
+async function emitTypeNode(node: TypeNode): Promise<string> {
+  if (node instanceof TypePrimitive) {
+    switch (node.kind) {
+      case "type-string":
+        return "string";
+      case "type-number":
+        return "number";
+      case "type-boolean":
+        return "boolean";
+      case "type-null":
+        return "null";
+      case "type-undefined":
+        return "undefined";
+    }
+  }
+  if (node instanceof TypeRef) {
+    const args = node.typeArgs ? await Promise.all(node.typeArgs.map(emitTypeNode)) : [];
+    const suffix = args.length > 0 ? `<${args.join(", ")}>` : "";
+    return `${node.identifier.name}${suffix}`;
+  }
+  if (node instanceof TypeFunction) {
+    const typeParamText = await emitTypeParams(node.typeParams);
+    const params = await Promise.all(node.params.map(emitTypeNode));
+    const returns = await emitTypeNode(node.returns);
+    return `${typeParamText}(${params.join(", ")}) => ${returns}`;
+  }
+  if (node instanceof TypeObject) {
+    const entries = await Promise.all(
+      node.fields.map(async (field) => {
+        const valueText = await emitTypeNode(field.fieldType);
+        return `${formatObjectKey(field.key)}: ${valueText}`;
+      })
+    );
+    return `{ ${entries.join("; ")} }`;
+  }
+  if (node instanceof TypeUnion) {
+    const entries = await Promise.all(node.types.map(emitTypeNode));
+    return entries.join(" | ");
+  }
+  if (node instanceof TypeIntersection) {
+    const entries = await Promise.all(node.types.map(emitTypeNode));
+    return entries.join(" & ");
+  }
+  if (node instanceof TypeLiteral) {
+    const entries = await Promise.all(node.value.map((literal) => formatLiteral(literal.value)));
+    return entries.join(" | ");
+  }
+  if (node instanceof TypeMapped) {
+    return emitTypeMapped(node);
+  }
+  if (node instanceof TypeApp) {
+    const target = isTypeNodeValue(node.expr) ? await emitTypeNode(node.expr) : await emitExpression(node.expr);
+    const typeArgs = await Promise.all(node.typeArgs.map(emitTypeNode));
+    return `${target}<${typeArgs.join(", ")}>`;
+  }
+  throw new Error("Unsupported type node");
+}
+
+async function emitTypeMapped(node: TypeMapped): Promise<string> {
+  const readonlyPrefix = node.readonlyModifier ? `${node.readonlyModifier === "readonly" ? "readonly " : "-readonly "}` : "";
+  const optionalSuffix = node.optionalModifier ? `${node.optionalModifier === "optional" ? "?" : "-?"}` : "";
+  const nameText = node.nameRemap ? ` as ${await emitTypeNode(node.nameRemap)}` : "";
+  const inTypeNode = node.via ?? node.typeParam.constraint;
+  const inTypeText = inTypeNode ? await emitTypeNode(inTypeNode) : "any";
+  const valueText = await emitTypeNode(node.valueType);
+  return `{ ${readonlyPrefix}[${node.typeParam.name.name} in ${inTypeText}${nameText}]${optionalSuffix}: ${valueText} }`;
+}
+
+function isTypeNodeValue(value: unknown): value is TypeNode {
+  return (
+    value instanceof TypePrimitive ||
+    value instanceof TypeRef ||
+    value instanceof TypeFunction ||
+    value instanceof TypeObject ||
+    value instanceof TypeUnion ||
+    value instanceof TypeIntersection ||
+    value instanceof TypeLiteral ||
+    value instanceof TypeMapped ||
+    value instanceof TypeApp
+  );
+}
 
 function mappingFromSpan(span: { source: string; startLine?: number; startColumn?: number }, lineOffset: number) {
   return {
