@@ -27,8 +27,11 @@ import {
   ForAwait,
   ThrowExpr,
   FunctionExpr,
+  ClassExpr,
   TryCatchExpr,
   SwitchStmt,
+  BreakStmt,
+  ContinueStmt,
   ImportStmt,
   ExportStmt,
   NamedImport,
@@ -47,6 +50,11 @@ import {
   TypePrimitive,
   TypeRef,
   TypeUnion,
+  InterfaceStmt,
+  SpreadExpr,
+  TernaryExpr,
+  AwaitExpr,
+  YieldExpr,
 } from "./phaseA1.js";
 export interface CompilerConfig {
   prettyOutput?: "pretty" | "ugly";
@@ -166,6 +174,20 @@ async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
       mappings: [mappingFromSpan(stmt.span, 0)],
     };
   }
+  if (stmt instanceof BreakStmt) {
+    const label = stmt.label ? ` ${stmt.label.name}` : "";
+    return {
+      lines: [`break${label};`],
+      mappings: [mappingFromSpan(stmt.span, 0)],
+    };
+  }
+  if (stmt instanceof ContinueStmt) {
+    const label = stmt.label ? ` ${stmt.label.name}` : "";
+    return {
+      lines: [`continue${label};`],
+      mappings: [mappingFromSpan(stmt.span, 0)],
+    };
+  }
   if (stmt instanceof IfStmt) {
     const test = await emitExpression(stmt.test);
     const consequent = await emitStatementBody(stmt.consequent);
@@ -268,8 +290,25 @@ async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
     }
     return { lines: ["export {};"], mappings: [mappingFromSpan(stmt.span, 0)] };
   }
+  if (stmt instanceof FunctionExpr) {
+    const text = await emitFunctionExpression(stmt);
+    return {
+      lines: [`(${text});`],
+      mappings: [mappingFromSpan(stmt.span, 0)],
+    };
+  }
+  if (stmt instanceof ClassExpr) {
+    const text = await emitClassExpression(stmt);
+    return {
+      lines: [`(${text});`],
+      mappings: [mappingFromSpan(stmt.span, 0)],
+    };
+  }
   if (stmt instanceof TypeAliasStmt) {
     return await emitTypeAlias(stmt);
+  }
+  if (stmt instanceof InterfaceStmt) {
+    return await emitInterface(stmt);
   }
   if (stmt instanceof ForClassic) {
     const initClause = stmt.init ? await clauseFromStatement(stmt.init) : "";
@@ -392,8 +431,33 @@ async function emitExpression(expr: Expression): Promise<string> {
     const entries = await Promise.all(expr.elements.map(emitExpression));
     return `[${entries.join(", ")}]`;
   }
+  if (expr instanceof SpreadExpr) {
+    const inner = await emitExpression(expr.expr);
+    return `...${inner}`;
+  }
   if (expr instanceof FunctionExpr) {
     return emitFunctionExpression(expr);
+  }
+  if (expr instanceof ClassExpr) {
+    return emitClassExpression(expr);
+  }
+  if (expr instanceof TernaryExpr) {
+    const test = await emitExpression(expr.test);
+    const consequent = await emitExpression(expr.consequent);
+    const alternate = await emitExpression(expr.alternate);
+    return `${test} ? ${consequent} : ${alternate}`;
+  }
+  if (expr instanceof AwaitExpr) {
+    const argument = await emitExpression(expr.argument);
+    return `await ${argument}`;
+  }
+  if (expr instanceof YieldExpr) {
+    const keyword = expr.delegate ? "yield*" : "yield";
+    if (expr.argument) {
+      const argument = await emitExpression(expr.argument);
+      return `${keyword} ${argument}`;
+    }
+    return keyword;
   }
   if (expr instanceof TypeAssertExpr) {
     const value = await emitExpression(expr.expr);
@@ -408,17 +472,14 @@ async function emitExpression(expr: Expression): Promise<string> {
   if (expr instanceof PropExpr) {
     const objectExpr = await emitExpression(expr.object);
     if (isIdentifierName(expr.name)) {
-      const operator = expr.maybeNull ? "?." : ".";
-      return `${objectExpr}${operator}${expr.name}`;
+      return `${objectExpr}.${expr.name}`;
     }
-    const computed = expr.maybeNull ? "?[" : "[";
-    return `${objectExpr}${computed}${JSON.stringify(expr.name)}]`;
+    return `${objectExpr}[${JSON.stringify(expr.name)}]`;
   }
   if (expr instanceof IndexExpr) {
     const objectExpr = await emitExpression(expr.object);
     const indexExpr = await emitExpression(expr.index);
-    const operator = expr.maybeNull ? "?.[" : "[";
-    return `${objectExpr}${operator}${indexExpr}]`;
+    return `${objectExpr}[${indexExpr}]`;
   }
   if (expr instanceof ObjectExpr) {
     if (expr.fields.length === 0) {
@@ -464,6 +525,23 @@ async function emitFunctionExpression(expr: FunctionExpr): Promise<string> {
   }
   bodyLines.push("}");
   return `${prefix}function${generator}${typeParams}(${params.join(", ")})${returnAnnotation} ${bodyLines.join("\n")}`;
+}
+
+async function emitClassExpression(expr: ClassExpr): Promise<string> {
+  const name = expr.name ? ` ${expr.name.name}` : "";
+  const extendsClause = expr.extends ? ` extends ${await emitExpression(expr.extends)}` : "";
+  const implementsClause = expr.implements && expr.implements.length > 0
+    ? ` implements ${await Promise.all(expr.implements.map(emitExpression)).then((items) => items.join(", "))}`
+    : "";
+  const lines: string[] = [`class${name}${extendsClause}${implementsClause} {`];
+  for (const stmt of expr.body.statements) {
+    const emitted = await emitStatement(stmt);
+    for (const line of emitted.lines) {
+      lines.push(`  ${line}`);
+    }
+  }
+  lines.push("}");
+  return lines.join("\n");
 }
 
 const IDENTIFIER_REGEX = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
@@ -594,6 +672,19 @@ async function emitTypeAlias(stmt: TypeAliasStmt): Promise<EmittedStatement> {
   };
 }
 
+async function emitInterface(stmt: InterfaceStmt): Promise<EmittedStatement> {
+  const fields = await Promise.all(
+    stmt.body.fields.map(async (field) => {
+      const valueText = await emitTypeNode(field.fieldType);
+      return `${formatObjectKey(field.key)}: ${valueText};`;
+    })
+  );
+  return {
+    lines: [`interface ${stmt.name.name} {`, ...fields.map((line) => `  ${line}`), `}`],
+    mappings: [mappingFromSpan(stmt.span, 0)],
+  };
+}
+
 async function emitTypeParams(params?: TypeParam[]): Promise<string> {
   if (!params || params.length === 0) {
     return "";
@@ -603,7 +694,14 @@ async function emitTypeParams(params?: TypeParam[]): Promise<string> {
 }
 
 async function emitTypeParam(param: TypeParam): Promise<string> {
-  const parts: string[] = [param.name.name];
+  const parts: string[] = [];
+  if (param.const) {
+    parts.push("const");
+  }
+  if (param.infer) {
+    parts.push("infer");
+  }
+  parts.push(param.name.name);
   if (param.constraint) {
     const constraint = await emitTypeNode(param.constraint);
     parts.push(`extends ${constraint}`);

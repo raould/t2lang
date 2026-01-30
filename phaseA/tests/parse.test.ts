@@ -36,7 +36,7 @@ import {
 test("parseSource skips comments and preserves original line numbers", () => {
   const source = `(program
 ; line comment
-(let* ((x 1)) x) // trailing comment
+(let* (x 1) x) // trailing comment
 /* block
 comment */
 (array 1 2)
@@ -123,9 +123,9 @@ test("parseSource handles control-flow nesting", () => {
 
 test("parseSource handles prop/index/object/new expressions", () => {
   const source = `(program
-    (let* ((obj (object (foo 1) (bar 2))))
+    (let* (obj (object ("foo" 1) ("bar" 2)))
     (call log
-      (prop obj foo)
+      (prop obj "foo")
       (index obj (call getKey))
       (new Widget obj)))
   )`;
@@ -161,11 +161,11 @@ test("parseSource handles prop/index/object/new expressions", () => {
 
 test("parseSource handles import/export statements", () => {
   const source = `(program
-    (import-default Default "./default")
-    (import-named ((Foo alias) Bar) "./named")
-    (import-all Everything "./all")
-    (export Bar)
-    (export-default (call Default))
+    (import (import-spec "./default" (default Default)))
+    (import (import-spec "./named" (named (Foo alias) Bar)))
+    (import (import-spec "./all" (namespace Everything)))
+    (export (export-spec (named Bar)))
+    (export (export-spec (default (call Default))))
   )`;
 
   const program = parseSource(source);

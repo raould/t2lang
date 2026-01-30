@@ -30,7 +30,7 @@ const makeTypePrimitive = (kind: TypePrimitive["kind"]): TypePrimitive =>
   new TypePrimitive({ kind, span: makeSpan(`type:${kind}`) });
 
 test("compilePhaseA parses/serializes/codegens simple let*", async () => {
-  const source = `(program (let* ((x 42)) x))`;
+  const source = `(program (let* (x 42) x))`;
   const result = await compilePhaseA(source);
   if (result.diagnostics.length > 0) {
     console.error(result.diagnostics);
@@ -87,9 +87,9 @@ test("compilePhaseA emits control-flow nesting", async () => {
 
 test("compilePhaseA emits prop/index/object/new output", async () => {
   const source = `(program
-    (let* ((obj (object (foo 1) (bar 2))))
+    (let* (obj (object ("foo" 1) ("bar" 2)))
     (call log
-      (prop obj foo)
+      (prop obj "foo")
       (index obj (call getKey))
       (new Widget obj)))
   )`;
@@ -105,11 +105,11 @@ test("compilePhaseA emits prop/index/object/new output", async () => {
 
 test("compilePhaseA emits import/export statements", async () => {
   const source = `(program
-    (import-default Default "./default")
-    (import-named ((Foo alias) Bar) "./named")
-    (import-all Everything "./all")
-    (export Bar)
-    (export-default (call Default 42))
+    (import (import-spec "./default" (default Default)))
+    (import (import-spec "./named" (named (Foo alias) Bar)))
+    (import (import-spec "./all" (namespace Everything)))
+    (export (export-spec (named Bar)))
+    (export (export-spec (default (call Default 42))))
   )`;
   const result = await compilePhaseA(source);
   if (result.diagnostics.length > 0) {

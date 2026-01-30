@@ -348,8 +348,11 @@ export class TypeParam {
   readonly variance?: "in" | "out";
   readonly constraint?: TypeNode;
   readonly defaultType?: TypeNode;
-  constructor(data: { name: Identifier; span: Span; variance?: "in" | "out"; constraint?: TypeNode; defaultType?: TypeNode }) {
+  readonly const?: boolean;
+  readonly infer?: boolean;
+  constructor(data: { name: Identifier; span: Span; variance?: "in" | "out"; constraint?: TypeNode; defaultType?: TypeNode; const?: boolean; infer?: boolean }) {
     this.name = data.name; this.span = data.span; this.variance = data.variance; this.constraint = data.constraint; this.defaultType = data.defaultType;
+    this.const = data.const; this.infer = data.infer;
   }
 }
 
