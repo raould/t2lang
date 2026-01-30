@@ -9,6 +9,7 @@
  */
 
 import type { CompilerStage } from "./events.js";
+import { requireRegistryEntry } from "./errorRegistry.js";
 
 // ============================================================================
 // LAYER A0 - Core Runtime Calculus
@@ -39,16 +40,13 @@ function formatDiagnosticMessage(message: string): string {
   return `${DIAGNOSTIC_NAMESPACE}:${message}`;
 }
 
-function formatDiagnosticCode(code: string): string {
-  return `${DIAGNOSTIC_NAMESPACE}:${code}`;
-}
-
-export function createDiagnostic(stage: CompilerStage, code: string, message: string, span: Span): Diagnostic {
+export function createDiagnostic(stage: CompilerStage, registryId: string, span: Span): Diagnostic {
+  const entry = requireRegistryEntry(registryId);
   return {
-    message: formatDiagnosticMessage(message),
+    message: formatDiagnosticMessage(entry.message),
     span,
     stage,
-    code: formatDiagnosticCode(code),
+    code: registryId,
   };
 }
 
@@ -508,7 +506,7 @@ export async function createProcessor(ctx: Context) {
       await evaluateExpression(target);
       return;
     }
-    ctx.diagnostics.push(createDiagnostic(PARSE_STAGE, "invalid-assignment-target", "Invalid assignment target", target.span));
+    ctx.diagnostics.push(createDiagnostic(PARSE_STAGE, "T2:0002", target.span));
   }
 
   async function processStatement(stmt: Statement): Promise<void> {
@@ -579,7 +577,7 @@ export async function createProcessor(ctx: Context) {
     } else if (stmt instanceof FunctionExpr || stmt instanceof ClassExpr) {
       await evaluateExpression(stmt);
     } else {
-      ctx.diagnostics.push(createDiagnostic(PARSE_STAGE, "unknown-statement", `Unknown statement type`, (stmt as Statement).span));
+      ctx.diagnostics.push(createDiagnostic(PARSE_STAGE, "T2:0003", (stmt as Statement).span));
     }
   }
 
@@ -664,7 +662,7 @@ export async function createProcessor(ctx: Context) {
       });
       return expr;
     }
-    ctx.diagnostics.push(createDiagnostic(PARSE_STAGE, "unknown-expression", `Unknown expression type`, (expr as Expression).span));
+    ctx.diagnostics.push(createDiagnostic(PARSE_STAGE, "T2:0004", (expr as Expression).span));
     return expr;
   }
 

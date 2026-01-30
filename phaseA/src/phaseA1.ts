@@ -586,9 +586,7 @@ export async function createProcessor(ctx: Context) {
       await evaluateExpression(target);
       return;
     }
-    ctx.diagnostics.push(
-      A0.createDiagnostic(RESOLVE_STAGE, "invalid-assignment-target", "Invalid assignment target", target.span)
-    );
+    ctx.diagnostics.push(A0.createDiagnostic(RESOLVE_STAGE, "T2:0002", target.span));
   }
 
   async function processStatement(stmt: Statement): Promise<void> {
@@ -669,9 +667,7 @@ export async function createProcessor(ctx: Context) {
       } else if (stmt instanceof InterfaceStmt) {
         await processInterface(stmt);
       } else {
-        ctx.diagnostics.push(
-          A0.createDiagnostic(RESOLVE_STAGE, "unknown-statement", `Unknown statement type`, (stmt as Statement).span)
-        );
+        ctx.diagnostics.push(A0.createDiagnostic(RESOLVE_STAGE, "T2:0003", (stmt as Statement).span));
       }
     } finally {
       await emitStatementTrace("end", stmt);
@@ -825,9 +821,7 @@ export async function createProcessor(ctx: Context) {
         await evaluateType(expr.assertedType);
         return expr;
       }
-      ctx.diagnostics.push(
-        A0.createDiagnostic(RESOLVE_STAGE, "unknown-expression", `Unknown expression type`, (expr as Expression).span)
-      );
+      ctx.diagnostics.push(A0.createDiagnostic(RESOLVE_STAGE, "T2:0004", (expr as Expression).span));
       return expr;
     } finally {
       await emitExpressionTrace("end", expr);
@@ -945,12 +939,10 @@ export async function createProcessor(ctx: Context) {
       }
       return;
     }
-    if (typeNode instanceof TypeLiteral) {
-      return;
-    }
-    ctx.diagnostics.push(
-      A0.createDiagnostic(TYPECHECK_STAGE, "unknown-type", `Unknown type node`, (typeNode as TypeNode).span)
-    );
+      if (typeNode instanceof TypeLiteral) {
+        return;
+      }
+      ctx.diagnostics.push(A0.createDiagnostic(TYPECHECK_STAGE, "T2:0005", (typeNode as TypeNode).span));
   }
 
   async function run(program: Program): Promise<{ diagnostics: Diagnostic[]; program: Program }> {

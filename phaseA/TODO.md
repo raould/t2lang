@@ -38,10 +38,6 @@
 # pt 4
 
 * CLI integration (PhaseA CLI entry)
-    * AST dumps (--ast, --ast-before-expand, --ast-after-expand) – These flags should print the AST at each pipeline milestone. The current Phase A code has no parser or CLI to generate those dumps, so building the parse/expand stages (and optional macro stage) plus hooks to log them is required.
-    * Snapshot serialization per stage – The compiler must be able to serialize each stage (parse, after sugar/macro expand, resolve, typecheck, codegen) for replay. Phase A lacks any stage-tracking infrastructure or snapshot writers, so we’d need to add structured emitters tied to each event dump.
-    * Pretty-printing of generated .ts – As above, until there’s a CLI that produces codegen output and optionally runs Prettier it’s not implemented.
-    * Integrating diagnostics registry and namespaces (T2A:) – Diagnostics need to emit stage metadata plus per-phase prefixes, which requires wiring the spec’s registry into the future CLI.
 
 # pt 5
 
