@@ -1,6 +1,6 @@
 # TODO
 
-# now
+# pt 1
 
 * Bootstrapping the pipeline: compilePhaseA (in api.ts) already runs the processor and produces diagnostics/snapshots, but it doesn’t parse actual .t2 text or generate TypeScript. We need to implement the missing pieces in Phase A:
     * Parser (Phase A only): consume .t2 text and produce phaseA1 AST nodes per phaseA/GRAMMAR.md and phaseA/AST-Spec-Draft.md (no Phase0/Phase1/common/OLD dependencies).
@@ -18,6 +18,8 @@
     * Reuse the serialization helpers for --dump-snapshot or replay hooks as needed.
 * Distribution packaging: keep the shebang and package bin entries so npx t2tc runs the Phase A CLI, and ensure tsc builds the CLI entry (maybe add a cli.js entry or hook into package.json scripts).
 
+# pt 2
+
 * Next: Grammar implementation checklist (Phase A parser + codegen, aligned with phaseA/GRAMMAR.md and AST-Spec-Draft.md):
     * program + stmt forms: program, exprStmt, block, let*, const*, assign, return, if, while, for-classic, for-of/for-await, throw, try/catch/finally, switch.
     * core expr forms: call, prop (literal property only), index (computed), object, array, ternary, new, await, yield, spread.
@@ -25,7 +27,7 @@
     * operator lowering: recognize operator-call heads and emit infix/prefix TS (Phase B sugar stays separate).
     * type AST parsing/emission: type-ref, type-literal, type-object, type-array, type-union, type-intersection, type-function, type-mapped, typeparams, type-app.
 
-# then
+# pt 3
 
 * Phase B macros must update --ast-before-expand and --ast-after-expand to be working before and after macros, repectively.
 
@@ -51,3 +53,10 @@
 * Snapshot serialization per stage – The compiler must be able to serialize each stage (parse, after sugar/macro expand, resolve, typecheck, codegen) for replay. Phase A lacks any stage-tracking infrastructure or snapshot writers, so we’d need to add structured emitters tied to each event dump.
 * Pretty-printing of generated .ts – As above, until there’s a CLI that produces codegen output and optionally runs Prettier it’s not implemented.
 * Integrating diagnostics registry and namespaces (T2A:) – Diagnostics need to emit stage metadata plus per-phase prefixes, which requires wiring the spec’s registry into the future CLI.
+
+# pt 4
+
+* Phase B macros, sugar.
+  * dot-forms.
+  * infix.
+
