@@ -14,3 +14,7 @@ Phase B is the frontend layer of t2lang, responsible for ergonomics, macros, and
 1.  **Reading**: Parsing source text into S-expressions.
 2.  **Expanding**: Running macros and rewriting sugar.
 3.  **Lowering**: Producing valid Phase A AST for the next compilation stage.
+
+## CLI
+
+Use `npm run phaseb -- <path>` to run the Phase B parser. The package also ships a `t2b` binary (via the `bin` field in `package.json`), so once the package is built you can run `npx t2b -- <file>`. Control how diagnostics are emitted with `--error-format=tty|json|short`—the formats and error codes are documented in [ERRORS.md](ERRORS.md).

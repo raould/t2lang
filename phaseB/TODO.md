@@ -52,9 +52,9 @@
 - [ ] Define `SourceLoc` and `ExpansionFrame` types
 - [ ] Attach source locations in reader
 - [ ] Propagate expansion stack in macro expander
-- [ ] Implement error code registry
-- [ ] Implement error formatter (TTY, JSON, short)
-- [ ] Add `--error-format` CLI flag
+- [x] Implement error code registry
+- [x] Implement error formatter (TTY, JSON, short)
+- [x] Add `--error-format` CLI flag
 - [ ] Test error messages for all categories
 
 ## 9. Open Design Decisions

@@ -4,10 +4,17 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "t2b": "./dist/cli.js"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./cli": {
+      "import": "./dist/cli.js",
+      "types": "./dist/cli.d.ts"
     }
   },
   "files": [
@@ -17,7 +24,8 @@
     "build": "tsc --project tsconfig.json",
     "clean": "node -e \"const fs=require('fs');['node_modules','dist'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p)}catch(e){}})\"",
     "test": "npm run build && node ./scripts/run-tests.mjs",
-    "lint": "eslint src tests scripts --ext .ts"
+    "lint": "eslint src tests scripts --ext .ts",
+    "phaseb": "tsx ./src/cli.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

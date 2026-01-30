@@ -1,16 +1,5 @@
-export interface SourceLoc {
-  file: string;
-  line: number;
-  column: number;
-  endLine: number;
-  endColumn: number;
-}
-
-export interface ExpansionFrame {
-  macroName: string;
-  callSite: SourceLoc;
-  macroDefSite: SourceLoc;
-}
+import type { ExpansionFrame, SourceLoc } from "./location.js";
+export type { ExpansionFrame, SourceLoc } from "./location.js";
 
 export interface BaseNode {
   loc: SourceLoc;
@@ -34,6 +23,15 @@ export type ListNode = BaseNode & {
 
 export type SExprNode = SymbolNode | LiteralNode | ListNode;
 
+export type ReaderErrorCode =
+  | "E001"
+  | "E002"
+  | "E003"
+  | "E004"
+  | "E005"
+  | "E006"
+  | "E007";
+
 export type PhaseBKind =
   | "symbol"
   | "literal"
@@ -48,7 +46,7 @@ export interface PhaseBNodeBase extends BaseNode {
 export type PhaseBNode =
   | (SymbolNode & PhaseBNodeBase)
   | (LiteralNode & PhaseBNodeBase)
-  | (ListNode & PhaseBNodeBase)
+  | PhaseBListNode
   | PhaseBDottedIdentifier
   | PhaseBTypeAnnotation;
 
@@ -61,6 +59,12 @@ export interface PhaseBTypeAnnotation extends PhaseBNodeBase {
   phaseKind: "type-annotation";
   target: PhaseBNode;
   annotation: PhaseBNode;
+}
+
+export interface PhaseBListNode extends PhaseBNodeBase {
+  phaseKind: "list";
+  kind: "list";
+  elements: PhaseBNode[];
 }
 
 export function parsePhaseB(source: string, file = "<input>"): PhaseBNode[] {
@@ -91,12 +95,18 @@ function wrapLiteral(node: LiteralNode): PhaseBNode {
 }
 
 function wrapList(node: ListNode): PhaseBNode {
-  const elements = node.elements.map(wrapPhaseBNode);
+  const elements: PhaseBListNode["elements"] = node.elements.map(wrapPhaseBNode);
   const annotation = tryTypeAnnotation(elements, node);
   if (annotation) {
     return annotation;
   }
-  return { ...node, phaseKind: "list", elements };
+  return {
+    kind: "list",
+    loc: node.loc,
+    elements,
+    phaseKind: "list",
+    expansionStack: node.expansionStack,
+  };
 }
 
 function tryTypeAnnotation(elements: PhaseBNode[], node: ListNode): PhaseBTypeAnnotation | null {
@@ -117,10 +127,13 @@ function isColon(node: PhaseBNode): boolean {
 
 export class ParseError extends Error {
   public readonly loc: SourceLoc;
+  public readonly code: ReaderErrorCode;
+  public expansionStack?: ExpansionFrame[];
 
-  constructor(message: string, loc: SourceLoc) {
-    super(`${message} (${loc.file}:${loc.line}:${loc.column})`);
+  constructor(message: string, loc: SourceLoc, code: ReaderErrorCode = "E001") {
+    super(message);
     this.loc = loc;
+    this.code = code;
     this.name = "ParseError";
   }
 }
@@ -158,17 +171,17 @@ export function parseSexpr(source: string, file = "<input>"): SExprNode[] {
 function readNode(state: ParserState): SExprNode {
   skipWhitespace(state);
   if (state.index >= state.length) {
-    throw createError(state, "unexpected end of input");
+    throw createError(state, "unexpected end of input", "E001");
   }
   const char = peek(state);
   if (!char) {
-    throw createError(state, "unexpected end of input");
+    throw createError(state, "unexpected end of input", "E001");
   }
   if (char === "(") {
     return readList(state);
   }
   if (char === ")") {
-    throw createError(state, "unexpected ')' encountered");
+    throw createError(state, "unexpected ')' encountered", "E002");
   }
   if (char === '"') {
     return readString(state);
@@ -185,7 +198,7 @@ function readList(state: ParserState): ListNode {
     skipWhitespace(state);
     const char = peek(state);
     if (!char) {
-      throw createError(state, "unterminated list", startLine, startColumn);
+      throw createError(state, "unclosed '(' delimiter", "E001", startLine, startColumn);
     }
     if (char === ")") {
       readChar(state);
@@ -204,7 +217,7 @@ function readString(state: ParserState): LiteralNode {
   while (true) {
     const ch = peek(state);
     if (!ch) {
-      throw createError(state, "unterminated string", startLine, startColumn);
+      throw createError(state, "unclosed string literal", "E004", startLine, startColumn);
     }
     if (ch === '"') {
       readChar(state);
@@ -212,8 +225,10 @@ function readString(state: ParserState): LiteralNode {
     }
     if (ch === "\\") {
       readChar(state);
+      const escapeLine = state.line;
+      const escapeColumn = state.column;
       const escaped = readChar(state);
-      value += translateEscape(escaped);
+      value += translateEscape(escaped, state, escapeLine, escapeColumn);
       continue;
     }
     value += readChar(state);
@@ -234,7 +249,7 @@ function readAtom(state: ParserState): SExprNode {
     token += readChar(state);
   }
   if (token.length === 0) {
-    throw createError(state, "expected atom", startLine, startColumn);
+    throw createError(state, "invalid token", "E003", startLine, startColumn);
   }
   const value = parseLiteralValue(token);
   const loc = makeLoc(state.file, startLine, startColumn, state.line, state.column);
@@ -264,7 +279,7 @@ function isNumericToken(token: string): boolean {
   return /^-?(?:\d+|\d+\.\d+|\.\d+)$/.test(token);
 }
 
-function translateEscape(ch: string): string {
+function translateEscape(ch: string, state: ParserState, line: number, column: number): string {
   switch (ch) {
     case "n":
       return "\n";
@@ -277,7 +292,7 @@ function translateEscape(ch: string): string {
     case "\\":
       return "\\";
     default:
-      return ch;
+      throw createError(state, `invalid escape sequence '\\${ch}'`, "E005", line, column);
   }
 }
 
@@ -309,9 +324,15 @@ function skipLineComment(state: ParserState): void {
   }
 }
 
-function createError(state: ParserState, message: string, startLine = state.line, startColumn = state.column): ParseError {
+function createError(
+  state: ParserState,
+  message: string,
+  code: ReaderErrorCode = "E001",
+  startLine = state.line,
+  startColumn = state.column
+): ParseError {
   const loc = makeLoc(state.file, startLine, startColumn, state.line, state.column);
-  return new ParseError(message, loc);
+  return new ParseError(message, loc, code);
 }
 
 function peek(state: ParserState): string {

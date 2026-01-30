@@ -17,7 +17,10 @@ test("parse simple list", () => {
 });
 
 test("throws on unterminated list", () => {
-  assert.throws(() => parseSexpr("(foo", "test.t2"), ParseError);
+  assert.throws(
+    () => parseSexpr("(foo", "test.t2"),
+    (error) => error instanceof ParseError && error.code === "E001"
+  );
 });
 
 test("records string literal locations", () => {
