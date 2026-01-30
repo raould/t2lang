@@ -9,6 +9,9 @@ import {
   FunctionExpr,
   ReturnExpr,
   Span,
+  TypeParam,
+  TypePrimitive,
+  TypeRef,
 } from "../src/phaseA1.js";
 
 const makeSpan = (label = "codegen"): Span => ({
@@ -22,6 +25,9 @@ const makeSpan = (label = "codegen"): Span => ({
 });
 
 const mkIdentifier = (name: string): Identifier => new Identifier({ name, span: makeSpan(`ident:${name}`) });
+const makeTypeRef = (name: string): TypeRef => new TypeRef({ identifier: mkIdentifier(name), span: makeSpan(`type:${name}`) });
+const makeTypePrimitive = (kind: TypePrimitive["kind"]): TypePrimitive =>
+  new TypePrimitive({ kind, span: makeSpan(`type:${kind}`) });
 
 test("compilePhaseA parses/serializes/codegens simple let*", async () => {
   const source = `(program (let* ((x 42)) x))`;
@@ -132,5 +138,64 @@ test("generateCode emits function expressions", async () => {
   const program = new Program({ body: [stmt], span: makeSpan("program") });
   const result = await generateCode(program);
   assert.ok(result.tsSource.includes("function"));
+  assert.ok(result.tsSource.includes("return value;"));
+});
+
+test("compilePhaseA emits type alias definitions", async () => {
+  const source = `(program
+    (type-alias OptionalValue
+      (typeparams (T (extends (type-string)) (default (type-number))))
+      (type-union
+        (type-ref T)
+        (type-null)))
+    (type-alias MapIt
+      (type-mapped (T)
+        (type-ref Value)
+        (type-ref Identity)
+        readonly
+        optional
+        (type-null)))
+)`;
+  const result = await compilePhaseA(source);
+  assert.ok(
+    result.tsSource.includes("type OptionalValue<T extends string = number> = T | null;")
+  );
+  assert.ok(
+    result.tsSource.includes("type MapIt = { readonly [T in null as Identity]?: Value };")
+  );
+});
+
+test("generateCode emits async generator with type params", async () => {
+  const typeParam = new TypeParam({
+    name: mkIdentifier("T"),
+    span: makeSpan("type-param"),
+    constraint: makeTypePrimitive("type-string"),
+  });
+  const paramId = mkIdentifier("value");
+  const fn = new FunctionExpr({
+    signature: {
+      parameters: [{
+        name: paramId,
+        typeAnnotation: makeTypeRef("T"),
+      }],
+      returnType: makeTypePrimitive("type-number"),
+    },
+    body: [
+      new ReturnExpr({
+        span: makeSpan("return"),
+        value: paramId,
+      }),
+    ],
+    span: makeSpan("function"),
+    async: true,
+    generator: true,
+    typeParams: [typeParam],
+  });
+  const stmt = new ExprStmt({ expr: fn, span: makeSpan("expr") });
+  const program = new Program({ body: [stmt], span: makeSpan("program") });
+  const result = await generateCode(program);
+  assert.ok(
+    result.tsSource.includes("async function*<T extends string>(value: T): number {")
+  );
   assert.ok(result.tsSource.includes("return value;"));
 });
