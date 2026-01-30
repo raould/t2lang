@@ -34,6 +34,87 @@ export type ListNode = BaseNode & {
 
 export type SExprNode = SymbolNode | LiteralNode | ListNode;
 
+export type PhaseBKind =
+  | "symbol"
+  | "literal"
+  | "list"
+  | "dotted"
+  | "type-annotation";
+
+export interface PhaseBNodeBase extends BaseNode {
+  phaseKind: PhaseBKind;
+}
+
+export type PhaseBNode =
+  | (SymbolNode & PhaseBNodeBase)
+  | (LiteralNode & PhaseBNodeBase)
+  | (ListNode & PhaseBNodeBase)
+  | PhaseBDottedIdentifier
+  | PhaseBTypeAnnotation;
+
+export interface PhaseBDottedIdentifier extends PhaseBNodeBase {
+  phaseKind: "dotted";
+  parts: string[];
+}
+
+export interface PhaseBTypeAnnotation extends PhaseBNodeBase {
+  phaseKind: "type-annotation";
+  target: PhaseBNode;
+  annotation: PhaseBNode;
+}
+
+export function parsePhaseB(source: string, file = "<input>"): PhaseBNode[] {
+  return parseSexpr(source, file).map(wrapPhaseBNode);
+}
+
+function wrapPhaseBNode(node: SExprNode): PhaseBNode {
+  switch (node.kind) {
+    case "symbol":
+      return wrapSymbol(node);
+    case "literal":
+      return wrapLiteral(node);
+    case "list":
+      return wrapList(node);
+  }
+}
+
+function wrapSymbol(node: SymbolNode): PhaseBNode {
+  if (node.name.includes(".")) {
+    const parts = node.name.split(".");
+    return { ...node, phaseKind: "dotted", parts };
+  }
+  return { ...node, phaseKind: "symbol" };
+}
+
+function wrapLiteral(node: LiteralNode): PhaseBNode {
+  return { ...node, phaseKind: "literal" };
+}
+
+function wrapList(node: ListNode): PhaseBNode {
+  const elements = node.elements.map(wrapPhaseBNode);
+  const annotation = tryTypeAnnotation(elements, node);
+  if (annotation) {
+    return annotation;
+  }
+  return { ...node, phaseKind: "list", elements };
+}
+
+function tryTypeAnnotation(elements: PhaseBNode[], node: ListNode): PhaseBTypeAnnotation | null {
+  if (elements.length === 3 && isColon(elements[1])) {
+    return {
+      ...node,
+      phaseKind: "type-annotation",
+      target: elements[0],
+      annotation: elements[2],
+    };
+  }
+  return null;
+}
+
+function isColon(node: PhaseBNode): boolean {
+  return node.phaseKind === "symbol" && (node as SymbolNode).name === ":";
+}
+
 export class ParseError extends Error {
   public readonly loc: SourceLoc;
 
