@@ -8,8 +8,8 @@
         * Done: for-classic/for-of/for-await, throw, try/catch/finally, switch, prop/index/object/new, import/export, type forms.
     * Codegen: walk the Phase A AST and emit TS, respecting pretty/ugly and emitTypes flags.
         * Done: let/const bindings, assign, return, block, if, while; array/call/ident/literal.
-        * Next: for/try/throw/switch, prop/index/object/new, functions/classes, import/export, types, operator lowering.
-    * Diagnostics/tracing: connect parser + processor so compilePhaseA emits diagnostics/events (AST dumps, trace events, snapshots) compatible with the CLI flags (--ast*, --log, --log-level).
+        * Done: for/try/throw/switch, prop/index/object/new, functions/classes, import/export, types, operator lowering.
+    * Next: Diagnostics/tracing: connect parser + processor so compilePhaseA emits diagnostics/events (AST dumps, trace events, snapshots) compatible with the CLI flags (--ast*, --log, --log-level).
 * CLI glue: once parsing and codegen exist, update cli.ts to:
     * Parse CLI arguments for input/output, AST dump flags, trace phases, pretty modes, etc.
     * Call compilePhaseA with the parsed source and config, then write the generated TypeScript to the requested destination (file or stdout), handling Prettier when requested.

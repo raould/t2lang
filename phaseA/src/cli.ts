@@ -24,6 +24,8 @@ interface CliOptions {
   logLevel?: "debug" | "info" | "warn" | "error";
 }
 
+type SnapshotEntry = { stage: CompilerStage; program: () => Promise<unknown> };
+
 function buildCommand(): Command {
   const cmd = new Command();
   cmd
@@ -39,6 +41,7 @@ function buildCommand(): Command {
         .default("pretty")
         .choices(["pretty", "ugly"])
     )
+    .option("--ast", "Print AST dumps before/after expansion", false)
     .option("--ast-before-expand", "Print AST before expand (alias of parse)", false)
     .option("--ast-after-expand", "Print AST after expand (alias of parse)", false)
     .option("--dump-snapshots <dir>", "Write JSON snapshots to a directory")
@@ -179,12 +182,20 @@ export async function main(argv: string[]): Promise<void> {
     }
   }
 
-  if (options.astBeforeExpand || options.astAfterExpand) { // TODO: differentiate
-    const snapshot = result.snapshots.find((entry) => entry.stage === "parse");
-    if (snapshot) {
-      const serialized = await snapshot.program();
-      console.error(JSON.stringify(serialized, null, 2));
-    }
+  const snapshotByStage = new Map<CompilerStage, SnapshotEntry>();
+  for (const snapshot of result.snapshots) {
+    snapshotByStage.set(snapshot.stage, snapshot);
+  }
+
+  const dumpAstBefore = Boolean(options.ast || options.astBeforeExpand);
+  const dumpAstAfter = Boolean(options.ast || options.astAfterExpand);
+
+  if (dumpAstBefore) {
+    await printAstDump("AST before expand", "parse", snapshotByStage);
+  }
+
+  if (dumpAstAfter) {
+    await printAstDump("AST after expand", "resolve", snapshotByStage);
   }
 
   if (options.dumpSnapshots) {
@@ -206,13 +217,24 @@ function shouldLog(level: string): boolean {
   return level === "debug" || level === "info";
 }
 
-async function dumpSnapshots(targetDir: string, snapshots: Array<{ stage: CompilerStage; program: () => Promise<unknown> }>): Promise<void> {
+async function dumpSnapshots(targetDir: string, snapshots: SnapshotEntry[]): Promise<void> {
   await fs.mkdir(targetDir, { recursive: true });
   for (const snapshot of snapshots) {
     const serialized = await snapshot.program();
     const filePath = path.join(targetDir, `${snapshot.stage}.json`);
     await fs.writeFile(filePath, JSON.stringify(serialized, null, 2), "utf8");
   }
+}
+
+async function printAstDump(title: string, stage: CompilerStage, snapshots: Map<CompilerStage, SnapshotEntry>): Promise<void> {
+  const snapshot = snapshots.get(stage);
+  if (!snapshot) {
+    return;
+  }
+  const serialized = await snapshot.program();
+  console.error(`--- ${title} (${stage}) ---`);
+  console.error(JSON.stringify(serialized, null, 2));
+  console.error(`--- END ${title} (${stage}) ---`);
 }
 
 function logEvent(event: CompilerEvent, logPhases: Set<string>): void {
