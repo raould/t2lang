@@ -4,7 +4,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError, Option } from "commander";
-import { compilePhaseA } from "./api.js";
+import { compilePhaseA, SnapshotRecord } from "./api.js";
 import {
   CompilerEvent,
   CompilerStage,
@@ -33,8 +33,6 @@ interface CliOptions {
   trace?: boolean;
   tracePhases?: string[];
 }
-
-type SnapshotEntry = { stage: CompilerStage; program: () => Promise<unknown> };
 
 function buildCommand(): Command {
   const cmd = new Command();
@@ -210,28 +208,9 @@ export async function main(argv: string[]): Promise<void> {
   }
 
   for (const event of result.events) {
+    await handleEventSideEffects(event, options);
     logEvent(event, logPhases, logLevel);
     logTraceEvent(event, tracePhases, logLevel);
-  }
-
-  const snapshotByStage = new Map<CompilerStage, SnapshotEntry>();
-  for (const snapshot of result.snapshots) {
-    snapshotByStage.set(snapshot.stage, snapshot);
-  }
-
-  const dumpAstBefore = Boolean(options.ast || options.astBeforeExpand);
-  const dumpAstAfter = Boolean(options.ast || options.astAfterExpand);
-
-  if (dumpAstBefore) {
-    await printAstDump("AST before expand", "parse", snapshotByStage);
-  }
-
-  if (dumpAstAfter) {
-    await printAstDump("AST after expand", "resolve", snapshotByStage);
-  }
-
-  if (options.dumpSnapshots) {
-    await dumpSnapshots(options.dumpSnapshots, result.snapshots);
   }
 
   const outputSource = await formatWithPrettier(result.tsSource, prettyOption);
@@ -247,24 +226,55 @@ export async function main(argv: string[]): Promise<void> {
   console.log(`Compiled ${inputPath} -> ${target}`);
 }
 
-async function dumpSnapshots(targetDir: string, snapshots: SnapshotEntry[]): Promise<void> {
-  await fs.mkdir(targetDir, { recursive: true });
-  for (const snapshot of snapshots) {
-    const serialized = await snapshot.program();
-    const filePath = path.join(targetDir, `${snapshot.stage}.json`);
-    await fs.writeFile(filePath, JSON.stringify(serialized, null, 2), "utf8");
-  }
+async function handleEventSideEffects(event: CompilerEvent, options: CliOptions): Promise<void> {
+  await dumpAstForEvent(event, options);
+  await dumpSnapshotFileForEvent(event, options);
 }
 
-async function printAstDump(title: string, stage: CompilerStage, snapshots: Map<CompilerStage, SnapshotEntry>): Promise<void> {
-  const snapshot = snapshots.get(stage);
-  if (!snapshot) {
+async function dumpAstForEvent(event: CompilerEvent, options: CliOptions): Promise<void> {
+  if (event.kind !== "snapshot") {
     return;
   }
+  const snapshot = event.data as SnapshotRecord;
+  const title = getAstDumpTitle(snapshot.stage, options);
+  if (!title) {
+    return;
+  }
+  await printAstSnapshot(title, snapshot);
+}
+
+function getAstDumpTitle(stage: CompilerStage, options: CliOptions): string | undefined {
+  if (stage === "parse" && (options.ast || options.astBeforeExpand)) {
+    return "AST before expand";
+  }
+  if (stage === "resolve" && (options.ast || options.astAfterExpand)) {
+    return "AST after expand";
+  }
+  return undefined;
+}
+
+async function printAstSnapshot(title: string, snapshot: SnapshotRecord): Promise<void> {
   const serialized = await snapshot.program();
-  console.error(`--- ${title} (${stage}) ---`);
+  console.error(`--- ${title} (${snapshot.stage}) ---`);
   console.error(JSON.stringify(serialized, null, 2));
-  console.error(`--- END ${title} (${stage}) ---`);
+  console.error(`--- END ${title} (${snapshot.stage}) ---`);
+}
+
+async function dumpSnapshotFileForEvent(event: CompilerEvent, options: CliOptions): Promise<void> {
+  if (!options.dumpSnapshots) {
+    return;
+  }
+  if (event.kind !== "snapshot") {
+    return;
+  }
+  await dumpSnapshotFile(options.dumpSnapshots, event.data as SnapshotRecord);
+}
+
+async function dumpSnapshotFile(targetDir: string, snapshot: SnapshotRecord): Promise<void> {
+  await fs.mkdir(targetDir, { recursive: true });
+  const serialized = await snapshot.program();
+  const filePath = path.join(targetDir, `${snapshot.stage}.json`);
+  await fs.writeFile(filePath, JSON.stringify(serialized, null, 2), "utf8");
 }
 
 function logEvent(event: CompilerEvent, logPhases: Set<string>, logLevel: string): void {
