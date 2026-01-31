@@ -19,11 +19,11 @@
 
 ## 3. Macro System
 - [x] **Macro Registry**: Storage for `defmacro` definitions.
-- [ ] **Expander**: Recursive function that traverses AST-B.
+- [x] **Expander**: Recursive function that traverses AST-B.
     - Input: AST-B (potential macros, sugar)
     - Output: AST-A (canonical Phase A nodes)
     - If head of list is a macro, invoke it.
-- [ ] **Quasiquote Expansion**: Implement the logic to transform `` `(a ~b) `` into list construction code `(list 'a b)`.
+- [x] **Quasiquote Expansion**: Implement the logic to transform `` `(a ~b) `` into list construction code `(list 'a b)`.
 - [ ] **GenSym**: Implement hygienic symbol generation.
 
 ## 4. Syntactic Sugar (Rewrites)
