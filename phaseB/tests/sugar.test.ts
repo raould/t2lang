@@ -69,3 +69,45 @@ test("type annotations emit t:tuple for bracketed tuples", () => {
   const head = rewritten.elements[0] as SymbolNode;
   assert.strictEqual(head.name, "t:tuple");
 });
+
+test("type annotations emit t:keyof for keyof expressions", () => {
+  const annotation = getFirstAnnotation("(fn (x : keyof Foo) 0)");
+  const rewritten = annotation.annotation as PhaseBListNode;
+  const head = rewritten.elements[0] as SymbolNode;
+  assert.strictEqual(head.name, "t:keyof");
+});
+
+test("type annotations emit t:typeof when using typeof", () => {
+  const annotation = getFirstAnnotation("(fn (x : typeof Foo) 0)");
+  const rewritten = annotation.annotation as PhaseBListNode;
+  const head = rewritten.elements[0] as SymbolNode;
+  assert.strictEqual(head.name, "t:typeof");
+});
+
+test("type annotations emit t:indexed for indexed access", () => {
+  const annotation = getFirstAnnotation("(fn (x : Foo[Bar]) 0)");
+  const rewritten = annotation.annotation as PhaseBListNode;
+  const head = rewritten.elements[0] as SymbolNode;
+  assert.strictEqual(head.name, "t:indexed");
+});
+
+test("type annotations emit t:conditional for conditional types", () => {
+  const annotation = getFirstAnnotation("(fn (x : Foo extends Bar ? Baz : Qux) 0)");
+  const rewritten = annotation.annotation as PhaseBListNode;
+  const head = rewritten.elements[0] as SymbolNode;
+  assert.strictEqual(head.name, "t:conditional");
+});
+
+test("type annotations emit t:infer for infer declarations", () => {
+  const annotation = getFirstAnnotation("(fn (x : infer Foo) 0)");
+  const rewritten = annotation.annotation as PhaseBListNode;
+  const head = rewritten.elements[0] as SymbolNode;
+  assert.strictEqual(head.name, "t:infer");
+});
+
+test("type annotations emit t:literal for literal values", () => {
+  const annotation = getFirstAnnotation("(fn (x : true) 0)");
+  const rewritten = annotation.annotation as PhaseBListNode;
+  const head = rewritten.elements[0] as SymbolNode;
+  assert.strictEqual(head.name, "t:literal");
+});

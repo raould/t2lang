@@ -15,10 +15,18 @@ export function collectAnnotationSegment(
     return { annotationNode: null, consumed: 0 };
   }
   let boundary = elements.length;
-  for (let i = startIdx + 1; i < elements.length - 1; i += 1) {
-    const symbolNode = elements[i];
-    const colonNode = elements[i + 1];
-    if (symbolNode.phaseKind === "symbol" && colonNode && isColon(colonNode)) {
+  let questionDepth = 0;
+  for (let i = startIdx; i < elements.length - 1; i += 1) {
+    const current = elements[i];
+    if (current.phaseKind === "symbol" && (current as SymbolNode).name === "?") {
+      questionDepth += 1;
+    }
+    const next = elements[i + 1];
+    if (next && isColon(next)) {
+      if (questionDepth > 0) {
+        questionDepth -= 1;
+        continue;
+      }
       boundary = i;
       break;
     }
@@ -40,7 +48,13 @@ export function serializePhaseBNode(node: PhaseBNode): string {
     case "symbol":
       return (node as SymbolNode).name;
     case "literal":
-      return String((node as { value: unknown }).value);
+      {
+        const value = (node as { value: unknown }).value;
+        if (typeof value === "string") {
+          return JSON.stringify(value);
+        }
+        return String(value);
+      }
     case "list":
       return `(${(node as PhaseBListNode).elements.map((child) => serializePhaseBNode(child)).join(" ")})`;
     case "dotted":

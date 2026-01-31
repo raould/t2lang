@@ -45,7 +45,7 @@
 - [x] Update `t2tc` et. al. CLI to support running Phase B -> Phase A.
 
 ## 7. Type System Infrastructure
-- [ ] Define `t:*` type AST nodes in Phase A (see `phaseA/TYPES.md`).
+- [x] Define `t:*` type AST nodes in Phase A (see `phaseA/TYPES.md`).
 - [ ] Implement type expression parser in the Phase B reader.
 - [ ] Implement type sugar rewrites (generics, unions, tuples, mapped types, etc.).
 - [ ] Add type annotation support to `fn`, `let*`, and `const*` forms.

@@ -1,11 +1,8 @@
 type Token = { type: "identifier"; value: string } | { type: "punc"; value: string };
+type TokenStream = { tokens: Token[]; pos: number };
 
-type TokenStream = {
-  tokens: Token[];
-  pos: number;
-};
-
-const PUNCTUATION = new Set(["[", "]", "<", ">", ",", "|", "&", "?", "(", ")"]);
+const PUNCTUATION = new Set(["[", "]", "<", ">", ",", "|", "&", "?", ":", "(", ")"]);
+let allowOptionalPostfix = true;
 
 export type TypeAst =
   | { kind: "primitive"; name: string }
@@ -15,10 +12,16 @@ export type TypeAst =
   | { kind: "tuple"; elements: TypeAst[] }
   | { kind: "union"; options: TypeAst[] }
   | { kind: "intersection"; options: TypeAst[] }
-  | { kind: "apply"; base: TypeAst; args: TypeAst[] };
+  | { kind: "apply"; base: TypeAst; args: TypeAst[] }
+  | { kind: "keyof"; target: TypeAst }
+  | { kind: "typeof"; expr: string }
+  | { kind: "indexed"; object: TypeAst; index: TypeAst }
+  | { kind: "conditional"; check: TypeAst; extends: TypeAst; trueType: TypeAst; falseType: TypeAst }
+  | { kind: "infer"; name: string }
+  | { kind: "literal"; value: string | number | boolean };
 
 export function parseTypeExpression(input: string): TypeAst {
-  const stream = { tokens: tokenize(input), pos: 0 };
+  const stream: TokenStream = { tokens: tokenize(input), pos: 0 };
   const expr = parseUnion(stream);
   if (!atEnd(stream)) {
     throw new Error("unexpected token in type expression");
@@ -51,14 +54,33 @@ function tokenize(input: string): Token[] {
 }
 
 function parseUnion(stream: TokenStream): TypeAst {
-  const nodes: TypeAst[] = [parseIntersection(stream)];
+  const nodes: TypeAst[] = [parseConditional(stream)];
   while (matchPunc(stream, "|")) {
-    nodes.push(parseIntersection(stream));
+    nodes.push(parseConditional(stream));
   }
   if (nodes.length === 1) {
     return nodes[0];
   }
   return { kind: "union", options: nodes };
+}
+
+function parseConditional(stream: TokenStream): TypeAst {
+  const check = parseIntersection(stream);
+  if (matchIdentifier(stream, "extends")) {
+    const extendsType = withOptionalDisabled(() => parseUnion(stream));
+    expectPunc(stream, "?");
+    const trueType = parseUnion(stream);
+    expectPunc(stream, ":");
+    const falseType = parseUnion(stream);
+    return {
+      kind: "conditional",
+      check,
+      extends: extendsType,
+      trueType,
+      falseType,
+    };
+  }
+  return check;
 }
 
 function parseIntersection(stream: TokenStream): TypeAst {
@@ -73,14 +95,19 @@ function parseIntersection(stream: TokenStream): TypeAst {
 }
 
 function parsePostfix(stream: TokenStream): TypeAst {
-  let node = parsePrimary(stream);
+  let node = parsePrefix(stream);
   while (true) {
     if (matchPunc(stream, "[")) {
+      if (matchPunc(stream, "]")) {
+        node = { kind: "array", element: node };
+        continue;
+      }
+      const indexType = parseUnion(stream);
       expectPunc(stream, "]");
-      node = { kind: "array", element: node };
+      node = { kind: "indexed", object: node, index: indexType };
       continue;
     }
-    if (matchPunc(stream, "?")) {
+    if (allowOptionalPostfix && matchPunc(stream, "?")) {
       node = { kind: "nullable", inner: node };
       continue;
     }
@@ -91,6 +118,22 @@ function parsePostfix(stream: TokenStream): TypeAst {
     break;
   }
   return node;
+}
+
+function parsePrefix(stream: TokenStream): TypeAst {
+  if (matchIdentifier(stream, "keyof")) {
+    const target = parsePrefix(stream);
+    return { kind: "keyof", target };
+  }
+  if (matchIdentifier(stream, "typeof")) {
+    const identifier = nextIdentifier(stream);
+    return { kind: "typeof", expr: identifier };
+  }
+  if (matchIdentifier(stream, "infer")) {
+    const name = nextIdentifier(stream);
+    return { kind: "infer", name };
+  }
+  return parsePrimary(stream);
 }
 
 function parsePrimary(stream: TokenStream): TypeAst {
@@ -127,14 +170,6 @@ function parseTypeArguments(stream: TokenStream, base: TypeAst): TypeAst {
   return { kind: "apply", base, args };
 }
 
-function identifierToType(name: string): TypeAst {
-  const normalized = name.toLowerCase();
-  if (primitiveNames.has(normalized)) {
-    return { kind: "primitive", name: normalized };
-  }
-  return { kind: "ref", name };
-}
-
 const primitiveNames = new Set([
   "number",
   "string",
@@ -150,6 +185,35 @@ const primitiveNames = new Set([
   "bigint",
 ]);
 
+function identifierToType(name: string): TypeAst {
+  const normalized = name.toLowerCase();
+  if (primitiveNames.has(normalized)) {
+    return { kind: "primitive", name: normalized };
+  }
+  if (normalized === "true" || normalized === "false") {
+    return { kind: "literal", value: normalized === "true" };
+  }
+  if (isQuotedString(name)) {
+    return { kind: "literal", value: parseQuotedString(name) };
+  }
+  if (isNumericToken(name)) {
+    return { kind: "literal", value: Number(name) };
+  }
+  return { kind: "ref", name };
+}
+
+function isQuotedString(token: string): boolean {
+  return token.length >= 2 && token.startsWith("\"") && token.endsWith("\"");
+}
+
+function parseQuotedString(token: string): string {
+  try {
+    return JSON.parse(token);
+  } catch {
+    return token.slice(1, -1);
+  }
+}
+
 function nextIdentifier(stream: TokenStream): string {
   const token = stream.tokens[stream.pos];
   if (!token || token.type !== "identifier") {
@@ -157,6 +221,15 @@ function nextIdentifier(stream: TokenStream): string {
   }
   stream.pos += 1;
   return token.value;
+}
+
+function matchIdentifier(stream: TokenStream, value: string): boolean {
+  const token = stream.tokens[stream.pos];
+  if (token && token.type === "identifier" && token.value === value) {
+    stream.pos += 1;
+    return true;
+  }
+  return false;
 }
 
 function matchPunc(stream: TokenStream, value: string): boolean {
@@ -179,6 +252,22 @@ function expectPunc(stream: TokenStream, value: string): void {
   }
 }
 
+const numericRegex = /^-?(?:\d+|\d+\.\d+|\.\d+)$/;
+
+function isNumericToken(token: string): boolean {
+  return numericRegex.test(token);
+}
+
 function atEnd(stream: TokenStream): boolean {
   return stream.pos >= stream.tokens.length;
+}
+
+function withOptionalDisabled<T>(action: () => T): T {
+  const previous = allowOptionalPostfix;
+  allowOptionalPostfix = false;
+  try {
+    return action();
+  } finally {
+    allowOptionalPostfix = previous;
+  }
 }

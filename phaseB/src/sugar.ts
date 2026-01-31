@@ -185,6 +185,31 @@ function typeAstToPhaseB(ast: TypeAst, loc: SourceLoc): PhaseBNode {
         [typeAstToPhaseB(ast.base, loc), ...ast.args.map((arg) => typeAstToPhaseB(arg, loc))],
         loc
       );
+    case "keyof":
+      return createTypeList("t:keyof", [typeAstToPhaseB(ast.target, loc)], loc);
+    case "typeof":
+      return createTypeList("t:typeof", [createPhaseBSymbol(ast.expr, loc)], loc);
+    case "indexed":
+      return createTypeList(
+        "t:indexed",
+        [typeAstToPhaseB(ast.object, loc), typeAstToPhaseB(ast.index, loc)],
+        loc
+      );
+    case "conditional":
+      return createTypeList(
+        "t:conditional",
+        [
+          typeAstToPhaseB(ast.check, loc),
+          typeAstToPhaseB(ast.extends, loc),
+          typeAstToPhaseB(ast.trueType, loc),
+          typeAstToPhaseB(ast.falseType, loc),
+        ],
+        loc
+      );
+    case "infer":
+      return createTypeList("t:infer", [createPhaseBSymbol(ast.name, loc)], loc);
+    case "literal":
+      return createTypeList("t:literal", [createLiteralNode(ast.value, loc)], loc);
   }
 }
 
@@ -201,13 +226,17 @@ function createPhaseBSymbol(name: string, loc: SourceLoc): PhaseBNode {
   };
 }
 
-function createStringLiteral(value: string, loc: SourceLoc): PhaseBNode {
+function createLiteralNode(value: string | number | boolean, loc: SourceLoc): PhaseBNode {
   return {
     kind: "literal",
     value,
     loc,
     phaseKind: "literal",
   };
+}
+
+function createStringLiteral(value: string, loc: SourceLoc): PhaseBNode {
+  return createLiteralNode(value, loc);
 }
 
 function createPhaseBList(elements: PhaseBNode[], loc: SourceLoc): PhaseBListNode {
