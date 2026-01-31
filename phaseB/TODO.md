@@ -65,27 +65,27 @@
 
 ## 10. architecture review
 
-- Implement reader macros — Required for any macro system to work.
+- [ ] Implement reader macros — Required for any macro system to work.
 - Implement sugar rewrites — The OLD/phase1 sugarRewrite.ts can be used as guidance for reimplementing these features in phase B:
-    Assignment (:=)
-    Dotted identifier → prop chains
-    let/const single-binding sugar
-    Type annotation parsing
-- Separate reader from rewriter — Keep reader.ts focused on tokenization and S-expr construction. Create a new rewriter.ts for sugar transforms.
+    - [ ] Assignment (:=)
+    - [ ] Dotted identifier → prop chains
+    - [ ] let/const single-binding sugar
+    - [ ] Type annotation parsing
+- [ ] Separate reader from rewriter — Keep reader.ts focused on tokenization and S-expr construction. Create a new rewriter.ts for sugar transforms.
 - Create expander.ts — Dedicated macro expansion module with:
-    MacroRegistry class
-    expand(node, registry) function
-    gensym(prefix) function
-    Depth limiting
+    - [ ] MacroRegistry class
+    - [ ] expand(node, registry) function
+    - [ ] gensym(prefix) function
+    - [ ] Depth limiting
 - Create lower.ts — Transform Phase B nodes to Phase A:
-    Remove all sugar
-    Validate structure
-    Produce canonical AST
-- Test Coverage
-    - All existing error codes. Work
-    - Reader macros
-    - Dotted identifiers (edge cases)
-    - Type annotations
-    - Sugar rewrites
-    - Macro expansion
-    - Integration with Phase A
+    - [ ] Remove all sugar
+    - [ ] Validate structure
+    - [ ] Produce canonical AST
+- Test Coverage (ongoing, requires adding new tests incrementally)
+    - [x] All existing error codes. Context: any time a new error code is added to the registry, add a test for the situation in which it arises.
+    - [x] Reader macros (covered by tests/reader.test.ts)
+    - [x] Dotted identifiers (covered by reader.test.ts + rewriter.test.ts cases for multi-part access and invalid identifiers)
+    - [x] Type annotations (covered by the comprehensive sugar tests that assert each t:* form)
+    - [x] Sugar rewrites (covered by rewriter.test.ts and sugar.test.ts)
+    - [ ] Macro expansion
+    - [ ] Integration with Phase A
