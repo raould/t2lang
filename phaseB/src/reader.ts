@@ -1,7 +1,9 @@
 import type { ExpansionFrame, SourceLoc } from "./location.js";
 export type { ExpansionFrame, SourceLoc } from "./location.js";
+import type { Program } from "../../phaseA/dist/phaseA0.js";
 import { applySugar } from "./sugar.js";
 import { rewriteAssignments } from "./rewriter.js";
+import { lowerPhaseB } from "./lower.js";
 
 export interface BaseNode {
   loc: SourceLoc;
@@ -71,7 +73,12 @@ export interface PhaseBListNode extends PhaseBNodeBase {
   elements: PhaseBNode[];
 }
 
-export function parsePhaseB(source: string, file = "<input>"): PhaseBNode[] {
+export function parsePhaseB(source: string, file = "<input>"): Program {
+  const nodes = parsePhaseBRaw(source, file);
+  return lowerPhaseB(nodes);
+}
+
+export function parsePhaseBRaw(source: string, file = "<input>"): PhaseBNode[] {
   const parsed = parseSexpr(source, file);
   const rewritten = rewriteAssignments(parsed);
   const nodes = rewritten.map(wrapPhaseBNode);

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert";
-import { parseSexpr, parsePhaseB, ParseError } from "../src/reader.js";
+import { parseSexpr, parsePhaseBRaw, ParseError } from "../src/reader.js";
 import type { ListNode, SymbolNode } from "../src/reader.js";
 
 test("parse simple list", () => {
@@ -35,13 +35,13 @@ test("records string literal locations", () => {
 
 test("rejects invalid dotted identifiers", () => {
   assert.throws(
-    () => parsePhaseB(".foo", "dots.t2"),
+    () => parsePhaseBRaw(".foo", "dots.t2"),
     (error) => error instanceof ParseError && error.code === "E006"
   );
 });
 
 test("parsePhaseB rewrites dotted property access into prop node", () => {
-  const [node] = parsePhaseB("obj.prop", "dots.t2");
+  const [node] = parsePhaseBRaw("obj.prop", "dots.t2");
   assert.strictEqual(node.kind, "list");
   const [head, target, property] = node.elements;
   assert.strictEqual(head.kind, "symbol");
@@ -53,7 +53,7 @@ test("parsePhaseB rewrites dotted property access into prop node", () => {
 });
 
 test("parsePhaseB rewrites dotted method calls into call/prop structures", () => {
-  const [node] = parsePhaseB("(obj.method 1 2)", "dots.t2");
+  const [node] = parsePhaseBRaw("(obj.method 1 2)", "dots.t2");
   assert.strictEqual(node.kind, "list");
   const [head, propNode, arg1, arg2] = node.elements;
   assert.strictEqual(head.kind, "symbol");

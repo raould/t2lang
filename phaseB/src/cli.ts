@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { ParseError, parsePhaseB } from "./reader.js";
+import { ParseError, parsePhaseBRaw } from "./reader.js";
 import type { PhaseBNode, ReaderErrorCode } from "./reader.js";
 import type { SourceLoc } from "./location.js";
 import { compilePhaseA } from "../../phaseA/dist/api.js";
@@ -24,6 +24,7 @@ import {
   EventSeverity,
   isEventSeverity,
 } from "../../phaseA/dist/events.js";
+import { lowerPhaseB } from "./lower.js";
 
 const CLI_NAME = "t2b";
 const VALID_LOG_PHASES: CompilerStage[] = ["parse", "resolve", "typecheck", "codegen"];
@@ -67,7 +68,7 @@ export async function main(argv: string[]): Promise<void> {
     const { source, actualPath } = await readSource(args.inputPath);
     let parsedNodes: PhaseBNode[] = [];
     try {
-      parsedNodes = parsePhaseB(source, actualPath);
+      parsedNodes = parsePhaseBRaw(source, actualPath);
     } catch (error) {
       handleParserFailure(error, args.format, {
         sourceMap: { [actualPath]: source },
@@ -76,9 +77,10 @@ export async function main(argv: string[]): Promise<void> {
       return;
     }
 
+    const normalizedProgram = lowerPhaseB(parsedNodes);
     if (args.dumpAst) {
-      console.error("Parsed Phase B AST:");
-      console.error(JSON.stringify(parsedNodes, stringifyFilter, 2));
+      console.error("Normalized Phase A AST:");
+      console.error(JSON.stringify(normalizedProgram, stringifyFilter, 2));
     }
 
     const isStdin = actualPath === "<stdin>";

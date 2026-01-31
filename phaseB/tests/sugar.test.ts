@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert";
-import { parsePhaseB } from "../src/reader.js";
+import { parsePhaseBRaw } from "../src/reader.js";
 import type { PhaseBListNode, PhaseBTypeAnnotation, SymbolNode } from "../src/reader.js";
 
 test("fn parameter list rewrites colon annotations", () => {
-  const nodes = parsePhaseB("(fn (x : Number) (+ x 1))", "params.t2");
+  const nodes = parsePhaseBRaw("(fn (x : Number) (+ x 1))", "params.t2");
   const fnNode = nodes[0];
   assert.strictEqual(fnNode.phaseKind, "list");
 
@@ -16,13 +16,13 @@ test("fn parameter list rewrites colon annotations", () => {
 });
 
 test("colon expressions outside of parameter lists stay lists", () => {
-  const nodes = parsePhaseB("((x : Number default))", "bindings.t2");
+  const nodes = parsePhaseBRaw("((x : Number default))", "bindings.t2");
   const inner = ((nodes[0] as PhaseBListNode).elements[0] as PhaseBListNode);
   assert.strictEqual(inner.phaseKind, "list");
 });
 
 function getFirstAnnotation(expr: string): PhaseBTypeAnnotation {
-  const nodes = parsePhaseB(expr, "type.t2");
+  const nodes = parsePhaseBRaw(expr, "type.t2");
   const fnNode = nodes[0] as PhaseBListNode;
   const params = fnNode.elements[1] as PhaseBListNode;
   return params.elements[0] as PhaseBTypeAnnotation;

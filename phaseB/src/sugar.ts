@@ -30,6 +30,10 @@ function rewriteList(node: PhaseBListNode): PhaseBNode {
     elements = [...elements];
     elements[1] = rewriteFunctionParams(elements[1] as PhaseBListNode);
   }
+  if (head && isLetForm(head) && elements[1]?.phaseKind === "list") {
+    elements = [...elements];
+    elements[1] = rewriteLetBindings(elements[1] as PhaseBListNode);
+  }
 
   const rewrittenElements = elements.map(rewriteNode);
   return { ...node, elements: rewrittenElements };
@@ -66,6 +70,44 @@ function createTypeAnnotationNode(target: PhaseBNode, colon: PhaseBNode, annotat
     target,
     annotation,
   };
+}
+
+function rewriteLetBindings(node: PhaseBListNode): PhaseBListNode {
+  const rewritten = node.elements.map((binding) => {
+    if (binding.phaseKind === "list") {
+      return rewriteBindingEntry(binding as PhaseBListNode);
+    }
+    return binding;
+  });
+  return { ...node, elements: rewritten };
+}
+
+function rewriteBindingEntry(node: PhaseBListNode): PhaseBListNode {
+  const elements: PhaseBNode[] = [];
+  let idx = 0;
+  while (idx < node.elements.length) {
+    const target = node.elements[idx];
+    const colon = node.elements[idx + 1];
+    if (colon && isColon(colon)) {
+      const annotationStart = idx + 2;
+      const { annotationNode, consumed } = collectAnnotationSegment(node.elements, annotationStart);
+      if (annotationNode && consumed > 0) {
+        elements.push(createTypeAnnotationNode(target, colon, annotationNode));
+        idx = annotationStart + consumed;
+        continue;
+      }
+    }
+    elements.push(node.elements[idx]);
+    idx += 1;
+  }
+  return { ...node, elements };
+}
+
+function isLetForm(node: PhaseBNode): node is SymbolNode & { phaseKind: "symbol" } {
+  return (
+    node.phaseKind === "symbol" &&
+    ["let", "let*", "const", "const*"].includes((node as SymbolNode).name)
+  );
 }
 
 function rewriteTypeAnnotation(node: PhaseBTypeAnnotation): PhaseBTypeAnnotation {

@@ -18,7 +18,7 @@ test("phaseB CLI --dump-ast prints AST and still emits TypeScript", () => {
   );
 
   assert.strictEqual(result.status, 0, "CLI should exit successfully");
-  assert.strictEqual(result.stderr?.includes("Parsed Phase B AST:"), true, "AST dump header expected");
+  assert.strictEqual(result.stderr?.includes("Normalized Phase A AST:"), true, "AST dump header expected");
   assert.strictEqual(result.stdout?.trim(), exampleExpected, "stdout should still contain the compiled TypeScript");
 });
 
