@@ -398,15 +398,22 @@ class Parser {
     const entries = node.elements.slice(1);
     const bindings: Binding[] = [];
     let bodyStartIndex = 0;
-    for (let i = 0; i < entries.length; i++) {
-      const entry = entries[i];
-      if (this.isBindingEntry(entry)) {
-        bindings.push(this.nodeToBinding(entry));
-        bodyStartIndex = i + 1;
-        continue;
+    if (entries.length > 0 && this.isBindingList(entries[0])) {
+      for (const bindingNode of entries[0].elements) {
+        bindings.push(this.nodeToBinding(bindingNode));
       }
-      bodyStartIndex = i;
-      break;
+      bodyStartIndex = 1;
+    } else {
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        if (this.isBindingEntry(entry)) {
+          bindings.push(this.nodeToBinding(entry));
+          bodyStartIndex = i + 1;
+          continue;
+        }
+        bodyStartIndex = i;
+        break;
+      }
     }
     const statements = entries.slice(bodyStartIndex).map((child) => this.nodeToStatement(child));
     return new LetStarExpr({ isConst, bindings, body: statements, span });
@@ -425,6 +432,13 @@ class Parser {
     } catch {
       return false;
     }
+  }
+
+  private isBindingList(node: Node): node is ListNode {
+    if (node.type !== "list" || node.elements.length === 0) {
+      return false;
+    }
+    return node.elements.every((child) => this.isBindingEntry(child));
   }
 
   private buildAssign(node: ListNode): AssignExpr {
