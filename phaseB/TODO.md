@@ -51,7 +51,7 @@
     - [x] Validate type node structure before handing the AST to Phase A.
 
 ## 8. Error Handling Infrastructure
-- [ ] Define `SourceLoc` and `ExpansionFrame` types
+- [x] Define `SourceLoc` and `ExpansionFrame` types (see src/location.ts)
 - [ ] Attach source locations in reader
 - [ ] Propagate expansion stack in macro expander
 - [x] Implement error code registry
@@ -82,7 +82,7 @@
     Validate structure
     Produce canonical AST
 - Test Coverage
-    - All error codes (E001-E007)
+    - All existing error codes. Work
     - Reader macros
     - Dotted identifiers (edge cases)
     - Type annotations
