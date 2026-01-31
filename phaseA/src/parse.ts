@@ -1107,12 +1107,20 @@ class Parser {
       throw new Error("Export statement must start with an atom");
     }
     if (head.value === "export") {
-      const specNode = node.elements[1];
-      if (!specNode || specNode.type !== "list") {
-        throw new Error("export requires an export-spec list");
+      const entries = node.elements.slice(1);
+      if (entries.length === 0) {
+        throw new Error("export requires at least one spec");
       }
-      const spec = this.parseExportSpec(specNode);
-      return new ExportStmt({ spec, span });
+      const first = entries[0];
+      if (first.type === "list" && first.elements.length > 0) {
+        const specHead = first.elements[0];
+        if (specHead.type === "atom" && specHead.value === "export-spec") {
+          const spec = this.parseExportSpec(first);
+          return new ExportStmt({ spec, span });
+        }
+      }
+      const named: NamedExport[] = entries.map((entry) => this.parseNamedExport(entry));
+      return new ExportStmt({ spec: { named }, span });
     }
     if (head.value === "export-default") {
       const declarationNode = node.elements[1];
