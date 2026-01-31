@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert";
 import { parseSexpr, ParseError } from "../src/reader.js";
+import { parsePhaseB } from "../src/reader.js";
 
 test("parse simple list", () => {
   const nodes = parseSexpr("(foo 1 \"bar\")", "test.t2");
@@ -30,4 +31,11 @@ test("records string literal locations", () => {
   assert.strictEqual(stringNode.value, "hello");
   assert.strictEqual(stringNode.loc.line, 1);
   assert.strictEqual(stringNode.loc.column, 8);
+});
+
+test("rejects invalid dotted identifiers", () => {
+  assert.throws(
+    () => parsePhaseB(".foo", "dots.t2"),
+    (error) => error instanceof ParseError && error.code === "E006"
+  );
 });

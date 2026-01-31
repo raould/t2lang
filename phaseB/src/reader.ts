@@ -89,6 +89,9 @@ function wrapPhaseBNode(node: SExprNode): PhaseBNode {
 function wrapSymbol(node: SymbolNode): PhaseBNode {
   if (node.name.includes(".")) {
     const parts = node.name.split(".");
+    if (parts.some((part) => part.length === 0)) {
+      throw new ParseError("invalid dotted identifier", node.loc, "E006");
+    }
     return { ...node, phaseKind: "dotted", parts };
   }
   return { ...node, phaseKind: "symbol" };
