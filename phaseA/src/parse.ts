@@ -59,6 +59,15 @@ import {
   TypePrimitive,
   TypeRef,
   TypeUnion,
+  TypeVar,
+  TypeTuple,
+  TypeArray,
+  TypeNullable,
+  TypeKeyof,
+  TypeTypeof,
+  TypeIndexed,
+  TypeConditional,
+  TypeInfer,
   InterfaceStmt,
 } from "./phaseA1.js";
 
@@ -74,6 +83,21 @@ interface Token {
 }
 
 type Node = AtomNode | ListNode;
+
+const PRIMITIVE_NAME_MAP: Record<string, TypePrimitive["kind"]> = {
+  number: "type-number",
+  string: "type-string",
+  boolean: "type-boolean",
+  void: "type-void",
+  null: "type-null",
+  undefined: "type-undefined",
+  any: "type-any",
+  unknown: "type-unknown",
+  never: "type-never",
+  object: "type-object",
+  symbol: "type-symbol",
+  bigint: "type-bigint",
+};
 
 interface AtomNode {
   type: "atom";
@@ -1317,10 +1341,125 @@ class Parser {
     return new TypeFunction({ typeParams, params, returns, span });
   }
 
+  private buildTFn(node: ListNode): TypeFunction {
+    const span = node.span;
+    let entries = node.elements.slice(1);
+    let typeParams: TypeParam[] | undefined;
+    const paramMarkerIndex = entries.findIndex((child) => child.type === "atom" && child.value === ":type-params");
+    if (paramMarkerIndex >= 0) {
+      const paramsNode = entries[paramMarkerIndex + 1];
+      if (!paramsNode) {
+        throw new Error(":type-params requires a list of identifiers");
+      }
+      typeParams = this.parseTypeParamNames(paramsNode);
+      entries = entries.slice(0, paramMarkerIndex);
+    }
+    if (entries.length === 0) {
+      throw new Error("t:fn requires at least a return type");
+    }
+    const returns = this.nodeToType(entries[entries.length - 1]);
+    const params = entries.slice(0, -1).map((child) => this.nodeToType(child));
+    return new TypeFunction({ typeParams, params, returns, span });
+  }
+
+  private buildTPrimitive(node: ListNode): TypePrimitive {
+    const span = node.span;
+    const [, nameNode] = node.elements;
+    if (!nameNode) {
+      throw new Error("t:primitive requires a name");
+    }
+    const name = this.nodeToStringLiteral(nameNode, "t:primitive name");
+    const kind = PRIMITIVE_NAME_MAP[name];
+    if (!kind) {
+      throw new Error(`Unknown primitive type ${name}`);
+    }
+    return new TypePrimitive({ kind, span });
+  }
+
+  private buildTVar(node: ListNode): TypeVar {
+    const span = node.span;
+    const [, nameNode] = node.elements;
+    if (!nameNode) {
+      throw new Error("t:var requires a name");
+    }
+    const name = this.nodeToIdentifier(nameNode, "t:var name");
+    return new TypeVar({ name, span });
+  }
+
   private buildTypeObject(node: ListNode): TypeObject {
     const span = node.span;
     const fields = node.elements.slice(1).map((child) => this.nodeToTypeField(child));
     return new TypeObject({ fields, span });
+  }
+
+  private buildTTuple(node: ListNode): TypeTuple {
+    const span = node.span;
+    const types = node.elements.slice(1).map((child) => this.nodeToType(child));
+    return new TypeTuple({ types, span });
+  }
+
+  private buildTArray(node: ListNode): TypeArray {
+    const span = node.span;
+    const [, elementNode] = node.elements;
+    if (!elementNode) {
+      throw new Error("t:array requires an element type");
+    }
+    return new TypeArray({ element: this.nodeToType(elementNode), span });
+  }
+
+  private buildTNullable(node: ListNode): TypeNullable {
+    const span = node.span;
+    const [, innerNode] = node.elements;
+    if (!innerNode) {
+      throw new Error("t:nullable requires an inner type");
+    }
+    return new TypeNullable({ inner: this.nodeToType(innerNode), span });
+  }
+
+  private buildTKeyof(node: ListNode): TypeKeyof {
+    const span = node.span;
+    const [, targetNode] = node.elements;
+    if (!targetNode) {
+      throw new Error("t:keyof requires a target type");
+    }
+    return new TypeKeyof({ target: this.nodeToType(targetNode), span });
+  }
+
+  private buildTTypeof(node: ListNode): TypeTypeof {
+    const span = node.span;
+    const [, exprNode] = node.elements;
+    if (!exprNode) {
+      throw new Error("t:typeof requires an expression");
+    }
+    return new TypeTypeof({ expr: this.nodeToExpression(exprNode), span });
+  }
+
+  private buildTIndexed(node: ListNode): TypeIndexed {
+    const span = node.span;
+    const [, objectNode, indexNode] = node.elements;
+    if (!objectNode || !indexNode) {
+      throw new Error("t:indexed requires an object and an index type");
+    }
+    return new TypeIndexed({ object: this.nodeToType(objectNode), index: this.nodeToType(indexNode), span });
+  }
+
+  private buildTConditional(node: ListNode): TypeConditional {
+    const span = node.span;
+    const [, checkNode, extendsNode, trueNode, falseNode] = node.elements;
+    if (!checkNode || !extendsNode || !trueNode || !falseNode) {
+      throw new Error("t:conditional requires check, extends, true, and false branches");
+    }
+    return new TypeConditional({ check: this.nodeToType(checkNode), extendsType: this.nodeToType(extendsNode), trueType: this.nodeToType(trueNode), falseType: this.nodeToType(falseNode), span });
+  }
+
+  private buildTInfer(node: ListNode): TypeInfer {
+    const span = node.span;
+    const [, nameNode] = node.elements;
+    if (!nameNode) {
+      throw new Error("t:infer requires a name");
+    }
+    const name = this.nodeToIdentifier(nameNode, "t:infer name");
+    return new TypeInfer({ name, span });
   }
 
   private nodeToTypeField(node: Node): TypeField {
@@ -1332,7 +1471,29 @@ class Parser {
       throw new Error("type-object field key must be an atom");
     }
     const valueNode = node.elements[1];
-    return new TypeField({ key: keyNode.value, fieldType: this.nodeToType(valueNode), span: node.span });
+    let optional: boolean | undefined;
+    let readonlyFlag: boolean | undefined;
+    let index = 2;
+    while (index < node.elements.length) {
+      const flagNode = node.elements[index];
+      const valueArg = node.elements[index + 1];
+      if (!valueArg) {
+        throw new Error(`Field modifier ${flagNode.type === "atom" ? flagNode.value : "?"} lacks a value`);
+      }
+      if (flagNode.type !== "atom") {
+        throw new Error("Field modifiers must be atoms");
+      }
+      const flagValue = this.nodeToBooleanValue(valueArg, flagNode.value);
+      if (flagNode.value === ":optional") {
+        optional = flagValue;
+      } else if (flagNode.value === ":readonly") {
+        readonlyFlag = flagValue;
+      } else {
+        throw new Error(`Unknown field modifier ${flagNode.value}`);
+      }
+      index += 2;
+    }
+    return new TypeField({ key: keyNode.value, fieldType: this.nodeToType(valueNode), span: node.span, optional, readonlyFlag });
   }
 
   private buildTypeUnion(node: ListNode): TypeUnion {
@@ -1466,6 +1627,13 @@ class Parser {
       "type-boolean",
       "type-null",
       "type-undefined",
+      "type-void",
+      "type-any",
+      "type-unknown",
+      "type-never",
+      "type-object",
+      "type-symbol",
+      "type-bigint",
       "type-ref",
       "type-function",
       "type-object",
@@ -1475,7 +1643,27 @@ class Parser {
       "type-mapped",
       "type-app",
     ]);
-    return typeHeads.has(head.value);
+    const tHeads = new Set([
+      "t:primitive",
+      "t:var",
+      "t:ref",
+      "t:fn",
+      "t:object",
+      "t:union",
+      "t:intersection",
+      "t:tuple",
+      "t:array",
+      "t:nullable",
+      "t:literal",
+      "t:keyof",
+      "t:typeof",
+      "t:indexed",
+      "t:conditional",
+      "t:infer",
+      "t:mapped",
+      "t:apply",
+    ]);
+    return typeHeads.has(head.value) || tHeads.has(head.value);
   }
 
   private parseTypeParams(node: Node): TypeParam[] {
@@ -1542,6 +1730,32 @@ class Parser {
     return new TypeParam({ name, span: node.span, variance, constraint, defaultType, const: constFlag, infer: inferFlag });
   }
 
+  private nodeToBooleanValue(node: Node, label: string): boolean {
+    const expr = this.nodeToExpression(node);
+    if (expr instanceof Literal && typeof expr.value === "boolean") {
+      return expr.value;
+    }
+    throw new Error(`${label} requires a boolean literal`);
+  }
+
+  private nodeToStringLiteral(node: Node, label: string): string {
+    const expr = this.nodeToExpression(node);
+    if (expr instanceof Literal && typeof expr.value === "string") {
+      return expr.value;
+    }
+    throw new Error(`${label} requires a string literal`);
+  }
+
+  private parseTypeParamNames(node: Node): TypeParam[] {
+    if (node.type !== "list") {
+      throw new Error("type-params list must be a list of identifiers");
+    }
+    return node.elements.map((child) => {
+      const ident = this.nodeToIdentifier(child, "type-param name");
+      return new TypeParam({ name: ident, span: child.span });
+    });
+  }
+
   private nodeToType(node: Node): TypeNode {
     if (node.type !== "list" || node.elements.length === 0) {
       throw new Error("Type expressions must be lists");
@@ -1556,6 +1770,12 @@ class Parser {
       case "type-boolean":
       case "type-null":
       case "type-undefined":
+      case "type-void":
+      case "type-any":
+      case "type-unknown":
+      case "type-never":
+      case "type-symbol":
+      case "type-bigint":
         return new TypePrimitive({ kind: head.value as TypePrimitive["kind"], span: node.span });
       case "type-ref":
         return this.buildTypeRef(node);
@@ -1572,6 +1792,42 @@ class Parser {
       case "type-mapped":
         return this.buildTypeMapped(node);
       case "type-app":
+        return this.buildTypeApp(node, (child) => this.nodeToType(child));
+      case "t:primitive":
+        return this.buildTPrimitive(node);
+      case "t:var":
+        return this.buildTVar(node);
+      case "t:ref":
+        return this.buildTypeRef(node);
+      case "t:fn":
+        return this.buildTFn(node);
+      case "t:object":
+        return this.buildTypeObject(node);
+      case "t:union":
+        return this.buildTypeUnion(node);
+      case "t:intersection":
+        return this.buildTypeIntersection(node);
+      case "t:tuple":
+        return this.buildTTuple(node);
+      case "t:array":
+        return this.buildTArray(node);
+      case "t:nullable":
+        return this.buildTNullable(node);
+      case "t:literal":
+        return this.buildTypeLiteral(node);
+      case "t:keyof":
+        return this.buildTKeyof(node);
+      case "t:typeof":
+        return this.buildTTypeof(node);
+      case "t:indexed":
+        return this.buildTIndexed(node);
+      case "t:conditional":
+        return this.buildTConditional(node);
+      case "t:infer":
+        return this.buildTInfer(node);
+      case "t:mapped":
+        return this.buildTypeMapped(node);
+      case "t:apply":
         return this.buildTypeApp(node, (child) => this.nodeToType(child));
       default:
         throw new Error(`Unknown type constructor ${head.value}`);

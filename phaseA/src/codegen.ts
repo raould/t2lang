@@ -50,6 +50,15 @@ import {
   TypePrimitive,
   TypeRef,
   TypeUnion,
+  TypeVar,
+  TypeTuple,
+  TypeArray,
+  TypeNullable,
+  TypeKeyof,
+  TypeTypeof,
+  TypeIndexed,
+  TypeConditional,
+  TypeInfer,
   InterfaceStmt,
   SpreadExpr,
   TernaryExpr,
@@ -561,6 +570,13 @@ function formatObjectKey(key: string): string {
   return isIdentifierName(key) ? key : JSON.stringify(key);
 }
 
+async function emitTypeField(field: TypeField): Promise<string> {
+  const valueText = await emitTypeNode(field.fieldType);
+  const readonlyPrefix = field.readonlyFlag ? "readonly " : "";
+  const optionalSuffix = field.optional ? "?" : "";
+  return `${readonlyPrefix}${formatObjectKey(field.key)}${optionalSuffix}: ${valueText}`;
+}
+
 function formatNamedImportEntry(entry: NamedImport): string {
   const localName = entry.local.name;
   if (entry.imported === localName) {
@@ -680,14 +696,9 @@ async function emitTypeAlias(stmt: TypeAliasStmt): Promise<EmittedStatement> {
 }
 
 async function emitInterface(stmt: InterfaceStmt): Promise<EmittedStatement> {
-  const fields = await Promise.all(
-    stmt.body.fields.map(async (field) => {
-      const valueText = await emitTypeNode(field.fieldType);
-      return `${formatObjectKey(field.key)}: ${valueText};`;
-    })
-  );
+  const fields = await Promise.all(stmt.body.fields.map(emitTypeField));
   return {
-    lines: [`interface ${stmt.name.name} {`, ...fields.map((line) => `  ${line}`), `}`],
+    lines: [`interface ${stmt.name.name} {`, ...fields.map((line) => `  ${line};`), `}`],
     mappings: [mappingFromSpan(stmt.span, 0)],
   };
 }
@@ -733,7 +744,59 @@ async function emitTypeNode(node: TypeNode): Promise<string> {
         return "null";
       case "type-undefined":
         return "undefined";
+      case "type-void":
+        return "void";
+      case "type-any":
+        return "any";
+      case "type-unknown":
+        return "unknown";
+      case "type-never":
+        return "never";
+      case "type-object":
+        return "object";
+      case "type-symbol":
+        return "symbol";
+      case "type-bigint":
+        return "bigint";
     }
+  }
+  if (node instanceof TypeVar) {
+    return node.name.name;
+  }
+  if (node instanceof TypeTuple) {
+    const entries = await Promise.all(node.types.map(emitTypeNode));
+    return `[${entries.join(", ")}]`;
+  }
+  if (node instanceof TypeArray) {
+    const element = await emitTypeNode(node.element);
+    return `${element}[]`;
+  }
+  if (node instanceof TypeNullable) {
+    const inner = await emitTypeNode(node.inner);
+    return `${inner} | null | undefined`;
+  }
+  if (node instanceof TypeKeyof) {
+    const target = await emitTypeNode(node.target);
+    return `keyof ${target}`;
+  }
+  if (node instanceof TypeTypeof) {
+    const expr = await emitExpression(node.expr);
+    return `typeof ${expr}`;
+  }
+  if (node instanceof TypeIndexed) {
+    const objectText = await emitTypeNode(node.object);
+    const indexText = await emitTypeNode(node.index);
+    return `${objectText}[${indexText}]`;
+  }
+  if (node instanceof TypeConditional) {
+    const check = await emitTypeNode(node.check);
+    const extendsText = await emitTypeNode(node.extends);
+    const trueText = await emitTypeNode(node.trueType);
+    const falseText = await emitTypeNode(node.falseType);
+    return `${check} extends ${extendsText} ? ${trueText} : ${falseText}`;
+  }
+  if (node instanceof TypeInfer) {
+    return `infer ${node.name.name}`;
   }
   if (node instanceof TypeRef) {
     const args = node.typeArgs ? await Promise.all(node.typeArgs.map(emitTypeNode)) : [];
@@ -747,12 +810,7 @@ async function emitTypeNode(node: TypeNode): Promise<string> {
     return `${typeParamText}(${params.join(", ")}) => ${returns}`;
   }
   if (node instanceof TypeObject) {
-    const entries = await Promise.all(
-      node.fields.map(async (field) => {
-        const valueText = await emitTypeNode(field.fieldType);
-        return `${formatObjectKey(field.key)}: ${valueText}`;
-      })
-    );
+    const entries = await Promise.all(node.fields.map(emitTypeField));
     return `{ ${entries.join("; ")} }`;
   }
   if (node instanceof TypeUnion) {
@@ -791,6 +849,15 @@ async function emitTypeMapped(node: TypeMapped): Promise<string> {
 function isTypeNodeValue(value: unknown): value is TypeNode {
   return (
     value instanceof TypePrimitive ||
+    value instanceof TypeVar ||
+    value instanceof TypeTuple ||
+    value instanceof TypeArray ||
+    value instanceof TypeNullable ||
+    value instanceof TypeKeyof ||
+    value instanceof TypeTypeof ||
+    value instanceof TypeIndexed ||
+    value instanceof TypeConditional ||
+    value instanceof TypeInfer ||
     value instanceof TypeRef ||
     value instanceof TypeFunction ||
     value instanceof TypeObject ||

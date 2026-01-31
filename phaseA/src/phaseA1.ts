@@ -361,14 +361,137 @@ export class TypeField {
   readonly key: string;
   readonly fieldType: TypeNode;
   readonly span: Span;
-  constructor(data: { key: string; fieldType: TypeNode; span: Span }) { this.key = data.key; this.fieldType = data.fieldType; this.span = data.span; }
+  readonly optional?: boolean;
+  readonly readonlyFlag?: boolean;
+  constructor(data: { key: string; fieldType: TypeNode; span: Span; optional?: boolean; readonlyFlag?: boolean }) {
+    this.key = data.key;
+    this.fieldType = data.fieldType;
+    this.span = data.span;
+    this.optional = data.optional;
+    this.readonlyFlag = data.readonlyFlag;
+  }
 }
 
 export class TypePrimitive {
-  private readonly __brand!: "type-string" | "type-number" | "type-boolean" | "type-null" | "type-undefined";
-  readonly kind: "type-string" | "type-number" | "type-boolean" | "type-null" | "type-undefined";
+  private readonly __brand!:
+    | "type-string"
+    | "type-number"
+    | "type-boolean"
+    | "type-null"
+    | "type-undefined"
+    | "type-void"
+    | "type-any"
+    | "type-unknown"
+    | "type-never"
+    | "type-object"
+    | "type-symbol"
+    | "type-bigint";
+  readonly kind:
+    | "type-string"
+    | "type-number"
+    | "type-boolean"
+    | "type-null"
+    | "type-undefined"
+    | "type-void"
+    | "type-any"
+    | "type-unknown"
+    | "type-never"
+    | "type-object"
+    | "type-symbol"
+    | "type-bigint";
   readonly span: Span;
-  constructor(data: { kind: "type-string" | "type-number" | "type-boolean" | "type-null" | "type-undefined"; span: Span }) { this.kind = data.kind; this.span = data.span; }
+  constructor(data: {
+    kind:
+      | "type-string"
+      | "type-number"
+      | "type-boolean"
+      | "type-null"
+      | "type-undefined"
+      | "type-void"
+      | "type-any"
+      | "type-unknown"
+      | "type-never"
+      | "type-object"
+      | "type-symbol"
+      | "type-bigint";
+    span: Span;
+  }) {
+    this.kind = data.kind;
+    this.span = data.span;
+  }
+}
+
+export class TypeVar {
+  private readonly __brand!: "type-var";
+  readonly name: Identifier;
+  readonly span: Span;
+  constructor(data: { name: Identifier; span: Span }) { this.name = data.name; this.span = data.span; }
+}
+
+export class TypeTuple {
+  private readonly __brand!: "type-tuple";
+  readonly types: TypeNode[];
+  readonly span: Span;
+  constructor(data: { types: TypeNode[]; span: Span }) { this.types = data.types; this.span = data.span; }
+}
+
+export class TypeArray {
+  private readonly __brand!: "type-array";
+  readonly element: TypeNode;
+  readonly span: Span;
+  constructor(data: { element: TypeNode; span: Span }) { this.element = data.element; this.span = data.span; }
+}
+
+export class TypeNullable {
+  private readonly __brand!: "type-nullable";
+  readonly inner: TypeNode;
+  readonly span: Span;
+  constructor(data: { inner: TypeNode; span: Span }) { this.inner = data.inner; this.span = data.span; }
+}
+
+export class TypeKeyof {
+  private readonly __brand!: "type-keyof";
+  readonly target: TypeNode;
+  readonly span: Span;
+  constructor(data: { target: TypeNode; span: Span }) { this.target = data.target; this.span = data.span; }
+}
+
+export class TypeTypeof {
+  private readonly __brand!: "type-typeof";
+  readonly expr: Expression;
+  readonly span: Span;
+  constructor(data: { expr: Expression; span: Span }) { this.expr = data.expr; this.span = data.span; }
+}
+
+export class TypeIndexed {
+  private readonly __brand!: "type-indexed";
+  readonly object: TypeNode;
+  readonly index: TypeNode;
+  readonly span: Span;
+  constructor(data: { object: TypeNode; index: TypeNode; span: Span }) { this.object = data.object; this.index = data.index; this.span = data.span; }
+}
+
+export class TypeConditional {
+  private readonly __brand!: "type-conditional";
+  readonly check: TypeNode;
+  readonly extends: TypeNode;
+  readonly trueType: TypeNode;
+  readonly falseType: TypeNode;
+  readonly span: Span;
+  constructor(data: { check: TypeNode; extendsType: TypeNode; trueType: TypeNode; falseType: TypeNode; span: Span }) {
+    this.check = data.check;
+    this.extends = data.extendsType;
+    this.trueType = data.trueType;
+    this.falseType = data.falseType;
+    this.span = data.span;
+  }
+}
+
+export class TypeInfer {
+  private readonly __brand!: "type-infer";
+  readonly name: Identifier;
+  readonly span: Span;
+  constructor(data: { name: Identifier; span: Span }) { this.name = data.name; this.span = data.span; }
 }
 
 export class TypeRef {
@@ -441,7 +564,25 @@ export class TypeApp {
   constructor(data: { expr: Expression | TypeNode; typeArgs: TypeNode[]; span: Span }) { this.expr = data.expr; this.typeArgs = data.typeArgs; this.span = data.span; }
 }
 
-export type TypeNode = TypePrimitive | TypeRef | TypeFunction | TypeObject | TypeUnion | TypeIntersection | TypeLiteral | TypeMapped | TypeApp;
+export type TypeNode =
+  | TypePrimitive
+  | TypeVar
+  | TypeTuple
+  | TypeArray
+  | TypeNullable
+  | TypeKeyof
+  | TypeTypeof
+  | TypeIndexed
+  | TypeConditional
+  | TypeInfer
+  | TypeRef
+  | TypeFunction
+  | TypeObject
+  | TypeUnion
+  | TypeIntersection
+  | TypeLiteral
+  | TypeMapped
+  | TypeApp;
 
 // --- Import/Export ---
 
@@ -542,6 +683,15 @@ export async function createProcessor(ctx: Context) {
 
   const isTypeNodeValue = (value: unknown): value is TypeNode =>
     value instanceof TypePrimitive ||
+    value instanceof TypeVar ||
+    value instanceof TypeTuple ||
+    value instanceof TypeArray ||
+    value instanceof TypeNullable ||
+    value instanceof TypeKeyof ||
+    value instanceof TypeTypeof ||
+    value instanceof TypeIndexed ||
+    value instanceof TypeConditional ||
+    value instanceof TypeInfer ||
     value instanceof TypeRef ||
     value instanceof TypeFunction ||
     value instanceof TypeObject ||
@@ -890,6 +1040,46 @@ export async function createProcessor(ctx: Context) {
     if (typeNode instanceof TypePrimitive) {
       return;
     }
+    if (typeNode instanceof TypeVar) {
+      return;
+    }
+    if (typeNode instanceof TypeTuple) {
+      for (const t of typeNode.types) {
+        await evaluateType(t);
+      }
+      return;
+    }
+    if (typeNode instanceof TypeArray) {
+      await evaluateType(typeNode.element);
+      return;
+    }
+    if (typeNode instanceof TypeNullable) {
+      await evaluateType(typeNode.inner);
+      return;
+    }
+    if (typeNode instanceof TypeKeyof) {
+      await evaluateType(typeNode.target);
+      return;
+    }
+    if (typeNode instanceof TypeTypeof) {
+      await evaluateExpression(typeNode.expr);
+      return;
+    }
+    if (typeNode instanceof TypeIndexed) {
+      await evaluateType(typeNode.object);
+      await evaluateType(typeNode.index);
+      return;
+    }
+    if (typeNode instanceof TypeConditional) {
+      await evaluateType(typeNode.check);
+      await evaluateType(typeNode.extends);
+      await evaluateType(typeNode.trueType);
+      await evaluateType(typeNode.falseType);
+      return;
+    }
+    if (typeNode instanceof TypeInfer) {
+      return;
+    }
     if (typeNode instanceof TypeRef) {
       if (typeNode.typeArgs) {
         for (const arg of typeNode.typeArgs) {
@@ -942,10 +1132,10 @@ export async function createProcessor(ctx: Context) {
       }
       return;
     }
-      if (typeNode instanceof TypeLiteral) {
-        return;
-      }
-      ctx.diagnostics.push(A0.createDiagnostic(TYPECHECK_STAGE, "T2:0005", (typeNode as TypeNode).span));
+    if (typeNode instanceof TypeLiteral) {
+      return;
+    }
+    ctx.diagnostics.push(A0.createDiagnostic(TYPECHECK_STAGE, "T2:0005", (typeNode as TypeNode).span));
   }
 
   async function run(program: Program): Promise<{ diagnostics: Diagnostic[]; program: Program }> {
