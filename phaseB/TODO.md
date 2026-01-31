@@ -12,13 +12,13 @@
 - [ ] iteratively create new tests for any new functionalty.
 
 ## 2. Core Infrastructure
-- [ ] **AST Definitions**: Define the "Surface AST" (AST-B) which includes sugar nodes that don't exist in Phase A (e.g. `MacroDef`, `InfixExpr` if we allow mixed trees).
-- [ ] **Parser (Reader)**: Implement a reader that produces S-expressions (or AST-B nodes) from text.
+- [x] **AST Definitions**: Define the "Surface AST" (AST-B) which includes sugar nodes that don't exist in Phase A (e.g. `MacroDef`, `InfixExpr` if we allow mixed trees).
+- [x] **Parser (Reader)**: Implement a reader that produces S-expressions (or AST-B nodes) from text.
     - Needs to handle dotted identifiers at the token level or post-process them.
     - Needs to support `'(...)`, `` `(...) ``, `~expr`, `~@expr` reader macros.
 
 ## 3. Macro System
-- [ ] **Macro Registry**: Storage for `defmacro` definitions.
+- [x] **Macro Registry**: Storage for `defmacro` definitions.
 - [ ] **Expander**: Recursive function that traverses AST-B.
     - Input: AST-B (potential macros, sugar)
     - Output: AST-A (canonical Phase A nodes)

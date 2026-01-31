@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert";
-import { parseSexpr, ParseError } from "../src/reader.js";
-import { parsePhaseB } from "../src/reader.js";
+import { parseSexpr, parsePhaseB, ParseError } from "../src/reader.js";
+import type { ListNode, SymbolNode } from "../src/reader.js";
 
 test("parse simple list", () => {
   const nodes = parseSexpr("(foo 1 \"bar\")", "test.t2");
@@ -45,4 +45,31 @@ test("rejects malformed numeric literals", () => {
     () => parseSexpr("12.34.56", "numbers.t2"),
     (error) => error instanceof ParseError && error.code === "E007"
   );
+});
+
+test("quote reader macro wraps a symbol", () => {
+  const [node] = parseSexpr("'foo", "quote.t2");
+  assert.strictEqual(node.kind, "list");
+  const list = node as ListNode;
+  const macroSymbol = list.elements[0] as SymbolNode;
+  assert.strictEqual(macroSymbol.name, "quote");
+  assert.strictEqual(list.elements[1].kind, "symbol");
+});
+
+test("quasiquote reader macro wraps a symbol", () => {
+  const [node] = parseSexpr("`foo", "quasi.t2");
+  assert.strictEqual((node as ListNode).elements[0].kind, "symbol");
+  assert.strictEqual(((node as ListNode).elements[0] as SymbolNode).name, "quasiquote");
+});
+
+test("unquote reader macro wraps a symbol", () => {
+  const [node] = parseSexpr("~foo", "unquote.t2");
+  assert.strictEqual((node as ListNode).elements[0].kind, "symbol");
+  assert.strictEqual(((node as ListNode).elements[0] as SymbolNode).name, "unquote");
+});
+
+test("unquote-splicing reader macro wraps a symbol", () => {
+  const [node] = parseSexpr("~@foo", "unquote-splice.t2");
+  assert.strictEqual((node as ListNode).elements[0].kind, "symbol");
+  assert.strictEqual(((node as ListNode).elements[0] as SymbolNode).name, "unquote-splicing");
 });

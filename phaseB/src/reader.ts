@@ -164,6 +164,28 @@ function readNode(state: ParserState): SExprNode {
   if (!char) {
     throw createError(state, "unexpected end of input", "E001");
   }
+  if (char === "'") {
+    const startLine = state.line;
+    const startColumn = state.column;
+    readChar(state);
+    return readReaderMacro(state, "quote", startLine, startColumn, 1);
+  }
+  if (char === "`") {
+    const startLine = state.line;
+    const startColumn = state.column;
+    readChar(state);
+    return readReaderMacro(state, "quasiquote", startLine, startColumn, 1);
+  }
+  if (char === "~") {
+    const startLine = state.line;
+    const startColumn = state.column;
+    readChar(state);
+    if (peek(state) === "@") {
+      readChar(state);
+      return readReaderMacro(state, "unquote-splicing", startLine, startColumn, 2);
+    }
+    return readReaderMacro(state, "unquote", startLine, startColumn, 1);
+  }
   if (char === "(") {
     return readList(state);
   }
@@ -176,6 +198,32 @@ function readNode(state: ParserState): SExprNode {
   return readAtom(state);
 }
 
+
+function readReaderMacro(
+  state: ParserState,
+  macroName: string,
+  startLine: number,
+  startColumn: number,
+  prefixLength: number
+): ListNode {
+  const node = readNode(state);
+  return createReaderMacroList(state.file, startLine, startColumn, prefixLength, macroName, node);
+}
+
+function createReaderMacroList(
+  file: string,
+  startLine: number,
+  startColumn: number,
+  prefixLength: number,
+  macroName: string,
+  node: SExprNode
+): ListNode {
+  const symbolColumn = startColumn + prefixLength;
+  const symbolLoc = makeLoc(file, startLine, symbolColumn, startLine, symbolColumn + macroName.length);
+  const symbol: SymbolNode = { kind: "symbol", name: macroName, loc: symbolLoc };
+  const loc = makeLoc(file, startLine, startColumn, node.loc.endLine, node.loc.endColumn);
+  return { kind: "list", elements: [symbol, node], loc };
+}
 function readList(state: ParserState): ListNode {
   const startLine = state.line;
   const startColumn = state.column;
