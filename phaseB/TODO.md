@@ -24,15 +24,13 @@
     - Output: AST-A (canonical Phase A nodes)
     - If head of list is a macro, invoke it.
 - [x] **Quasiquote Expansion**: Implement the logic to transform `` `(a ~b) `` into list construction code `(list 'a b)`.
-- [ ] **GenSym**: Implement hygienic symbol generation.
+- [x] **GenSym**: Implement hygienic symbol generation.
 
 ## 4. Syntactic Sugar (Rewrites)
-- [ ] **Assignment**: Rewrite `(:= ...)` to `(assign ...)`
-- [ ] **Dot Notation**: 
-    - Rewrite `(obj.method ...)` -> `(call (prop obj "method") ...)`
-    - Rewrite `obj.prop` -> `(prop obj "prop")`
-- [ ] **Type Syntax**: Parse `(x: type)` sugar into `(x (type-ref ...))`.
-- [ ] **Parallel `let`/`const`**: Expand to `let*`/`const*` with temporary `gensym` bindings before reassigning targets.
+- [x] Rewrite `(obj.method ...)` -> `(call (prop obj "method") ...)`
+- [x] Rewrite `obj.prop` -> `(prop obj "prop")`
+- [x] **Assignment**: Rewrite `(:= ...)` to `(assign ...)`
+- [x] Rewrite `let`/`const` parallel bindings into `let*`/`const*`
 
 ## 5. Normalization
 - [ ] Ensure all output from Phase B is strictly compliant with Phase A AST types.

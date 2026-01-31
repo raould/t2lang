@@ -6,3 +6,5 @@ export * from "./ast.js";
 export { MacroRegistry } from "./macroRegistry.js";
 export type { MacroDefinition } from "./macroRegistry.js";
 export { expand } from "./expander.js";
+export { gensym, resetGensym } from "./gensym.js";
+export { rewriteAssignments } from "./rewriter.js";

@@ -40,6 +40,36 @@ test("rejects invalid dotted identifiers", () => {
   );
 });
 
+test("parsePhaseB rewrites dotted property access into prop node", () => {
+  const [node] = parsePhaseB("obj.prop", "dots.t2");
+  assert.strictEqual(node.kind, "list");
+  const [head, target, property] = node.elements;
+  assert.strictEqual(head.kind, "symbol");
+  assert.strictEqual((head as SymbolNode).name, "prop");
+  assert.strictEqual(target.kind, "symbol");
+  assert.strictEqual((target as SymbolNode).name, "obj");
+  assert.strictEqual(property.kind, "literal");
+  assert.strictEqual((property as { value: unknown }).value, "prop");
+});
+
+test("parsePhaseB rewrites dotted method calls into call/prop structures", () => {
+  const [node] = parsePhaseB("(obj.method 1 2)", "dots.t2");
+  assert.strictEqual(node.kind, "list");
+  const [head, propNode, arg1, arg2] = node.elements;
+  assert.strictEqual(head.kind, "symbol");
+  assert.strictEqual((head as SymbolNode).name, "call");
+  assert.strictEqual(propNode.kind, "list");
+  const [propHead, target, methodName] = (propNode as ListNode).elements;
+  assert.strictEqual(propHead.kind, "symbol");
+  assert.strictEqual((propHead as SymbolNode).name, "prop");
+  assert.strictEqual(target.kind, "symbol");
+  assert.strictEqual((target as SymbolNode).name, "obj");
+  assert.strictEqual(methodName.kind, "literal");
+  assert.strictEqual((methodName as { value: unknown }).value, "method");
+  assert.strictEqual(arg1.kind, "literal");
+  assert.strictEqual(arg2.kind, "literal");
+});
+
 test("rejects malformed numeric literals", () => {
   assert.throws(
     () => parseSexpr("12.34.56", "numbers.t2"),
