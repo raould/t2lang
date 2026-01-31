@@ -1,6 +1,7 @@
 import type { ListNode, SExprNode, SymbolNode } from "./reader.js";
 import type { ExpansionFrame, SourceLoc } from "./location.js";
 import { MacroRegistry } from "./macroRegistry.js";
+import { reportError } from "./errorRegistry.js";
 import type { PhaseBSurfaceNode } from "./ast.js";
 
 export function expand(nodes: PhaseBSurfaceNode[], registry: MacroRegistry): PhaseBSurfaceNode[] {
@@ -94,7 +95,7 @@ function substitute(node: PhaseBSurfaceNode, params: string[], args: PhaseBSurfa
       node.elements.map((child) => {
         const substituted = substitute(child, params, args);
         if (!isSExprNode(substituted)) {
-          throw new Error("macro substitution produced non-SExpr node inside list");
+          throw reportError("E101");
         }
         return substituted;
       })
@@ -149,7 +150,7 @@ function convertQuasiquote(node: SExprNode): SExprNode {
         return node.elements[1];
       }
       if (head.name === "unquote-splicing") {
-        throw new Error("unquote-splicing not supported yet");
+        throw reportError("E102");
       }
     }
     const listSymbol = createSymbol("list", node.loc);
@@ -163,7 +164,7 @@ function convertQuasiquoteElement(node: SExprNode): SExprNode {
   if (isListNode(node)) {
     const head = node.elements[0];
     if (isSymbolNode(head) && head.name === "unquote-splicing") {
-      throw new Error("unquote-splicing not supported yet");
+      throw reportError("E102");
     }
     return convertQuasiquote(node);
   }

@@ -57,7 +57,7 @@
 - [x] Implement error code registry
 - [x] Implement error formatter (TTY, JSON, short)
 - [x] Add `--error-format` CLI flag
-- [ ] Test error messages for all categories
+- [x] Test error messages for all categories
 
 ## 9. Open Design Decisions
 - [ ] Specify infix operator precedence table (see SUGAR.md Section 2)
