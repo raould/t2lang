@@ -6,7 +6,7 @@
 
 Unlike macros, sugar is often handled at the lexer or parser level, or via structural rewrites that don't involve user-defined code execution.
 
-# 0. set!
+# 0. set! [x]
 
 `set!` should be an alias for `assign`, if the lisp semantics are not too different.
 
@@ -14,14 +14,14 @@ Unlike macros, sugar is often handled at the lexer or parser level, or via struc
 
 To support standard object-oriented programming patterns without verbose nested `prop` calls.
 
-### Sugar
+### Sugar [x]
 ```typescript
 obj.prop
 obj.method(arg)
 a.b.c
 ```
 
-### Canonical Rewrite (Phase A)
+### Canonical Rewrite (Phase A) [ ]
 ```lisp
 (prop obj "prop")
 (call (prop obj "method") arg)
@@ -33,7 +33,7 @@ a.b.c
 2.  **Method Calls**: A list `(obj.method args...)` transforms into `(call (prop obj "method") args...)`.
 3.  **Property Access**: A bare atom `obj.prop` transform into `(prop obj "prop")`.
 
-## 2. Infix Operators (Future/WIP)
+## 2. Infix Operators (Future/WIP) [ ]
 
 While Phase A requires prefix operators `(call + a b)`, Phase B aims to support infix expressions for common math and logic.
 
@@ -53,9 +53,55 @@ While Phase A requires prefix operators `(call + a b)`, Phase B aims to support 
 
 * precdence to be exactly javascript's. see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_precedence#table
 
-*Status: To be implemented via a precedence-climbing parser or a specialized rewrite pass.*
+### Plan for Infix Operator Support
 
-## 3. Literal Shorthands
+- [ ] Lexer/Reader extension
+  - [ ] Expand reader.ts so that when it sees tokens like +, -, *, &&, etc., it emits symbol nodes but also tracks their precedence/associativity metadata (or at least exposes the raw token sequence in a form the parser can work with).
+  - [ ] Ensure the reader can differentiate between symbol/infix uses vs. prefix function calls (e.g., ( + a b ) should still be the canonical Phase A call).
+- [ ] Parser (“prec-climbing”) or dedicated rewrite
+  - [ ] Build a precedence table matching JavaScript’s operator list.
+  - [ ] Implement a precedence-climbing parser (or a recursive-descent pass) in rewriter.ts or a new module (infix.ts) that:
+    - [ ] Walks list nodes and, when it detects infix tokens interleaved with operands, rewrites the sequence into nested (call <operator> … ) forms in accordance with precedence and associativity.
+    - [ ] Handles parentheses/brackets to override precedence and supports unary operators.
+    - [ ] Escapes to the existing sugar logic so operators within (call … ) or (prop … ) remain unchanged.
+- [ ] Phase B AST integration
+  - [ ] Ensure the new pass runs after the reader but before lower.ts so every infix expression is normalized when lowering to Phase A nodes.
+  - [ ] Add tests in sugar.test.ts (or equivalent) covering 1 + 2 * 3, logical chains (a && b || c), unary forms (-x), and mixed parentheses.
+- [ ] Lower / Codegen compatibility
+  - [ ] Verify that lower.ts no longer sees infix symbols—only standard (call … ) nodes—so no further changes are required there.
+  - [ ] Add integration / CLI tests (maybe reusing existing Phase B sample programs) to confirm the generated Phase A AST still compiles and runs.
+- [ ] Documentation & SUGAR.md update
+  - [ ] Mark section 2 as implemented once the above passes and add usage details (supported operators, associativity notes).
+  - [ ] Document any limitations (e.g., which operators are implemented, how precedence is resolved).
+
+### Operator Precedence Reference
+
+Derived from the [MDN Operator Precedence table](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_precedence#table), this ordered list is what the infix rewrite must respect before handing expressions off to Phase A.
+
+| Precedence | Associativity | Operators / Notes |
+| --- | --- | --- |
+| 18 – Grouping | n/a | `( ... )` forces its contents to evaluate before any surrounding operator. |
+| 17 – Access & call | left-to-right (member/call) | Member access `obj.prop`, optional chaining `obj?.prop`, computed access `obj[expr]`, `new Foo(arg…)`, function calls `fn(args…)`, `import(expr)`. |
+| 16 – `new` without args | n/a | `new Foo` (no argument list). |
+| 15 – Postfix | n/a | `x++`, `x--` (operand must be an assignable target). |
+| 14 – Prefix | n/a | `++x`, `--x`, `+x`, `-x`, `~x`, `!x`, `typeof`, `void`, `delete`, `await`. |
+| 13 – Exponentiation | right-to-left | `x ** y` (right operand cannot be another exponentiation without parentheses). |
+| 12 – Multiplicative | left-to-right | `*`, `/`, `%`. |
+| 11 – Additive | left-to-right | `+`, `-`. |
+| 10 – Bitwise shift | left-to-right | `<<`, `>>`, `>>>`. |
+| 9 – Relational | left-to-right | `<`, `>`, `<=`, `>=`, `in`, `instanceof`. |
+| 8 – Equality | left-to-right | `==`, `!=`, `===`, `!==`. |
+| 7 – Bitwise AND | left-to-right | `x & y`. |
+| 6 – Bitwise XOR | left-to-right | `x ^ y`. |
+| 5 – Bitwise OR | left-to-right | `x | y`. |
+| 4 – Logical AND | left-to-right | `x && y` (short-circuits on falsy `x`). |
+| 3 – Logical OR & Nullish | left-to-right | `x || y`, `x ?? y` (short-circuits on truthy/nonnull left operand). |
+| 2 – Assignment & control | right-to-left | Assignment `=`, compound assignments `+=`, `-=`, ..., logical/nullish assignments `&&=`, `||=`, `??=`, ternary `x ? y : z`, arrow `x => y`, `yield`, `yield*`, spread `...expr`. |
+| 1 – Comma | left-to-right | `x, y` evaluates both operands and returns `y`. |
+
+> Operator precedence only tells us how the operators group. Operand evaluation order remains left-to-right regardless of precedence or associativity, so short-circuiting is only observable when the operand expressions carry side effects. (See the section on evaluation order in the MDN table for the full explanation.)
+
+## 3. Literal Shorthands [ ]
 
 ### Object Literals
 Allowed to use implicit keys or shorthand syntax.
@@ -87,7 +133,7 @@ Phase B may support `[...]` syntax if the tokenizer handles brackets.
 (array 1 2 3)
 ```
 
-## 4. Binding Forms
+## 4. Binding Forms [ ]
 
 Phase B exposes `let`/`const` sugar as parallel bindings, but Phase A only understands the sequential `let*`/`const*` forms. To preserve correct semantics (e.g., `(let ((a b) (b a)) ...)` must swap using the *old* values), Phase B rewrites every `let`/`const` into a `let*` that evaluates every initializer into temporary `gensym` bindings before reassigning the user variables.
 
@@ -137,7 +183,7 @@ This strategy guarantees that every `let`/`const` binding becomes a deterministi
 
 Phase A strictly requires `let*` and `const*` with specific nesting. Phase B allows `let` and `const` which are parallel bindings.
 
-## 5. Assignment Sugar
+## 5. Assignment Sugar [ ]
 
 **Sugar**:
 ```lisp
@@ -153,7 +199,7 @@ Phase A strictly requires `let*` and `const*` with specific nesting. Phase B all
 (assign (prop obj "prop") 20)
 ```
 
-## 6. Function Definitions
+## 6. Function Definitions [ ]
 
 Support for TypeScript-style parameter lists with colons.
 
@@ -169,7 +215,7 @@ Support for TypeScript-style parameter lists with colons.
 
 Phase B is responsible for parsing the type syntax (`x: T`) and converting it into the `(x T)` tuple structure Phase A expects for named parameters.
 
-## 7. Optional Chaining (Expanded)
+## 7. Optional Chaining (Expanded) [ ]
 
 Optional chaining rewrites avoid thunks by nesting `let*` bindings with `if` checks so arguments are never evaluated when the chain short-circuits.
 See [phaseB/ERRORS.md](phaseB/ERRORS.md) for the diagnostics Surface B surfaces when optional chaining sugar is malformed.
@@ -225,7 +271,7 @@ When the callable target is a method access (e.g., `obj.method?.(a, b)`), the re
 - Method calls must preserve `this` semantics; emitting `(tmp.call obj args...)` or equivalent Phase A call is acceptable.
 - The base expression (like `getObj()?.method`) is evaluated exactly once because it is bound before the guard.
 
-## 8. Async / Await
+## 8. Async / Await [ ]
 
 **Sugar**:
 ```lisp
@@ -240,7 +286,7 @@ When the callable target is a method access (e.g., `obj.method?.(a, b)`), the re
 Explicit `async` keyword macros or rewrites produce the `FunctionExpr` with `async: true` metadata.
 Additional metadata on the generated `FunctionExpr` indicates it is async so downstream phases can treat `await` appropriately; the canonical form might look like `(fn (x) :async true (return (await ...)))` or similar depending on how Phase A records metadata, but the key point is that the node is decorated with `async: true` rather than requiring a separate sugar form.
 
-## 9. Type Expression Syntax
+## 9. Type Expression Syntax [ ]
 
 Phase B parses TypeScript-style type annotations and rewrites them to the structured `t:` nodes documented in [phaseA/TYPES.md](phaseA/TYPES.md).
 
