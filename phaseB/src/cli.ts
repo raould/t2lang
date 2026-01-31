@@ -21,6 +21,7 @@ interface CliArgs {
   inputPath?: string;
   format: ErrorFormat;
   showHelp: boolean;
+  color: boolean;
 }
 
 export async function main(argv: string[]): Promise<void> {
@@ -41,7 +42,10 @@ export async function main(argv: string[]): Promise<void> {
     try {
       parsePhaseB(source, actualPath);
     } catch (error) {
-      handleParserFailure(error, args.format, { sourceMap: { [actualPath]: source } });
+      handleParserFailure(error, args.format, {
+        sourceMap: { [actualPath]: source },
+        useColor: args.color,
+      });
     }
   } catch (error) {
     if (error instanceof CliError) {
@@ -58,6 +62,7 @@ function parseArguments(argv: string[]): CliArgs {
   let format: ErrorFormat = DEFAULT_ERROR_FORMAT;
   let inputPath: string | undefined;
   let showHelp = false;
+  let color = true;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -86,6 +91,14 @@ function parseArguments(argv: string[]): CliArgs {
       format = parsed;
       continue;
     }
+    if (arg === "--no-color") {
+      color = false;
+      continue;
+    }
+    if (arg === "--color") {
+      color = true;
+      continue;
+    }
     if (arg.startsWith("-")) {
       throw new CliError(`Unknown option '${arg}'`);
     }
@@ -95,7 +108,7 @@ function parseArguments(argv: string[]): CliArgs {
     inputPath = arg;
   }
 
-  return { inputPath, format, showHelp };
+  return { inputPath, format, showHelp, color };
 }
 
 function printHelp(): void {
@@ -104,6 +117,8 @@ function printHelp(): void {
 
 Options:
   --error-format <format>  Choose diagnostic output (tty, short, json); defaults to ${DEFAULT_ERROR_FORMAT}
+  --color                  Force colored diagnostic output (default)
+  --no-color               Disable diagnostic coloring
   -h, --help               Show this help message`
   );
 }

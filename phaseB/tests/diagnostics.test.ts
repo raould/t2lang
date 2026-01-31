@@ -60,7 +60,7 @@ test("formatDiagnostics produces detailed tty output", () => {
   const output = formatDiagnostics(
     [diag],
     "tty",
-    { sourceMap: { "app.t2": sourceText } }
+    { sourceMap: { "app.t2": sourceText }, useColor: false }
   );
 
   const expected = [
@@ -78,6 +78,23 @@ test("formatDiagnostics produces detailed tty output", () => {
   ].join("\n");
 
   assert.strictEqual(output, expected);
+});
+
+test("formatDiagnostics tty applies colors when enabled", () => {
+  const diag: Diagnostic = {
+    code: "E004",
+    level: "error",
+    message: "unclosed string",
+    loc: {
+      file: "app.t2",
+      line: 1,
+      column: 1,
+      endLine: 1,
+      endColumn: 2,
+    },
+  };
+  const output = formatDiagnostics([diag], "tty", { useColor: true });
+  assert.ok(output.startsWith("\x1b[31merror\x1b[0m[E004]"));
 });
 
 test("formatDiagnostics json follows spec", () => {
