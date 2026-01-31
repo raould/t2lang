@@ -14,6 +14,12 @@ import {
   isEventSeverity,
 } from "./events.js";
 import { PhaseACompilerContext } from "./compilerContext.js";
+import {
+  DEFAULT_ERROR_FORMAT,
+  DiagnosticContext,
+  formatDiagnostics,
+  parseErrorFormat,
+} from "./diagnostics.js";
 
 const VALID_LOG_PHASES: CompilerStage[] = ["parse", "resolve", "typecheck", "codegen"];
 
@@ -32,6 +38,9 @@ interface CliOptions {
   logLevel?: "debug" | "info" | "warn" | "error";
   trace?: boolean;
   tracePhases?: string[];
+  errorFormat?: string;
+  color?: boolean;
+  noColor?: boolean;
 }
 
 function buildCommand(): Command {
@@ -72,6 +81,9 @@ function buildCommand(): Command {
       parsePhaseList,
       [] as string[]
     )
+    .option("--error-format <format>", "Choose diagnostic output (tty, short, json)", DEFAULT_ERROR_FORMAT)
+    .option("--color", "Force colored diagnostic output")
+    .option("--no-color", "Disable colored diagnostic output")
     .allowUnknownOption(false);
   return cmd;
 }
@@ -116,34 +128,6 @@ function getDefaultOutput(input: string): string {
   return path.join(parsed.dir, `${parsed.name}.ts`);
 }
 
-function formatDiagnostics(
-  diags: Array<{
-    message: string;
-    span?: {
-      source?: string;
-      start?: number;
-      end?: number;
-      startLine?: number;
-      startColumn?: number;
-      endLine?: number;
-      endColumn?: number;
-    };
-  }>
-): void {
-  for (const diag of diags) {
-    if (diag.span && diag.span.source) {
-      if (diag.span.startLine != null) {
-        const column = diag.span.startColumn ?? 1;
-        console.error(`${diag.span.source}:${diag.span.startLine}:${column}: ${diag.message}`);
-      } else {
-        console.error(`${diag.span.source}:${diag.span.start ?? 0}-${diag.span.end ?? 0}: ${diag.message}`);
-      }
-    } else {
-      console.error(diag.message);
-    }
-  }
-}
-
 export async function main(argv: string[]): Promise<void> {
   const cmd = buildCommand();
   try {
@@ -159,6 +143,12 @@ export async function main(argv: string[]): Promise<void> {
   }
 
   const options = cmd.opts<CliOptions>();
+  const formatArg = options.errorFormat ?? DEFAULT_ERROR_FORMAT;
+  const format = parseErrorFormat(formatArg);
+  if (!format) {
+    throw new CommanderError(1, "error-format", `Unknown error format '${formatArg}'`);
+  }
+  const useColor = options.noColor ? false : options.color ?? true;
   const inputPath = cmd.args[0];
   if (!inputPath) {
     console.error("Error: No input file specified (use '-' for stdin)");
@@ -180,7 +170,7 @@ export async function main(argv: string[]): Promise<void> {
   if (options.output === "-") {
     writeStdout = true;
   }
-
+  const sourcePath = isStdin ? "stdin.t2" : inputPath;
   const source = await readSource(inputPath);
   const prettyOption = options.prettyOption ?? "pretty";
   const compilerSerializerStamp = await loadCompilerStamp();
@@ -191,8 +181,12 @@ export async function main(argv: string[]): Promise<void> {
     stamp: compilerSerializerStamp,
     logLevel,
   };
+  const diagContext: DiagnosticContext = {
+    sourceMap: { [sourcePath]: source },
+    useColor,
+  };
   const result = await compilePhaseA(source, {
-    sourcePath: isStdin ? "stdin.t2" : inputPath,
+    sourcePath,
     seed: options.seed,
     emitTypes: options.emitTypes,
     prettyOption,
@@ -203,7 +197,7 @@ export async function main(argv: string[]): Promise<void> {
 
   if (result.diagnostics.length > 0) {
     console.error("Compilation produced diagnostics:");
-    formatDiagnostics(result.diagnostics);
+    console.error(formatDiagnostics(result.diagnostics, format, diagContext));
     process.exit(1);
   }
 
