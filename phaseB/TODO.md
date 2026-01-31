@@ -33,8 +33,8 @@
 - [x] Rewrite `let`/`const` parallel bindings into `let*`/`const*`
 
 ## 5. Normalization
-- [ ] Ensure all output from Phase B is strictly compliant with Phase A AST types.
-- [ ] Validation pass before handing off to Phase A compiler.
+- [x] Ensure all output from Phase B is strictly compliant with Phase A AST types.
+- [s] Validation pass before handing off to Phase A compiler.
 - Normalization Plan
     - [x] Build a lower.ts (or similarly named) stage that runs after macro expansion/sugar and walks the Phase B AST, transforming every node into the Phase A classes defined in phaseA0.ts (e.g., Identifier, CallExpr, LetStarExpr, t:* nodes) or reporting diagnostics when a structure can’t be lowered.
     - [x] Use typeAnnotationUtils when you translate let/const bindings or fn params so each binding’s annotation is already in (t:…) form before it hits the Phase A constructors; ensure the lowerer reuses those t:* constructors rather than re-parsing raw reader tokens.
@@ -42,7 +42,7 @@
     - [x] Hook the pass into the CLI pipeline so phaseB’s parsePhaseB exports the normalized Phase A AST (and update index.ts accordingly) — this enforces the TODO’s “strict compliance” requirement before handing the tree to Phase A.
 
 ## 6. CLI Integration
-- [ ] Update `t2` CLI to support running Phase B -> Phase A.
+- [x] Update `t2tc` et. al. CLI to support running Phase B -> Phase A.
 
 ## 7. Type System Infrastructure
 - [ ] Define `t:*` type AST nodes in Phase A (see `phaseA/TYPES.md`).
