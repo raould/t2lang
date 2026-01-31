@@ -1,5 +1,6 @@
 import type { ExpansionFrame, SourceLoc } from "./location.js";
 export type { ExpansionFrame, SourceLoc } from "./location.js";
+import { applySugar } from "./sugar.js";
 
 export interface BaseNode {
   loc: SourceLoc;
@@ -57,6 +58,8 @@ export interface PhaseBDottedIdentifier extends PhaseBNodeBase {
 
 export interface PhaseBTypeAnnotation extends PhaseBNodeBase {
   phaseKind: "type-annotation";
+  kind: "list";
+  elements: PhaseBNode[];
   target: PhaseBNode;
   annotation: PhaseBNode;
 }
@@ -68,7 +71,8 @@ export interface PhaseBListNode extends PhaseBNodeBase {
 }
 
 export function parsePhaseB(source: string, file = "<input>"): PhaseBNode[] {
-  return parseSexpr(source, file).map(wrapPhaseBNode);
+  const nodes = parseSexpr(source, file).map(wrapPhaseBNode);
+  return applySugar(nodes);
 }
 
 function wrapPhaseBNode(node: SExprNode): PhaseBNode {
@@ -96,10 +100,6 @@ function wrapLiteral(node: LiteralNode): PhaseBNode {
 
 function wrapList(node: ListNode): PhaseBNode {
   const elements: PhaseBListNode["elements"] = node.elements.map(wrapPhaseBNode);
-  const annotation = tryTypeAnnotation(elements, node);
-  if (annotation) {
-    return annotation;
-  }
   return {
     kind: "list",
     loc: node.loc,
@@ -107,22 +107,6 @@ function wrapList(node: ListNode): PhaseBNode {
     phaseKind: "list",
     expansionStack: node.expansionStack,
   };
-}
-
-function tryTypeAnnotation(elements: PhaseBNode[], node: ListNode): PhaseBTypeAnnotation | null {
-  if (elements.length === 3 && isColon(elements[1])) {
-    return {
-      ...node,
-      phaseKind: "type-annotation",
-      target: elements[0],
-      annotation: elements[2],
-    };
-  }
-  return null;
-}
-
-function isColon(node: PhaseBNode): boolean {
-  return node.phaseKind === "symbol" && (node as SymbolNode).name === ":";
 }
 
 export class ParseError extends Error {
@@ -345,12 +329,17 @@ function readChar(state: ParserState): string {
   if (ch === "\n") {
     state.line += 1;
     state.column = 1;
-  } else if (ch === "\r") {
+    return ch;
+  }
+  if (ch === "\r") {
+    if (state.index < state.length && state.source[state.index] === "\n") {
+      state.index += 1;
+    }
     state.line += 1;
     state.column = 1;
-  } else {
-    state.column += 1;
+    return "\n";
   }
+  state.column += 1;
   return ch;
 }
 
