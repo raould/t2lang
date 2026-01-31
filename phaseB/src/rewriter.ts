@@ -22,12 +22,11 @@ function rewriteNode(node: SExprNode): SExprNode {
         return parallel;
       }
     }
-    if (isSymbolNode(rewrittenHead) && rewrittenHead.name === ":=") {
-      const assignSymbol: SymbolNode = {
-        ...rewrittenHead,
-        name: "assign",
-      };
-      return { ...node, elements: [assignSymbol, ...rewrittenRest] };
+    if (isSymbolNode(rewrittenHead)) {
+      const alias = getAliasSymbolName(rewrittenHead.name);
+      if (alias) {
+        rewrittenHead = { ...rewrittenHead, name: alias };
+      }
     }
     const elements = rewrittenHead ? [rewrittenHead, ...rewrittenRest] : rewrittenRest;
     return { ...node, elements };
@@ -75,6 +74,14 @@ function rewritePropertyAccess(node: SymbolNode): SExprNode | null {
     return null;
   }
   return buildPropertyChain(parts, node.loc);
+}
+
+function getAliasSymbolName(name: string): string | undefined {
+  const mapping: Record<string, string> = {
+    ":=": "assign",
+    "set!": "assign",
+  };
+  return mapping[name];
 }
 
 function rewriteParallelBindings(

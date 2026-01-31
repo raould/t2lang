@@ -24,7 +24,7 @@
     "build": "npm --prefix ../phaseA run build && tsc --project tsconfig.json",
     "clean": "node -e \"const fs=require('fs');['node_modules','dist'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p)}catch(e){}})\"",
     "test": "npm run build && node ./scripts/run-tests.mjs",
-    "lint": "ESLINT_USE_FLAT_CONFIG=true eslint . --ext .ts",
+    "lint": "ESLINT_USE_FLAT_CONFIG=true eslint --ignore-pattern 'dist/**' --ignore-pattern 'node_modules/**' . --ext .ts",
     "phaseb": "tsx ./src/cli.ts"
   },
   "devDependencies": {
