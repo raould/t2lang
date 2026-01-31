@@ -238,6 +238,9 @@ function readAtom(state: ParserState): SExprNode {
   if (token.length === 0) {
     throw createError(state, "invalid token", "E003", startLine, startColumn);
   }
+  if (isMalformedNumericToken(token)) {
+    throw createError(state, "malformed numeric literal", "E007", startLine, startColumn);
+  }
   const value = parseLiteralValue(token);
   const loc = makeLoc(state.file, startLine, startColumn, state.line, state.column);
   if (typeof value === "string" && !isNumericToken(token)) {
@@ -264,6 +267,17 @@ function parseLiteralValue(token: string): string | number | boolean | null {
 
 function isNumericToken(token: string): boolean {
   return /^-?(?:\d+|\d+\.\d+|\.\d+)$/.test(token);
+}
+
+function isMalformedNumericToken(token: string): boolean {
+  if (!token.includes(".")) {
+    return false;
+  }
+  const normalized = token.startsWith("-") ? token.slice(1) : token;
+  if (!/^[0-9.]+$/.test(normalized)) {
+    return false;
+  }
+  return !isNumericToken(token);
 }
 
 function translateEscape(ch: string, state: ParserState, line: number, column: number): string {

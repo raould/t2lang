@@ -39,3 +39,10 @@ test("rejects invalid dotted identifiers", () => {
     (error) => error instanceof ParseError && error.code === "E006"
   );
 });
+
+test("rejects malformed numeric literals", () => {
+  assert.throws(
+    () => parseSexpr("12.34.56", "numbers.t2"),
+    (error) => error instanceof ParseError && error.code === "E007"
+  );
+});
