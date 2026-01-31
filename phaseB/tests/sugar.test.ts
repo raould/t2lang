@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert";
 import { parsePhaseBRaw } from "../src/reader.js";
-import type { PhaseBListNode, PhaseBTypeAnnotation, SymbolNode } from "../src/reader.js";
+import type { PhaseBListNode, PhaseBTypeAnnotation, SymbolNode, LiteralNode } from "../src/reader.js";
 
 test("fn parameter list rewrites colon annotations", () => {
   const nodes = parsePhaseBRaw("(fn (x : Number) (+ x 1))", "params.t2");
@@ -110,4 +110,38 @@ test("type annotations emit t:literal for literal values", () => {
   const rewritten = annotation.annotation as PhaseBListNode;
   const head = rewritten.elements[0] as SymbolNode;
   assert.strictEqual(head.name, "t:literal");
+});
+
+test("object literal sugar expands shorthand and string keys", () => {
+  const nodes = parsePhaseBRaw("(object name \"age\" 30)", "object.t2");
+  const objNode = nodes[0] as PhaseBListNode;
+  const [, nameField, ageField] = objNode.elements;
+  assert.strictEqual(nameField.phaseKind, "list");
+
+  const nameFieldList = nameField as PhaseBListNode;
+  assert.strictEqual(nameFieldList.elements.length, 2);
+  const nameKey = nameFieldList.elements[0];
+  const nameValue = nameFieldList.elements[1];
+  assert.strictEqual(nameKey.phaseKind, "literal");
+  assert.strictEqual((nameKey as LiteralNode).value, "name");
+  assert.strictEqual((nameValue as SymbolNode).name, "name");
+
+  assert.strictEqual(ageField.phaseKind, "list");
+  const ageFieldList = ageField as PhaseBListNode;
+  const ageKey = ageFieldList.elements[0];
+  const ageValue = ageFieldList.elements[1];
+  assert.strictEqual((ageKey as LiteralNode).value, "age");
+  assert.strictEqual(ageValue.phaseKind, "literal");
+  assert.strictEqual((ageValue as LiteralNode).value, 30);
+});
+
+test("array literal sugar rewrites to (array ...)", () => {
+  const nodes = parsePhaseBRaw("[1 2 3]", "array.t2");
+  const arrayNode = nodes[0] as PhaseBListNode;
+  const arrayHead = arrayNode.elements[0];
+  assert.strictEqual(arrayHead.phaseKind, "symbol");
+  assert.strictEqual((arrayHead as SymbolNode).name, "array");
+  const values = arrayNode.elements.slice(1);
+  assert.strictEqual(values.length, 3);
+  assert.deepStrictEqual(values.map((node) => (node.kind === "literal" ? (node as LiteralNode).value : undefined)), [1, 2, 3]);
 });

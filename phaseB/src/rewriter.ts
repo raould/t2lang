@@ -1,4 +1,4 @@
-import type { ListNode, SExprNode, SymbolNode } from "./reader.js";
+import type { ListNode, SExprNode, SymbolNode, ListDelimiter } from "./reader.js";
 import { gensym } from "./gensym.js";
 
 export function rewriteAssignments(nodes: SExprNode[]): SExprNode[] {
@@ -15,7 +15,7 @@ function rewriteNode(node: SExprNode): SExprNode {
         return methodCall;
       }
     }
-    const rewrittenHead = originalHead ? rewriteNode(originalHead) : undefined;
+    let rewrittenHead = originalHead ? rewriteNode(originalHead) : undefined;
     if (isSymbolNode(rewrittenHead)) {
       const parallel = rewriteParallelBindings(rewrittenHead, rewrittenRest, node.loc);
       if (parallel) {
@@ -147,6 +147,6 @@ function createStringLiteral(value: string, loc: SymbolNode["loc"]): SExprNode {
   return { kind: "literal", value, loc };
 }
 
-function createList(elements: SExprNode[], loc: SymbolNode["loc"]): ListNode {
-  return { kind: "list", elements, loc };
+function createList(elements: SExprNode[], loc: SymbolNode["loc"], delimiter: ListDelimiter = "("): ListNode {
+  return { kind: "list", elements, loc, delimiter };
 }

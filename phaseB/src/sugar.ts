@@ -1,9 +1,14 @@
 import type {
   PhaseBListNode,
   PhaseBNode,
+  PhaseBNodeBase,
   PhaseBTypeAnnotation,
   SymbolNode,
+  LiteralNode,
+  ListDelimiter,
 } from "./reader.js";
+type PhaseBSymbolNode = SymbolNode & PhaseBNodeBase & { phaseKind: "symbol" };
+type PhaseBLiteralNode = LiteralNode & PhaseBNodeBase & { phaseKind: "literal"; value: string };
 import type { SourceLoc } from "./location.js";
 import { parseTypeExpression, TypeAst } from "./typeExpr.js";
 import { collectAnnotationSegment, mergeLocs, serializePhaseBNode } from "./typeAnnotationUtils.js";
@@ -24,6 +29,10 @@ function rewriteNode(node: PhaseBNode): PhaseBNode {
 }
 
 function rewriteList(node: PhaseBListNode): PhaseBNode {
+  if (node.delimiter === "[") {
+    return rewriteList(createArrayLiteral(node));
+  }
+
   let elements = node.elements;
   const head = elements[0];
   if (head && isSymbol(head, "fn") && elements[1]?.phaseKind === "list") {
@@ -33,6 +42,9 @@ function rewriteList(node: PhaseBListNode): PhaseBNode {
   if (head && isLetForm(head) && elements[1]?.phaseKind === "list") {
     elements = [...elements];
     elements[1] = rewriteLetBindings(elements[1] as PhaseBListNode);
+  }
+  if (head && isSymbol(head, "object")) {
+    elements = rewriteObjectFields(elements);
   }
 
   const rewrittenElements = elements.map(rewriteNode);
@@ -101,6 +113,52 @@ function rewriteBindingEntry(node: PhaseBListNode): PhaseBListNode {
     idx += 1;
   }
   return { ...node, elements };
+}
+
+function createArrayLiteral(node: PhaseBListNode): PhaseBListNode {
+  const arraySymbol = createPhaseBSymbol("array", node.loc);
+  return createPhaseBList([arraySymbol, ...node.elements], node.loc);
+}
+
+function rewriteObjectFields(elements: PhaseBNode[]): PhaseBNode[] {
+  const head = elements[0];
+  if (!head || !isSymbol(head, "object")) {
+    return elements;
+  }
+  const rewritten: PhaseBNode[] = [head];
+  let idx = 1;
+  while (idx < elements.length) {
+    const entry = elements[idx];
+    if (entry.phaseKind === "symbol") {
+      rewritten.push(createShorthandObjectField(entry as PhaseBSymbolNode));
+      idx += 1;
+      continue;
+    }
+    if (isStringLiteral(entry) && idx + 1 < elements.length) {
+      const value = elements[idx + 1];
+      rewritten.push(createStringKeyField(entry as PhaseBLiteralNode, value));
+      idx += 2;
+      continue;
+    }
+    rewritten.push(entry);
+    idx += 1;
+  }
+  return rewritten;
+}
+
+function createShorthandObjectField(symbol: PhaseBSymbolNode): PhaseBListNode {
+  const keyLiteral = createStringLiteral(symbol.name, symbol.loc);
+  const loc = mergeLocs(keyLiteral.loc, symbol.loc);
+  return createPhaseBList([keyLiteral, symbol], loc);
+}
+
+function createStringKeyField(key: PhaseBLiteralNode, value: PhaseBNode): PhaseBListNode {
+  const loc = mergeLocs(key.loc, value.loc);
+  return createPhaseBList([key, value], loc);
+}
+
+function isStringLiteral(node: PhaseBNode): node is PhaseBLiteralNode {
+  return node.phaseKind === "literal" && typeof (node as PhaseBNode & { value: unknown }).value === "string";
 }
 
 function isLetForm(node: PhaseBNode): node is SymbolNode & { phaseKind: "symbol" } {
@@ -239,11 +297,12 @@ function createStringLiteral(value: string, loc: SourceLoc): PhaseBNode {
   return createLiteralNode(value, loc);
 }
 
-function createPhaseBList(elements: PhaseBNode[], loc: SourceLoc): PhaseBListNode {
+function createPhaseBList(elements: PhaseBNode[], loc: SourceLoc, delimiter: ListDelimiter = "("): PhaseBListNode {
   return {
     kind: "list",
     phaseKind: "list",
     elements,
     loc,
+    delimiter,
   };
 }

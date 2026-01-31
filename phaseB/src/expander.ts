@@ -155,7 +155,7 @@ function convertQuasiquote(node: SExprNode): SExprNode {
     }
     const listSymbol = createSymbol("list", node.loc);
     const elements = node.elements.map((child) => convertQuasiquoteElement(child));
-    return { kind: "list", elements: [listSymbol, ...elements], loc: node.loc };
+    return { kind: "list", elements: [listSymbol, ...elements], loc: node.loc, delimiter: "(" };
   }
   return createQuoteNode(node);
 }
@@ -177,7 +177,7 @@ function createSymbol(name: string, loc: SourceLoc): SymbolNode {
 
 function createQuoteNode(node: SExprNode): ListNode {
   const quoteSym = createSymbol("quote", node.loc);
-  return { kind: "list", elements: [quoteSym, cloneNode(node) as SExprNode], loc: node.loc };
+  return { kind: "list", elements: [quoteSym, cloneNode(node) as SExprNode], loc: node.loc, delimiter: "(" };
 }
 
 function attachExpansionFrame(node: PhaseBSurfaceNode, frame: ExpansionFrame): PhaseBSurfaceNode {

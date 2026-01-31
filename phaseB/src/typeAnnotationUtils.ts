@@ -56,7 +56,12 @@ export function serializePhaseBNode(node: PhaseBNode): string {
         return String(value);
       }
     case "list":
-      return `(${(node as PhaseBListNode).elements.map((child) => serializePhaseBNode(child)).join(" ")})`;
+        {
+          const list = node as PhaseBListNode;
+          const open = list.delimiter === "[" ? "[" : "(";
+          const close = list.delimiter === "[" ? "]" : ")";
+          return `${open}${list.elements.map((child) => serializePhaseBNode(child)).join(" ")}${close}`;
+        }
     case "dotted":
       return (node as PhaseBDottedIdentifier).parts.join(".");
     case "type-annotation":

@@ -33,7 +33,7 @@ a.b.c
 2.  **Method Calls**: A list `(obj.method args...)` transforms into `(call (prop obj "method") args...)`.
 3.  **Property Access**: A bare atom `obj.prop` transform into `(prop obj "prop")`.
 
-## 2. Infix Operators (Future/WIP) [ ]
+## 2. Infix Operators (Future/WIP) [ ] not yet done!
 
 While Phase A requires prefix operators `(call + a b)`, Phase B aims to support infix expressions for common math and logic.
 
