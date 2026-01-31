@@ -4,7 +4,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { ParseError, parsePhaseB } from "./reader.js";
-import type { ReaderErrorCode } from "./reader.js";
+import type { PhaseBNode, ReaderErrorCode } from "./reader.js";
 import type { SourceLoc } from "./location.js";
 import { compilePhaseA } from "../../phaseA/dist/api.js";
 import {
@@ -45,6 +45,7 @@ interface CliArgs {
   logPhases: string[];
   trace: boolean;
   tracePhases: string[];
+  dumpAst: boolean;
 }
 
 class CliError extends Error {}
@@ -64,14 +65,20 @@ export async function main(argv: string[]): Promise<void> {
     }
 
     const { source, actualPath } = await readSource(args.inputPath);
+    let parsedNodes: PhaseBNode[] = [];
     try {
-      parsePhaseB(source, actualPath);
+      parsedNodes = parsePhaseB(source, actualPath);
     } catch (error) {
       handleParserFailure(error, args.format, {
         sourceMap: { [actualPath]: source },
         useColor: args.color,
       });
       return;
+    }
+
+    if (args.dumpAst) {
+      console.error("Parsed Phase B AST:");
+      console.error(JSON.stringify(parsedNodes, stringifyFilter, 2));
     }
 
     const isStdin = actualPath === "<stdin>";
@@ -127,7 +134,7 @@ export async function main(argv: string[]): Promise<void> {
 
     for (const event of result.events) {
       logEvent(event, logPhases, args.logLevel);
-      logTraceEvent(event, tracePhases, args.logLevel);
+      await logTraceEvent(event, tracePhases, args.logLevel);
     }
   } catch (error) {
     if (error instanceof CliError) {
@@ -153,6 +160,7 @@ function parseArguments(argv: string[]): CliArgs {
   let logLevel: EventSeverity = "info";
   const logPhases: string[] = [];
   let trace = false;
+  let dumpAst = false;
   const tracePhases: string[] = [];
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -256,6 +264,10 @@ function parseArguments(argv: string[]): CliArgs {
       tracePhases.push(...parsePhaseList(next));
       continue;
     }
+    if (arg === "--dump-ast") {
+      dumpAst = true;
+      continue;
+    }
     if (arg.startsWith("-")) {
       throw new CliError(`Unknown option '${arg}'`);
     }
@@ -279,6 +291,7 @@ function parseArguments(argv: string[]): CliArgs {
     logPhases,
     trace,
     tracePhases,
+    dumpAst,
   };
 }
 
@@ -306,12 +319,13 @@ function printHelp(): void {
   --no-color               Disable diagnostic coloring
   --output <path>          Write TypeScript output to a file
   --stdout                 Always print TypeScript to stdout
+  --dump-ast               Print the Phase B AST (after sugar/macro expansion) to stderr
   --seed <value>           Deterministic seed value for compilation (default: 'default')
   --pretty-option <style>  Format output (pretty|ugly) (default: pretty)
   --log                    Emit compiler events as log messages
   --log-level <level>      Set the minimum severity for emitted logs (debug, info, warn, error)
   --log-phases <phases>    Comma-separated phases to include in logs
-  --trace                  Emit trace events
+  --trace                  Emit trace events and dump Phase A snapshots
   --trace-phases <phases>  Comma-separated phases to include in traces
   -h, --help               Show this help message`);
 }
@@ -368,6 +382,11 @@ interface PhaseADiagnostic {
   stage?: CompilerStage;
 }
 
+interface SnapshotEventData {
+  stage?: CompilerStage;
+  program?: () => Promise<unknown>;
+}
+
 function normalizePhaseADiagnostics(diags: PhaseADiagnostic[]): Diagnostic[] {
   return diags.map((diag) => ({
     code: (diag.code as ReaderErrorCode) ?? "E001",
@@ -406,25 +425,42 @@ function logEvent(event: CompilerEvent, phases: Set<string>, level: EventSeverit
   );
 }
 
-function logTraceEvent(event: CompilerEvent, phases: Set<string>, level: EventSeverity): void {
-  if (event.kind !== "trace") {
-    return;
-  }
-  if (phases.size === 0) {
-    return;
-  }
+async function logTraceEvent(event: CompilerEvent, phases: Set<string>, level: EventSeverity): Promise<void> {
   if (!shouldEmitForPhase(phases, event.phase)) {
     return;
   }
   if (!shouldEmitForLevel(level, event.severity)) {
     return;
   }
-  const timestamp = new Date(event.timestamp).toISOString();
-  const payload = summarizeEventData(event);
-  const diagSummary = summarizeEventDiagnostics(event);
-  console.error(
-    `[trace] ${timestamp} ${event.phase} seed=${event.seed} stamp=${event.stamp} ${payload}${diagSummary}`
-  );
+
+  if (event.kind === "trace") {
+    const timestamp = new Date(event.timestamp).toISOString();
+    const payload = summarizeEventData(event);
+    const diagSummary = summarizeEventDiagnostics(event);
+    console.error(
+      `[trace] ${timestamp} ${event.phase} seed=${event.seed} stamp=${event.stamp} ${payload}${diagSummary}`
+    );
+    return;
+  }
+
+  if (event.kind === "snapshot") {
+    const snapshotData = event.data;
+    if (!snapshotData || typeof snapshotData !== "object") {
+      return;
+    }
+    const snapshot = snapshotData as SnapshotEventData;
+    if (typeof snapshot.program !== "function") {
+      return;
+    }
+    const stageLabel = snapshot.stage ?? event.phase;
+    try {
+      const program = await snapshot.program();
+      console.error(`[trace] ${stageLabel} snapshot AST:`);
+      console.error(JSON.stringify(program, stringifyFilter, 2));
+    } catch (error) {
+      console.error(`[trace] ${stageLabel} snapshot AST failed:`, error);
+    }
+  }
 }
 
 function summarizeEventData(event: CompilerEvent): string {

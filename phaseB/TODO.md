@@ -60,3 +60,30 @@
 ## 9. Open Design Decisions
 - [ ] Specify infix operator precedence table (see SUGAR.md Section 2)
 - [ ] Define macro execution sandbox boundaries (see MACROS.md)
+
+## 10. architecture review
+
+- Implement reader macros — Required for any macro system to work.
+- Implement sugar rewrites — The OLD/phase1 sugarRewrite.ts can be used as guidance for reimplementing these features in phase B:
+    Assignment (:=)
+    Dotted identifier → prop chains
+    let/const single-binding sugar
+    Type annotation parsing
+- Separate reader from rewriter — Keep reader.ts focused on tokenization and S-expr construction. Create a new rewriter.ts for sugar transforms.
+- Create expander.ts — Dedicated macro expansion module with:
+    MacroRegistry class
+    expand(node, registry) function
+    gensym(prefix) function
+    Depth limiting
+- Create lower.ts — Transform Phase B nodes to Phase A:
+    Remove all sugar
+    Validate structure
+    Produce canonical AST
+- Test Coverage
+    - All error codes (E001-E007)
+    - Reader macros
+    - Dotted identifiers (edge cases)
+    - Type annotations
+    - Sugar rewrites
+    - Macro expansion
+    - Integration with Phase A
