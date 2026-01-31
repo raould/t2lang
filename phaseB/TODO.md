@@ -52,8 +52,8 @@
 
 ## 8. Error Handling Infrastructure
 - [x] Define `SourceLoc` and `ExpansionFrame` types (see src/location.ts)
-- [ ] Attach source locations in reader
-- [ ] Propagate expansion stack in macro expander
+- [x] Attach source locations in reader
+- [x] Propagate expansion stack in macro expander (done in expander.ts)
 - [x] Implement error code registry
 - [x] Implement error formatter (TTY, JSON, short)
 - [x] Add `--error-format` CLI flag

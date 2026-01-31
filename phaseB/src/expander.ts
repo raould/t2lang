@@ -1,5 +1,5 @@
 import type { ListNode, SExprNode, SymbolNode } from "./reader.js";
-import type { SourceLoc } from "./location.js";
+import type { ExpansionFrame, SourceLoc } from "./location.js";
 import { MacroRegistry } from "./macroRegistry.js";
 import type { PhaseBSurfaceNode } from "./ast.js";
 
@@ -32,7 +32,13 @@ function expandNode(node: PhaseBSurfaceNode, registry: MacroRegistry): PhaseBSur
           return expanded[0] ?? cloneNode(arg);
         });
         const body = macro.body.map((entry) => substitute(entry, macro.params, args));
-        return expand(body, registry);
+        const frame: ExpansionFrame = {
+          macroName: macro.name,
+          callSite: node.loc,
+          macroDefSite: macro.loc,
+        };
+        const expanded = expand(body, registry);
+        return expanded.map((resultNode) => attachExpansionFrame(resultNode, frame));
       }
     }
 
@@ -171,4 +177,15 @@ function createSymbol(name: string, loc: SourceLoc): SymbolNode {
 function createQuoteNode(node: SExprNode): ListNode {
   const quoteSym = createSymbol("quote", node.loc);
   return { kind: "list", elements: [quoteSym, cloneNode(node) as SExprNode], loc: node.loc };
+}
+
+function attachExpansionFrame(node: PhaseBSurfaceNode, frame: ExpansionFrame): PhaseBSurfaceNode {
+  const expandedStack = [...(node.expansionStack ?? []), frame];
+  if (isListNode(node)) {
+    const elements = node.elements.map((child) =>
+      attachExpansionFrame(child, frame) as SExprNode
+    );
+    return { ...node, elements, expansionStack: expandedStack };
+  }
+  return { ...node, expansionStack: expandedStack };
 }
