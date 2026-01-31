@@ -82,10 +82,11 @@
     - [ ] Validate structure
     - [ ] Produce canonical AST
 - Test Coverage (ongoing, requires adding new tests incrementally)
-    - [x] All existing error codes. Context: any time a new error code is added to the registry, add a test for the situation in which it arises.
-    - [x] Reader macros (covered by tests/reader.test.ts)
-    - [x] Dotted identifiers (covered by reader.test.ts + rewriter.test.ts cases for multi-part access and invalid identifiers)
-    - [x] Type annotations (covered by the comprehensive sugar tests that assert each t:* form)
-    - [x] Sugar rewrites (covered by rewriter.test.ts and sugar.test.ts)
-    - [ ] Macro expansion
-    - [ ] Integration with Phase A
+    - last done as of git sha 89fe8dea72951c059b4b8d987fcbdacc86d7603f
+    - [ ] All existing error codes. Context: any time a new error code is added to the registry, add a test for the situation in which it arises.
+    - [ ] Reader macros (covered by tests/reader.test.ts)
+    - [ ] Dotted identifiers (covered by reader.test.ts + rewriter.test.ts cases for multi-part access and invalid identifiers)
+    - [ ] Type annotations (covered by the comprehensive sugar tests that assert each t:* form)
+    - [ ] Sugar rewrites (covered by rewriter.test.ts and sugar.test.ts)
+    - [ ] Macro expansion (covered by tests/expander.test.ts and macroRegistry tests)
+    - [ ] Integration with Phase A (covered by cli-debug.test.ts which runs phaseB CLI -> Phase A)
