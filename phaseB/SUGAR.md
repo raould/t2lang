@@ -51,6 +51,8 @@ While Phase A requires prefix operators `(call + a b)`, Phase B aims to support 
 
 > Phase B fully parenthesizes every rewritten operator expression (so `1 + 2 * 3` yields `(call + 1 (call * 2 3))`) before any formatting step. The emitted TypeScript therefore never relies on Prettier’s precedence handling to preserve semantic order.
 
+* precdence to be exactly javascript's. see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_precedence#table
+
 *Status: To be implemented via a precedence-climbing parser or a specialized rewrite pass.*
 
 ## 3. Literal Shorthands
