@@ -6,16 +6,19 @@ test('various class field modifier combinations are emitted', async () => {
   const src = `
     (program
       (class A
-        (field "a" 1))
+        (class-body
+          (field "a" 1)))
 
       (class B
-        (field public "b" 2)
-        (field protected "c" 3)
-        (field private readonly "d" 4))
+        (class-body
+          (field public "b" 2)
+          (field protected "c" 3)
+          (field private readonly "d" 4)))
 
       (class C
-        (field static "s" 5)
-        (field public static readonly "psr" 6))
+        (class-body
+          (field static "s" 5)
+          (field public static readonly "psr" 6)))
     )
   `;
   const result = await compilePhase0(src, { enableTsc: false });

@@ -18,10 +18,10 @@ test('class modifiers end-to-end: compile to JS and run', async () => {
   const src = `
     (program
       (class C
-        (field public static readonly "X" 42)
-        (field private "_y" 7)
-        (method "getY" () (prop this "_y"))
-      )
+        (class-body
+          (field public static readonly "X" 42)
+          (field private "_y" 7)
+          (method "getY" () (prop this "_y"))))
 
       (let* ((c (new C)))
         (call (prop console "log") (prop C "X"))

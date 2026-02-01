@@ -6,9 +6,10 @@ test('readonly field is emitted and not enforced by t2lang', async () => {
   const src = `
     (program
       (class C
-        (field readonly "x" 0)
-        (method "constructor" ()
-          (assign (prop this "x") 1)))
+        (class-body
+          (field readonly "x" 0)
+          (method "constructor" ()
+            (assign (prop this "x") 1)))))
     )
   `;
   const result = await compilePhase0(src, { enableTsc: false });

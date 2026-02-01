@@ -528,9 +528,9 @@ class Parser {
     if (clauseNodes.length > 3) {
       throw new Error("for classic accepts at most init, condition, and update");
     }
-    const init = clauseNodes[0] ? this.nodeToStatement(clauseNodes[0]) : undefined;
-    const condition = clauseNodes[1] ? this.nodeToExpression(clauseNodes[1]) : undefined;
-    const update = clauseNodes[2] ? this.nodeToExpression(clauseNodes[2]) : undefined;
+    const init = clauseNodes[0] && !this.isForClausePlaceholder(clauseNodes[0]) ? this.nodeToStatement(clauseNodes[0]) : undefined;
+    const condition = clauseNodes[1] && !this.isForClausePlaceholder(clauseNodes[1]) ? this.nodeToExpression(clauseNodes[1]) : undefined;
+    const update = clauseNodes[2] && !this.isForClausePlaceholder(clauseNodes[2]) ? this.nodeToExpression(clauseNodes[2]) : undefined;
     const body = this.nodeToStatement(bodyNode);
     return new ForClassic({ init, condition, update, body, span });
   }
@@ -573,6 +573,19 @@ class Parser {
     const iterable = this.nodeToExpression(iterableNode);
     const body = this.nodeToStatement(bodyNode);
     return new ForAwait({ binding, iterable, body, span });
+  }
+
+  private isForClausePlaceholder(node: Node): boolean {
+    if (node.type === "atom" && node.value === "null") {
+      return true;
+    }
+    if (node.type === "atom" && node.value === "_") {
+      return true;
+    }
+    if (node.type === "list" && node.elements.length === 0) {
+      return true;
+    }
+    return false;
   }
 
   private nodeToBinding(node: Node): Binding {
@@ -882,15 +895,32 @@ class Parser {
 
   private buildTry(node: ListNode): TryCatchExpr {
     const span = node.span;
-    const bodyNode = node.elements[1];
-    if (!bodyNode) {
+    const children = node.elements.slice(1);
+    const bodyNodes: Node[] = [];
+    let index = 0;
+
+    while (index < children.length) {
+      const child = children[index];
+      if (child.type === "list" && child.elements.length > 0) {
+        const head = child.elements[0];
+        if (head.type === "atom" && (head.value === "catch" || head.value === "finally")) {
+          break;
+        }
+      }
+      bodyNodes.push(child);
+      index++;
+    }
+
+    if (bodyNodes.length === 0) {
       throw new Error("try requires a body statement");
     }
-    const body = this.nodeToStatement(bodyNode);
+
+    const body = this.buildStatementSequence(bodyNodes, span);
     let catchClause: CatchClause | undefined;
     let finallyClause: FinallyClause | undefined;
-    for (let i = 2; i < node.elements.length; i++) {
-      const child = node.elements[i];
+
+    while (index < children.length) {
+      const child = children[index];
       if (child.type !== "list" || child.elements.length === 0) {
         throw new Error("try child must be catch or finally");
       }
@@ -899,15 +929,21 @@ class Parser {
         throw new Error("try child must start with an atom");
       }
       if (head.value === "catch") {
+        if (catchClause) {
+          throw new Error("try supports at most one catch");
+        }
         catchClause = this.buildCatchClause(child);
-        continue;
-      }
-      if (head.value === "finally") {
+      } else if (head.value === "finally") {
+        if (finallyClause) {
+          throw new Error("try supports at most one finally");
+        }
         finallyClause = this.buildFinallyClause(child);
-        continue;
+      } else {
+        throw new Error(`Unknown try child ${head.value}`);
       }
-      throw new Error(`Unknown try child ${head.value}`);
+      index++;
     }
+
     return new TryCatchExpr({ body, span, catchClause, finallyClause });
   }
 
