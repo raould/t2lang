@@ -40,6 +40,7 @@ import {
   CallExpr,
   ArrayExpr,
   FunctionExpr,
+  CallableKind,
   ClassExpr,
   SpreadExpr,
   TernaryExpr,
@@ -372,6 +373,12 @@ class Parser {
         }
         if (head.value === "fn") {
           return this.buildFunction(node);
+        }
+        if (head.value === "lambda") {
+          return this.buildLambda(node);
+        }
+        if (head.value === "method") {
+          return this.buildMethod(node);
         }
         if (head.value === "class") {
           return this.buildClass(node);
@@ -733,6 +740,9 @@ class Parser {
       if (head.value === "fn") {
         return this.buildFunction(node);
       }
+      if (head.value === "lambda") {
+        return this.buildLambda(node);
+      }
       if (head.value === "class") {
         return this.buildClass(node);
       }
@@ -952,20 +962,81 @@ class Parser {
   }
 
   private buildFunction(node: ListNode): FunctionExpr {
+    return this.buildCallable(node, "fn");
+  }
+
+  private buildLambda(node: ListNode): FunctionExpr {
+    return this.buildCallable(node, "lambda");
+  }
+
+  private buildMethod(node: ListNode): FunctionExpr {
+    return this.buildCallable(node, "method");
+  }
+
+  private buildCallable(node: ListNode, kind: CallableKind): FunctionExpr {
     const span = node.span;
-    const [, signatureNode, ...rest] = node.elements;
+    let entries = node.elements.slice(1);
+    let async = false;
+    let generator = false;
+    while (entries.length > 0) {
+      const head = entries[0];
+      if (head.type === "atom") {
+        if (head.value === "async") {
+          async = true;
+          entries = entries.slice(1);
+          continue;
+        }
+        if (head.value === "generator") {
+          generator = true;
+          entries = entries.slice(1);
+          continue;
+        }
+      }
+      break;
+    }
+
+    let name: Identifier | undefined;
+    let methodName: string | undefined;
+
+    if (kind === "fn" && entries.length > 0 && entries[0].type === "atom" && entries[0].tokenType === "atom") {
+      name = this.nodeToIdentifier(entries[0], "function name");
+      entries = entries.slice(1);
+    }
+
+    if (kind === "method") {
+      const nameNode = entries[0];
+      if (!nameNode || nameNode.type !== "atom" || nameNode.tokenType !== "string") {
+        throw new Error("method requires a string name");
+      }
+      methodName = nameNode.value;
+      entries = entries.slice(1);
+    }
+
+    const signatureNode = entries[0];
     if (!signatureNode || signatureNode.type !== "list") {
-      throw new Error("fn requires a signature list");
+      throw new Error(`${kind} requires a signature list`);
     }
     const signature = this.parseFnSignature(signatureNode);
-    let entries = rest;
+    entries = entries.slice(1);
+
     let typeParams: TypeParam[] | undefined;
     if (entries.length > 0 && this.isTypeParamsList(entries[0])) {
       typeParams = this.parseTypeParams(entries[0]);
       entries = entries.slice(1);
     }
+
     const body = entries.map((child) => this.nodeToStatement(child));
-    return new FunctionExpr({ signature, body, span, typeParams });
+    return new FunctionExpr({
+      signature,
+      body,
+      span,
+      typeParams,
+      async,
+      generator,
+      callableKind: kind,
+      name,
+      methodName,
+    });
   }
 
   private parseFnSignature(node: ListNode): { parameters: { name: Identifier; typeAnnotation?: TypeNode }[]; returnType?: TypeNode } {

@@ -32,6 +32,7 @@ import {
   ThrowExpr,
   TryCatchExpr,
   FunctionExpr,
+  CallableKind,
   ClassExpr,
   ClassMember,
   CatchClause,
@@ -63,7 +64,15 @@ export type SerializedExpression =
       finallyClause?: SerializedFinallyClause;
       span: SerializedSpan;
     }
-  | { kind: "fn"; signature: { parameters: { name: SerializedIdentifier }[]; returnType?: SerializedTypeNode }; body: SerializedStatement[]; span: SerializedSpan }
+  | {
+      kind: "fn";
+      callableKind?: CallableKind;
+      name?: SerializedIdentifier;
+      methodName?: string;
+      signature: { parameters: { name: SerializedIdentifier }[]; returnType?: SerializedTypeNode };
+      body: SerializedStatement[];
+      span: SerializedSpan;
+    }
   | ({ kind: "class" } & { body: SerializedStatement[]; span: SerializedSpan });
 
 export type SerializedStatement =
@@ -80,7 +89,15 @@ export type SerializedStatement =
   | { kind: "break"; label?: SerializedIdentifier; span: SerializedSpan }
   | { kind: "continue"; label?: SerializedIdentifier; span: SerializedSpan }
   | { kind: "exprStmt"; expr: SerializedExpression; span: SerializedSpan }
-  | { kind: "fn"; signature: { parameters: { name: SerializedIdentifier }[] }; body: SerializedStatement[]; span: SerializedSpan }
+  | {
+      kind: "fn";
+      callableKind?: CallableKind;
+      name?: SerializedIdentifier;
+      methodName?: string;
+      signature: { parameters: { name: SerializedIdentifier }[] };
+      body: SerializedStatement[];
+      span: SerializedSpan;
+    }
   | { kind: "class"; body: SerializedStatement[]; span: SerializedSpan };
 
 export type SerializedBinding = {
@@ -172,6 +189,9 @@ export async function serializeExpression(expr: Expression): Promise<SerializedE
     const body = await Promise.all(expr.body.map(serializeStatement));
     return {
       kind: "fn",
+      callableKind: expr.callableKind,
+      name: expr.name ? await serializeIdentifier(expr.name) : undefined,
+      methodName: expr.methodName,
       signature: { parameters },
       body,
       span: await serializeSpan(expr.span),
@@ -313,6 +333,9 @@ export async function serializeStatement(stmt: Statement): Promise<SerializedSta
     const parameters = await Promise.all(stmt.signature.parameters.map(async (p) => ({ name: await serializeIdentifier(p.name) })));
     return {
       kind: "fn",
+      callableKind: stmt.callableKind,
+      name: stmt.name ? await serializeIdentifier(stmt.name) : undefined,
+      methodName: stmt.methodName,
       signature: { parameters },
       body: await Promise.all(stmt.body.map(serializeStatement)),
       span: await serializeSpan(stmt.span),

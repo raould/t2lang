@@ -526,6 +526,16 @@ async function emitExpression(expr: Expression): Promise<string> {
 async function emitFunctionExpression(expr: FunctionExpr): Promise<string> {
   const prefix = expr.async ? "async " : "";
   const generator = expr.generator ? "*" : "";
+  const { typeParams, params, returnAnnotation } = await emitFunctionSignature(expr);
+  const bodyText = await renderFunctionBody(expr);
+  if (expr.callableKind === "lambda") {
+    return `${prefix}${typeParams}(${params.join(", ")})${returnAnnotation} => ${bodyText}`;
+  }
+  const namePart = expr.name ? ` ${expr.name.name}` : "";
+  return `${prefix}function${generator}${namePart}${typeParams}(${params.join(", ")})${returnAnnotation} ${bodyText}`;
+}
+
+async function emitFunctionSignature(expr: FunctionExpr): Promise<{ typeParams: string; params: string[]; returnAnnotation: string }> {
   const typeParams = await emitTypeParams(expr.typeParams);
   const params = await Promise.all(
     expr.signature.parameters.map(async (param) => {
@@ -534,14 +544,30 @@ async function emitFunctionExpression(expr: FunctionExpr): Promise<string> {
     })
   );
   const returnAnnotation = expr.signature.returnType ? `: ${await emitTypeNode(expr.signature.returnType)}` : "";
+  return { typeParams, params, returnAnnotation };
+}
+
+async function renderFunctionBody(expr: FunctionExpr): Promise<string> {
   const bodyBlock = new BlockStmt({ statements: expr.body, span: expr.span });
   const body = await emitStatementBody(bodyBlock);
-  const bodyLines = ["{"];
+  const lines = ["{"];
   for (const line of body.lines) {
-    bodyLines.push(`  ${line}`);
+    lines.push(`  ${line}`);
   }
-  bodyLines.push("}");
-  return `${prefix}function${generator}${typeParams}(${params.join(", ")})${returnAnnotation} ${bodyLines.join("\n")}`;
+  lines.push("}");
+  return lines.join("\n");
+}
+
+async function emitMethodDefinition(expr: FunctionExpr): Promise<string> {
+  if (!expr.methodName) {
+    throw new Error("method requires a name");
+  }
+  const { typeParams, params, returnAnnotation } = await emitFunctionSignature(expr);
+  const bodyText = await renderFunctionBody(expr);
+  const prefix = expr.async ? "async " : "";
+  const generator = expr.generator ? "*" : "";
+  const key = formatObjectKey(expr.methodName);
+  return `${prefix}${generator}${key}${typeParams}(${params.join(", ")})${returnAnnotation} ${bodyText}`;
 }
 
 async function emitClassExpression(expr: ClassExpr): Promise<string> {
@@ -552,6 +578,11 @@ async function emitClassExpression(expr: ClassExpr): Promise<string> {
     : "";
   const lines: string[] = [`class${name}${extendsClause}${implementsClause} {`];
   for (const stmt of expr.body.statements) {
+    if (stmt instanceof FunctionExpr && stmt.callableKind === "method") {
+      const methodText = await emitMethodDefinition(stmt);
+      lines.push(`  ${methodText}`);
+      continue;
+    }
     const emitted = await emitStatement(stmt);
     for (const line of emitted.lines) {
       lines.push(`  ${line}`);

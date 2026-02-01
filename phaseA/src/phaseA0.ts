@@ -395,16 +395,24 @@ export interface FnSignature {
   parameters: FnParam[];
 }
 
+export type CallableKind = "fn" | "lambda" | "method";
+
 export class FunctionExpr {
   private readonly __brand!: "fn";
   readonly signature: FnSignature;
   readonly body: Statement[];
   readonly span: Span;
+  readonly callableKind: CallableKind;
+  readonly name?: Identifier;
+  readonly methodName?: string;
 
-  constructor(data: { signature: FnSignature; body: Statement[]; span: Span }) {
+  constructor(data: { signature: FnSignature; body: Statement[]; span: Span; callableKind?: CallableKind; name?: Identifier; methodName?: string }) {
     this.signature = data.signature;
     this.body = data.body;
     this.span = data.span;
+    this.callableKind = data.callableKind ?? "fn";
+    this.name = data.name;
+    this.methodName = data.methodName;
   }
 }
 

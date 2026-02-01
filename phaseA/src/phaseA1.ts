@@ -263,16 +263,39 @@ export class TryCatchExpr {
 export interface FnParam { name: Identifier; typeAnnotation?: TypeNode; }
 export interface FnSignature { parameters: FnParam[]; returnType?: TypeNode; }
 
+export type CallableKind = "fn" | "lambda" | "method";
+
 export class FunctionExpr {
   private readonly __brand!: "fn";
   readonly signature: FnSignature;
   readonly body: Statement[];
   readonly span: Span;
+  readonly callableKind: CallableKind;
+  readonly name?: Identifier;
+  readonly methodName?: string;
   readonly typeParams?: TypeParam[];
   readonly async?: boolean;
   readonly generator?: boolean;
-  constructor(data: { signature: FnSignature; body: Statement[]; span: Span; typeParams?: TypeParam[]; async?: boolean; generator?: boolean }) {
-    this.signature = data.signature; this.body = data.body; this.span = data.span; this.typeParams = data.typeParams; this.async = data.async; this.generator = data.generator;
+  constructor(data: {
+    signature: FnSignature;
+    body: Statement[];
+    span: Span;
+    typeParams?: TypeParam[];
+    async?: boolean;
+    generator?: boolean;
+    callableKind?: CallableKind;
+    name?: Identifier;
+    methodName?: string;
+  }) {
+    this.signature = data.signature;
+    this.body = data.body;
+    this.span = data.span;
+    this.typeParams = data.typeParams;
+    this.async = data.async;
+    this.generator = data.generator;
+    this.callableKind = data.callableKind ?? "fn";
+    this.name = data.name;
+    this.methodName = data.methodName;
   }
 }
 
