@@ -8,6 +8,6 @@ import { compilePhase0 } from "../../../src/api";
 const test = ((..._args: unknown[]) => {}) as typeof testBase;
 
 test("nested program form produces error", async () => {
-  const result = await compilePhase0(`(program (program (fn foo (x) x)))`, { enableTsc: false });
+  const result = await compilePhase0(`(program (program (fn foo ((x)) x)))`, { enableTsc: false });
   assert.ok(result.errors.length > 0);
 });

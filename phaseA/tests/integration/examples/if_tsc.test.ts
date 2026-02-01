@@ -10,14 +10,14 @@ const test = ((..._args: unknown[]) => {}) as typeof testBase;
 const nonTsc = (errors: any[]) => errors.filter(e => e.phase !== "tsc");
 
 test("if with then only", async () => {
-  const result = await compilePhase0(`(program (fn foo (x) x) (if true (foo 1)))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (fn foo ((x)) x) (if true (foo 1)))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
   assert.match(result.tsSource, /if \(true\)/);
   assert.match(result.tsSource, /foo\(1\)/);
 });
 
 test("if with then and else", async () => {
-  const result = await compilePhase0(`(program (fn foo (x) x) (fn bar (x) x) (if false (foo 1) (bar 2)))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (fn foo ((x)) x) (fn bar ((x)) x) (if false (foo 1) (bar 2)))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
   assert.match(result.tsSource, /if \(false\)/);
   assert.match(result.tsSource, /foo\(1\)/);
@@ -28,8 +28,8 @@ test("if with then and else", async () => {
 test("if with identifier condition", async () => {
   const result = await compilePhase0(`
     (program
-      (fn foo (x) x)
-      (fn bar (x) x)
+      (fn foo ((x)) x)
+      (fn bar ((x)) x)
       (let* ((x true))
         (if x (foo 1) (bar 2))))
   `, { enableTsc: true });
@@ -61,9 +61,9 @@ test("nested if expressions", async () => {
 test("if with block branches", async () => {
   const result = await compilePhase0(`
     (program
-      (fn foo (x) x)
-      (fn bar (x) x)
-      (fn baz (x) x)
+      (fn foo ((x)) x)
+      (fn bar ((x)) x)
+      (fn baz ((x)) x)
       (if true
         (block
           (foo 1)
