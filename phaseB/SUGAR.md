@@ -60,33 +60,6 @@ While Phase A requires prefix operators `(call + a b)`, Phase B aims to support 
 - Supported operators include `+ - * / % << >> >>> < <= > >= in instanceof == != === !== & ^ | && || ??` (see the precedence table below for their ordering and associativity).
 - Regression coverage lives in `phaseB/tests/sugar.test.ts`, which asserts the addition rewrite plus precedence and logical chaining scenarios.
 
-### Operator Precedence Reference
-
-Derived from the [MDN Operator Precedence table](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_precedence#table), this ordered list is what the infix rewrite must respect before handing expressions off to Phase A.
-
-| Precedence | Associativity | Operators / Notes |
-| --- | --- | --- |
-| 18 – Grouping | n/a | `( ... )` forces its contents to evaluate before any surrounding operator. |
-| 17 – Access & call | left-to-right (member/call) | Member access `obj.prop`, optional chaining `obj?.prop`, computed access `obj[expr]`, `new Foo(arg…)`, function calls `fn(args…)`, `import(expr)`. |
-| 16 – `new` without args | n/a | `new Foo` (no argument list). |
-| 15 – Postfix | n/a | `x++`, `x--` (operand must be an assignable target). |
-| 14 – Prefix | n/a | `++x`, `--x`, `+x`, `-x`, `~x`, `!x`, `typeof`, `void`, `delete`, `await`. |
-| 13 – Exponentiation | right-to-left | `x ** y` (right operand cannot be another exponentiation without parentheses). |
-| 12 – Multiplicative | left-to-right | `*`, `/`, `%`. |
-| 11 – Additive | left-to-right | `+`, `-`. |
-| 10 – Bitwise shift | left-to-right | `<<`, `>>`, `>>>`. |
-| 9 – Relational | left-to-right | `<`, `>`, `<=`, `>=`, `in`, `instanceof`. |
-| 8 – Equality | left-to-right | `==`, `!=`, `===`, `!==`. |
-| 7 – Bitwise AND | left-to-right | `x & y`. |
-| 6 – Bitwise XOR | left-to-right | `x ^ y`. |
-| 5 – Bitwise OR | left-to-right | `x | y`. |
-| 4 – Logical AND | left-to-right | `x && y` (short-circuits on falsy `x`). |
-| 3 – Logical OR & Nullish | left-to-right | `x || y`, `x ?? y` (short-circuits on truthy/nonnull left operand). |
-| 2 – Assignment & control | right-to-left | Assignment `=`, compound assignments `+=`, `-=`, ..., logical/nullish assignments `&&=`, `||=`, `??=`, ternary `x ? y : z`, arrow `x => y`, `yield`, `yield*`, spread `...expr`. |
-| 1 – Comma | left-to-right | `x, y` evaluates both operands and returns `y`. |
-
-> Operator precedence only tells us how the operators group. Operand evaluation order remains left-to-right regardless of precedence or associativity, so short-circuiting is only observable when the operand expressions carry side effects. (See the section on evaluation order in the MDN table for the full explanation.)
-
 ## 3. Literal Shorthands [x]
 
 ### Object Literals
@@ -201,7 +174,7 @@ Support for TypeScript-style parameter lists with colons.
 
 Phase B is responsible for parsing the type syntax (`x: T`) and converting it into the `(x T)` tuple structure Phase A expects for named parameters.
 
-## 7. Optional Chaining (Expanded) [ ]
+## 7. Optional Chaining (Expanded) [x]
 
 Optional chaining rewrites avoid thunks by nesting `let*` bindings with `if` checks so arguments are never evaluated when the chain short-circuits.
 See [phaseB/ERRORS.md](phaseB/ERRORS.md) for the diagnostics Surface B surfaces when optional chaining sugar is malformed.
@@ -247,6 +220,19 @@ When the callable target is a method access (e.g., `obj.method?.(a, b)`), the re
       undefined
       (call-with-this tmp-fn tmp-obj a b)))
 ```
+
+### Computed optional access
+
+Computed lookups like `obj?.[key]` share the same guard strategy, but they always rewrite to the `index` primitive so the downstream compiler can handle arbitrary expressions for the key. For example:
+
+```lisp
+(let* ((tmp obj))
+  (if (== tmp null)
+      undefined
+      (index tmp key)))
+```
+
+When the receiver is non-optional (e.g., `obj.[key]`) the sugar simply emits `(index obj key)` without introducing guards.
 
 **Nested chains** `a?.b?.c(x)` introduce one `let*`/`if` per `?.`, short-circuiting to `undefined` at the first nullish value while reusing the previous temporary in the next check.
 
@@ -344,5 +330,6 @@ Phase B parses TypeScript-style type annotations and rewrites them to the struct
 # 10 more precedence and evaluation order testing [ ]
 
 - Precedence in TypeScript, JavaScript, ECMAScript must bes tested. We need to build extensive tests that have JavaScript tests being compard with T2 versions thereof to assert that T2 is not genrating incorrect output. This means generating many small tests in javascript which try to cover precedence + evaluation order + short-circuiting with high sensitivity. Then create a T2 version of the same test. Run the matched .js and .t2 pair and assert the output is the same. (Unfortunately it is a bit of a combinatorial explosion.)
-  - see EVALUATION_PRECEDENCE.json
-  - see TYPE_PRECEDENCE.md
+  - [ ] validate the t2lang precedence implementation matches EVALUATION_PRECEDENCE.json
+  - [ ] implement fully parenthasized type-level precedence. See TYPE_PRECEDENCE.md
+
