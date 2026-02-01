@@ -102,9 +102,16 @@ function wrapPhaseBNode(node: SExprNode): PhaseBNode {
 
 function wrapSymbol(node: SymbolNode): PhaseBNode {
   if (node.name.includes(".")) {
-    const parts = node.name.split(".");
+    let parts = node.name.split(".");
+    const lastIndex = parts.length - 1;
+    if (lastIndex >= 1 && parts[lastIndex] === "" && parts[lastIndex - 1].endsWith("?")) {
+      parts = parts.slice(0, -1);
+    }
     if (parts.some((part) => part.length === 0)) {
       throw new ParseError("invalid dotted identifier", node.loc, "E006");
+    }
+    if (parts.length === 1) {
+      return { ...node, phaseKind: "symbol" };
     }
     return { ...node, phaseKind: "dotted", parts };
   }

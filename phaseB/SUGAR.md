@@ -14,14 +14,14 @@ Unlike macros, sugar is often handled at the lexer or parser level, or via struc
 
 To support standard object-oriented programming patterns without verbose nested `prop` calls.
 
-### Sugar [ ]
+### Sugar
 ```typescript
 obj.prop
 obj.method(arg)
 a.b.c
 ```
 
-### Canonical Rewrite (Phase A) [ ]
+### Canonical Rewrite (Phase A)
 ```lisp
 (prop obj "prop")
 (call (prop obj "method") arg)
@@ -340,3 +340,7 @@ Phase B parses TypeScript-style type annotations and rewrites them to the struct
 (type-alias "Alias" SomeType')
 (type-alias "Generic" (t:apply (t:ref "Array") (t:var "T")) :type-params ("T"))
 ```
+
+# 10 more precedence and evaluation order testing [ ]
+
+Precedence in TypeScript, JavaScript, ECMAScript is not succinctly defined anywhere, and interacts with or is easily confused with order of evalutation, including short-circuiting effects. We need to build extensive tests that have JavaScript tests being compard with T2 versions thereof to assert that T2 is not genrating incorrect output. This means generating many small tests in javascript which try to cover precedence + evaluation order + short-circuiting with high sensitivity. Then create a T2 version of the same test. Run the matched .js and .t2 pair and assert the output is the same. (Unfortunately it is a bit of a combinatorial explosion.)

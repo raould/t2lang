@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert";
 import { parsePhaseBRaw } from "../src/reader.js";
+import { resetGensym } from "../src/gensym.js";
+import { serializePhaseBNode } from "../src/typeAnnotationUtils.js";
 import type { PhaseBListNode, PhaseBTypeAnnotation, SymbolNode, LiteralNode } from "../src/reader.js";
 
 test("fn parameter list rewrites colon annotations", () => {
@@ -187,4 +189,34 @@ test("logical infix chains retain short-circuit grouping", () => {
   assert.strictEqual((andSymbol as SymbolNode).name, "&&");
   assert.strictEqual((andLeft as SymbolNode).name, "a");
   assert.strictEqual((andRight as SymbolNode).name, "b");
+});
+
+test("optional property access rewrites into a null guard", () => {
+  resetGensym();
+  const nodes = parsePhaseBRaw("(prop obj? \"prop\")", "optional-property.t2");
+  const serialized = serializePhaseBNode(nodes[0]);
+  assert.strictEqual(
+    serialized,
+    "(let* ((opt_tmp_1 obj)) (if (== opt_tmp_1 null) undefined (prop opt_tmp_1 \"prop\")))",
+  );
+});
+
+test("optional method call emits call-with-this guard", () => {
+  resetGensym();
+  const nodes = parsePhaseBRaw("(call (prop obj? \"method\") 1)", "optional-method.t2");
+  const serialized = serializePhaseBNode(nodes[0]);
+  assert.strictEqual(
+    serialized,
+    "(let* ((opt_obj_1 obj)) (if (== opt_obj_1 null) undefined (call-with-this (prop opt_obj_1 \"method\") opt_obj_1 1)))",
+  );
+});
+
+test("optional callable access guards the callee", () => {
+  resetGensym();
+  const nodes = parsePhaseBRaw("(call fn? 1)", "optional-callable.t2");
+  const serialized = serializePhaseBNode(nodes[0]);
+  assert.strictEqual(
+    serialized,
+    "(let* ((opt_call_1 fn)) (if (== opt_call_1 null) undefined (call opt_call_1 1)))",
+  );
 });
