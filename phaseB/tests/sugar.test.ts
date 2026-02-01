@@ -13,8 +13,30 @@ test("fn parameter list rewrites colon annotations", () => {
   const params = (fnNode as PhaseBListNode).elements[1];
   assert.strictEqual(params.phaseKind, "list");
 
-  const [param] = (params as PhaseBListNode).elements;
-  assert.strictEqual(param.phaseKind, "type-annotation");
+  const [entry] = (params as PhaseBListNode).elements;
+  assert.strictEqual(entry.phaseKind, "list");
+  const inner = (entry as PhaseBListNode).elements[0];
+  assert.strictEqual(inner.phaseKind, "type-annotation");
+});
+
+test("bare fn parameters normalize to list entries", () => {
+  const nodes = parsePhaseBRaw("(fn (x y) (+ x y))", "bare-params.t2");
+  const fnNode = nodes[0] as PhaseBListNode;
+  const params = fnNode.elements[1] as PhaseBListNode;
+  assert.strictEqual(params.phaseKind, "list");
+  assert.strictEqual(params.elements.length, 2);
+
+  const firstParam = params.elements[0] as PhaseBListNode;
+  assert.strictEqual(firstParam.phaseKind, "list");
+  const firstSymbol = firstParam.elements[0];
+  assert.strictEqual(firstSymbol.phaseKind, "symbol");
+  assert.strictEqual((firstSymbol as SymbolNode).name, "x");
+
+  const secondParam = params.elements[1] as PhaseBListNode;
+  assert.strictEqual(secondParam.phaseKind, "list");
+  const secondSymbol = secondParam.elements[0];
+  assert.strictEqual(secondSymbol.phaseKind, "symbol");
+  assert.strictEqual((secondSymbol as SymbolNode).name, "y");
 });
 
 test("colon expressions outside of parameter lists stay lists", () => {
@@ -27,7 +49,9 @@ function getFirstAnnotation(expr: string): PhaseBTypeAnnotation {
   const nodes = parsePhaseBRaw(expr, "type.t2");
   const fnNode = nodes[0] as PhaseBListNode;
   const params = fnNode.elements[1] as PhaseBListNode;
-  return params.elements[0] as PhaseBTypeAnnotation;
+  const [entry] = params.elements;
+  const annotationNode = entry.phaseKind === "list" ? (entry as PhaseBListNode).elements[0] : entry;
+  return annotationNode as PhaseBTypeAnnotation;
 }
 
 test("type annotations produce t:primitive nodes", () => {

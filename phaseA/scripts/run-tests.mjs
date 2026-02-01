@@ -6,8 +6,6 @@ import { fileURLToPath } from "node:url";
 const scriptDir = resolve(fileURLToPath(new URL(".", import.meta.url)));
 const rootDir = resolve(scriptDir, "..");
 const testsDir = resolve(rootDir, "tests");
-const skipSegment = `${join("tests", "integration", "examples")}/`;
-
 const testFiles = [];
 
 const collectTests = (dir) => {
@@ -25,14 +23,12 @@ const collectTests = (dir) => {
       continue;
     }
     const relPath = fullPath.replace(`${rootDir}/`, "");
-    if (relPath.includes(skipSegment)) {
-      continue;
-    }
     testFiles.push(fullPath);
   }
 };
 
 collectTests(testsDir);
+console.log(`Found ${testFiles.length} test files.`);
 
 if (testFiles.length === 0) {
   process.exit(0);

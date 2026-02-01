@@ -81,12 +81,12 @@ function rewriteFunctionParams(node: PhaseBListNode): PhaseBListNode {
       const annotationStart = idx + 2;
       const { annotationNode, consumed } = collectAnnotationSegment(node.elements, annotationStart);
       if (annotationNode && consumed > 0) {
-        elements.push(createTypeAnnotationNode(target, colon, annotationNode));
+        elements.push(wrapFunctionParam(createTypeAnnotationNode(target, colon, annotationNode)));
         idx = annotationStart + consumed;
         continue;
       }
     }
-    elements.push(target);
+    elements.push(wrapFunctionParam(target));
     idx += 1;
   }
   return { ...node, elements };
@@ -696,7 +696,14 @@ function createPhaseBList(elements: PhaseBNode[], loc: SourceLoc, delimiter: Lis
   };
 }
 
-const INFIX_OPERATOR_TABLE: Record<
+function wrapFunctionParam(node: PhaseBNode): PhaseBNode {
+  if (node.phaseKind === "list") {
+    return node;
+  }
+  return createPhaseBList([node], node.loc);
+}
+
+export const INFIX_OPERATOR_TABLE: Record<
   string,
   { precedence: number; associativity: "left" | "right" }
 > = {

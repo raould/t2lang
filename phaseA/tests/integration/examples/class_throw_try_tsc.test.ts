@@ -24,7 +24,7 @@ test("simple class with field", async () => {
 test("class with method", async () => {
   const result = await compilePhase0(`
     (program
-      (let* ((console (obj (field "log" (fn (x) x)))))
+      (let* ((console (obj (field "log" (fn ((x)) x)))))
         (class Greeter
           (method "greet" ()
             (call (prop console "log") "Hello"))))
@@ -40,8 +40,8 @@ test("class with method", async () => {
 test("class with method params", async () => {
   const result = await compilePhase0(`
     (program
-      (class Calculator
-        (method "add" (a b)
+        (class Calculator
+        (method "add" ((a) (b))
           (return (+ a b))))
     )
   `, { enableTsc: true });
@@ -80,7 +80,7 @@ test("type assert on expression", async () => {
 
 // Throw tests
 test("throw error", async () => {
-  const result = await compilePhase0(`(program (let* ((Error (fn (x) x))) (throw (new Error "oops"))))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (let* ((Error (fn ((x)) x))) (throw (new Error "oops"))))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
   assert.match(result.tsSource, /throw new Error\("oops"\)/);
 });
@@ -95,8 +95,8 @@ test("throw variable", async () => {
 test("simple try-catch", async () => {
   const result = await compilePhase0(`
     (program
-      (let* ((riskyOp (fn () null))
-             (log (fn (x) x)))
+            (let* ((riskyOp (fn () null))
+              (log (fn ((x)) x)))
         (try
           (riskyOp)
           (catch e
@@ -114,7 +114,7 @@ test("try-catch with finally", async () => {
     (program
       (let* ((open (fn () null))
              (close (fn () null))
-             (log (fn (x) x)))
+             (log (fn ((x)) x)))
         (try
           (open)
           (catch e
@@ -134,7 +134,7 @@ test("try-catch with multiple statements", async () => {
     (program
       (let* ((step1 (fn () null))
              (step2 (fn () null))
-             (log (fn (x) x))
+             (log (fn ((x)) x))
              (recover (fn () null)))
         (try
           (step1)

@@ -34,8 +34,8 @@ test("assignment to array index", async () => {
 test("simple for loop", async () => {
   const result = await compilePhase0(`
     (program
-      (let* ((i 0)
-             (print (fn (x) x)))
+            (let* ((i 0)
+              (print (fn ((x)) x)))
         (for (assign i 0) (< i 10) (assign i (+ i 1))
           (print i))))
   `, { enableTsc: true });
@@ -88,13 +88,13 @@ test("new with no args", async () => {
 });
 
 test("new with args", async () => {
-  const result = await compilePhase0(`(program (let* ((Error (fn (x) x))) (new Error "something went wrong")))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (let* ((Error (fn ((x)) x))) (new Error "something went wrong")))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
   assert.match(result.tsSource, /new Error\("something went wrong"\)/);
 });
 
 test("new with multiple args", async () => {
-  const result = await compilePhase0(`(program (let* ((Date (fn (a b c) a))) (new Date 2024 0 1)))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (let* ((Date (fn ((a) (b) (c)) a))) (new Date 2024 0 1)))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
   assert.match(result.tsSource, /new Date\(2024, 0, 1\)/);
 });
@@ -103,8 +103,8 @@ test("new with multiple args", async () => {
 test("combined usage", async () => {
   const result = await compilePhase0(`
     (program
-            (let* ((Array (fn () null))
-                    (console (obj (field "log" (fn (x) x))))
+                (let* ((Array (fn () null))
+                  (console (obj (field "log" (fn ((x)) x))))
               (i 0))
         (const* ((arr (new Array)))
           (for (assign i 0) (< i 5) (assign i (+ i 1))

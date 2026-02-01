@@ -63,7 +63,7 @@ test("object with array field", async () => {
 test("object assigned to variable", async () => {
   const result = await compilePhase0(`
     (program
-      (const* ((foo (fn (x) x))
+      (const* ((foo (fn ((x)) x))
               (person (obj (field "name" "John"))))
         (foo person)))
   `, { enableTsc: false });

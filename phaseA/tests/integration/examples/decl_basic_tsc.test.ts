@@ -10,7 +10,7 @@ import { Program } from "../../../src/ast/nodes";
 const nonTsc = (errors: any[]) => errors.filter(e => e.phase !== "tsc");
 
 test("let declaration as expression", async () => {
-  const source = `(program (let* ((foo (fn (x) x)) (x 42)) (foo x)))`;
+  const source = `(program (let* ((foo (fn ((x)) x)) (x 42)) (foo x)))`;
 
   const result = await compilePhase0(source, {
     prettyOutput: true,
