@@ -115,8 +115,9 @@ export async function generateCode(program: Program, config: CompilerConfig = {}
     }
     generatedLine += outputOffset;
   }
+  const wrapperPrefix = programRequiresAsync(program) ? "async " : "";
   const wrappedLines = [
-    "void (async () => {",
+    `void (${wrapperPrefix}() => {`,
     ...lines.map((line) => (line ? `  ${line}` : "")),
     "})();",
   ];
@@ -878,6 +879,170 @@ function mappingFromSpan(span: { source: string; startLine?: number; startColumn
     },
     source: span.source,
   };
+}
+
+function programRequiresAsync(program: Program): boolean {
+  return program.body.some((stmt) => containsAsyncStatement(stmt));
+}
+
+function containsAsyncStatement(stmt: Statement): boolean {
+  if (stmt instanceof ForAwait) {
+    return true;
+  }
+  if (stmt instanceof ExprStmt) {
+    return containsAsyncExpression(stmt.expr);
+  }
+  if (stmt instanceof LetStarExpr) {
+    if (stmt.bindings.some((binding) => binding.init && containsAsyncExpression(binding.init))) {
+      return true;
+    }
+    return stmt.body.some((inner) => containsAsyncStatement(inner));
+  }
+  if (stmt instanceof AssignExpr) {
+    return containsAsyncExpression(stmt.target) || containsAsyncExpression(stmt.value);
+  }
+  if (stmt instanceof ReturnExpr) {
+    return stmt.value ? containsAsyncExpression(stmt.value) : false;
+  }
+  if (stmt instanceof IfStmt) {
+    if (containsAsyncExpression(stmt.test)) {
+      return true;
+    }
+    if (containsAsyncStatement(stmt.consequent)) {
+      return true;
+    }
+    return stmt.alternate ? containsAsyncStatement(stmt.alternate) : false;
+  }
+  if (stmt instanceof WhileStmt) {
+    return containsAsyncExpression(stmt.condition) || containsAsyncStatement(stmt.body);
+  }
+  if (stmt instanceof BlockStmt) {
+    return stmt.statements.some((inner) => containsAsyncStatement(inner));
+  }
+  if (stmt instanceof ForClassic) {
+    if (stmt.init && containsAsyncStatement(stmt.init)) {
+      return true;
+    }
+    if (stmt.condition && containsAsyncExpression(stmt.condition)) {
+      return true;
+    }
+    if (stmt.update && containsAsyncExpression(stmt.update)) {
+      return true;
+    }
+    return containsAsyncStatement(stmt.body);
+  }
+  if (stmt instanceof ForOf) {
+    if (stmt.binding.init && containsAsyncExpression(stmt.binding.init)) {
+      return true;
+    }
+    if (containsAsyncExpression(stmt.iterable)) {
+      return true;
+    }
+    return containsAsyncStatement(stmt.body);
+  }
+  if (stmt instanceof SwitchStmt) {
+    if (containsAsyncExpression(stmt.discriminant)) {
+      return true;
+    }
+    for (const c of stmt.cases) {
+      if (c.test && containsAsyncExpression(c.test)) {
+        return true;
+      }
+      if (c.consequent.some((inner) => containsAsyncStatement(inner))) {
+        return true;
+      }
+    }
+    return false;
+  }
+  if (stmt instanceof FunctionExpr || stmt instanceof ClassExpr) {
+    return containsAsyncExpression(stmt as Expression);
+  }
+  return false;
+}
+
+function containsAsyncExpression(expr: Expression): boolean {
+  if (expr instanceof AwaitExpr) {
+    return true;
+  }
+  if (expr instanceof CallExpr) {
+    if (containsAsyncExpression(expr.callee)) {
+      return true;
+    }
+    return expr.args.some((arg) => containsAsyncExpression(arg));
+  }
+  if (expr instanceof ArrayExpr) {
+    return expr.elements.some((element) => containsAsyncExpression(element));
+  }
+  if (expr instanceof SpreadExpr) {
+    return containsAsyncExpression(expr.expr);
+  }
+  if (expr instanceof ObjectExpr) {
+    return expr.fields.some((field) => containsAsyncExpression(field.value));
+  }
+  if (expr instanceof NewExpr) {
+    if (containsAsyncExpression(expr.callee)) {
+      return true;
+    }
+    return expr.args.some((arg) => containsAsyncExpression(arg));
+  }
+  if (expr instanceof ThrowExpr) {
+    return containsAsyncExpression(expr.argument);
+  }
+  if (expr instanceof PropExpr) {
+    return containsAsyncExpression(expr.object);
+  }
+  if (expr instanceof IndexExpr) {
+    return containsAsyncExpression(expr.object) || containsAsyncExpression(expr.index);
+  }
+  if (expr instanceof TernaryExpr) {
+    return (
+      containsAsyncExpression(expr.test) ||
+      containsAsyncExpression(expr.consequent) ||
+      containsAsyncExpression(expr.alternate)
+    );
+  }
+  if (expr instanceof YieldExpr && expr.argument) {
+    return containsAsyncExpression(expr.argument);
+  }
+  if (expr instanceof TypeAssertExpr) {
+    return containsAsyncExpression(expr.expr);
+  }
+  if (expr instanceof TypeApp) {
+    if (!isTypeNodeValue(expr.expr)) {
+      if (containsAsyncExpression(expr.expr as Expression)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  if (expr instanceof FunctionExpr) {
+    return expr.body.some((inner) => containsAsyncStatement(inner));
+  }
+  if (expr instanceof ClassExpr) {
+    if (expr.body.statements.some((inner) => containsAsyncStatement(inner))) {
+      return true;
+    }
+    if (expr.constructorStmt && containsAsyncStatement(expr.constructorStmt)) {
+      return true;
+    }
+    if (expr.staticBlocks && expr.staticBlocks.some((block) => containsAsyncStatement(block))) {
+      return true;
+    }
+    return false;
+  }
+  if (expr instanceof TryCatchExpr) {
+    if (containsAsyncStatement(expr.body)) {
+      return true;
+    }
+    if (expr.catchClause && expr.catchClause.body.some((inner) => containsAsyncStatement(inner))) {
+      return true;
+    }
+    if (expr.finallyClause && expr.finallyClause.body.some((inner) => containsAsyncStatement(inner))) {
+      return true;
+    }
+    return false;
+  }
+  return false;
 }
  
 const OPERATOR_SYMBOLS: Record<string, string> = {
