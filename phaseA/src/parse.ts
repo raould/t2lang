@@ -766,9 +766,6 @@ class Parser {
         return this.buildTypeApp(node, (child) => this.nodeToExpression(child));
       }
     }
-    if (node.elements.length === 1) {
-      return this.nodeToExpression(node.elements[0]);
-    }
     const callee = this.nodeToExpression(head);
     const args = node.elements.slice(1).map((child) => this.nodeToExpression(child));
     return new CallExpr({ callee, args, span: node.span });
@@ -1088,6 +1085,9 @@ class Parser {
   }
 
   private parseFnParam(node: Node): { name: Identifier; typeAnnotation?: TypeNode } {
+    if (node.type === "atom") {
+      return { name: this.nodeToIdentifier(node, "fn param name") };
+    }
     if (node.type !== "list" || node.elements.length === 0) {
       throw new Error("fn param must be a list with a name");
     }
@@ -1428,9 +1428,19 @@ class Parser {
     const [, ...rest] = node.elements;
     let binding: Binding | undefined;
     let bodyStartIndex = 1;
-    if (rest.length > 0 && rest[0].type === "list" && rest[0].elements.length <= 2 && this.isBindingCandidate(rest[0])) {
-      binding = this.nodeToBinding(rest[0]);
-      bodyStartIndex = 2;
+    if (rest.length > 0) {
+      const first = rest[0];
+      if (first.type === "atom") {
+        binding = { target: this.nodeToBindingTarget(first) };
+        bodyStartIndex = 2;
+      } else if (
+        first.type === "list" &&
+        first.elements.length <= 2 &&
+        this.isBindingCandidate(first)
+      ) {
+        binding = this.nodeToBinding(first);
+        bodyStartIndex = 2;
+      }
     }
     const bodyNodes = node.elements.slice(bodyStartIndex);
     const body = bodyNodes.map((stmt) => this.nodeToStatement(stmt));

@@ -105,6 +105,10 @@ export async function compilePhaseA(source: string, config: CompilePhaseAConfig 
 
   await emitTrace("parse", "start");
   const parsedProgram = await parseSource(source, finalConfig.sourcePath ?? "input.t2");
+  if (process.env.T2_DEBUG_PARSE === "1") {
+    const nodeCount = parsedProgram.body.length;
+    console.error(`[DEBUG] Parsed AST: nodeCount=${nodeCount}`);
+  }
   await emitStage("parse", parsedProgram);
   await emitTrace("parse", "done");
 
@@ -123,6 +127,9 @@ export async function compilePhaseA(source: string, config: CompilePhaseAConfig 
     prettyOutput: finalConfig.prettyOption,
     emitTypes: finalConfig.emitTypes,
   });
+  if (process.env.T2_DEBUG_CODEGEN === "1") {
+    console.error(`[DEBUG] Codegen output: size=${tsSource.length}`);
+  }
   await emitStage("codegen", resolvedProgram);
   await emitTrace("codegen", "done");
 

@@ -115,20 +115,30 @@ export async function generateCode(program: Program, config: CompilerConfig = {}
     }
     generatedLine += outputOffset;
   }
-  const wrapperPrefix = programRequiresAsync(program) ? "async " : "";
-  const wrappedLines = [
-    `void (${wrapperPrefix}() => {`,
-    ...lines.map((line) => (line ? `  ${line}` : "")),
-    "})();",
-  ];
+  const requiresAsync = programRequiresAsync(program);
+  let tsLines = lines;
+  let lineShift = 0;
+  if (config.prettyOutput === "pretty") {
+    tsLines = ["{", ...tsLines, "}"];
+    lineShift += 1;
+  }
+  if (requiresAsync) {
+    const wrapperPrefix = "async ";
+    tsLines = [
+      `void (${wrapperPrefix}() => {`,
+      ...tsLines.map((line) => (line ? `  ${line}` : "")),
+      "})();",
+    ];
+    lineShift += 1;
+  }
   const shiftedMappings = mappings.map((mapping) => ({
     ...mapping,
     generated: {
-      line: mapping.generated.line + 1,
+      line: mapping.generated.line + lineShift,
       column: mapping.generated.column,
     },
   }));
-  const tsSource = wrappedLines.join("\n");
+  const tsSource = tsLines.join("\n");
   return { tsSource, mappings: shiftedMappings };
 }
 
@@ -136,6 +146,13 @@ async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
   if (stmt instanceof ExprStmt) {
     if (stmt.expr instanceof TryCatchExpr) {
       return await emitTryCatchStatement(stmt.expr);
+    }
+    if (stmt.expr instanceof ClassExpr) {
+      const text = await emitClassExpression(stmt.expr);
+      return {
+        lines: [text],
+        mappings: [mappingFromSpan(stmt.expr.span, 0)],
+      };
     }
     return {
       lines: [`${await emitExpression(stmt.expr)};`],
@@ -301,16 +318,16 @@ async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
     return { lines: ["export {};"], mappings: [mappingFromSpan(stmt.span, 0)] };
   }
   if (stmt instanceof FunctionExpr) {
-    const text = await emitFunctionExpression(stmt);
+    const text = await emitFunctionExpression(stmt, true);
     return {
-      lines: [`(${text});`],
+      lines: [text],
       mappings: [mappingFromSpan(stmt.span, 0)],
     };
   }
   if (stmt instanceof ClassExpr) {
     const text = await emitClassExpression(stmt);
     return {
-      lines: [`(${text});`],
+      lines: [text],
       mappings: [mappingFromSpan(stmt.span, 0)],
     };
   }
@@ -523,12 +540,13 @@ async function emitExpression(expr: Expression): Promise<string> {
   return "undefined";
 }
 
-async function emitFunctionExpression(expr: FunctionExpr): Promise<string> {
+async function emitFunctionExpression(expr: FunctionExpr, asDeclaration = false): Promise<string> {
   const prefix = expr.async ? "async " : "";
   const generator = expr.generator ? "*" : "";
   const { typeParams, params, returnAnnotation } = await emitFunctionSignature(expr);
   const bodyText = await renderFunctionBody(expr);
-  if (expr.callableKind === "lambda") {
+  const canUseArrow = !asDeclaration && !expr.generator;
+  if (canUseArrow) {
     return `${prefix}${typeParams}(${params.join(", ")})${returnAnnotation} => ${bodyText}`;
   }
   const namePart = expr.name ? ` ${expr.name.name}` : "";
@@ -548,11 +566,19 @@ async function emitFunctionSignature(expr: FunctionExpr): Promise<{ typeParams: 
 }
 
 async function renderFunctionBody(expr: FunctionExpr): Promise<string> {
-  const bodyBlock = new BlockStmt({ statements: expr.body, span: expr.span });
+  const bodyStatements = expr.body.slice();
+  if (expr.callableKind === "method" && bodyStatements.length > 0) {
+    const lastIndex = bodyStatements.length - 1;
+    const lastStmt = bodyStatements[lastIndex];
+    if (lastStmt instanceof ExprStmt) {
+      bodyStatements[lastIndex] = new ReturnExpr({ span: lastStmt.span, value: lastStmt.expr });
+    }
+  }
+  const bodyBlock = new BlockStmt({ statements: bodyStatements, span: expr.span });
   const body = await emitStatementBody(bodyBlock);
   const lines = ["{"];
   for (const line of body.lines) {
-    lines.push(`  ${line}`);
+    lines.push(line);
   }
   lines.push("}");
   return lines.join("\n");
@@ -583,6 +609,11 @@ async function emitClassExpression(expr: ClassExpr): Promise<string> {
       lines.push(`  ${methodText}`);
       continue;
     }
+    const classField = await tryEmitClassField(stmt);
+    if (classField) {
+      lines.push(`  ${classField}`);
+      continue;
+    }
     const emitted = await emitStatement(stmt);
     for (const line of emitted.lines) {
       lines.push(`  ${line}`);
@@ -600,6 +631,101 @@ function isIdentifierName(name: string): boolean {
 
 function formatObjectKey(key: string): string {
   return isIdentifierName(key) ? key : JSON.stringify(key);
+}
+
+interface ClassFieldDescriptor {
+  access?: "public" | "protected" | "private";
+  isStatic: boolean;
+  isReadonly: boolean;
+  name: string;
+  initializer?: Expression;
+}
+
+async function tryEmitClassField(stmt: Statement): Promise<string | undefined> {
+  if (!(stmt instanceof ExprStmt)) {
+    return undefined;
+  }
+  const expr = stmt.expr;
+  if (!(expr instanceof CallExpr)) {
+    return undefined;
+  }
+  if (!(expr.callee instanceof Identifier) || expr.callee.name !== "field") {
+    return undefined;
+  }
+  const descriptor = extractClassFieldDescriptor(expr);
+  if (!descriptor) {
+    return undefined;
+  }
+  const initializerText = descriptor.initializer ? await emitExpression(descriptor.initializer) : undefined;
+  const prefix = formatClassFieldModifiers(descriptor);
+  const key = formatClassFieldKey(descriptor.name);
+  const suffix = initializerText ? ` = ${initializerText}` : "";
+  return `${prefix}${key}${suffix};`;
+}
+
+function extractClassFieldDescriptor(expr: CallExpr): ClassFieldDescriptor | undefined {
+  const descriptor: ClassFieldDescriptor = { isStatic: false, isReadonly: false, name: "" };
+  let idx = 0;
+  while (idx < expr.args.length) {
+    const arg = expr.args[idx];
+    if (arg instanceof Identifier) {
+      const modifier = arg.name;
+      if (modifier === "public" || modifier === "protected" || modifier === "private") {
+        if (!descriptor.access) {
+          descriptor.access = modifier as ClassFieldDescriptor["access"];
+        }
+        idx++;
+        continue;
+      }
+      if (modifier === "static") {
+        descriptor.isStatic = true;
+        idx++;
+        continue;
+      }
+      if (modifier === "readonly") {
+        descriptor.isReadonly = true;
+        idx++;
+        continue;
+      }
+    }
+    break;
+  }
+
+  if (idx >= expr.args.length) {
+    return undefined;
+  }
+  const nameArg = expr.args[idx];
+  if (!(nameArg instanceof Literal) || typeof nameArg.value !== "string") {
+    return undefined;
+  }
+  descriptor.name = nameArg.value;
+  idx++;
+
+  if (idx < expr.args.length) {
+    descriptor.initializer = expr.args[idx];
+  }
+  return descriptor;
+}
+
+function formatClassFieldModifiers(descriptor: ClassFieldDescriptor): string {
+  const parts: string[] = [];
+  if (descriptor.access) {
+    parts.push(descriptor.access);
+  }
+  if (descriptor.isStatic) {
+    parts.push("static");
+  }
+  if (descriptor.isReadonly) {
+    parts.push("readonly");
+  }
+  return parts.length > 0 ? `${parts.join(" ")} ` : "";
+}
+
+function formatClassFieldKey(key: string): string {
+  if (isIdentifierName(key)) {
+    return key;
+  }
+  return `[${JSON.stringify(key)}]`;
 }
 
 async function emitTypeField(field: TypeField): Promise<string> {

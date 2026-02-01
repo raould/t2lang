@@ -137,7 +137,7 @@ test("generateCode emits function expressions", async () => {
   const stmt = new ExprStmt({ expr: fn, span: makeSpan("expr") });
   const program = new Program({ body: [stmt], span: makeSpan("program") });
   const result = await generateCode(program);
-  assert.ok(result.tsSource.includes("function"));
+  assert.ok(result.tsSource.includes("=>"));
   assert.ok(result.tsSource.includes("return value;"));
 });
 

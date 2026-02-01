@@ -1,0 +1,800 @@
+
+> phaseA@0.1.0 test
+> npm run build && node ./scripts/run-tests.mjs
+
+
+> phaseA@0.1.0 build
+> tsc --project tsconfig.json
+
+Found 61 test files.
+[32m✔ compilePhaseA parses/serializes/codegens simple let* [90m(36.67879ms)[39m[39m
+[32m✔ compilePhaseA generates for loops [90m(33.355175ms)[39m[39m
+[32m✔ compilePhaseA emits control-flow nesting [90m(11.126563ms)[39m[39m
+[32m✔ compilePhaseA emits prop/index/object/new output [90m(2.728808ms)[39m[39m
+[32m✔ compilePhaseA emits import/export statements [90m(3.066255ms)[39m[39m
+[32m✔ generateCode emits function expressions [90m(1.221873ms)[39m[39m
+[32m✔ compilePhaseA emits type alias definitions [90m(3.663301ms)[39m[39m
+[32m✔ generateCode emits async generator with type params [90m(0.745967ms)[39m[39m
+[32m✔ empty array [90m(10.045167ms)[39m[39m
+[32m✔ array with numbers [90m(4.991044ms)[39m[39m
+[32m✔ array with strings [90m(5.087432ms)[39m[39m
+[32m✔ array with mixed types [90m(1.985613ms)[39m[39m
+[32m✔ nested arrays [90m(3.681142ms)[39m[39m
+[32m✔ array assigned to variable [90m(5.59132ms)[39m[39m
+[32m✔ empty array [90m(10.377813ms)[39m[39m
+[32m✔ array with numbers [90m(4.926887ms)[39m[39m
+[32m✔ array with strings [90m(4.86732ms)[39m[39m
+[32m✔ array with mixed types [90m(1.373856ms)[39m[39m
+[32m✔ nested arrays [90m(4.316804ms)[39m[39m
+[32m✔ array assigned to variable [90m(5.396957ms)[39m[39m
+[32m✔ simple assignment [90m(25.45639ms)[39m[39m
+[32m✔ assignment to property [90m(10.298572ms)[39m[39m
+[32m✔ assignment to array index [90m(3.744516ms)[39m[39m
+[32m✔ simple for loop [90m(14.603445ms)[39m[39m
+[31m✖ for loop with null init [90m(13.885089ms)[39m[39m
+[31m✖ infinite for loop [90m(9.020123ms)[39m[39m
+[32m✔ array index [90m(1.514548ms)[39m[39m
+[32m✔ nested index [90m(6.290739ms)[39m[39m
+[32m✔ index with expression [90m(6.797841ms)[39m[39m
+[32m✔ new with no args [90m(3.581139ms)[39m[39m
+[32m✔ new with args [90m(5.148785ms)[39m[39m
+[32m✔ new with multiple args [90m(5.901829ms)[39m[39m
+[32m✔ combined usage [90m(17.161705ms)[39m[39m
+[32m✔ simple assignment [90m(13.978499ms)[39m[39m
+[32m✔ assignment to property [90m(14.658329ms)[39m[39m
+[32m✔ assignment to array index [90m(2.866651ms)[39m[39m
+[32m✔ simple for loop [90m(16.228118ms)[39m[39m
+[31m✖ for loop with null init [90m(18.578889ms)[39m[39m
+[31m✖ infinite for loop [90m(4.828467ms)[39m[39m
+[32m✔ array index [90m(4.992316ms)[39m[39m
+[32m✔ nested index [90m(3.833183ms)[39m[39m
+[32m✔ index with expression [90m(3.996243ms)[39m[39m
+[32m✔ new with no args [90m(2.20143ms)[39m[39m
+[32m✔ new with args [90m(2.04883ms)[39m[39m
+[32m✔ new with multiple args [90m(5.040563ms)[39m[39m
+[32m✔ combined usage [90m(4.301828ms)[39m[39m
+[32m✔ block with nested let and call [90m(15.489008ms)[39m[39m
+[32m✔ block with nested let and call [90m(17.74453ms)[39m[39m
+[31m✖ class modifiers end-to-end: compile to JS and run [90m(3.777829ms)[39m[39m
+[31m✖ class field modifiers are emitted in TS output [90m(4.396797ms)[39m[39m
+[31m✖ readonly field is emitted and not enforced by t2lang [90m(4.562873ms)[39m[39m
+[31m✖ various class field modifier combinations are emitted [90m(4.269874ms)[39m[39m
+[31m✖ simple class with field [90m(16.509714ms)[39m[39m
+[32m✔ class with method [90m(12.835578ms)[39m[39m
+[32m✔ class with method params [90m(3.611393ms)[39m[39m
+[31m✖ class with field and method [90m(3.892209ms)[39m[39m
+[31m✖ simple type assert [90m(2.33989ms)[39m[39m
+[31m✖ type assert on expression [90m(1.594676ms)[39m[39m
+[32m✔ throw error [90m(4.758719ms)[39m[39m
+[32m✔ throw variable [90m(2.391386ms)[39m[39m
+[31m✖ simple try-catch [90m(4.37966ms)[39m[39m
+[31m✖ try-catch with finally [90m(6.022235ms)[39m[39m
+[31m✖ try-catch with multiple statements [90m(0.830322ms)[39m[39m
+[31m✖ try-catch with empty catch body still emits catch [90m(2.817813ms)[39m[39m
+[31m✖ simple class with field [90m(21.278204ms)[39m[39m
+[32m✔ class with method [90m(11.338562ms)[39m[39m
+[32m✔ class with method params [90m(3.562517ms)[39m[39m
+[31m✖ class with field and method [90m(4.625112ms)[39m[39m
+[31m✖ simple type assert [90m(2.671261ms)[39m[39m
+[31m✖ type assert on expression [90m(1.44636ms)[39m[39m
+[32m✔ throw error [90m(2.607994ms)[39m[39m
+[32m✔ throw variable [90m(1.546448ms)[39m[39m
+[31m✖ simple try-catch [90m(4.392161ms)[39m[39m
+[31m✖ try-catch with finally [90m(6.582045ms)[39m[39m
+[31m✖ try-catch with multiple statements [90m(0.951636ms)[39m[39m
+[31m✖ try-catch with empty catch body still emits catch [90m(2.343903ms)[39m[39m
+[32m✔ lisp-style semicolon comment [90m(17.173233ms)[39m[39m
+[32m✔ lisp-style inline comment [90m(11.219417ms)[39m[39m
+[32m✔ c-style double-slash comment [90m(8.36075ms)[39m[39m
+[32m✔ c-style block comment [90m(4.229105ms)[39m[39m
+[32m✔ multi-line block comment [90m(4.824035ms)[39m[39m
+[32m✔ mixed comment styles [90m(6.621347ms)[39m[39m
+[32m✔ comment at end of file [90m(5.555924ms)[39m[39m
+[32m✔ lisp-style semicolon comment [90m(26.16769ms)[39m[39m
+[32m✔ lisp-style inline comment [90m(5.838788ms)[39m[39m
+[32m✔ c-style double-slash comment [90m(3.662664ms)[39m[39m
+[32m✔ c-style block comment [90m(2.326776ms)[39m[39m
+[32m✔ multi-line block comment [90m(1.804281ms)[39m[39m
+[32m✔ mixed comment styles [90m(3.042198ms)[39m[39m
+[32m✔ comment at end of file [90m(1.906804ms)[39m[39m
+[32m✔ const binding [90m(17.195535ms)[39m[39m
+[32m✔ const sequential binding - later can reference earlier [90m(6.613067ms)[39m[39m
+[32m✔ const with multiple bindings [90m(4.914552ms)[39m[39m
+[32m✔ let still produces let keyword [90m(2.672818ms)[39m[39m
+[32m✔ const binding [90m(16.647234ms)[39m[39m
+[32m✔ const sequential binding - later can reference earlier [90m(4.820756ms)[39m[39m
+[32m✔ const with multiple bindings [90m(4.929176ms)[39m[39m
+[32m✔ let still produces let keyword [90m(2.81654ms)[39m[39m
+DEBUGOUTPUT_PARSED:SANITY
+
+DEBUGOUTPUT_CODEGEN:SANITY
+
+[31m✖ T2_DEBUG_PARSE prints parsed AST in phase0 [90m(10.443515ms)[39m[39m
+[31m✖ T2_DEBUG_CODEGEN prints codegen output in phase0 [90m(1.934006ms)[39m[39m
+[31m✖ let declaration as expression [90m(22.323861ms)[39m[39m
+[31m✖ let declaration as expression [90m(24.366036ms)[39m[39m
+[31m✖ dotted method invocation emits method call [90m(5.849862ms)[39m[39m
+[32m✔ dumpAst=true emits parse astDump event [90m(12.986082ms)[39m[39m
+[32m✔ dumpAst=false does not emit parse astDump event [90m(5.714327ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/function.test.ts [90m(518.515404ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/function_implicit_return.test.ts [90m(515.039222ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/function_return_type.test.ts [90m(540.277445ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/function_return_type_mismatch.test.ts [90m(489.575014ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/function_tsc.test.ts [90m(565.075836ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/generics.test.ts [90m(537.460889ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/hoisting_scoping.test.ts [90m(506.797288ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/if.test.ts [90m(553.966102ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/if_tsc.test.ts [90m(535.78467ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/lexer_backtick.test.ts [90m(458.719517ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/lexer_errors.test.ts [90m(510.291339ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/lexer_errors_tsc.test.ts [90m(574.274544ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/literals.test.ts [90m(499.852247ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/literals_tsc.test.ts [90m(494.870414ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/object.test.ts [90m(543.88576ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/object_tsc.test.ts [90m(530.857412ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/operators.test.ts [90m(622.021647ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/operators_tsc.test.ts [90m(542.526009ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parse_basic.test.ts [90m(566.476009ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parse_basic_tsc.test.ts [90m(610.84867ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parser_errors.test.ts [90m(528.970364ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parser_errors_tsc.test.ts [90m(551.720874ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/prop.test.ts [90m(544.055742ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/prop_tsc.test.ts [90m(535.570756ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/resolve_errors.test.ts [90m(608.839872ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/resolve_errors_tsc.test.ts [90m(497.342335ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/runCli_flags.test.ts [90m(451.61704ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/type_ast.test.ts [90m(526.95816ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/type_ast_tsc.test.ts [90m(574.790024ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/type_errors.test.ts [90m(538.419756ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/type_errors_tsc.test.ts [90m(532.712903ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/type_parse.test.ts [90m(536.123984ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/type_parse_tsc.test.ts [90m(591.051636ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/while.test.ts [90m(543.263545ms)[39m[39m
+[32m✔ /home/superman/Dev/t2lang2/phaseA/tests/integration/examples/while_tsc.test.ts [90m(603.788557ms)[39m[39m
+[32m✔ parseSource skips comments and preserves original line numbers [90m(4.282246ms)[39m[39m
+[32m✔ parseSource handles for loops [90m(1.572258ms)[39m[39m
+[32m✔ parseSource handles control-flow nesting [90m(2.935947ms)[39m[39m
+[32m✔ parseSource handles prop/index/object/new expressions [90m(1.263285ms)[39m[39m
+[32m✔ parseSource handles import/export statements [90m(2.156458ms)[39m[39m
+[32m✔ parseSource handles type expressions and assertions [90m(3.597165ms)[39m[39m
+[
+  {
+    message: 'T2A:Invalid assignment target',
+    span: { start: 0, end: 0, source: 'phaseA0-tests:lit:lit' },
+    stage: 'parse',
+    code: 'T2:0002'
+  }
+]
+[32m✔ phaseA0 processes literal expressions without diagnostics [90m(2.240379ms)[39m[39m
+[32m✔ phaseA0 allows assignments to identifiers [90m(0.707664ms)[39m[39m
+[32m✔ phaseA0 reports diagnostics for invalid assignment targets [90m(2.370123ms)[39m[39m
+[32m✔ phaseA0 runs let* bindings sequentially [90m(1.174856ms)[39m[39m
+[32m✔ phaseA0 evaluates for-classic loops [90m(0.994726ms)[39m[39m
+[32m✔ phaseA0 handles for-of iterations [90m(0.776228ms)[39m[39m
+[32m✔ phaseA0 inspects switch cases [90m(0.874543ms)[39m[39m
+[32m✔ phaseA0 marches through try/catch/finally [90m(1.837164ms)[39m[39m
+[32m✔ phaseA0 evaluates function bodies with returns [90m(1.233443ms)[39m[39m
+[32m✔ phaseA0 visits class bodies [90m(0.752097ms)[39m[39m
+[32m✔ phaseA1 binds array patterns inside let* [90m(6.007248ms)[39m[39m
+[32m✔ phaseA1 supports object pattern bindings [90m(0.771928ms)[39m[39m
+[32m✔ phaseA1 visits spread expressions inside arrays [90m(0.636238ms)[39m[39m
+[32m✔ phaseA1 evaluates ternary expressions [90m(0.569018ms)[39m[39m
+[32m✔ phaseA1 registers import bindings [90m(0.579781ms)[39m[39m
+[32m✔ phaseA1 processes export statements [90m(0.42633ms)[39m[39m
+[32m✔ phaseA1 handles type aliases with parameters [90m(0.759187ms)[39m[39m
+[32m✔ phaseA1 processes interface definitions [90m(0.400619ms)[39m[39m
+[32m✔ phaseA1 accepts typed functions and asserts [90m(0.75028ms)[39m[39m
+[32m✔ phaseA1 traverses decorator-rich classes [90m(0.964368ms)[39m[39m
+[32m✔ serialize program with literal expression [90m(2.393386ms)[39m[39m
+[32m✔ serialize for-of with array pattern binding [90m(0.841124ms)[39m[39m
+[32m✔ serialize/deserialize roundtrip preserves AST shape [90m(0.856142ms)[39m[39m
+[34mℹ tests 169[39m
+[34mℹ suites 0[39m
+[34mℹ pass 140[39m
+[34mℹ fail 29[39m
+[34mℹ cancelled 0[39m
+[34mℹ skipped 0[39m
+[34mℹ todo 0[39m
+[34mℹ duration_ms 5526.835772[39m
+
+[31m✖ failing tests:[39m
+
+test at tests/integration/examples/assign_for_index_new.test.ts:7:245
+[31m✖ for loop with null init [90m(13.885089ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /for \(;/. Input:
+  
+  'void (() => {\n' +
+    '  let i = 0;\n' +
+    '  let foo = function() {\n' +
+    '  null;\n' +
+    '};\n' +
+    '  for (null; (i < 10); i = (i + 1)) {\n' +
+    '    foo;\n' +
+    '  }\n' +
+    '})();'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/assign_for_index_new.test.ts:51:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'void (() => {\n  let i = 0;\n  let foo = function() {\n  null;\n};\n  for (null; (i < 10); i = (i + 1)) {\n    foo;\n  }\n})();',
+    expected: /for \(;/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/assign_for_index_new.test.ts:7:578
+[31m✖ infinite for loop [90m(9.020123ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /for \(; ; \)/. Input:
+  
+  'void (() => {\n' +
+    '  let foo = function() {\n' +
+    '  null;\n' +
+    '};\n' +
+    '  for (null; null; null) {\n' +
+    '    foo;\n' +
+    '  }\n' +
+    '})();'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/assign_for_index_new.test.ts:58:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'void (() => {\n  let foo = function() {\n  null;\n};\n  for (null; null; null) {\n    foo;\n  }\n})();',
+    expected: /for \(; ; \)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/assign_for_index_new_tsc.test.ts:7:260
+[31m✖ for loop with null init [90m(18.578889ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /for \(;/. Input:
+  
+  'void (() => {\n' +
+    '  let i = 0;\n' +
+    '  let foo = function() {\n' +
+    '  null;\n' +
+    '};\n' +
+    '  for (null; (i < 10); i = (i + 1)) {\n' +
+    '    foo;\n' +
+    '  }\n' +
+    '})();'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/assign_for_index_new_tsc.test.ts:53:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'void (() => {\n  let i = 0;\n  let foo = function() {\n  null;\n};\n  for (null; (i < 10); i = (i + 1)) {\n    foo;\n  }\n})();',
+    expected: /for \(;/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/assign_for_index_new_tsc.test.ts:7:608
+[31m✖ infinite for loop [90m(4.828467ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /for \(; ; \)/. Input:
+  
+  'void (() => {\n' +
+    '  let foo = function() {\n' +
+    '  null;\n' +
+    '};\n' +
+    '  for (null; null; null) {\n' +
+    '    foo;\n' +
+    '  }\n' +
+    '})();'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/assign_for_index_new_tsc.test.ts:60:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'void (() => {\n  let foo = function() {\n  null;\n};\n  for (null; null; null) {\n    foo;\n  }\n})();',
+    expected: /for \(; ; \)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/class_modifiers_e2e.test.ts:1:641
+[31m✖ class modifiers end-to-end: compile to JS and run [90m(3.777829ms)[39m[39m
+  Error: class-body must start with (class-body ...)
+      at Parser.buildClassBody (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1077:13)
+      at Parser.buildClass (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1071:23)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:384:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+      at Parser.parseProgram (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:41)
+      at parseSource (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1955:17)
+      at compilePhaseA (/home/superman/Dev/t2lang2/phaseA/src/api.ts:107:31)
+      at async compilePhase0 (/home/superman/Dev/t2lang2/phaseA/src/api.ts:142:18)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_modifiers_e2e.test.ts:34:18)
+
+test at tests/integration/examples/class_modifiers_emit.test.ts:1:105
+[31m✖ class field modifiers are emitted in TS output [90m(4.396797ms)[39m[39m
+  Error: class-body must start with (class-body ...)
+      at Parser.buildClassBody (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1077:13)
+      at Parser.buildClass (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1071:23)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:384:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+      at Parser.parseProgram (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:41)
+      at parseSource (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1955:17)
+      at compilePhaseA (/home/superman/Dev/t2lang2/phaseA/src/api.ts:107:31)
+      at async compilePhase0 (/home/superman/Dev/t2lang2/phaseA/src/api.ts:142:18)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_modifiers_emit.test.ts:15:18)
+
+test at tests/integration/examples/class_modifiers_readonly_error.test.ts:1:105
+[31m✖ readonly field is emitted and not enforced by t2lang [90m(4.562873ms)[39m[39m
+  Error: class-body must start with (class-body ...)
+      at Parser.buildClassBody (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1077:13)
+      at Parser.buildClass (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1071:23)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:384:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+      at Parser.parseProgram (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:41)
+      at parseSource (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1955:17)
+      at compilePhaseA (/home/superman/Dev/t2lang2/phaseA/src/api.ts:107:31)
+      at async compilePhase0 (/home/superman/Dev/t2lang2/phaseA/src/api.ts:142:18)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_modifiers_readonly_error.test.ts:14:18)
+
+test at tests/integration/examples/class_modifiers_variations.test.ts:1:105
+[31m✖ various class field modifier combinations are emitted [90m(4.269874ms)[39m[39m
+  Error: class-body must start with (class-body ...)
+      at Parser.buildClassBody (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1077:13)
+      at Parser.buildClass (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1071:23)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:384:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+      at Parser.parseProgram (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:41)
+      at parseSource (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1955:17)
+      at compilePhaseA (/home/superman/Dev/t2lang2/phaseA/src/api.ts:107:31)
+      at async compilePhase0 (/home/superman/Dev/t2lang2/phaseA/src/api.ts:142:18)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_modifiers_variations.test.ts:21:18)
+
+test at tests/integration/examples/class_throw_try.test.ts:1:105
+[31m✖ simple class with field [90m(16.509714ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /name = "John"/. Input:
+  
+  'void (() => {\n  (class Person {\n  field("name", "John");\n});\n})();'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_throw_try.test.ts:20:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'void (() => {\n  (class Person {\n  field("name", "John");\n});\n})();',
+    expected: /name = "John"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/class_throw_try.test.ts:21:219
+[31m✖ class with field and method [90m(3.892209ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /count = 0/. Input:
+  
+  'void (() => {\n' +
+    '  (class Counter {\n' +
+    '  field("count", 0);\n' +
+    '  increment() {\n' +
+    '  this.count = (this.count + 1);\n' +
+    '}\n' +
+    '});\n' +
+    '})();'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_throw_try.test.ts:66:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'void (() => {\n  (class Counter {\n  field("count", 0);\n  increment() {\n  this.count = (this.count + 1);\n}\n});\n})();',
+    expected: /count = 0/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/class_throw_try.test.ts:28:213
+[31m✖ simple type assert [90m(2.33989ms)[39m[39m
+  Error: Unsupported expression kind undefined
+      at serializeExpression (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:204:9)
+      at serializeStatement (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:330:44)
+      at Array.map (<anonymous>)
+      at serializeStatement (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:266:41)
+      at async Promise.all (index 0)
+      at async serializeProgram (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:353:11)
+      at async compilePhase0 (/home/superman/Dev/t2lang2/phaseA/src/api.ts:152:17)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_throw_try.test.ts:72:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/class_throw_try.test.ts:28:451
+[31m✖ type assert on expression [90m(1.594676ms)[39m[39m
+  Error: Unsupported expression kind undefined
+      at serializeExpression (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:204:9)
+      at serializeStatement (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:330:44)
+      at Array.map (<anonymous>)
+      at serializeProgram (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:353:42)
+      at Object.program (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:362:16)
+      at compilePhase0 (/home/superman/Dev/t2lang2/phaseA/src/api.ts:152:37)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_throw_try.test.ts:78:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/class_throw_try.test.ts:28:1187
+[31m✖ simple try-catch [90m(4.37966ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /riskyOp\(\)/. Input:
+  
+  'void (() => {\n' +
+    '  let riskyOp = function() {\n' +
+    '  null;\n' +
+    '};\n' +
+    '  let log = function(x) {\n' +
+    '  x;\n' +
+    '};\n' +
+    '  try {\n' +
+    '    riskyOp;\n' +
+    '  }\n' +
+    '  catch {\n' +
+    '    e;\n' +
+    '    log(e);\n' +
+    '  }\n' +
+    '})();'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_throw_try.test.ts:109:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'void (() => {\n  let riskyOp = function() {\n  null;\n};\n  let log = function(x) {\n  x;\n};\n  try {\n    riskyOp;\n  }\n  catch {\n    e;\n    log(e);\n  }\n})();',
+    expected: /riskyOp\(\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/class_throw_try.test.ts:36:237
+[31m✖ try-catch with finally [90m(6.022235ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /catch \(e\)/. Input:
+  
+  'void (() => {\n' +
+    '  let open = function() {\n' +
+    '  null;\n' +
+    '};\n' +
+    '  let close = function() {\n' +
+    '  null;\n' +
+    '};\n' +
+    '  let log = function(x) {\n' +
+    '  x;\n' +
+    '};\n' +
+    '  try {\n' +
+    '    open;\n' +
+    '  }\n' +
+    '  catch {\n' +
+    '    e;\n' +
+    '    log(e);\n' +
+    '  }\n' +
+    '  finally {\n' +
+    '    close;\n' +
+    '  }\n' +
+    '})();'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_throw_try.test.ts:129:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'void (() => {\n  let open = function() {\n  null;\n};\n  let close = function() {\n  null;\n};\n  let log = function(x) {\n  x;\n};\n  try {\n    open;\n  }\n  catch {\n    e;\n    log(e);\n  }\n  finally {\n    close;\n  }\n})();',
+    expected: /catch \(e\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/class_throw_try.test.ts:47:237
+[31m✖ try-catch with multiple statements [90m(0.830322ms)[39m[39m
+  Error: Unknown try child step2
+      at Parser.buildTry (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:909:13)
+      at Parser.nodeToExpression (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:738:21)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:400:38)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:425:74)
+      at Array.map (<anonymous>)
+      at Parser.buildLetStar (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:425:54)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:345:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+      at Parser.parseProgram (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:41)
+
+test at tests/integration/examples/class_throw_try.test.ts:59:240
+[31m✖ try-catch with empty catch body still emits catch [90m(2.817813ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /catch \(e\)/. Input:
+  
+  'void (() => {\n' +
+    '  let risky = function() {\n' +
+    '  null;\n' +
+    '};\n' +
+    '  try {\n' +
+    '    risky;\n' +
+    '  }\n' +
+    '  catch {\n' +
+    '    e;\n' +
+    '  }\n' +
+    '})();'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_throw_try.test.ts:165:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'void (() => {\n  let risky = function() {\n  null;\n};\n  try {\n    risky;\n  }\n  catch {\n    e;\n  }\n})();',
+    expected: /catch \(e\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/class_throw_try_tsc.test.ts:1:291
+[31m✖ simple class with field [90m(21.278204ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /name = "John"/. Input:
+  
+  'void (() => {\n  (class Person {\n  field("name", "John");\n});\n})();'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_throw_try_tsc.test.ts:22:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'void (() => {\n  (class Person {\n  field("name", "John");\n});\n})();',
+    expected: /name = "John"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/class_throw_try_tsc.test.ts:21:234
+[31m✖ class with field and method [90m(4.625112ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /count = 0/. Input:
+  
+  'void (() => {\n' +
+    '  (class Counter {\n' +
+    '  field("count", 0);\n' +
+    '  increment() {\n' +
+    '  this.count = (this.count + 1);\n' +
+    '}\n' +
+    '});\n' +
+    '})();'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_throw_try_tsc.test.ts:68:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'void (() => {\n  (class Counter {\n  field("count", 0);\n  increment() {\n  this.count = (this.count + 1);\n}\n});\n})();',
+    expected: /count = 0/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/class_throw_try_tsc.test.ts:28:228
+[31m✖ simple type assert [90m(2.671261ms)[39m[39m
+  Error: Unsupported expression kind undefined
+      at serializeExpression (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:204:9)
+      at serializeStatement (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:330:44)
+      at Array.map (<anonymous>)
+      at serializeStatement (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:266:41)
+      at async Promise.all (index 0)
+      at async serializeProgram (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:353:11)
+      at async compilePhase0 (/home/superman/Dev/t2lang2/phaseA/src/api.ts:152:17)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_throw_try_tsc.test.ts:74:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/class_throw_try_tsc.test.ts:28:473
+[31m✖ type assert on expression [90m(1.44636ms)[39m[39m
+  Error: Unsupported expression kind undefined
+      at serializeExpression (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:204:9)
+      at serializeStatement (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:330:44)
+      at Array.map (<anonymous>)
+      at serializeProgram (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:353:42)
+      at Object.program (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:362:16)
+      at compilePhase0 (/home/superman/Dev/t2lang2/phaseA/src/api.ts:152:37)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_throw_try_tsc.test.ts:80:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/class_throw_try_tsc.test.ts:28:1230
+[31m✖ simple try-catch [90m(4.392161ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /riskyOp\(\)/. Input:
+  
+  'void (() => {\n' +
+    '  let riskyOp = function() {\n' +
+    '  null;\n' +
+    '};\n' +
+    '  let log = function(x) {\n' +
+    '  x;\n' +
+    '};\n' +
+    '  try {\n' +
+    '    riskyOp;\n' +
+    '  }\n' +
+    '  catch {\n' +
+    '    e;\n' +
+    '    log(e);\n' +
+    '  }\n' +
+    '})();'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_throw_try_tsc.test.ts:111:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'void (() => {\n  let riskyOp = function() {\n  null;\n};\n  let log = function(x) {\n  x;\n};\n  try {\n    riskyOp;\n  }\n  catch {\n    e;\n    log(e);\n  }\n})();',
+    expected: /riskyOp\(\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/class_throw_try_tsc.test.ts:36:244
+[31m✖ try-catch with finally [90m(6.582045ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /catch \(e\)/. Input:
+  
+  'void (() => {\n' +
+    '  let open = function() {\n' +
+    '  null;\n' +
+    '};\n' +
+    '  let close = function() {\n' +
+    '  null;\n' +
+    '};\n' +
+    '  let log = function(x) {\n' +
+    '  x;\n' +
+    '};\n' +
+    '  try {\n' +
+    '    open;\n' +
+    '  }\n' +
+    '  catch {\n' +
+    '    e;\n' +
+    '    log(e);\n' +
+    '  }\n' +
+    '  finally {\n' +
+    '    close;\n' +
+    '  }\n' +
+    '})();'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_throw_try_tsc.test.ts:131:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'void (() => {\n  let open = function() {\n  null;\n};\n  let close = function() {\n  null;\n};\n  let log = function(x) {\n  x;\n};\n  try {\n    open;\n  }\n  catch {\n    e;\n    log(e);\n  }\n  finally {\n    close;\n  }\n})();',
+    expected: /catch \(e\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/class_throw_try_tsc.test.ts:47:244
+[31m✖ try-catch with multiple statements [90m(0.951636ms)[39m[39m
+  Error: Unknown try child step2
+      at Parser.buildTry (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:909:13)
+      at Parser.nodeToExpression (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:738:21)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:400:38)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:425:74)
+      at Array.map (<anonymous>)
+      at Parser.buildLetStar (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:425:54)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:345:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+      at Parser.parseProgram (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:41)
+
+test at tests/integration/examples/class_throw_try_tsc.test.ts:59:247
+[31m✖ try-catch with empty catch body still emits catch [90m(2.343903ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /catch \(e\)/. Input:
+  
+  'void (() => {\n' +
+    '  let risky = function() {\n' +
+    '  null;\n' +
+    '};\n' +
+    '  try {\n' +
+    '    risky;\n' +
+    '  }\n' +
+    '  catch {\n' +
+    '    e;\n' +
+    '  }\n' +
+    '})();'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/class_throw_try_tsc.test.ts:167:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'void (() => {\n  let risky = function() {\n  null;\n};\n  try {\n    risky;\n  }\n  catch {\n    e;\n  }\n})();',
+    expected: /catch \(e\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/debug_flags.test.ts:1:105
+[31m✖ T2_DEBUG_PARSE prints parsed AST in phase0 [90m(10.443515ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: expected debug parsed AST output
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/debug_flags.test.ts:18:16)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'SANITY\n',
+    expected: /\[DEBUG\] Parsed AST/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/debug_flags.test.ts:1:680
+[31m✖ T2_DEBUG_CODEGEN prints codegen output in phase0 [90m(1.934006ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: expected debug codegen output
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/debug_flags.test.ts:39:16)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'SANITY\n',
+    expected: /\[DEBUG\] Codegen output/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/decl_basic.test.ts:1:105
+[31m✖ let declaration as expression [90m(22.323861ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'void (() => {\n' +
+  +   '  let foo = function(x) {\n' +
+  +   '  x;\n' +
+  +   '};\n' +
+  +   '  let x = 42;\n' +
+  +   '  foo(x);\n' +
+  +   '})();'
+  - '{\nlet foo = (x) => {\nx;\n};\nlet x = 42;\nfoo(x);\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/decl_basic.test.ts:18:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'void (() => {\n  let foo = function(x) {\n  x;\n};\n  let x = 42;\n  foo(x);\n})();',
+    expected: '{\nlet foo = (x) => {\nx;\n};\nlet x = 42;\nfoo(x);\n}',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/decl_basic_tsc.test.ts:1:291
+[31m✖ let declaration as expression [90m(24.366036ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'void (() => {\n' +
+  +   '  let foo = function(x) {\n' +
+  +   '  x;\n' +
+  +   '};\n' +
+  +   '  let x = 42;\n' +
+  +   '  foo(x);\n' +
+  +   '})();'
+  - '{\nlet foo = (x) => {\nx;\n};\nlet x = 42;\nfoo(x);\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/decl_basic_tsc.test.ts:24:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'void (() => {\n  let foo = function(x) {\n  x;\n};\n  let x = 42;\n  foo(x);\n})();',
+    expected: '{\nlet foo = (x) => {\nx;\n};\nlet x = 42;\nfoo(x);\n}',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/dotted_method.test.ts:1:105
+[31m✖ dotted method invocation emits method call [90m(5.849862ms)[39m[39m
+  Error: class-body must start with (class-body ...)
+      at Parser.buildClassBody (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1077:13)
+      at Parser.buildClass (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1071:23)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:384:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+      at Parser.parseProgram (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:41)
+      at parseSource (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1955:17)
+      at compilePhaseA (/home/superman/Dev/t2lang2/phaseA/src/api.ts:107:31)
+      at async compilePhase0 (/home/superman/Dev/t2lang2/phaseA/src/api.ts:142:18)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/dotted_method.test.ts:25:18)

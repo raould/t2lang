@@ -29,5 +29,7 @@ test("let declaration as expression", async () => {
   const letExpr = ast.body[0];
   assert.strictEqual(letExpr.kind, "let*");
   if (letExpr.kind !== "let*") throw new Error("Expected let");
-  assert.ok(letExpr.bindings[0].name.symbolId);
+  const bindingTarget = letExpr.bindings[0].target;
+  assert.strictEqual(bindingTarget.kind, "identifier");
+  assert.ok(typeof bindingTarget.name === "string");
 });
