@@ -33,7 +33,7 @@ a.b.c
 2.  **Method Calls**: A list `(obj.method args...)` transforms into `(call (prop obj "method") args...)`.
 3.  **Property Access**: A bare atom `obj.prop` transform into `(prop obj "prop")`.
 
-## 2. Infix Operators (Future/WIP) [ ] not yet done!
+## 2. Infix Operators [x]
 
 While Phase A requires prefix operators `(call + a b)`, Phase B aims to support infix expressions for common math and logic.
 
@@ -53,26 +53,12 @@ While Phase A requires prefix operators `(call + a b)`, Phase B aims to support 
 
 * precdence to be exactly javascript's. see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_precedence#table
 
-### Plan for Infix Operator Support
+### Implementation
 
-- [ ] Lexer/Reader extension
-  - [ ] Expand reader.ts so that when it sees tokens like +, -, *, &&, etc., it emits symbol nodes but also tracks their precedence/associativity metadata (or at least exposes the raw token sequence in a form the parser can work with).
-  - [ ] Ensure the reader can differentiate between symbol/infix uses vs. prefix function calls (e.g., ( + a b ) should still be the canonical Phase A call).
-- [ ] Parser (“prec-climbing”) or dedicated rewrite
-  - [ ] Build a precedence table matching JavaScript’s operator list.
-  - [ ] Implement a precedence-climbing parser (or a recursive-descent pass) in rewriter.ts or a new module (infix.ts) that:
-    - [ ] Walks list nodes and, when it detects infix tokens interleaved with operands, rewrites the sequence into nested (call <operator> … ) forms in accordance with precedence and associativity.
-    - [ ] Handles parentheses/brackets to override precedence and supports unary operators.
-    - [ ] Escapes to the existing sugar logic so operators within (call … ) or (prop … ) remain unchanged.
-- [ ] Phase B AST integration
-  - [ ] Ensure the new pass runs after the reader but before lower.ts so every infix expression is normalized when lowering to Phase A nodes.
-  - [ ] Add tests in sugar.test.ts (or equivalent) covering 1 + 2 * 3, logical chains (a && b || c), unary forms (-x), and mixed parentheses.
-- [ ] Lower / Codegen compatibility
-  - [ ] Verify that lower.ts no longer sees infix symbols—only standard (call … ) nodes—so no further changes are required there.
-  - [ ] Add integration / CLI tests (maybe reusing existing Phase B sample programs) to confirm the generated Phase A AST still compiles and runs.
-- [ ] Documentation & SUGAR.md update
-  - [ ] Mark section 2 as implemented once the above passes and add usage details (supported operators, associativity notes).
-  - [ ] Document any limitations (e.g., which operators are implemented, how precedence is resolved).
+- Phase B now rewrites lists that look like `operand operator operand …` into nested `(call <operator> …)` forms using the JavaScript precedence table shown below.
+- The rewrite lives in `phaseB/src/sugar.ts` and runs inside `applySugar`, so `lower.ts` only ever sees canonical `call` nodes and the corresponding operators are never touched again.
+- Supported operators include `+ - * / % << >> >>> < <= > >= in instanceof == != === !== & ^ | && || ??` (see the precedence table below for their ordering and associativity).
+- Regression coverage lives in `phaseB/tests/sugar.test.ts`, which asserts the addition rewrite plus precedence and logical chaining scenarios.
 
 ### Operator Precedence Reference
 

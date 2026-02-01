@@ -145,3 +145,46 @@ test("array literal sugar rewrites to (array ...)", () => {
   assert.strictEqual(values.length, 3);
   assert.deepStrictEqual(values.map((node) => (node.kind === "literal" ? (node as LiteralNode).value : undefined)), [1, 2, 3]);
 });
+
+test("infix addition rewrites to (call + ...)", () => {
+  const nodes = parsePhaseBRaw("(1 + 2)", "infix-add.t2");
+  const root = nodes[0] as PhaseBListNode;
+  const [head, operator, left, right] = root.elements;
+  assert.strictEqual(head.phaseKind, "symbol");
+  assert.strictEqual((head as SymbolNode).name, "call");
+  assert.strictEqual(operator.phaseKind, "symbol");
+  assert.strictEqual((operator as SymbolNode).name, "+");
+  assert.strictEqual(left.phaseKind, "literal");
+  assert.strictEqual((left as LiteralNode).value, 1);
+  assert.strictEqual(right.phaseKind, "literal");
+  assert.strictEqual((right as LiteralNode).value, 2);
+});
+
+test("infix expressions respect operator precedence", () => {
+  const nodes = parsePhaseBRaw("(1 + 2 * 3)", "infix-order.t2");
+  const root = nodes[0] as PhaseBListNode;
+  const [, plus, left, right] = root.elements;
+  assert.strictEqual((plus as SymbolNode).name, "+");
+  assert.strictEqual((left as LiteralNode).value, 1);
+  assert.strictEqual(right.phaseKind, "list");
+  const nested = right as PhaseBListNode;
+  const [, multiply, mulLeft, mulRight] = nested.elements;
+  assert.strictEqual((multiply as SymbolNode).name, "*");
+  assert.strictEqual((mulLeft as LiteralNode).value, 2);
+  assert.strictEqual((mulRight as LiteralNode).value, 3);
+});
+
+test("logical infix chains retain short-circuit grouping", () => {
+  const nodes = parsePhaseBRaw("(a && b || c)", "infix-logical.t2");
+  const root = nodes[0] as PhaseBListNode;
+  const [, orSymbol, left, right] = root.elements;
+  assert.strictEqual((orSymbol as SymbolNode).name, "||");
+  assert.strictEqual(right.phaseKind, "symbol");
+  assert.strictEqual((right as SymbolNode).name, "c");
+  assert.strictEqual(left.phaseKind, "list");
+  const guard = left as PhaseBListNode;
+  const [, andSymbol, andLeft, andRight] = guard.elements;
+  assert.strictEqual((andSymbol as SymbolNode).name, "&&");
+  assert.strictEqual((andLeft as SymbolNode).name, "a");
+  assert.strictEqual((andRight as SymbolNode).name, "b");
+});

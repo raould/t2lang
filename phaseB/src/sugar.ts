@@ -48,7 +48,9 @@ function rewriteList(node: PhaseBListNode): PhaseBNode {
   }
 
   const rewrittenElements = elements.map(rewriteNode);
-  return { ...node, elements: rewrittenElements };
+  const rewrittenList: PhaseBListNode = { ...node, elements: rewrittenElements };
+  const infixRewritten = rewriteInfixExpression(rewrittenList);
+  return infixRewritten ?? rewrittenList;
 }
 
 function rewriteFunctionParams(node: PhaseBListNode): PhaseBListNode {
@@ -275,7 +277,7 @@ function createTypeList(name: string, args: PhaseBNode[], loc: SourceLoc): Phase
   return createPhaseBList([createPhaseBSymbol(name, loc), ...args], loc);
 }
 
-function createPhaseBSymbol(name: string, loc: SourceLoc): PhaseBNode {
+function createPhaseBSymbol(name: string, loc: SourceLoc): PhaseBSymbolNode {
   return {
     kind: "symbol",
     name,
@@ -305,4 +307,148 @@ function createPhaseBList(elements: PhaseBNode[], loc: SourceLoc, delimiter: Lis
     loc,
     delimiter,
   };
+}
+
+const INFIX_OPERATOR_TABLE: Record<
+  string,
+  { precedence: number; associativity: "left" | "right" }
+> = {
+  "**": { precedence: 13, associativity: "right" },
+  "*": { precedence: 12, associativity: "left" },
+  "/": { precedence: 12, associativity: "left" },
+  "%": { precedence: 12, associativity: "left" },
+  "+": { precedence: 11, associativity: "left" },
+  "-": { precedence: 11, associativity: "left" },
+  "<<": { precedence: 10, associativity: "left" },
+  ">>": { precedence: 10, associativity: "left" },
+  ">>>": { precedence: 10, associativity: "left" },
+  "<": { precedence: 9, associativity: "left" },
+  "<=": { precedence: 9, associativity: "left" },
+  ">": { precedence: 9, associativity: "left" },
+  ">=": { precedence: 9, associativity: "left" },
+  "in": { precedence: 9, associativity: "left" },
+  "instanceof": { precedence: 9, associativity: "left" },
+  "==": { precedence: 8, associativity: "left" },
+  "!=": { precedence: 8, associativity: "left" },
+  "===": { precedence: 8, associativity: "left" },
+  "!==": { precedence: 8, associativity: "left" },
+  "&": { precedence: 7, associativity: "left" },
+  "^": { precedence: 6, associativity: "left" },
+  "|": { precedence: 5, associativity: "left" },
+  "&&": { precedence: 4, associativity: "left" },
+  "||": { precedence: 3, associativity: "left" },
+  "??": { precedence: 3, associativity: "left" },
+};
+
+interface InfixOperatorDescriptor {
+  operator: PhaseBSymbolNode;
+  precedence: number;
+  associativity: "left" | "right";
+}
+
+function rewriteInfixExpression(node: PhaseBListNode): PhaseBNode | null {
+  const tokenized = extractInfixTokens(node);
+  if (!tokenized) {
+    return null;
+  }
+  const expression = buildInfixExpression(tokenized.operands, tokenized.operators);
+  if (expression.phaseKind === "list") {
+    const rewritten = expression as PhaseBListNode;
+    rewritten.loc = node.loc;
+    rewritten.expansionStack = node.expansionStack;
+    return rewritten;
+  }
+  return expression;
+}
+
+function extractInfixTokens(node: PhaseBListNode): { operands: PhaseBNode[]; operators: InfixOperatorDescriptor[] } | null {
+  if (node.elements.length < 3) {
+    return null;
+  }
+  const operands: PhaseBNode[] = [];
+  const operators: InfixOperatorDescriptor[] = [];
+  let expectOperand = true;
+  for (const element of node.elements) {
+    if (expectOperand) {
+      operands.push(element);
+      expectOperand = false;
+      continue;
+    }
+    const operator = getOperatorInfo(element);
+    if (!operator) {
+      return null;
+    }
+    operators.push(operator);
+    expectOperand = true;
+  }
+  if (expectOperand || operators.length === 0) {
+    return null;
+  }
+  return { operands, operators };
+}
+
+function buildInfixExpression(operands: PhaseBNode[], operators: InfixOperatorDescriptor[]): PhaseBNode {
+  const operandStack: PhaseBNode[] = [operands[0]];
+  const operatorStack: InfixOperatorDescriptor[] = [];
+  for (let index = 0; index < operators.length; index += 1) {
+    const nextOperator = operators[index];
+    while (operatorStack.length > 0 && shouldReduce(operatorStack[operatorStack.length - 1], nextOperator)) {
+      reduceExpression(operatorStack, operandStack);
+    }
+    operatorStack.push(nextOperator);
+    operandStack.push(operands[index + 1]);
+  }
+  while (operatorStack.length > 0) {
+    reduceExpression(operatorStack, operandStack);
+  }
+  return operandStack[0];
+}
+
+function shouldReduce(top: InfixOperatorDescriptor, next: InfixOperatorDescriptor): boolean {
+  if (top.precedence > next.precedence) {
+    return true;
+  }
+  if (top.precedence < next.precedence) {
+    return false;
+  }
+  return next.associativity === "left";
+}
+
+function reduceExpression(operatorStack: InfixOperatorDescriptor[], operandStack: PhaseBNode[]): void {
+  const operator = operatorStack.pop();
+  const right = operandStack.pop();
+  const left = operandStack.pop();
+  if (!operator || !left || !right) {
+    return;
+  }
+  operandStack.push(createInfixCall(operator, left, right));
+}
+
+function createInfixCall(operator: InfixOperatorDescriptor, left: PhaseBNode, right: PhaseBNode): PhaseBListNode {
+  const loc = mergeNodeLocs(left, operator.operator, right);
+  const callHead = createPhaseBSymbol("call", loc);
+  const callNode = createPhaseBList([callHead, operator.operator, left, right], loc);
+  callNode.expansionStack = operator.operator.expansionStack ?? left.expansionStack ?? right.expansionStack;
+  return callNode;
+}
+
+function mergeNodeLocs(...nodes: PhaseBNode[]): SourceLoc {
+  if (nodes.length === 0) {
+    return { file: "<unknown>", line: 0, column: 0, endLine: 0, endColumn: 0 };
+  }
+  return nodes.slice(1).reduce((acc, node) => mergeLocs(acc, node.loc), nodes[0].loc);
+}
+
+function getOperatorInfo(node: PhaseBNode): InfixOperatorDescriptor | null {
+  if (node.phaseKind !== "symbol") {
+    return null;
+  }
+  const symbol = node as SymbolNode;
+  const entry = INFIX_OPERATOR_TABLE[symbol.name];
+  if (!entry) {
+    return null;
+  }
+  const phaseSymbol = createPhaseBSymbol(symbol.name, symbol.loc);
+  phaseSymbol.expansionStack = symbol.expansionStack;
+  return { operator: phaseSymbol, precedence: entry.precedence, associativity: entry.associativity };
 }
