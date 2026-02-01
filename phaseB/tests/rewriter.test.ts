@@ -18,6 +18,19 @@ test("rewrites assignment sugar into assign", () => {
   assert.strictEqual(source.kind, "symbol");
 });
 
+test("rewrites set! sugar into assign", () => {
+  const nodes = parseSexpr("(set! foo bar)", "rewriter.t2");
+  const rewritten = rewriteAssignments(nodes);
+  assert.strictEqual(rewritten.length, 1);
+  const list = rewritten[0];
+  assert.strictEqual(list.kind, "list");
+  const [head, target, source] = list.elements;
+  assert.strictEqual(head.kind, "symbol");
+  assert.strictEqual((head as SymbolNode).name, "assign");
+  assert.strictEqual(target.kind, "symbol");
+  assert.strictEqual(source.kind, "symbol");
+});
+
 test("keeps other forms untouched", () => {
   const nodes = parseSexpr("(add 1 2)", "rewriter.t2");
   const rewritten = rewriteAssignments(nodes);

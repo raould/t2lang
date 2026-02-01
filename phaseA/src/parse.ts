@@ -40,6 +40,7 @@ import {
   CallExpr,
   ArrayExpr,
   FunctionExpr,
+  CallableKind,
   ClassExpr,
   SpreadExpr,
   TernaryExpr,
@@ -373,6 +374,12 @@ class Parser {
         if (head.value === "fn") {
           return this.buildFunction(node);
         }
+        if (head.value === "lambda") {
+          return this.buildLambda(node);
+        }
+        if (head.value === "method") {
+          return this.buildMethod(node);
+        }
         if (head.value === "class") {
           return this.buildClass(node);
         }
@@ -398,15 +405,22 @@ class Parser {
     const entries = node.elements.slice(1);
     const bindings: Binding[] = [];
     let bodyStartIndex = 0;
-    for (let i = 0; i < entries.length; i++) {
-      const entry = entries[i];
-      if (this.isBindingEntry(entry)) {
-        bindings.push(this.nodeToBinding(entry));
-        bodyStartIndex = i + 1;
-        continue;
+    if (entries.length > 0 && this.isBindingList(entries[0])) {
+      for (const bindingNode of entries[0].elements) {
+        bindings.push(this.nodeToBinding(bindingNode));
       }
-      bodyStartIndex = i;
-      break;
+      bodyStartIndex = 1;
+    } else {
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        if (this.isBindingEntry(entry)) {
+          bindings.push(this.nodeToBinding(entry));
+          bodyStartIndex = i + 1;
+          continue;
+        }
+        bodyStartIndex = i;
+        break;
+      }
     }
     const statements = entries.slice(bodyStartIndex).map((child) => this.nodeToStatement(child));
     return new LetStarExpr({ isConst, bindings, body: statements, span });
@@ -425,6 +439,13 @@ class Parser {
     } catch {
       return false;
     }
+  }
+
+  private isBindingList(node: Node): node is ListNode {
+    if (node.type !== "list" || node.elements.length === 0) {
+      return false;
+    }
+    return node.elements.every((child) => this.isBindingEntry(child));
   }
 
   private buildAssign(node: ListNode): AssignExpr {
@@ -507,9 +528,9 @@ class Parser {
     if (clauseNodes.length > 3) {
       throw new Error("for classic accepts at most init, condition, and update");
     }
-    const init = clauseNodes[0] ? this.nodeToStatement(clauseNodes[0]) : undefined;
-    const condition = clauseNodes[1] ? this.nodeToExpression(clauseNodes[1]) : undefined;
-    const update = clauseNodes[2] ? this.nodeToExpression(clauseNodes[2]) : undefined;
+    const init = clauseNodes[0] && !this.isForClausePlaceholder(clauseNodes[0]) ? this.nodeToStatement(clauseNodes[0]) : undefined;
+    const condition = clauseNodes[1] && !this.isForClausePlaceholder(clauseNodes[1]) ? this.nodeToExpression(clauseNodes[1]) : undefined;
+    const update = clauseNodes[2] && !this.isForClausePlaceholder(clauseNodes[2]) ? this.nodeToExpression(clauseNodes[2]) : undefined;
     const body = this.nodeToStatement(bodyNode);
     return new ForClassic({ init, condition, update, body, span });
   }
@@ -552,6 +573,19 @@ class Parser {
     const iterable = this.nodeToExpression(iterableNode);
     const body = this.nodeToStatement(bodyNode);
     return new ForAwait({ binding, iterable, body, span });
+  }
+
+  private isForClausePlaceholder(node: Node): boolean {
+    if (node.type === "atom" && node.value === "null") {
+      return true;
+    }
+    if (node.type === "atom" && node.value === "_") {
+      return true;
+    }
+    if (node.type === "list" && node.elements.length === 0) {
+      return true;
+    }
+    return false;
   }
 
   private nodeToBinding(node: Node): Binding {
@@ -719,6 +753,9 @@ class Parser {
       if (head.value === "fn") {
         return this.buildFunction(node);
       }
+      if (head.value === "lambda") {
+        return this.buildLambda(node);
+      }
       if (head.value === "class") {
         return this.buildClass(node);
       }
@@ -728,9 +765,6 @@ class Parser {
       if (head.value === "type-app") {
         return this.buildTypeApp(node, (child) => this.nodeToExpression(child));
       }
-    }
-    if (node.elements.length === 1) {
-      return this.nodeToExpression(node.elements[0]);
     }
     const callee = this.nodeToExpression(head);
     const args = node.elements.slice(1).map((child) => this.nodeToExpression(child));
@@ -858,15 +892,32 @@ class Parser {
 
   private buildTry(node: ListNode): TryCatchExpr {
     const span = node.span;
-    const bodyNode = node.elements[1];
-    if (!bodyNode) {
+    const children = node.elements.slice(1);
+    const bodyNodes: Node[] = [];
+    let index = 0;
+
+    while (index < children.length) {
+      const child = children[index];
+      if (child.type === "list" && child.elements.length > 0) {
+        const head = child.elements[0];
+        if (head.type === "atom" && (head.value === "catch" || head.value === "finally")) {
+          break;
+        }
+      }
+      bodyNodes.push(child);
+      index++;
+    }
+
+    if (bodyNodes.length === 0) {
       throw new Error("try requires a body statement");
     }
-    const body = this.nodeToStatement(bodyNode);
+
+    const body = this.buildStatementSequence(bodyNodes, span);
     let catchClause: CatchClause | undefined;
     let finallyClause: FinallyClause | undefined;
-    for (let i = 2; i < node.elements.length; i++) {
-      const child = node.elements[i];
+
+    while (index < children.length) {
+      const child = children[index];
       if (child.type !== "list" || child.elements.length === 0) {
         throw new Error("try child must be catch or finally");
       }
@@ -875,15 +926,21 @@ class Parser {
         throw new Error("try child must start with an atom");
       }
       if (head.value === "catch") {
+        if (catchClause) {
+          throw new Error("try supports at most one catch");
+        }
         catchClause = this.buildCatchClause(child);
-        continue;
-      }
-      if (head.value === "finally") {
+      } else if (head.value === "finally") {
+        if (finallyClause) {
+          throw new Error("try supports at most one finally");
+        }
         finallyClause = this.buildFinallyClause(child);
-        continue;
+      } else {
+        throw new Error(`Unknown try child ${head.value}`);
       }
-      throw new Error(`Unknown try child ${head.value}`);
+      index++;
     }
+
     return new TryCatchExpr({ body, span, catchClause, finallyClause });
   }
 
@@ -938,20 +995,81 @@ class Parser {
   }
 
   private buildFunction(node: ListNode): FunctionExpr {
+    return this.buildCallable(node, "fn");
+  }
+
+  private buildLambda(node: ListNode): FunctionExpr {
+    return this.buildCallable(node, "lambda");
+  }
+
+  private buildMethod(node: ListNode): FunctionExpr {
+    return this.buildCallable(node, "method");
+  }
+
+  private buildCallable(node: ListNode, kind: CallableKind): FunctionExpr {
     const span = node.span;
-    const [, signatureNode, ...rest] = node.elements;
+    let entries = node.elements.slice(1);
+    let async = false;
+    let generator = false;
+    while (entries.length > 0) {
+      const head = entries[0];
+      if (head.type === "atom") {
+        if (head.value === "async") {
+          async = true;
+          entries = entries.slice(1);
+          continue;
+        }
+        if (head.value === "generator") {
+          generator = true;
+          entries = entries.slice(1);
+          continue;
+        }
+      }
+      break;
+    }
+
+    let name: Identifier | undefined;
+    let methodName: string | undefined;
+
+    if (kind === "fn" && entries.length > 0 && entries[0].type === "atom" && entries[0].tokenType === "atom") {
+      name = this.nodeToIdentifier(entries[0], "function name");
+      entries = entries.slice(1);
+    }
+
+    if (kind === "method") {
+      const nameNode = entries[0];
+      if (!nameNode || nameNode.type !== "atom" || nameNode.tokenType !== "string") {
+        throw new Error("method requires a string name");
+      }
+      methodName = nameNode.value;
+      entries = entries.slice(1);
+    }
+
+    const signatureNode = entries[0];
     if (!signatureNode || signatureNode.type !== "list") {
-      throw new Error("fn requires a signature list");
+      throw new Error(`${kind} requires a signature list`);
     }
     const signature = this.parseFnSignature(signatureNode);
-    let entries = rest;
+    entries = entries.slice(1);
+
     let typeParams: TypeParam[] | undefined;
     if (entries.length > 0 && this.isTypeParamsList(entries[0])) {
       typeParams = this.parseTypeParams(entries[0]);
       entries = entries.slice(1);
     }
+
     const body = entries.map((child) => this.nodeToStatement(child));
-    return new FunctionExpr({ signature, body, span, typeParams });
+    return new FunctionExpr({
+      signature,
+      body,
+      span,
+      typeParams,
+      async,
+      generator,
+      callableKind: kind,
+      name,
+      methodName,
+    });
   }
 
   private parseFnSignature(node: ListNode): { parameters: { name: Identifier; typeAnnotation?: TypeNode }[]; returnType?: TypeNode } {
@@ -967,6 +1085,9 @@ class Parser {
   }
 
   private parseFnParam(node: Node): { name: Identifier; typeAnnotation?: TypeNode } {
+    if (node.type === "atom") {
+      return { name: this.nodeToIdentifier(node, "fn param name") };
+    }
     if (node.type !== "list" || node.elements.length === 0) {
       throw new Error("fn param must be a list with a name");
     }
@@ -1093,12 +1214,20 @@ class Parser {
       throw new Error("Export statement must start with an atom");
     }
     if (head.value === "export") {
-      const specNode = node.elements[1];
-      if (!specNode || specNode.type !== "list") {
-        throw new Error("export requires an export-spec list");
+      const entries = node.elements.slice(1);
+      if (entries.length === 0) {
+        throw new Error("export requires at least one spec");
       }
-      const spec = this.parseExportSpec(specNode);
-      return new ExportStmt({ spec, span });
+      const first = entries[0];
+      if (first.type === "list" && first.elements.length > 0) {
+        const specHead = first.elements[0];
+        if (specHead.type === "atom" && specHead.value === "export-spec") {
+          const spec = this.parseExportSpec(first);
+          return new ExportStmt({ spec, span });
+        }
+      }
+      const named: NamedExport[] = entries.map((entry) => this.parseNamedExport(entry));
+      return new ExportStmt({ spec: { named }, span });
     }
     if (head.value === "export-default") {
       const declarationNode = node.elements[1];
@@ -1299,9 +1428,19 @@ class Parser {
     const [, ...rest] = node.elements;
     let binding: Binding | undefined;
     let bodyStartIndex = 1;
-    if (rest.length > 0 && rest[0].type === "list" && rest[0].elements.length <= 2 && this.isBindingCandidate(rest[0])) {
-      binding = this.nodeToBinding(rest[0]);
-      bodyStartIndex = 2;
+    if (rest.length > 0) {
+      const first = rest[0];
+      if (first.type === "atom") {
+        binding = { target: this.nodeToBindingTarget(first) };
+        bodyStartIndex = 2;
+      } else if (
+        first.type === "list" &&
+        first.elements.length <= 2 &&
+        this.isBindingCandidate(first)
+      ) {
+        binding = this.nodeToBinding(first);
+        bodyStartIndex = 2;
+      }
     }
     const bodyNodes = node.elements.slice(bodyStartIndex);
     const body = bodyNodes.map((stmt) => this.nodeToStatement(stmt));

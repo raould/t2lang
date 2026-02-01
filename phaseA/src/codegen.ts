@@ -115,19 +115,30 @@ export async function generateCode(program: Program, config: CompilerConfig = {}
     }
     generatedLine += outputOffset;
   }
-  const wrappedLines = [
-    "void (async () => {",
-    ...lines.map((line) => (line ? `  ${line}` : "")),
-    "})();",
-  ];
+  const requiresAsync = programRequiresAsync(program);
+  let tsLines = lines;
+  let lineShift = 0;
+  if (config.prettyOutput === "pretty") {
+    tsLines = ["{", ...tsLines, "}"];
+    lineShift += 1;
+  }
+  if (requiresAsync) {
+    const wrapperPrefix = "async ";
+    tsLines = [
+      `void (${wrapperPrefix}() => {`,
+      ...tsLines.map((line) => (line ? `  ${line}` : "")),
+      "})();",
+    ];
+    lineShift += 1;
+  }
   const shiftedMappings = mappings.map((mapping) => ({
     ...mapping,
     generated: {
-      line: mapping.generated.line + 1,
+      line: mapping.generated.line + lineShift,
       column: mapping.generated.column,
     },
   }));
-  const tsSource = wrappedLines.join("\n");
+  const tsSource = tsLines.join("\n");
   return { tsSource, mappings: shiftedMappings };
 }
 
@@ -135,6 +146,13 @@ async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
   if (stmt instanceof ExprStmt) {
     if (stmt.expr instanceof TryCatchExpr) {
       return await emitTryCatchStatement(stmt.expr);
+    }
+    if (stmt.expr instanceof ClassExpr) {
+      const text = await emitClassExpression(stmt.expr);
+      return {
+        lines: [text],
+        mappings: [mappingFromSpan(stmt.expr.span, 0)],
+      };
     }
     return {
       lines: [`${await emitExpression(stmt.expr)};`],
@@ -300,16 +318,16 @@ async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
     return { lines: ["export {};"], mappings: [mappingFromSpan(stmt.span, 0)] };
   }
   if (stmt instanceof FunctionExpr) {
-    const text = await emitFunctionExpression(stmt);
+    const text = await emitFunctionExpression(stmt, true);
     return {
-      lines: [`(${text});`],
+      lines: [text],
       mappings: [mappingFromSpan(stmt.span, 0)],
     };
   }
   if (stmt instanceof ClassExpr) {
     const text = await emitClassExpression(stmt);
     return {
-      lines: [`(${text});`],
+      lines: [text],
       mappings: [mappingFromSpan(stmt.span, 0)],
     };
   }
@@ -522,9 +540,20 @@ async function emitExpression(expr: Expression): Promise<string> {
   return "undefined";
 }
 
-async function emitFunctionExpression(expr: FunctionExpr): Promise<string> {
+async function emitFunctionExpression(expr: FunctionExpr, asDeclaration = false): Promise<string> {
   const prefix = expr.async ? "async " : "";
   const generator = expr.generator ? "*" : "";
+  const { typeParams, params, returnAnnotation } = await emitFunctionSignature(expr);
+  const bodyText = await renderFunctionBody(expr);
+  const canUseArrow = !asDeclaration && !expr.generator;
+  if (canUseArrow) {
+    return `${prefix}${typeParams}(${params.join(", ")})${returnAnnotation} => ${bodyText}`;
+  }
+  const namePart = expr.name ? ` ${expr.name.name}` : "";
+  return `${prefix}function${generator}${namePart}${typeParams}(${params.join(", ")})${returnAnnotation} ${bodyText}`;
+}
+
+async function emitFunctionSignature(expr: FunctionExpr): Promise<{ typeParams: string; params: string[]; returnAnnotation: string }> {
   const typeParams = await emitTypeParams(expr.typeParams);
   const params = await Promise.all(
     expr.signature.parameters.map(async (param) => {
@@ -533,14 +562,38 @@ async function emitFunctionExpression(expr: FunctionExpr): Promise<string> {
     })
   );
   const returnAnnotation = expr.signature.returnType ? `: ${await emitTypeNode(expr.signature.returnType)}` : "";
-  const bodyBlock = new BlockStmt({ statements: expr.body, span: expr.span });
-  const body = await emitStatementBody(bodyBlock);
-  const bodyLines = ["{"];
-  for (const line of body.lines) {
-    bodyLines.push(`  ${line}`);
+  return { typeParams, params, returnAnnotation };
+}
+
+async function renderFunctionBody(expr: FunctionExpr): Promise<string> {
+  const bodyStatements = expr.body.slice();
+  if (expr.callableKind === "method" && bodyStatements.length > 0) {
+    const lastIndex = bodyStatements.length - 1;
+    const lastStmt = bodyStatements[lastIndex];
+    if (lastStmt instanceof ExprStmt) {
+      bodyStatements[lastIndex] = new ReturnExpr({ span: lastStmt.span, value: lastStmt.expr });
+    }
   }
-  bodyLines.push("}");
-  return `${prefix}function${generator}${typeParams}(${params.join(", ")})${returnAnnotation} ${bodyLines.join("\n")}`;
+  const bodyBlock = new BlockStmt({ statements: bodyStatements, span: expr.span });
+  const body = await emitStatementBody(bodyBlock);
+  const lines = ["{"];
+  for (const line of body.lines) {
+    lines.push(line);
+  }
+  lines.push("}");
+  return lines.join("\n");
+}
+
+async function emitMethodDefinition(expr: FunctionExpr): Promise<string> {
+  if (!expr.methodName) {
+    throw new Error("method requires a name");
+  }
+  const { typeParams, params, returnAnnotation } = await emitFunctionSignature(expr);
+  const bodyText = await renderFunctionBody(expr);
+  const prefix = expr.async ? "async " : "";
+  const generator = expr.generator ? "*" : "";
+  const key = formatObjectKey(expr.methodName);
+  return `${prefix}${generator}${key}${typeParams}(${params.join(", ")})${returnAnnotation} ${bodyText}`;
 }
 
 async function emitClassExpression(expr: ClassExpr): Promise<string> {
@@ -551,6 +604,16 @@ async function emitClassExpression(expr: ClassExpr): Promise<string> {
     : "";
   const lines: string[] = [`class${name}${extendsClause}${implementsClause} {`];
   for (const stmt of expr.body.statements) {
+    if (stmt instanceof FunctionExpr && stmt.callableKind === "method") {
+      const methodText = await emitMethodDefinition(stmt);
+      lines.push(`  ${methodText}`);
+      continue;
+    }
+    const classField = await tryEmitClassField(stmt);
+    if (classField) {
+      lines.push(`  ${classField}`);
+      continue;
+    }
     const emitted = await emitStatement(stmt);
     for (const line of emitted.lines) {
       lines.push(`  ${line}`);
@@ -568,6 +631,101 @@ function isIdentifierName(name: string): boolean {
 
 function formatObjectKey(key: string): string {
   return isIdentifierName(key) ? key : JSON.stringify(key);
+}
+
+interface ClassFieldDescriptor {
+  access?: "public" | "protected" | "private";
+  isStatic: boolean;
+  isReadonly: boolean;
+  name: string;
+  initializer?: Expression;
+}
+
+async function tryEmitClassField(stmt: Statement): Promise<string | undefined> {
+  if (!(stmt instanceof ExprStmt)) {
+    return undefined;
+  }
+  const expr = stmt.expr;
+  if (!(expr instanceof CallExpr)) {
+    return undefined;
+  }
+  if (!(expr.callee instanceof Identifier) || expr.callee.name !== "field") {
+    return undefined;
+  }
+  const descriptor = extractClassFieldDescriptor(expr);
+  if (!descriptor) {
+    return undefined;
+  }
+  const initializerText = descriptor.initializer ? await emitExpression(descriptor.initializer) : undefined;
+  const prefix = formatClassFieldModifiers(descriptor);
+  const key = formatClassFieldKey(descriptor.name);
+  const suffix = initializerText ? ` = ${initializerText}` : "";
+  return `${prefix}${key}${suffix};`;
+}
+
+function extractClassFieldDescriptor(expr: CallExpr): ClassFieldDescriptor | undefined {
+  const descriptor: ClassFieldDescriptor = { isStatic: false, isReadonly: false, name: "" };
+  let idx = 0;
+  while (idx < expr.args.length) {
+    const arg = expr.args[idx];
+    if (arg instanceof Identifier) {
+      const modifier = arg.name;
+      if (modifier === "public" || modifier === "protected" || modifier === "private") {
+        if (!descriptor.access) {
+          descriptor.access = modifier as ClassFieldDescriptor["access"];
+        }
+        idx++;
+        continue;
+      }
+      if (modifier === "static") {
+        descriptor.isStatic = true;
+        idx++;
+        continue;
+      }
+      if (modifier === "readonly") {
+        descriptor.isReadonly = true;
+        idx++;
+        continue;
+      }
+    }
+    break;
+  }
+
+  if (idx >= expr.args.length) {
+    return undefined;
+  }
+  const nameArg = expr.args[idx];
+  if (!(nameArg instanceof Literal) || typeof nameArg.value !== "string") {
+    return undefined;
+  }
+  descriptor.name = nameArg.value;
+  idx++;
+
+  if (idx < expr.args.length) {
+    descriptor.initializer = expr.args[idx];
+  }
+  return descriptor;
+}
+
+function formatClassFieldModifiers(descriptor: ClassFieldDescriptor): string {
+  const parts: string[] = [];
+  if (descriptor.access) {
+    parts.push(descriptor.access);
+  }
+  if (descriptor.isStatic) {
+    parts.push("static");
+  }
+  if (descriptor.isReadonly) {
+    parts.push("readonly");
+  }
+  return parts.length > 0 ? `${parts.join(" ")} ` : "";
+}
+
+function formatClassFieldKey(key: string): string {
+  if (isIdentifierName(key)) {
+    return key;
+  }
+  return `[${JSON.stringify(key)}]`;
 }
 
 async function emitTypeField(field: TypeField): Promise<string> {
@@ -878,6 +1036,170 @@ function mappingFromSpan(span: { source: string; startLine?: number; startColumn
     },
     source: span.source,
   };
+}
+
+function programRequiresAsync(program: Program): boolean {
+  return program.body.some((stmt) => containsAsyncStatement(stmt));
+}
+
+function containsAsyncStatement(stmt: Statement): boolean {
+  if (stmt instanceof ForAwait) {
+    return true;
+  }
+  if (stmt instanceof ExprStmt) {
+    return containsAsyncExpression(stmt.expr);
+  }
+  if (stmt instanceof LetStarExpr) {
+    if (stmt.bindings.some((binding) => binding.init && containsAsyncExpression(binding.init))) {
+      return true;
+    }
+    return stmt.body.some((inner) => containsAsyncStatement(inner));
+  }
+  if (stmt instanceof AssignExpr) {
+    return containsAsyncExpression(stmt.target) || containsAsyncExpression(stmt.value);
+  }
+  if (stmt instanceof ReturnExpr) {
+    return stmt.value ? containsAsyncExpression(stmt.value) : false;
+  }
+  if (stmt instanceof IfStmt) {
+    if (containsAsyncExpression(stmt.test)) {
+      return true;
+    }
+    if (containsAsyncStatement(stmt.consequent)) {
+      return true;
+    }
+    return stmt.alternate ? containsAsyncStatement(stmt.alternate) : false;
+  }
+  if (stmt instanceof WhileStmt) {
+    return containsAsyncExpression(stmt.condition) || containsAsyncStatement(stmt.body);
+  }
+  if (stmt instanceof BlockStmt) {
+    return stmt.statements.some((inner) => containsAsyncStatement(inner));
+  }
+  if (stmt instanceof ForClassic) {
+    if (stmt.init && containsAsyncStatement(stmt.init)) {
+      return true;
+    }
+    if (stmt.condition && containsAsyncExpression(stmt.condition)) {
+      return true;
+    }
+    if (stmt.update && containsAsyncExpression(stmt.update)) {
+      return true;
+    }
+    return containsAsyncStatement(stmt.body);
+  }
+  if (stmt instanceof ForOf) {
+    if (stmt.binding.init && containsAsyncExpression(stmt.binding.init)) {
+      return true;
+    }
+    if (containsAsyncExpression(stmt.iterable)) {
+      return true;
+    }
+    return containsAsyncStatement(stmt.body);
+  }
+  if (stmt instanceof SwitchStmt) {
+    if (containsAsyncExpression(stmt.discriminant)) {
+      return true;
+    }
+    for (const c of stmt.cases) {
+      if (c.test && containsAsyncExpression(c.test)) {
+        return true;
+      }
+      if (c.consequent.some((inner) => containsAsyncStatement(inner))) {
+        return true;
+      }
+    }
+    return false;
+  }
+  if (stmt instanceof FunctionExpr || stmt instanceof ClassExpr) {
+    return containsAsyncExpression(stmt as Expression);
+  }
+  return false;
+}
+
+function containsAsyncExpression(expr: Expression): boolean {
+  if (expr instanceof AwaitExpr) {
+    return true;
+  }
+  if (expr instanceof CallExpr) {
+    if (containsAsyncExpression(expr.callee)) {
+      return true;
+    }
+    return expr.args.some((arg) => containsAsyncExpression(arg));
+  }
+  if (expr instanceof ArrayExpr) {
+    return expr.elements.some((element) => containsAsyncExpression(element));
+  }
+  if (expr instanceof SpreadExpr) {
+    return containsAsyncExpression(expr.expr);
+  }
+  if (expr instanceof ObjectExpr) {
+    return expr.fields.some((field) => containsAsyncExpression(field.value));
+  }
+  if (expr instanceof NewExpr) {
+    if (containsAsyncExpression(expr.callee)) {
+      return true;
+    }
+    return expr.args.some((arg) => containsAsyncExpression(arg));
+  }
+  if (expr instanceof ThrowExpr) {
+    return containsAsyncExpression(expr.argument);
+  }
+  if (expr instanceof PropExpr) {
+    return containsAsyncExpression(expr.object);
+  }
+  if (expr instanceof IndexExpr) {
+    return containsAsyncExpression(expr.object) || containsAsyncExpression(expr.index);
+  }
+  if (expr instanceof TernaryExpr) {
+    return (
+      containsAsyncExpression(expr.test) ||
+      containsAsyncExpression(expr.consequent) ||
+      containsAsyncExpression(expr.alternate)
+    );
+  }
+  if (expr instanceof YieldExpr && expr.argument) {
+    return containsAsyncExpression(expr.argument);
+  }
+  if (expr instanceof TypeAssertExpr) {
+    return containsAsyncExpression(expr.expr);
+  }
+  if (expr instanceof TypeApp) {
+    if (!isTypeNodeValue(expr.expr)) {
+      if (containsAsyncExpression(expr.expr as Expression)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  if (expr instanceof FunctionExpr) {
+    return expr.body.some((inner) => containsAsyncStatement(inner));
+  }
+  if (expr instanceof ClassExpr) {
+    if (expr.body.statements.some((inner) => containsAsyncStatement(inner))) {
+      return true;
+    }
+    if (expr.constructorStmt && containsAsyncStatement(expr.constructorStmt)) {
+      return true;
+    }
+    if (expr.staticBlocks && expr.staticBlocks.some((block) => containsAsyncStatement(block))) {
+      return true;
+    }
+    return false;
+  }
+  if (expr instanceof TryCatchExpr) {
+    if (containsAsyncStatement(expr.body)) {
+      return true;
+    }
+    if (expr.catchClause && expr.catchClause.body.some((inner) => containsAsyncStatement(inner))) {
+      return true;
+    }
+    if (expr.finallyClause && expr.finallyClause.body.some((inner) => containsAsyncStatement(inner))) {
+      return true;
+    }
+    return false;
+  }
+  return false;
 }
  
 const OPERATOR_SYMBOLS: Record<string, string> = {

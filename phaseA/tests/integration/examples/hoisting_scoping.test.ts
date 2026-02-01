@@ -7,7 +7,7 @@ const test = ((..._args: unknown[]) => {}) as typeof testBase;
 test("Function declaration is visible in outer scope", async () => {
   const result = await compilePhase0(`
     (program
-      (fn declaredFunc (x) x)
+      (fn declaredFunc ((x)) x)
       (declaredFunc 1))
   `, { enableTsc: false });
   assert.strictEqual(result.errors.length, 0);
@@ -17,7 +17,7 @@ test("Function declaration is visible in outer scope", async () => {
 test("NFE name is NOT visible in outer scope (should fail resolution)", async () => {
   const result = await compilePhase0(`
     (program
-      (let* ((f (fn nfeName (x) x)))
+      (let* ((f (fn nfeName ((x)) x)))
         (nfeName 1)))
   `, { enableTsc: false });
 
@@ -38,7 +38,7 @@ test("NFE name is NOT visible in outer scope (should fail resolution)", async ()
 test("NFE name IS visible inside function body", async () => {
   const result = await compilePhase0(`
     (program
-      (let* ((factorial (fn fact (n)
+      (let* ((factorial (fn fact ((n))
                           (if n (fact 0) 1))))
         (factorial 5)))
   `, { enableTsc: false });

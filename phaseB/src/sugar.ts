@@ -1,10 +1,17 @@
 import type {
   PhaseBListNode,
   PhaseBNode,
+  PhaseBNodeBase,
   PhaseBTypeAnnotation,
+  PhaseBDottedIdentifier,
   SymbolNode,
+  LiteralNode,
+  ListDelimiter,
 } from "./reader.js";
+type PhaseBSymbolNode = SymbolNode & PhaseBNodeBase & { phaseKind: "symbol" };
+type PhaseBLiteralNode = LiteralNode & PhaseBNodeBase & { phaseKind: "literal"; value: string };
 import type { SourceLoc } from "./location.js";
+import { gensym } from "./gensym.js";
 import { parseTypeExpression, TypeAst } from "./typeExpr.js";
 import { collectAnnotationSegment, mergeLocs, serializePhaseBNode } from "./typeAnnotationUtils.js";
 
@@ -24,6 +31,20 @@ function rewriteNode(node: PhaseBNode): PhaseBNode {
 }
 
 function rewriteList(node: PhaseBListNode): PhaseBNode {
+  if (node.delimiter === "[") {
+    return rewriteList(createArrayLiteral(node));
+  }
+
+  const computedAccess = rewriteComputedAccess(node);
+  if (computedAccess) {
+    return rewriteNode(computedAccess);
+  }
+
+  const optionalCallRewritten = rewriteOptionalCall(node);
+  if (optionalCallRewritten) {
+    return rewriteNode(optionalCallRewritten);
+  }
+
   let elements = node.elements;
   const head = elements[0];
   if (head && isSymbol(head, "fn") && elements[1]?.phaseKind === "list") {
@@ -34,9 +55,20 @@ function rewriteList(node: PhaseBListNode): PhaseBNode {
     elements = [...elements];
     elements[1] = rewriteLetBindings(elements[1] as PhaseBListNode);
   }
+  if (head && isSymbol(head, "object")) {
+    elements = rewriteObjectFields(elements);
+  }
 
   const rewrittenElements = elements.map(rewriteNode);
-  return { ...node, elements: rewrittenElements };
+  const rewrittenList: PhaseBListNode = { ...node, elements: rewrittenElements };
+  const infixRewritten = rewriteInfixExpression(rewrittenList);
+  const baseList = infixRewritten ?? rewrittenList;
+  if (baseList.phaseKind !== "list") {
+    return baseList;
+  }
+  const listNode = baseList as PhaseBListNode;
+  const optionalPropRewritten = rewriteOptionalProperty(listNode);
+  return optionalPropRewritten ?? listNode;
 }
 
 function rewriteFunctionParams(node: PhaseBListNode): PhaseBListNode {
@@ -49,12 +81,12 @@ function rewriteFunctionParams(node: PhaseBListNode): PhaseBListNode {
       const annotationStart = idx + 2;
       const { annotationNode, consumed } = collectAnnotationSegment(node.elements, annotationStart);
       if (annotationNode && consumed > 0) {
-        elements.push(createTypeAnnotationNode(target, colon, annotationNode));
+        elements.push(wrapFunctionParam(createTypeAnnotationNode(target, colon, annotationNode)));
         idx = annotationStart + consumed;
         continue;
       }
     }
-    elements.push(target);
+    elements.push(wrapFunctionParam(target));
     idx += 1;
   }
   return { ...node, elements };
@@ -101,6 +133,104 @@ function rewriteBindingEntry(node: PhaseBListNode): PhaseBListNode {
     idx += 1;
   }
   return { ...node, elements };
+}
+
+function createArrayLiteral(node: PhaseBListNode): PhaseBListNode {
+  const arraySymbol = createPhaseBSymbol("array", node.loc);
+  return createPhaseBList([arraySymbol, ...node.elements], node.loc);
+}
+
+function rewriteComputedAccess(node: PhaseBListNode): PhaseBNode | null {
+  if (node.elements.length !== 2) {
+    return null;
+  }
+  const [head, propertyList] = node.elements;
+  if (!head || head.phaseKind !== "symbol") {
+    return null;
+  }
+  if (!propertyList || propertyList.phaseKind !== "list") {
+    return null;
+  }
+  const propertyListNode = propertyList as PhaseBListNode;
+  const propertyExpr = extractComputedPropertyExpr(propertyListNode);
+  if (!propertyExpr) {
+    return null;
+  }
+  const receiver = stripComputedReceiver(head as PhaseBSymbolNode);
+  const loc = mergeLocs(receiver.loc, propertyExpr.loc);
+  return createPhaseBList([
+    createPhaseBSymbol("index", loc),
+    receiver,
+    propertyExpr,
+  ], loc);
+}
+
+function extractComputedPropertyExpr(propertyList: PhaseBListNode): PhaseBNode | null {
+  if (propertyList.delimiter === "[") {
+    if (propertyList.elements.length !== 1) {
+      return null;
+    }
+    return propertyList.elements[0];
+  }
+  if (propertyList.elements.length !== 2) {
+    return null;
+  }
+  const propertyHead = propertyList.elements[0];
+  if (!propertyHead || !isSymbol(propertyHead, "array")) {
+    return null;
+  }
+  return propertyList.elements[1];
+}
+
+function stripComputedReceiver(symbol: PhaseBSymbolNode): PhaseBSymbolNode {
+  if (!symbol.name.endsWith(".")) {
+    return symbol;
+  }
+  const trimmed = symbol.name.slice(0, -1);
+  const replaced = createPhaseBSymbol(trimmed, symbol.loc);
+  replaced.expansionStack = symbol.expansionStack;
+  return replaced;
+}
+
+function rewriteObjectFields(elements: PhaseBNode[]): PhaseBNode[] {
+  const head = elements[0];
+  if (!head || !isSymbol(head, "object")) {
+    return elements;
+  }
+  const rewritten: PhaseBNode[] = [head];
+  let idx = 1;
+  while (idx < elements.length) {
+    const entry = elements[idx];
+    if (entry.phaseKind === "symbol") {
+      rewritten.push(createShorthandObjectField(entry as PhaseBSymbolNode));
+      idx += 1;
+      continue;
+    }
+    if (isStringLiteral(entry) && idx + 1 < elements.length) {
+      const value = elements[idx + 1];
+      rewritten.push(createStringKeyField(entry as PhaseBLiteralNode, value));
+      idx += 2;
+      continue;
+    }
+    rewritten.push(entry);
+    idx += 1;
+  }
+  return rewritten;
+}
+
+function createShorthandObjectField(symbol: PhaseBSymbolNode): PhaseBListNode {
+  const keyLiteral = createStringLiteral(symbol.name, symbol.loc);
+  const loc = mergeLocs(keyLiteral.loc, symbol.loc);
+  return createPhaseBList([keyLiteral, symbol], loc);
+}
+
+function createStringKeyField(key: PhaseBLiteralNode, value: PhaseBNode): PhaseBListNode {
+  const loc = mergeLocs(key.loc, value.loc);
+  return createPhaseBList([key, value], loc);
+}
+
+function isStringLiteral(node: PhaseBNode): node is PhaseBLiteralNode {
+  return node.phaseKind === "literal" && typeof (node as PhaseBNode & { value: unknown }).value === "string";
 }
 
 function isLetForm(node: PhaseBNode): node is SymbolNode & { phaseKind: "symbol" } {
@@ -217,7 +347,7 @@ function createTypeList(name: string, args: PhaseBNode[], loc: SourceLoc): Phase
   return createPhaseBList([createPhaseBSymbol(name, loc), ...args], loc);
 }
 
-function createPhaseBSymbol(name: string, loc: SourceLoc): PhaseBNode {
+function createPhaseBSymbol(name: string, loc: SourceLoc): PhaseBSymbolNode {
   return {
     kind: "symbol",
     name,
@@ -226,7 +356,7 @@ function createPhaseBSymbol(name: string, loc: SourceLoc): PhaseBNode {
   };
 }
 
-function createLiteralNode(value: string | number | boolean, loc: SourceLoc): PhaseBNode {
+function createLiteralNode(value: string | number | boolean | null, loc: SourceLoc): PhaseBNode {
   return {
     kind: "literal",
     value,
@@ -239,11 +369,480 @@ function createStringLiteral(value: string, loc: SourceLoc): PhaseBNode {
   return createLiteralNode(value, loc);
 }
 
-function createPhaseBList(elements: PhaseBNode[], loc: SourceLoc): PhaseBListNode {
+interface PropertySegment {
+  optional: boolean;
+  loc: SourceLoc;
+  computed: boolean;
+  name?: string;
+  property?: PhaseBNode;
+}
+
+function rewriteOptionalCall(node: PhaseBListNode): PhaseBNode | null {
+  const head = node.elements[0];
+  if (!head) {
+    return null;
+  }
+
+  if (head.phaseKind === "symbol" && hasOptionalIndicator(head)) {
+    if (node.elements.length < 2) {
+      return null;
+    }
+    const [, ...args] = node.elements;
+    const cleanedHead = stripOptionalNode(head);
+    return buildOptionalDirectCall(cleanedHead, args, head.loc);
+  }
+
+  if (!isSymbol(head, "call")) {
+    return null;
+  }
+  const [, callee, ...args] = node.elements;
+  if (!callee) {
+    return null;
+  }
+
+  const chain = collectPropertyChain(callee);
+  if (chain && chain.segments.length > 0) {
+    const last = chain.segments[chain.segments.length - 1];
+    if (!last.computed && last.optional && typeof last.name === "string") {
+      const prefix = chain.segments.slice(0, -1);
+      const objectExpr = buildPropertyChain(chain.base, prefix);
+      return buildOptionalMethodCall(objectExpr, last.name, args, last.loc);
+    }
+  }
+
+  if (isOptionalNode(callee)) {
+    const cleaned = stripOptionalNode(callee);
+    return buildOptionalDirectCall(cleaned, args, callee.loc);
+  }
+
+  return null;
+}
+
+function rewriteOptionalProperty(node: PhaseBListNode): PhaseBNode | null {
+  const head = node.elements[0];
+  if (!head || head.phaseKind !== "symbol") {
+    return null;
+  }
+  const headName = (head as SymbolNode).name;
+  if (headName !== "prop" && headName !== "index") {
+    return null;
+  }
+  const chain = collectPropertyChain(node);
+  if (!chain) {
+    return null;
+  }
+  if (chain.segments.every((segment) => !segment.optional)) {
+    return null;
+  }
+  return buildPropertyChain(chain.base, chain.segments);
+}
+
+function collectPropertyChain(node: PhaseBNode): { base: PhaseBNode; segments: PropertySegment[] } | null {
+  if (!isPropertyList(node)) {
+    return { base: stripOptionalNode(node), segments: [] };
+  }
+  const [, target, property] = node.elements;
+  const nested = collectPropertyChain(target);
+  if (!nested) {
+    return null;
+  }
+  const head = (node.elements[0] as SymbolNode);
+  const computed = head.name === "index";
+  const segment = buildPropertySegment(target, property, computed);
+  return { base: nested.base, segments: [...nested.segments, segment] };
+}
+
+function buildPropertySegment(target: PhaseBNode, property: PhaseBNode, computed: boolean): PropertySegment {
+  const targetOptional = hasOptionalIndicator(target);
+  const loc = property ? mergeLocs(target.loc, property.loc) : target.loc;
+  if (computed) {
+    const propertyOptional = property ? hasOptionalIndicator(property) : false;
+    return {
+      computed: true,
+      property,
+      optional: targetOptional || propertyOptional,
+      loc,
+    };
+  }
+  const { name, optional: propertyOptional } = property ? stripOptionalLiteral(property) : { name: "", optional: false };
+  return {
+    computed: false,
+    name,
+    optional: targetOptional || propertyOptional,
+    loc,
+  };
+}
+
+function buildPropertyChain(base: PhaseBNode, segments: PropertySegment[]): PhaseBNode {
+  return segments.reduce((expr, segment) => {
+    if (segment.computed) {
+      if (!segment.property) {
+        return expr;
+      }
+      if (segment.optional) {
+        return createOptionalIndexAccess(expr, segment.property, segment.loc);
+      }
+      return createIndex(expr, segment.property, segment.loc);
+    }
+    if (segment.optional) {
+      return createOptionalPropertyAccess(expr, segment.name ?? "", segment.loc);
+    }
+    return createProp(expr, segment.name ?? "", segment.loc);
+  }, base);
+}
+
+function createOptionalPropertyAccess(objectExpr: PhaseBNode, propertyName: string, loc: SourceLoc): PhaseBNode {
+  const tmpSymbol = createPhaseBSymbol(gensym("opt_tmp_"), loc);
+  const binding = createPhaseBList([tmpSymbol, objectExpr], loc);
+  const bindingList = createPhaseBList([binding], loc);
+  const condition = createPhaseBList([
+    createPhaseBSymbol("==", loc),
+    tmpSymbol,
+    createLiteralNode(null, loc),
+  ], loc);
+  const fallback = createPhaseBSymbol("undefined", loc);
+  const success = createProp(tmpSymbol, propertyName, loc);
+  const ifExpr = createPhaseBList([
+    createPhaseBSymbol("if", loc),
+    condition,
+    fallback,
+    success,
+  ], loc);
+  return createPhaseBList([
+    createPhaseBSymbol("let*", loc),
+    bindingList,
+    ifExpr,
+  ], loc);
+}
+
+function createProp(objectExpr: PhaseBNode, propertyName: string, loc: SourceLoc): PhaseBListNode {
+  const propSymbol = createPhaseBSymbol("prop", loc);
+  const literal = createStringLiteral(propertyName, loc);
+  return createPhaseBList([propSymbol, objectExpr, literal], loc);
+}
+
+function createIndex(objectExpr: PhaseBNode, propertyExpr: PhaseBNode, loc: SourceLoc): PhaseBListNode {
+  const indexSymbol = createPhaseBSymbol("index", loc);
+  return createPhaseBList([indexSymbol, objectExpr, propertyExpr], loc);
+}
+
+function createOptionalIndexAccess(objectExpr: PhaseBNode, propertyExpr: PhaseBNode, loc: SourceLoc): PhaseBNode {
+  const tmpSymbol = createPhaseBSymbol(gensym("opt_tmp_"), loc);
+  const binding = createPhaseBList([tmpSymbol, objectExpr], loc);
+  const bindingList = createPhaseBList([binding], loc);
+  const condition = createPhaseBList([
+    createPhaseBSymbol("==", loc),
+    tmpSymbol,
+    createLiteralNode(null, loc),
+  ], loc);
+  const fallback = createPhaseBSymbol("undefined", loc);
+  const success = createIndex(tmpSymbol, propertyExpr, loc);
+  const ifExpr = createPhaseBList([
+    createPhaseBSymbol("if", loc),
+    condition,
+    fallback,
+    success,
+  ], loc);
+  return createPhaseBList([
+    createPhaseBSymbol("let*", loc),
+    bindingList,
+    ifExpr,
+  ], loc);
+}
+
+function buildOptionalMethodCall(objectExpr: PhaseBNode, propertyName: string, args: PhaseBNode[], loc: SourceLoc): PhaseBNode {
+  const tmpSymbol = createPhaseBSymbol(gensym("opt_obj_"), loc);
+  const binding = createPhaseBList([tmpSymbol, objectExpr], loc);
+  const bindingList = createPhaseBList([binding], loc);
+  const condition = createPhaseBList([
+    createPhaseBSymbol("==", loc),
+    tmpSymbol,
+    createLiteralNode(null, loc),
+  ], loc);
+  const methodAccess = createProp(tmpSymbol, propertyName, loc);
+  const callWithThis = createPhaseBList([
+    createPhaseBSymbol("call-with-this", loc),
+    methodAccess,
+    tmpSymbol,
+    ...args,
+  ], loc);
+  const ifExpr = createPhaseBList([
+    createPhaseBSymbol("if", loc),
+    condition,
+    createPhaseBSymbol("undefined", loc),
+    callWithThis,
+  ], loc);
+  return createPhaseBList([
+    createPhaseBSymbol("let*", loc),
+    bindingList,
+    ifExpr,
+  ], loc);
+}
+
+function buildOptionalDirectCall(callee: PhaseBNode, args: PhaseBNode[], loc: SourceLoc): PhaseBNode {
+  const tmpSymbol = createPhaseBSymbol(gensym("opt_call_"), loc);
+  const binding = createPhaseBList([tmpSymbol, callee], loc);
+  const bindingList = createPhaseBList([binding], loc);
+  const condition = createPhaseBList([
+    createPhaseBSymbol("==", loc),
+    tmpSymbol,
+    createLiteralNode(null, loc),
+  ], loc);
+  const callExpr = createPhaseBList([createPhaseBSymbol("call", loc), tmpSymbol, ...args], loc);
+  const ifExpr = createPhaseBList([
+    createPhaseBSymbol("if", loc),
+    condition,
+    createPhaseBSymbol("undefined", loc),
+    callExpr,
+  ], loc);
+  return createPhaseBList([
+    createPhaseBSymbol("let*", loc),
+    bindingList,
+    ifExpr,
+  ], loc);
+}
+
+function stripOptionalNode(node: PhaseBNode): PhaseBNode {
+  if (node.phaseKind === "symbol") {
+    const symbol = node as SymbolNode;
+    if (symbol.name.endsWith("?.")) {
+      return createPhaseBSymbol(symbol.name.slice(0, -2), symbol.loc);
+    }
+    if (symbol.name.endsWith("?")) {
+      return createPhaseBSymbol(symbol.name.slice(0, -1), symbol.loc);
+    }
+  }
+  if (node.phaseKind === "literal") {
+    const literal = node as LiteralNode;
+    if (typeof literal.value === "string" && literal.value.endsWith("?")) {
+      return createLiteralNode(literal.value.slice(0, -1), literal.loc);
+    }
+  }
+  if (node.phaseKind === "dotted") {
+    const dotted = node as PhaseBDottedIdentifier;
+    const parts = [...dotted.parts];
+    const last = parts[parts.length - 1];
+    if (last?.endsWith("?")) {
+      parts[parts.length - 1] = last.slice(0, -1);
+    }
+    return { ...dotted, parts };
+  }
+  return node;
+}
+
+function hasOptionalIndicator(node: PhaseBNode): boolean {
+  if (node.phaseKind === "symbol") {
+    const symbolName = (node as SymbolNode).name;
+    return symbolName.endsWith("?") || symbolName.endsWith("?.");
+  }
+  if (node.phaseKind === "literal") {
+    const literal = node as LiteralNode;
+    return typeof literal.value === "string" && literal.value.endsWith("?");
+  }
+  if (node.phaseKind === "dotted") {
+    const dotted = node as PhaseBDottedIdentifier;
+    const last = dotted.parts[dotted.parts.length - 1];
+    return last?.endsWith("?") ?? false;
+  }
+  if (node.phaseKind === "list") {
+    if (isPropertyList(node)) {
+      const property = node.elements[2];
+      if (property && hasOptionalIndicator(property)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function stripOptionalLiteral(node: PhaseBNode): { name: string; optional: boolean } {
+  if (node.phaseKind === "literal") {
+    const literal = node as LiteralNode;
+    if (typeof literal.value === "string" && literal.value.endsWith("?")) {
+      return { name: literal.value.slice(0, -1), optional: true };
+    }
+    if (typeof literal.value === "string") {
+      return { name: literal.value, optional: false };
+    }
+  }
+  const serialized = serializePhaseBNode(node);
+  return { name: serialized ?? "", optional: false };
+}
+
+function isOptionalNode(node: PhaseBNode): boolean {
+  return hasOptionalIndicator(node);
+}
+
+function isPropertyList(node: PhaseBNode): node is PhaseBListNode {
+  if (node.phaseKind !== "list") {
+    return false;
+  }
+  const list = node as PhaseBListNode;
+  const head = list.elements[0];
+  if (!head || head.phaseKind !== "symbol") {
+    return false;
+  }
+  const name = (head as SymbolNode).name;
+  return name === "prop" || name === "index";
+}
+
+function createPhaseBList(elements: PhaseBNode[], loc: SourceLoc, delimiter: ListDelimiter = "("): PhaseBListNode {
   return {
     kind: "list",
     phaseKind: "list",
     elements,
     loc,
+    delimiter,
   };
+}
+
+function wrapFunctionParam(node: PhaseBNode): PhaseBNode {
+  if (node.phaseKind === "list") {
+    return node;
+  }
+  return createPhaseBList([node], node.loc);
+}
+
+export const INFIX_OPERATOR_TABLE: Record<
+  string,
+  { precedence: number; associativity: "left" | "right" }
+> = {
+  "**": { precedence: 16, associativity: "right" },
+  "*": { precedence: 15, associativity: "left" },
+  "/": { precedence: 15, associativity: "left" },
+  "%": { precedence: 15, associativity: "left" },
+  "+": { precedence: 14, associativity: "left" },
+  "-": { precedence: 14, associativity: "left" },
+  "<<": { precedence: 13, associativity: "left" },
+  ">>": { precedence: 13, associativity: "left" },
+  ">>>": { precedence: 13, associativity: "left" },
+  "<": { precedence: 12, associativity: "left" },
+  "<=": { precedence: 12, associativity: "left" },
+  ">": { precedence: 12, associativity: "left" },
+  ">=": { precedence: 12, associativity: "left" },
+  "in": { precedence: 12, associativity: "left" },
+  "instanceof": { precedence: 12, associativity: "left" },
+  "==": { precedence: 11, associativity: "left" },
+  "!=": { precedence: 11, associativity: "left" },
+  "===": { precedence: 11, associativity: "left" },
+  "!==": { precedence: 11, associativity: "left" },
+  "&": { precedence: 10, associativity: "left" },
+  "^": { precedence: 9, associativity: "left" },
+  "|": { precedence: 8, associativity: "left" },
+  "&&": { precedence: 7, associativity: "left" },
+  "||": { precedence: 6, associativity: "left" },
+  "??": { precedence: 5, associativity: "left" },
+};
+
+interface InfixOperatorDescriptor {
+  operator: PhaseBSymbolNode;
+  precedence: number;
+  associativity: "left" | "right";
+}
+
+function rewriteInfixExpression(node: PhaseBListNode): PhaseBNode | null {
+  const tokenized = extractInfixTokens(node);
+  if (!tokenized) {
+    return null;
+  }
+  const expression = buildInfixExpression(tokenized.operands, tokenized.operators);
+  if (expression.phaseKind === "list") {
+    const rewritten = expression as PhaseBListNode;
+    rewritten.loc = node.loc;
+    rewritten.expansionStack = node.expansionStack;
+    return rewritten;
+  }
+  return expression;
+}
+
+function extractInfixTokens(node: PhaseBListNode): { operands: PhaseBNode[]; operators: InfixOperatorDescriptor[] } | null {
+  if (node.elements.length < 3) {
+    return null;
+  }
+  const operands: PhaseBNode[] = [];
+  const operators: InfixOperatorDescriptor[] = [];
+  let expectOperand = true;
+  for (const element of node.elements) {
+    if (expectOperand) {
+      operands.push(element);
+      expectOperand = false;
+      continue;
+    }
+    const operator = getOperatorInfo(element);
+    if (!operator) {
+      return null;
+    }
+    operators.push(operator);
+    expectOperand = true;
+  }
+  if (expectOperand || operators.length === 0) {
+    return null;
+  }
+  return { operands, operators };
+}
+
+function buildInfixExpression(operands: PhaseBNode[], operators: InfixOperatorDescriptor[]): PhaseBNode {
+  const operandStack: PhaseBNode[] = [operands[0]];
+  const operatorStack: InfixOperatorDescriptor[] = [];
+  for (let index = 0; index < operators.length; index += 1) {
+    const nextOperator = operators[index];
+    while (operatorStack.length > 0 && shouldReduce(operatorStack[operatorStack.length - 1], nextOperator)) {
+      reduceExpression(operatorStack, operandStack);
+    }
+    operatorStack.push(nextOperator);
+    operandStack.push(operands[index + 1]);
+  }
+  while (operatorStack.length > 0) {
+    reduceExpression(operatorStack, operandStack);
+  }
+  return operandStack[0];
+}
+
+function shouldReduce(top: InfixOperatorDescriptor, next: InfixOperatorDescriptor): boolean {
+  if (top.precedence > next.precedence) {
+    return true;
+  }
+  if (top.precedence < next.precedence) {
+    return false;
+  }
+  return next.associativity === "left";
+}
+
+function reduceExpression(operatorStack: InfixOperatorDescriptor[], operandStack: PhaseBNode[]): void {
+  const operator = operatorStack.pop();
+  const right = operandStack.pop();
+  const left = operandStack.pop();
+  if (!operator || !left || !right) {
+    return;
+  }
+  operandStack.push(createInfixCall(operator, left, right));
+}
+
+function createInfixCall(operator: InfixOperatorDescriptor, left: PhaseBNode, right: PhaseBNode): PhaseBListNode {
+  const loc = mergeNodeLocs(left, operator.operator, right);
+  const callHead = createPhaseBSymbol("call", loc);
+  const callNode = createPhaseBList([callHead, operator.operator, left, right], loc);
+  callNode.expansionStack = operator.operator.expansionStack ?? left.expansionStack ?? right.expansionStack;
+  return callNode;
+}
+
+function mergeNodeLocs(...nodes: PhaseBNode[]): SourceLoc {
+  if (nodes.length === 0) {
+    return { file: "<unknown>", line: 0, column: 0, endLine: 0, endColumn: 0 };
+  }
+  return nodes.slice(1).reduce((acc, node) => mergeLocs(acc, node.loc), nodes[0].loc);
+}
+
+function getOperatorInfo(node: PhaseBNode): InfixOperatorDescriptor | null {
+  if (node.phaseKind !== "symbol") {
+    return null;
+  }
+  const symbol = node as SymbolNode;
+  const entry = INFIX_OPERATOR_TABLE[symbol.name];
+  if (!entry) {
+    return null;
+  }
+  const phaseSymbol = createPhaseBSymbol(symbol.name, symbol.loc);
+  phaseSymbol.expansionStack = symbol.expansionStack;
+  return { operator: phaseSymbol, precedence: entry.precedence, associativity: entry.associativity };
 }

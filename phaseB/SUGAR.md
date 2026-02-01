@@ -6,11 +6,11 @@
 
 Unlike macros, sugar is often handled at the lexer or parser level, or via structural rewrites that don't involve user-defined code execution.
 
-# 0. set!
+# 0. set! [x]
 
 `set!` should be an alias for `assign`, if the lisp semantics are not too different.
 
-## 1. Dotted Identifiers & Property Access
+## 1. Dotted Identifiers & Property Access [x]
 
 To support standard object-oriented programming patterns without verbose nested `prop` calls.
 
@@ -33,7 +33,7 @@ a.b.c
 2.  **Method Calls**: A list `(obj.method args...)` transforms into `(call (prop obj "method") args...)`.
 3.  **Property Access**: A bare atom `obj.prop` transform into `(prop obj "prop")`.
 
-## 2. Infix Operators (Future/WIP)
+## 2. Infix Operators [x]
 
 While Phase A requires prefix operators `(call + a b)`, Phase B aims to support infix expressions for common math and logic.
 
@@ -51,9 +51,16 @@ While Phase A requires prefix operators `(call + a b)`, Phase B aims to support 
 
 > Phase B fully parenthesizes every rewritten operator expression (so `1 + 2 * 3` yields `(call + 1 (call * 2 3))`) before any formatting step. The emitted TypeScript therefore never relies on Prettier’s precedence handling to preserve semantic order.
 
-*Status: To be implemented via a precedence-climbing parser or a specialized rewrite pass.*
+* precdence to be exactly javascript's. see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_precedence#table
 
-## 3. Literal Shorthands
+### Implementation
+
+- Phase B now rewrites lists that look like `operand operator operand …` into nested `(call <operator> …)` forms using the JavaScript precedence table shown below.
+- The rewrite lives in `phaseB/src/sugar.ts` and runs inside `applySugar`, so `lower.ts` only ever sees canonical `call` nodes and the corresponding operators are never touched again.
+- Supported operators include `+ - * / % << >> >>> < <= > >= in instanceof == != === !== & ^ | && || ??` (see the precedence table below for their ordering and associativity).
+- Regression coverage lives in `phaseB/tests/sugar.test.ts`, which asserts the addition rewrite plus precedence and logical chaining scenarios.
+
+## 3. Literal Shorthands [x]
 
 ### Object Literals
 Allowed to use implicit keys or shorthand syntax.
@@ -85,7 +92,7 @@ Phase B may support `[...]` syntax if the tokenizer handles brackets.
 (array 1 2 3)
 ```
 
-## 4. Binding Forms
+## 4. Binding Forms [x]
 
 Phase B exposes `let`/`const` sugar as parallel bindings, but Phase A only understands the sequential `let*`/`const*` forms. To preserve correct semantics (e.g., `(let ((a b) (b a)) ...)` must swap using the *old* values), Phase B rewrites every `let`/`const` into a `let*` that evaluates every initializer into temporary `gensym` bindings before reassigning the user variables.
 
@@ -135,7 +142,7 @@ This strategy guarantees that every `let`/`const` binding becomes a deterministi
 
 Phase A strictly requires `let*` and `const*` with specific nesting. Phase B allows `let` and `const` which are parallel bindings.
 
-## 5. Assignment Sugar
+## 5. Assignment Sugar [x]
 
 **Sugar**:
 ```lisp
@@ -151,7 +158,7 @@ Phase A strictly requires `let*` and `const*` with specific nesting. Phase B all
 (assign (prop obj "prop") 20)
 ```
 
-## 6. Function Definitions
+## 6. Function Definitions [x]
 
 Support for TypeScript-style parameter lists with colons.
 
@@ -167,7 +174,7 @@ Support for TypeScript-style parameter lists with colons.
 
 Phase B is responsible for parsing the type syntax (`x: T`) and converting it into the `(x T)` tuple structure Phase A expects for named parameters.
 
-## 7. Optional Chaining (Expanded)
+## 7. Optional Chaining (Expanded) [x]
 
 Optional chaining rewrites avoid thunks by nesting `let*` bindings with `if` checks so arguments are never evaluated when the chain short-circuits.
 See [phaseB/ERRORS.md](phaseB/ERRORS.md) for the diagnostics Surface B surfaces when optional chaining sugar is malformed.
@@ -214,6 +221,19 @@ When the callable target is a method access (e.g., `obj.method?.(a, b)`), the re
       (call-with-this tmp-fn tmp-obj a b)))
 ```
 
+### Computed optional access
+
+Computed lookups like `obj?.[key]` share the same guard strategy, but they always rewrite to the `index` primitive so the downstream compiler can handle arbitrary expressions for the key. For example:
+
+```lisp
+(let* ((tmp obj))
+  (if (== tmp null)
+      undefined
+      (index tmp key)))
+```
+
+When the receiver is non-optional (e.g., `obj.[key]`) the sugar simply emits `(index obj key)` without introducing guards.
+
 **Nested chains** `a?.b?.c(x)` introduce one `let*`/`if` per `?.`, short-circuiting to `undefined` at the first nullish value while reusing the previous temporary in the next check.
 
 ### Notes
@@ -223,7 +243,7 @@ When the callable target is a method access (e.g., `obj.method?.(a, b)`), the re
 - Method calls must preserve `this` semantics; emitting `(tmp.call obj args...)` or equivalent Phase A call is acceptable.
 - The base expression (like `getObj()?.method`) is evaluated exactly once because it is bound before the guard.
 
-## 8. Async / Await
+## 8. Async / Await [ ]
 
 **Sugar**:
 ```lisp
@@ -238,7 +258,7 @@ When the callable target is a method access (e.g., `obj.method?.(a, b)`), the re
 Explicit `async` keyword macros or rewrites produce the `FunctionExpr` with `async: true` metadata.
 Additional metadata on the generated `FunctionExpr` indicates it is async so downstream phases can treat `await` appropriately; the canonical form might look like `(fn (x) :async true (return (await ...)))` or similar depending on how Phase A records metadata, but the key point is that the node is decorated with `async: true` rather than requiring a separate sugar form.
 
-## 9. Type Expression Syntax
+## 9. Type Expression Syntax [x]
 
 Phase B parses TypeScript-style type annotations and rewrites them to the structured `t:` nodes documented in [phaseA/TYPES.md](phaseA/TYPES.md).
 
@@ -306,3 +326,10 @@ Phase B parses TypeScript-style type annotations and rewrites them to the struct
 (type-alias "Alias" SomeType')
 (type-alias "Generic" (t:apply (t:ref "Array") (t:var "T")) :type-params ("T"))
 ```
+
+# 10 more precedence and evaluation order testing [ ]
+
+- Precedence in TypeScript, JavaScript, ECMAScript must bes tested. We need to build extensive tests that have JavaScript tests being compard with T2 versions thereof to assert that T2 is not genrating incorrect output. This means generating many small tests in javascript which try to cover precedence + evaluation order + short-circuiting with high sensitivity. Then create a T2 version of the same test. Run the matched .js and .t2 pair and assert the output is the same. (Unfortunately it is a bit of a combinatorial explosion.)
+  - [ ] validate the t2lang precedence implementation matches EVALUATION_PRECEDENCE.json
+  - [ ] implement fully parenthasized type-level precedence. See TYPE_PRECEDENCE.md
+

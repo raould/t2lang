@@ -1,4 +1,4 @@
-import type { ListNode, SExprNode, SymbolNode } from "./reader.js";
+import type { ListNode, SExprNode, SymbolNode, ListDelimiter } from "./reader.js";
 import { gensym } from "./gensym.js";
 
 export function rewriteAssignments(nodes: SExprNode[]): SExprNode[] {
@@ -15,19 +15,18 @@ function rewriteNode(node: SExprNode): SExprNode {
         return methodCall;
       }
     }
-    const rewrittenHead = originalHead ? rewriteNode(originalHead) : undefined;
+    let rewrittenHead = originalHead ? rewriteNode(originalHead) : undefined;
     if (isSymbolNode(rewrittenHead)) {
       const parallel = rewriteParallelBindings(rewrittenHead, rewrittenRest, node.loc);
       if (parallel) {
         return parallel;
       }
     }
-    if (isSymbolNode(rewrittenHead) && rewrittenHead.name === ":=") {
-      const assignSymbol: SymbolNode = {
-        ...rewrittenHead,
-        name: "assign",
-      };
-      return { ...node, elements: [assignSymbol, ...rewrittenRest] };
+    if (isSymbolNode(rewrittenHead)) {
+      const alias = getAliasSymbolName(rewrittenHead.name);
+      if (alias) {
+        rewrittenHead = { ...rewrittenHead, name: alias };
+      }
     }
     const elements = rewrittenHead ? [rewrittenHead, ...rewrittenRest] : rewrittenRest;
     return { ...node, elements };
@@ -50,7 +49,7 @@ function isSymbolNode(node: SExprNode | undefined): node is SymbolNode {
 }
 
 function rewriteMethodCall(head: SymbolNode, args: SExprNode[], loc: SymbolNode["loc"]): SExprNode | null {
-  const parts = head.name.split(".");
+  const parts = normalizeDottedIdentifier(head.name);
   if (parts.length <= 1 || parts.some((part) => part.length === 0)) {
     return null;
   }
@@ -70,11 +69,27 @@ function rewriteMethodCall(head: SymbolNode, args: SExprNode[], loc: SymbolNode[
 }
 
 function rewritePropertyAccess(node: SymbolNode): SExprNode | null {
-  const parts = node.name.split(".");
+  const parts = normalizeDottedIdentifier(node.name);
   if (parts.length <= 1 || parts.some((part) => part.length === 0)) {
     return null;
   }
   return buildPropertyChain(parts, node.loc);
+}
+
+function normalizeDottedIdentifier(name: string): string[] {
+  const parts = name.split(".");
+  if (parts.length > 1 && parts[parts.length - 1] === "") {
+    parts.pop();
+  }
+  return parts;
+}
+
+function getAliasSymbolName(name: string): string | undefined {
+  const mapping: Record<string, string> = {
+    ":=": "assign",
+    "set!": "assign",
+  };
+  return mapping[name];
 }
 
 function rewriteParallelBindings(
@@ -140,6 +155,6 @@ function createStringLiteral(value: string, loc: SymbolNode["loc"]): SExprNode {
   return { kind: "literal", value, loc };
 }
 
-function createList(elements: SExprNode[], loc: SymbolNode["loc"]): ListNode {
-  return { kind: "list", elements, loc };
+function createList(elements: SExprNode[], loc: SymbolNode["loc"], delimiter: ListDelimiter = "("): ListNode {
+  return { kind: "list", elements, loc, delimiter };
 }

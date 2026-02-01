@@ -65,7 +65,7 @@ test("nested operators", async () => {
 test("operators in function", async () => {
   const result = await compilePhase0(`
     (program
-      (fn add (a b)
+      (fn add ((a) (b))
         (return (+ a b))))
   `, { enableTsc: false });
   assert.match(result.tsSource, /return \(a \+ b\)/);

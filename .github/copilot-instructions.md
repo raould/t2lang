@@ -21,5 +21,9 @@
 * Do try to add more small integration tests in the relevant phase0 or phase1 when making changes or adding new features.
 * When making changes, also make sure all phase1/examples build and run correctly.
 * read the "help" text in the CLI (common/src/cliHelper.ts, phase1/src/cli.ts, phase0/src/cli.ts) to understand the intended usage of the compiler.
-* phaseA cannot depend on anything from phase 0 or phase 1 or common. PhaseA cannot depend on anything in t2lang/OLD. if there are features which need to be carried over, they must be re-implemented in phaseA without any kind of dependency on phase0 or phase1. 
-* functions in the compiler pipeline should always be written as "async" even if they don't do anything asynchronous yet. This is to make it easier to add async features later without breaking the API.
+* phaseA cannot depend on anything from phase 0 or phase 1 or common. PhaseA cannot depend on anything in t2lang/OLD. if there are features which need to be carried over, they must be re-implemented in phaseA without any kind of dependency on phase0 or phase1.
+* phaseB cannot depend on anything from phase 0 or phase 1 or common. PhaseB cannot depend on anything in t2lang/OLD. if there are features which need to be carried over, they must be re-implemented in phaseB without any kind of dependency on phase0 or phase1.
+* functions internal to the compiler pipeline should always be written as "async" even if they don't do anything asynchronous yet. This is to make it easier to add async features later without breaking the API.
+* typescript output from the compiler should not create "async" unless the .t2 source input used "async".
+* phaseB can only rely on APIs from phaseA, it cannot rely on any file contents directly.
+* any file named **/*.test.ts must be run as part of the parent "npm test" command. check for any such files that are not being invoked. this is to ensure test coverage.

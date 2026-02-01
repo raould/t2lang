@@ -1,36 +1,60 @@
 import assert from "node:assert";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import fs from "node:fs";
-import test from "node:test";
+import { compilePhaseA } from "../../phaseA/dist/api.js";
 
 const cliPath = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
-const exampleInput = fileURLToPath(new URL("../../phaseA/examples/example_literals.t2", import.meta.url));
-const exampleExpected = fs.readFileSync(
-  fileURLToPath(new URL("../../phaseA/examples/example_literals.ts", import.meta.url)),
-  "utf8"
-).trim();
+const sampleSource = `
+(program
+  (return
+    (object
+      ("number" 42)
+      ("string" "alpha")
+      ("boolean" true)
+      ("nullish" null))))
+`;
 
-test("phaseB CLI compiles a simple example end-to-end", () => {
-  const result = spawnSync(process.execPath, [cliPath, "--stdout", exampleInput], {
-    encoding: "utf8",
-  });
+function writeTempInput(contents: string): string {
+  const tempPath = path.join(os.tmpdir(), `t2b-e2e-${Date.now()}-${Math.floor(Math.random() * 100000)}`);
+  fs.writeFileSync(tempPath, contents, "utf8");
+  return tempPath;
+}
 
-  assert.strictEqual(result.error, undefined, "CLI failed to start");
-  assert.strictEqual(
-    result.status,
-    0,
-    `phaseB CLI exited with ${result.status ?? "unknown status"} stderr=${result.stderr ?? "<none>"}`
-  );
-  assert.strictEqual(result.stderr ?? "", "", "CLI should not write to stderr on success");
-  assert.strictEqual(
-    typeof result.stdout,
-    "string",
-    "CLI should emit TypeScript output to stdout"
-  );
-  assert.strictEqual(
-    result.stdout!.trim(),
-    exampleExpected,
-    "generated TypeScript does not match example output"
-  );
+function cleanup(filePath: string) {
+  try {
+    fs.unlinkSync(filePath);
+  } catch {
+    // ignore
+  }
+}
+
+async function compileExpected(): Promise<string> {
+  const result = await compilePhaseA(sampleSource, { prettyOption: "pretty", logLevel: "none" });
+  return result.tsSource.trim();
+}
+
+test("phaseB CLI compiles a simple example end-to-end", async () => {
+  const inputPath = writeTempInput(sampleSource);
+  const expected = await compileExpected();
+  try {
+    const result = spawnSync(process.execPath, [cliPath, "--stdout", inputPath], {
+      encoding: "utf8",
+    });
+
+    assert.strictEqual(result.error, undefined, "CLI failed to start");
+    assert.strictEqual(
+      result.status,
+      0,
+      `phaseB CLI exited with ${result.status ?? "unknown status"} stderr=${result.stderr ?? "<none>"}`
+    );
+    assert.strictEqual(result.stderr ?? "", "", "CLI should not write to stderr on success");
+    assert.strictEqual(typeof result.stdout, "string", "CLI should emit TypeScript output to stdout");
+    assert.strictEqual(result.stdout!.trim(), expected, "generated TypeScript does not match compiled Phase A output");
+  } finally {
+    cleanup(inputPath);
+  }
 });

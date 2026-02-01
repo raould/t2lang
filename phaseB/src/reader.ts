@@ -20,9 +20,12 @@ export type LiteralNode = BaseNode & {
   value: string | number | boolean | null;
 };
 
+export type ListDelimiter = "(" | "[";
+
 export type ListNode = BaseNode & {
   kind: "list";
   elements: SExprNode[];
+  delimiter: ListDelimiter;
 };
 
 export type SExprNode = SymbolNode | LiteralNode | ListNode;
@@ -71,6 +74,7 @@ export interface PhaseBListNode extends PhaseBNodeBase {
   phaseKind: "list";
   kind: "list";
   elements: PhaseBNode[];
+  delimiter: ListDelimiter;
 }
 
 export function parsePhaseB(source: string, file = "<input>"): Program {
@@ -98,9 +102,16 @@ function wrapPhaseBNode(node: SExprNode): PhaseBNode {
 
 function wrapSymbol(node: SymbolNode): PhaseBNode {
   if (node.name.includes(".")) {
-    const parts = node.name.split(".");
+    let parts = node.name.split(".");
+    const lastIndex = parts.length - 1;
+    if (parts[lastIndex] === "") {
+      parts = parts.slice(0, -1);
+    }
     if (parts.some((part) => part.length === 0)) {
       throw new ParseError("invalid dotted identifier", node.loc, "E006");
+    }
+    if (parts.length === 1) {
+      return { ...node, phaseKind: "symbol" };
     }
     return { ...node, phaseKind: "dotted", parts };
   }
@@ -119,6 +130,7 @@ function wrapList(node: ListNode): PhaseBNode {
     elements,
     phaseKind: "list",
     expansionStack: node.expansionStack,
+    delimiter: node.delimiter,
   };
 }
 
@@ -199,8 +211,14 @@ function readNode(state: ParserState): SExprNode {
   if (char === "(") {
     return readList(state);
   }
+  if (char === "[") {
+    return readBracketList(state);
+  }
   if (char === ")") {
     throw createError(state, "unexpected ')' encountered", "E002");
+  }
+  if (char === "]") {
+    throw createError(state, "unexpected ']' encountered", "E002");
   }
   if (char === '"') {
     return readString(state);
@@ -232,7 +250,7 @@ function createReaderMacroList(
   const symbolLoc = makeLoc(file, startLine, symbolColumn, startLine, symbolColumn + macroName.length);
   const symbol: SymbolNode = { kind: "symbol", name: macroName, loc: symbolLoc };
   const loc = makeLoc(file, startLine, startColumn, node.loc.endLine, node.loc.endColumn);
-  return { kind: "list", elements: [symbol, node], loc };
+  return { kind: "list", elements: [symbol, node], loc, delimiter: "(" };
 }
 function readList(state: ParserState): ListNode {
   const startLine = state.line;
@@ -248,7 +266,27 @@ function readList(state: ParserState): ListNode {
     if (char === ")") {
       readChar(state);
       const loc = makeLoc(state.file, startLine, startColumn, state.line, state.column);
-      return { kind: "list", elements, loc };
+      return { kind: "list", elements, loc, delimiter: "(" };
+    }
+    elements.push(readNode(state));
+  }
+}
+
+function readBracketList(state: ParserState): ListNode {
+  const startLine = state.line;
+  const startColumn = state.column;
+  readChar(state); // consume '['
+  const elements: SExprNode[] = [];
+  while (true) {
+    skipWhitespace(state);
+    const char = peek(state);
+    if (!char) {
+      throw createError(state, "unclosed '[' delimiter", "E001", startLine, startColumn);
+    }
+    if (char === "]") {
+      readChar(state);
+      const loc = makeLoc(state.file, startLine, startColumn, state.line, state.column);
+      return { kind: "list", elements, loc, delimiter: "[" };
     }
     elements.push(readNode(state));
   }
@@ -288,7 +326,7 @@ function readAtom(state: ParserState): SExprNode {
   let token = "";
   while (true) {
     const ch = peek(state);
-    if (!ch || isWhitespace(ch) || ch === "(" || ch === ")" || ch === '"') {
+    if (!ch || isWhitespace(ch) || ch === "(" || ch === ")" || ch === "[" || ch === "]" || ch === '"') {
       break;
     }
     token += readChar(state);

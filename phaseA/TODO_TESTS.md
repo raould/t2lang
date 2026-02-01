@@ -1,6 +1,6 @@
 # PhaseA failing integration tests (temporarily disabled)
 
-Each entry lists the test file and why it currently fails under PhaseA.
+Each entry lists the test file copied from Phase0 currently failing under PhaseA.
 
 - tests/integration/examples/object.test.ts — expects object literal codegen and field syntax not implemented in PhaseA.
 - tests/integration/examples/object_tsc.test.ts — expects object literal codegen not implemented in PhaseA.

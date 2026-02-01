@@ -1,0 +1,265 @@
+{
+  "meta": {
+    "language": "JavaScript",
+    "dialect": "ECMAScript-2023-ish",
+    "notes": [
+      "Precedence controls grouping, not evaluation order.",
+      "Evaluation order of operands is always left-to-right.",
+      "Short-circuiting operators may skip evaluation of later operands."
+    ]
+  },
+  "evaluationOrder": {
+    "operands": "left-to-right",
+    "functionArguments": "left-to-right",
+    "arrayElements": "left-to-right",
+    "objectProperties": "left-to-right (in initializer)",
+    "memberAccess": "base then property/index",
+    "assignment": "evaluate reference base/index first, then RHS, then perform assignment",
+    "conditional": "test, then only consequent or alternate",
+    "comma": "left-to-right, result is last expression"
+  },
+  "operators": [
+    {
+      "name": "grouping",
+      "symbols": ["( … )"],
+      "precedence": 21,
+      "associativity": null,
+      "category": "grouping",
+      "shortCircuit": false,
+      "notes": ["Controls grouping only; does not change left-to-right evaluation of subexpressions."]
+    },
+    {
+      "name": "memberAccess",
+      "symbols": [".", "[]", "new.target", "import.meta"],
+      "precedence": 20,
+      "associativity": "left",
+      "category": "member",
+      "shortCircuit": false,
+      "notes": [
+        "Base expression evaluated before property/index.",
+        "For obj[expr], obj is evaluated before expr."
+      ]
+    },
+    {
+      "name": "callAndOptionalChaining",
+      "symbols": ["()", "?.", "?.()", "?.[]"],
+      "precedence": 20,
+      "associativity": "left",
+      "category": "call",
+      "shortCircuit": true,
+      "notes": [
+        "Function arguments evaluated left-to-right.",
+        "Optional chaining short-circuits when base is null or undefined, skipping property/index/arguments."
+      ]
+    },
+    {
+      "name": "newWithoutArgs",
+      "symbols": ["new X"],
+      "precedence": 19,
+      "associativity": "right",
+      "category": "construction",
+      "shortCircuit": false,
+      "notes": ["new X has higher precedence than new X()."]
+    },
+    {
+      "name": "postfixIncrementDecrement",
+      "symbols": ["expr++", "expr--"],
+      "precedence": 18,
+      "associativity": null,
+      "category": "update",
+      "shortCircuit": false,
+      "notes": [
+        "Operand evaluated first; result is old value; side effect applied after value is produced."
+      ]
+    },
+    {
+      "name": "unary",
+      "symbols": ["delete", "void", "typeof", "+", "-", "~", "!", "await"],
+      "precedence": 17,
+      "associativity": "right",
+      "category": "unary",
+      "shortCircuit": false,
+      "notes": ["Operand evaluated after operator is chosen; right-associative for chains like !+x."]
+    },
+    {
+      "name": "exponentiation",
+      "symbols": ["**"],
+      "precedence": 16,
+      "associativity": "right",
+      "category": "arithmetic",
+      "shortCircuit": false,
+      "notes": [
+        "Right-associative: a ** b ** c == a ** (b ** c).",
+        "Left operand evaluated before right operand."
+      ]
+    },
+    {
+      "name": "multiplicative",
+      "symbols": ["*", "/", "%"],
+      "precedence": 15,
+      "associativity": "left",
+      "category": "arithmetic",
+      "shortCircuit": false,
+      "notes": []
+    },
+    {
+      "name": "additive",
+      "symbols": ["+", "-"],
+      "precedence": 14,
+      "associativity": "left",
+      "category": "arithmetic",
+      "shortCircuit": false,
+      "notes": ["+ is also string concatenation depending on operand types."]
+    },
+    {
+      "name": "bitwiseShift",
+      "symbols": ["<<", ">>", ">>>"],
+      "precedence": 13,
+      "associativity": "left",
+      "category": "bitwise",
+      "shortCircuit": false,
+      "notes": []
+    },
+    {
+      "name": "relational",
+      "symbols": ["<", "<=", ">", ">=", "in", "instanceof"],
+      "precedence": 12,
+      "associativity": "left",
+      "category": "relational",
+      "shortCircuit": false,
+      "notes": []
+    },
+    {
+      "name": "equality",
+      "symbols": ["==", "!=", "===", "!=="],
+      "precedence": 11,
+      "associativity": "left",
+      "category": "equality",
+      "shortCircuit": false,
+      "notes": []
+    },
+    {
+      "name": "bitwiseAnd",
+      "symbols": ["&"],
+      "precedence": 10,
+      "associativity": "left",
+      "category": "bitwise",
+      "shortCircuit": false,
+      "notes": []
+    },
+    {
+      "name": "bitwiseXor",
+      "symbols": ["^"],
+      "precedence": 9,
+      "associativity": "left",
+      "category": "bitwise",
+      "shortCircuit": false,
+      "notes": []
+    },
+    {
+      "name": "bitwiseOr",
+      "symbols": ["|"],
+      "precedence": 8,
+      "associativity": "left",
+      "category": "bitwise",
+      "shortCircuit": false,
+      "notes": []
+    },
+    {
+      "name": "logicalAnd",
+      "symbols": ["&&"],
+      "precedence": 7,
+      "associativity": "left",
+      "category": "logical",
+      "shortCircuit": true,
+      "notes": [
+        "Evaluate left operand; if falsy, return it and skip right operand.",
+        "Returns one of the operands, not necessarily boolean."
+      ]
+    },
+    {
+      "name": "logicalOr",
+      "symbols": ["||"],
+      "precedence": 6,
+      "associativity": "left",
+      "category": "logical",
+      "shortCircuit": true,
+      "notes": [
+        "Evaluate left operand; if truthy, return it and skip right operand.",
+        "Returns one of the operands, not necessarily boolean."
+      ]
+    },
+    {
+      "name": "nullishCoalescing",
+      "symbols": ["??"],
+      "precedence": 5,
+      "associativity": "left",
+      "category": "logical",
+      "shortCircuit": true,
+      "notes": [
+        "Evaluate left operand; if not null/undefined, return it and skip right operand.",
+        "Otherwise evaluate and return right operand."
+      ]
+    },
+    {
+      "name": "conditional",
+      "symbols": ["?:"],
+      "precedence": 4,
+      "associativity": "right",
+      "category": "conditional",
+      "shortCircuit": true,
+      "notes": [
+        "Evaluate test; then only consequent or alternate is evaluated.",
+        "Right-associative: a ? b : c ? d : e == a ? b : (c ? d : e)."
+      ]
+    },
+    {
+      "name": "assignment",
+      "symbols": [
+        "=",
+        "+=",
+        "-=",
+        "*=",
+        "/=",
+        "%=",
+        "<<=",
+        ">>=",
+        ">>>=",
+        "&=",
+        "^=",
+        "|=",
+        "&&=",
+        "||=",
+        "??="
+      ],
+      "precedence": 3,
+      "associativity": "right",
+      "category": "assignment",
+      "shortCircuit": true,
+      "notes": [
+        "Evaluate LHS reference base/index first, then RHS.",
+        "Logical assignments (&&=, ||=, ??=) short-circuit based on current LHS value."
+      ]
+    },
+    {
+      "name": "yield",
+      "symbols": ["yield", "yield*"],
+      "precedence": 2,
+      "associativity": "right",
+      "category": "generator",
+      "shortCircuit": false,
+      "notes": []
+    },
+    {
+      "name": "comma",
+      "symbols": [","],
+      "precedence": 1,
+      "associativity": "left",
+      "category": "comma",
+      "shortCircuit": false,
+      "notes": [
+        "Evaluate left expression, then right; result is right expression's value."
+      ]
+    }
+  ]
+}

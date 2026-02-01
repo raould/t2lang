@@ -35,7 +35,7 @@
 | AwaitExpr | `await` | `argument: Expr` | A1 | Rewritten only inside `async` contexts by Phase B. |
 | YieldExpr | `yield` | `argument: Expr | null`, `delegate: boolean` | A1 | Handles both `yield` and `yield*`; Phase B resolves iterator protocol. |
 | SpreadExpr | `spread` | `expr: Expr` | A1 | Represents every `...` spread/rest after Phase B rewrites. |
-| FunctionExpr | `fn` | `signature: FnSignature`, `typeParams?: TypeParam[]`, `body: Stmt[]`, `async?: boolean`, `generator?: boolean` | A1 | Covers both function declarations and expressions; Phase B records metadata for decorators, params, `this` annotation. |
+| FunctionExpr | `fn` | `callableKind: CallableKind`, `name?: Identifier`, `methodName?: string`, `signature: FnSignature`, `typeParams?: TypeParam[]`, `body: Stmt[]`, `async?: boolean`, `generator?: boolean` | A1 | Covers `fn`, `lambda`, and `method` callable forms; Phase B records metadata for decorators, params, `this` annotation. |
 | ClassExpr | `class` | `name?: Identifier`, `body: ClassBody`, `decorators?: Expr[]`, `extends?: Expr | null`, `implements?: Expr[]`, `constructor?: Stmt | null`, `staticBlocks?: Stmt[]` | A1 | Includes metadata for TypeScript sugar (decorators, modifiers, implements). |
 | TypeAliasStmt | `type-alias` | `name: Identifier`, `typeParams?: TypeParam[]`, `type: TypeNode` | A1 | Represents TypeScript `type` declarations after Phase B rewrite. |
 | InterfaceStmt | `type-interface` | `name: Identifier`, `body: InterfaceBody` | A1 | Represents TypeScript `interface` declarations. |

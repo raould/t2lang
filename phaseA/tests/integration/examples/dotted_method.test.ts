@@ -6,17 +6,18 @@ test('dotted method invocation emits method call', async () => {
   const src = `
     (program
       (class Person
-        (field "firstName" "")
-        (field "lastName" "")
-        (field "age" 0)
+        (class-body
+          (field "firstName" "")
+          (field "lastName" "")
+          (field "age" 0)
 
-        (method "constructor" (firstName lastName age)
-          (assign (prop this "firstName") firstName)
-          (assign (prop this "lastName") lastName)
-          (assign (prop this "age") age))
+          (method "constructor" (firstName lastName age)
+            (assign (prop this "firstName") firstName)
+            (assign (prop this "lastName") lastName)
+            (assign (prop this "age") age))
 
-        (method "getFullName" ()
-          (+ (prop this "firstName") " " (prop this "lastName"))))
+          (method "getFullName" ()
+            (+ (prop this "firstName") " " (prop this "lastName")))))
 
       (let* ((person (new Person "John" "Doe" 25)))
         (call (prop console "log") (call (prop person "getFullName"))))

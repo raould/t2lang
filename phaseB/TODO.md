@@ -90,3 +90,8 @@
     - [ ] Sugar rewrites (covered by rewriter.test.ts and sugar.test.ts)
     - [ ] Macro expansion (covered by tests/expander.test.ts and macroRegistry tests)
     - [ ] Integration with Phase A (covered by cli-debug.test.ts which runs phaseB CLI -> Phase A)
+
+## 11 other sugar
+
+- [ ] "(fn (x) x)" must be rewritten for phase A as "(fn ((x)) x)".
+- [ ] "for (;" must be rewritten for phase A as "for (null;".

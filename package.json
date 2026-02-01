@@ -1,0 +1,9 @@
+{
+  "name": "t2lang",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix phaseB run build",
+    "test": "npm --prefix phaseA test && npm --prefix phaseB test",
+    "lint": "npm --prefix phaseA run lint && npm --prefix phaseB run lint"
+  }
+}

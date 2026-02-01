@@ -13,7 +13,8 @@ test("simple class with field", async () => {
   const result = await compilePhase0(`
     (program
       (class Person
-        (field "name" "John")))
+        (class-body
+          (field "name" "John"))))
   `, { enableTsc: true });
   if (nonTsc(result.errors).length > 0) { console.error(result.errors); }
   assert.strictEqual(nonTsc(result.errors).length, 0);
@@ -24,10 +25,11 @@ test("simple class with field", async () => {
 test("class with method", async () => {
   const result = await compilePhase0(`
     (program
-      (let* ((console (obj (field "log" (fn (x) x)))))
+      (let* ((console (obj (field "log" (fn ((x)) x)))))
         (class Greeter
-          (method "greet" ()
-            (call (prop console "log") "Hello"))))
+          (class-body
+            (method "greet" ()
+              (call (prop console "log") "Hello")))))
     )
   `, { enableTsc: true });
   if (nonTsc(result.errors).length > 0) { console.error(result.errors); }
@@ -40,9 +42,10 @@ test("class with method", async () => {
 test("class with method params", async () => {
   const result = await compilePhase0(`
     (program
-      (class Calculator
-        (method "add" (a b)
-          (return (+ a b))))
+        (class Calculator
+        (class-body
+          (method "add" ((a) (b))
+          (return (+ a b)))))
     )
   `, { enableTsc: true });
   if (nonTsc(result.errors).length > 0) { console.error(result.errors); }
@@ -55,9 +58,10 @@ test("class with field and method", async () => {
   const result = await compilePhase0(`
     (program
       (class Counter
-        (field "count" 0)
-        (method "increment" ()
-          (assign (prop this "count") (+ (prop this "count") 1)))))
+        (class-body
+          (field "count" 0)
+          (method "increment" ()
+            (assign (prop this "count") (+ (prop this "count") 1))))))
   `, { enableTsc: true });
   if (nonTsc(result.errors).length > 0) { console.error(result.errors); }
   assert.strictEqual(nonTsc(result.errors).length, 0);
@@ -67,20 +71,20 @@ test("class with field and method", async () => {
 
 // Type assert tests
 test("simple type assert", async () => {
-  const result = await compilePhase0(`(program (let* ((x 1)) (type-assert x "number")))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (let* ((x 1)) (type-assert x (type-number))))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
   assert.match(result.tsSource, /\(x as number\)/);
 });
 
 test("type assert on expression", async () => {
-  const result = await compilePhase0(`(program (fn getValue () "ok") (type-assert (getValue) "string"))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (fn getValue () "ok") (type-assert (getValue) (type-string)))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
   assert.match(result.tsSource, /\(getValue\(\) as string\)/);
 });
 
 // Throw tests
 test("throw error", async () => {
-  const result = await compilePhase0(`(program (let* ((Error (fn (x) x))) (throw (new Error "oops"))))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (let* ((Error (fn ((x)) x))) (throw (new Error "oops"))))`, { enableTsc: true });
   assert.strictEqual(nonTsc(result.errors).length, 0);
   assert.match(result.tsSource, /throw new Error\("oops"\)/);
 });
@@ -95,8 +99,8 @@ test("throw variable", async () => {
 test("simple try-catch", async () => {
   const result = await compilePhase0(`
     (program
-      (let* ((riskyOp (fn () null))
-             (log (fn (x) x)))
+            (let* ((riskyOp (fn () null))
+              (log (fn ((x)) x)))
         (try
           (riskyOp)
           (catch e
@@ -114,7 +118,7 @@ test("try-catch with finally", async () => {
     (program
       (let* ((open (fn () null))
              (close (fn () null))
-             (log (fn (x) x)))
+             (log (fn ((x)) x)))
         (try
           (open)
           (catch e
@@ -134,7 +138,7 @@ test("try-catch with multiple statements", async () => {
     (program
       (let* ((step1 (fn () null))
              (step2 (fn () null))
-             (log (fn (x) x))
+             (log (fn ((x)) x))
              (recover (fn () null)))
         (try
           (step1)

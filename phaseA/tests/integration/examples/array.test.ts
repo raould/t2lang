@@ -42,7 +42,7 @@ test("nested arrays", async () => {
 });
 
 test("array assigned to variable", async () => {
-  const result = await compilePhase0(`(program (const* ((foo (fn (x) x)) (nums (array 1 2 3))) (foo nums)))`, { enableTsc: false });
+  const result = await compilePhase0(`(program (const* ((foo (fn ((x)) x)) (nums (array 1 2 3))) (foo nums)))`, { enableTsc: false });
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /const nums = \[1, 2, 3\]/);

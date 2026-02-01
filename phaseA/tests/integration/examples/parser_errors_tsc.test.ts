@@ -10,6 +10,6 @@ const test = ((..._args: unknown[]) => {}) as typeof testBase;
 const nonTsc = (errors: any[]) => errors.filter(e => e.phase !== "tsc");
 
 test("nested program form produces error", async () => {
-  const result = await compilePhase0(`(program (program (fn foo (x) x)))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (program (fn foo ((x)) x)))`, { enableTsc: true });
   assert.ok(nonTsc(result.errors).length > 0);
 });

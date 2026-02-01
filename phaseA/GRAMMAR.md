@@ -33,6 +33,8 @@ Tokens:
               | <assign>
               | <expression>
               | <fn>
+              | <lambda>
+              | <method>
               | <class>
               | <import>
               | <export>
@@ -60,7 +62,10 @@ Tokens:
 <let-star> ::= "(" "let*" <binding>* <statement>* ")"
 <const-star> ::= "(" "const*" <binding>* <statement>* ")"
 <assign> ::= "(" "assign" <expression> <expression> ")"
-<fn> ::= "(" "fn" <fn-signature> <statement>* ")"
+<callable-flag> ::= "async" | "generator"
+<fn> ::= "(" "fn" <callable-flag>* <identifier>? <fn-signature> <statement>* ")"
+<lambda> ::= "(" "lambda" <callable-flag>* <fn-signature> <statement>* ")"
+<method> ::= "(" "method" <callable-flag>* <string> <fn-signature> <statement>* ")"
 <class> ::= "(" "class" <identifier> <class-body> ")"
 <import> ::= "(" "import" <import-spec> ")"
 <export> ::= "(" "export" <export-spec> ")"

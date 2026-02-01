@@ -6,10 +6,11 @@ test('class field modifiers are emitted in TS output', async () => {
   const src = `
     (program
       (class C
-        (field public static readonly "x" 1)
-        (field private "y" 2)
-        (method "constructor" ()
-          (assign (prop this "y") 2)))
+        (class-body
+          (field public static readonly "x" 1)
+          (field private "y" 2)
+          (method "constructor" ()
+            (assign (prop this "y") 2)))))
     )
   `;
   const result = await compilePhase0(src, { enableTsc: false });
