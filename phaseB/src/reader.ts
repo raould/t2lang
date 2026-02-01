@@ -104,7 +104,7 @@ function wrapSymbol(node: SymbolNode): PhaseBNode {
   if (node.name.includes(".")) {
     let parts = node.name.split(".");
     const lastIndex = parts.length - 1;
-    if (lastIndex >= 1 && parts[lastIndex] === "" && parts[lastIndex - 1].endsWith("?")) {
+    if (parts[lastIndex] === "") {
       parts = parts.slice(0, -1);
     }
     if (parts.some((part) => part.length === 0)) {

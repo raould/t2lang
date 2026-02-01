@@ -343,4 +343,6 @@ Phase B parses TypeScript-style type annotations and rewrites them to the struct
 
 # 10 more precedence and evaluation order testing [ ]
 
-Precedence in TypeScript, JavaScript, ECMAScript is not succinctly defined anywhere, and interacts with or is easily confused with order of evalutation, including short-circuiting effects. We need to build extensive tests that have JavaScript tests being compard with T2 versions thereof to assert that T2 is not genrating incorrect output. This means generating many small tests in javascript which try to cover precedence + evaluation order + short-circuiting with high sensitivity. Then create a T2 version of the same test. Run the matched .js and .t2 pair and assert the output is the same. (Unfortunately it is a bit of a combinatorial explosion.)
+- Precedence in TypeScript, JavaScript, ECMAScript must bes tested. We need to build extensive tests that have JavaScript tests being compard with T2 versions thereof to assert that T2 is not genrating incorrect output. This means generating many small tests in javascript which try to cover precedence + evaluation order + short-circuiting with high sensitivity. Then create a T2 version of the same test. Run the matched .js and .t2 pair and assert the output is the same. (Unfortunately it is a bit of a combinatorial explosion.)
+  - see EVALUATION_PRECEDENCE.json
+  - see TYPE_PRECEDENCE.md

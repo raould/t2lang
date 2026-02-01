@@ -267,3 +267,14 @@ test("nested optional chains short-circuit each step", () => {
     "(let* ((opt_obj_2 (let* ((opt_tmp_1 obj)) (if (== opt_tmp_1 null) undefined (prop opt_tmp_1 \"prop\"))))) (if (== opt_obj_2 null) undefined (call-with-this (prop opt_obj_2 \"value\") opt_obj_2)))",
   );
 });
+
+test("surface computed property access rewrites to index", () => {
+  expectExpression("(obj.[key])", "(index obj key)");
+});
+
+test("surface optional computed access guards nullish receiver", () => {
+  expectExpression(
+    "(obj?.[key])",
+    "(let* ((opt_tmp_1 obj)) (if (== opt_tmp_1 null) undefined (index opt_tmp_1 key)))",
+  );
+});
