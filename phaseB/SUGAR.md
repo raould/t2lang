@@ -10,11 +10,11 @@ Unlike macros, sugar is often handled at the lexer or parser level, or via struc
 
 `set!` should be an alias for `assign`, if the lisp semantics are not too different.
 
-## 1. Dotted Identifiers & Property Access
+## 1. Dotted Identifiers & Property Access [x]
 
 To support standard object-oriented programming patterns without verbose nested `prop` calls.
 
-### Sugar [x]
+### Sugar [ ]
 ```typescript
 obj.prop
 obj.method(arg)
@@ -101,7 +101,7 @@ Derived from the [MDN Operator Precedence table](https://developer.mozilla.org/e
 
 > Operator precedence only tells us how the operators group. Operand evaluation order remains left-to-right regardless of precedence or associativity, so short-circuiting is only observable when the operand expressions carry side effects. (See the section on evaluation order in the MDN table for the full explanation.)
 
-## 3. Literal Shorthands [ ]
+## 3. Literal Shorthands [x]
 
 ### Object Literals
 Allowed to use implicit keys or shorthand syntax.
@@ -133,7 +133,7 @@ Phase B may support `[...]` syntax if the tokenizer handles brackets.
 (array 1 2 3)
 ```
 
-## 4. Binding Forms [ ]
+## 4. Binding Forms [x]
 
 Phase B exposes `let`/`const` sugar as parallel bindings, but Phase A only understands the sequential `let*`/`const*` forms. To preserve correct semantics (e.g., `(let ((a b) (b a)) ...)` must swap using the *old* values), Phase B rewrites every `let`/`const` into a `let*` that evaluates every initializer into temporary `gensym` bindings before reassigning the user variables.
 
@@ -183,7 +183,7 @@ This strategy guarantees that every `let`/`const` binding becomes a deterministi
 
 Phase A strictly requires `let*` and `const*` with specific nesting. Phase B allows `let` and `const` which are parallel bindings.
 
-## 5. Assignment Sugar [ ]
+## 5. Assignment Sugar [x]
 
 **Sugar**:
 ```lisp
@@ -199,7 +199,7 @@ Phase A strictly requires `let*` and `const*` with specific nesting. Phase B all
 (assign (prop obj "prop") 20)
 ```
 
-## 6. Function Definitions [ ]
+## 6. Function Definitions [x]
 
 Support for TypeScript-style parameter lists with colons.
 
@@ -286,7 +286,7 @@ When the callable target is a method access (e.g., `obj.method?.(a, b)`), the re
 Explicit `async` keyword macros or rewrites produce the `FunctionExpr` with `async: true` metadata.
 Additional metadata on the generated `FunctionExpr` indicates it is async so downstream phases can treat `await` appropriately; the canonical form might look like `(fn (x) :async true (return (await ...)))` or similar depending on how Phase A records metadata, but the key point is that the node is decorated with `async: true` rather than requiring a separate sugar form.
 
-## 9. Type Expression Syntax [ ]
+## 9. Type Expression Syntax [x]
 
 Phase B parses TypeScript-style type annotations and rewrites them to the structured `t:` nodes documented in [phaseA/TYPES.md](phaseA/TYPES.md).
 
