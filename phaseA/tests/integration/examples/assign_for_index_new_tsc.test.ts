@@ -36,7 +36,7 @@ test("simple for loop", async () => {
     (program
             (let* ((i 0)
               (print (fn ((x)) x)))
-        (for (assign i 0) (< i 10) (assign i (+ i 1))
+        (for classic (assign i 0) (< i 10) (assign i (+ i 1))
           (print i))))
   `, { enableTsc: true });
   if (nonTsc(result.errors).length > 0) { console.error(result.errors); }
@@ -47,14 +47,14 @@ test("simple for loop", async () => {
 });
 
 test("for loop with null init", async () => {
-  const result = await compilePhase0(`(program (let* ((i 0) (foo (fn () null))) (for null (< i 10) (assign i (+ i 1)) (foo))))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (let* ((i 0) (foo (fn () null))) (for classic null (< i 10) (assign i (+ i 1)) (foo))))`, { enableTsc: true });
   if (nonTsc(result.errors).length > 0) { console.error(result.errors); }
   assert.strictEqual(nonTsc(result.errors).length, 0);
   assert.match(result.tsSource, /for \(;/);
 });
 
 test("infinite for loop", async () => {
-  const result = await compilePhase0(`(program (let* ((foo (fn () null))) (for null null null (foo))))`, { enableTsc: true });
+  const result = await compilePhase0(`(program (let* ((foo (fn () null))) (for classic null null null (foo))))`, { enableTsc: true });
   if (nonTsc(result.errors).length > 0) { console.error(result.errors); }
   assert.strictEqual(nonTsc(result.errors).length, 0);
   assert.match(result.tsSource, /for \(; ; \)/);
@@ -107,7 +107,7 @@ test("combined usage", async () => {
                   (console (obj (field "log" (fn ((x)) x))))
               (i 0))
         (const* ((arr (new Array)))
-          (for (assign i 0) (< i 5) (assign i (+ i 1))
+          (for classic (assign i 0) (< i 5) (assign i (+ i 1))
             (call (prop arr "push") i))
           (call (prop console "log") (index arr 2)))))
   `, { enableTsc: true });
