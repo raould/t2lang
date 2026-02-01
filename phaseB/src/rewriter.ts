@@ -49,7 +49,7 @@ function isSymbolNode(node: SExprNode | undefined): node is SymbolNode {
 }
 
 function rewriteMethodCall(head: SymbolNode, args: SExprNode[], loc: SymbolNode["loc"]): SExprNode | null {
-  const parts = head.name.split(".");
+  const parts = normalizeDottedIdentifier(head.name);
   if (parts.length <= 1 || parts.some((part) => part.length === 0)) {
     return null;
   }
@@ -69,11 +69,19 @@ function rewriteMethodCall(head: SymbolNode, args: SExprNode[], loc: SymbolNode[
 }
 
 function rewritePropertyAccess(node: SymbolNode): SExprNode | null {
-  const parts = node.name.split(".");
+  const parts = normalizeDottedIdentifier(node.name);
   if (parts.length <= 1 || parts.some((part) => part.length === 0)) {
     return null;
   }
   return buildPropertyChain(parts, node.loc);
+}
+
+function normalizeDottedIdentifier(name: string): string[] {
+  const parts = name.split(".");
+  if (parts.length > 1 && parts[parts.length - 1] === "") {
+    parts.pop();
+  }
+  return parts;
 }
 
 function getAliasSymbolName(name: string): string | undefined {

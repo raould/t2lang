@@ -220,3 +220,50 @@ test("optional callable access guards the callee", () => {
     "(let* ((opt_call_1 fn)) (if (== opt_call_1 null) undefined (call opt_call_1 1)))",
   );
 });
+
+function serializeSingleNode(expr: string): string {
+  resetGensym();
+  const nodes = parsePhaseBRaw(expr);
+  assert.strictEqual(nodes.length, 1);
+  return serializePhaseBNode(nodes[0]);
+}
+
+function expectExpression(expr: string, expected: string): void {
+  const serialized = serializeSingleNode(expr);
+  assert.strictEqual(serialized, expected);
+}
+
+test("surface optional property access lowers to a guard", () => {
+  expectExpression(
+    "obj?.prop",
+    "(let* ((opt_tmp_1 obj)) (if (== opt_tmp_1 null) undefined (prop opt_tmp_1 \"prop\")))",
+  );
+});
+
+test("surface optional method call preserves this guard", () => {
+  expectExpression(
+    "(obj?.method 1)",
+    "(let* ((opt_obj_1 obj)) (if (== opt_obj_1 null) undefined (call-with-this (prop opt_obj_1 \"method\") opt_obj_1 1)))",
+  );
+});
+
+test("surface optional method call on method indicator keeps guard", () => {
+  expectExpression(
+    "(obj.method?. a b)",
+    "(let* ((opt_obj_1 obj)) (if (== opt_obj_1 null) undefined (call-with-this (prop opt_obj_1 \"method\") opt_obj_1 a b)))",
+  );
+});
+
+test("surface callable optional invocation rewrites to guard", () => {
+  expectExpression(
+    "(fn?. 1)",
+    "(let* ((opt_call_1 fn)) (if (== opt_call_1 null) undefined (call opt_call_1 1)))",
+  );
+});
+
+test("nested optional chains short-circuit each step", () => {
+  expectExpression(
+    "(obj?.prop?.value)",
+    "(let* ((opt_obj_2 (let* ((opt_tmp_1 obj)) (if (== opt_tmp_1 null) undefined (prop opt_tmp_1 \"prop\"))))) (if (== opt_obj_2 null) undefined (call-with-this (prop opt_obj_2 \"value\") opt_obj_2)))",
+  );
+});

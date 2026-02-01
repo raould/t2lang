@@ -320,7 +320,20 @@ interface PropertySegment {
 
 function rewriteOptionalCall(node: PhaseBListNode): PhaseBNode | null {
   const head = node.elements[0];
-  if (!head || !isSymbol(head, "call")) {
+  if (!head) {
+    return null;
+  }
+
+  if (head.phaseKind === "symbol" && hasOptionalIndicator(head)) {
+    if (node.elements.length < 2) {
+      return null;
+    }
+    const [, ...args] = node.elements;
+    const cleanedHead = stripOptionalNode(head);
+    return buildOptionalDirectCall(cleanedHead, args, head.loc);
+  }
+
+  if (!isSymbol(head, "call")) {
     return null;
   }
   const [, callee, ...args] = node.elements;
@@ -475,6 +488,9 @@ function buildOptionalDirectCall(callee: PhaseBNode, args: PhaseBNode[], loc: So
 function stripOptionalNode(node: PhaseBNode): PhaseBNode {
   if (node.phaseKind === "symbol") {
     const symbol = node as SymbolNode;
+    if (symbol.name.endsWith("?.")) {
+      return createPhaseBSymbol(symbol.name.slice(0, -2), symbol.loc);
+    }
     if (symbol.name.endsWith("?")) {
       return createPhaseBSymbol(symbol.name.slice(0, -1), symbol.loc);
     }
@@ -499,7 +515,8 @@ function stripOptionalNode(node: PhaseBNode): PhaseBNode {
 
 function hasOptionalIndicator(node: PhaseBNode): boolean {
   if (node.phaseKind === "symbol") {
-    return (node as SymbolNode).name.endsWith("?");
+    const symbolName = (node as SymbolNode).name;
+    return symbolName.endsWith("?") || symbolName.endsWith("?.");
   }
   if (node.phaseKind === "literal") {
     const literal = node as LiteralNode;
@@ -509,6 +526,14 @@ function hasOptionalIndicator(node: PhaseBNode): boolean {
     const dotted = node as PhaseBDottedIdentifier;
     const last = dotted.parts[dotted.parts.length - 1];
     return last?.endsWith("?") ?? false;
+  }
+  if (node.phaseKind === "list") {
+    if (isPropertyList(node)) {
+      const property = node.elements[2];
+      if (property && hasOptionalIndicator(property)) {
+        return true;
+      }
+    }
   }
   return false;
 }
