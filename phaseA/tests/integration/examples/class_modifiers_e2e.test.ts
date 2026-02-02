@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import child_process from 'node:child_process';
 import ts from 'typescript';
-import { compilePhase0 } from '../../../src/api';
+import { compile } from '../../../src/api';
 
 function writeTempFile(contents: string, suffix = '.js'): string {
   const name = `t2-e2e-${Date.now()}-${Math.floor(Math.random()*10000)}${suffix}`;
@@ -31,7 +31,7 @@ test('class modifiers end-to-end: compile to JS and run', async () => {
 
   // We don't require running the TypeScript compiler here; transpile and
   // run the emitted JS with node to exercise end-to-end behavior.
-  const result = await compilePhase0(src, { enableTsc: false, emitTypes: false });
+  const result = await compile(src, { enableTsc: false, emitTypes: false });
   const nonTsc = result.errors.filter(e => e.phase !== 'tsc');
   if (nonTsc.length > 0) { console.error(nonTsc); }
   assert.strictEqual(nonTsc.length, 0, 'non-tsc compile errors');

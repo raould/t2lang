@@ -1,13 +1,13 @@
 import test from "node:test";
 import assert from "node:assert";
-import { compilePhase0 } from "../../../src/api";
+import { compile } from "../../../src/api";
 import { Program } from "../../../src/ast/nodes";
 
 test("let declaration as expression", async () => {
-  const source = `(program (let* ((foo (fn ((x)) x)) (x 42)) (foo x)))`;
+  const source = `(program (let* ((foo (lambda ((x)) x)) (x 42)) (foo x)))`;
 
-  const result = await compilePhase0(source, {
-    prettyOutput: true,
+  const result = await compile(source, {
+    prettyOption: "pretty",
     logLevel: "none",
     enableTsc: false
   });

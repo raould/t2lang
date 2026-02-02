@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert";
-import { compilePhase0 } from "../../../src/api";
+import { compile } from "../../../src/api";
 import { Program } from "../../../src/ast/nodes";
 
 test("block with nested let and call", async () => {
@@ -14,8 +14,8 @@ test("block with nested let and call", async () => {
     )
   `;
 
-  const result = await compilePhase0(source, {
-    prettyOutput: true,
+  const result = await compile(source, {
+    prettyOption: true,
     logLevel: "none",
     enableTsc: false
   });

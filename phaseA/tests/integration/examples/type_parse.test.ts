@@ -2,14 +2,11 @@
  * Parser coverage for full type AST forms
  */
 
-import testBase from "node:test";
-import assert from "node:assert";
-import { compilePhase0 } from "../../../src/api";
-import { Program, TypeAliasStmt, TypeAssertExpr } from "../../../src/ast/nodes";
-const test = ((..._args: unknown[]) => {}) as typeof testBase;
-
+import test from "node:test";import assert from "node:assert";
+import { compile } from "../../../src/api";
+ 
 test("parse full type AST forms", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (type-alias Num (type-number))
       (type-alias Str (type-string))
@@ -17,36 +14,37 @@ test("parse full type AST forms", async () => {
       (type-alias Nil (type-null))
       (type-alias Undef (type-undefined))
       (type-alias Lit (type-literal 1))
-      (type-alias Arr (type-array (type-number)))
+      (type-alias Arr (type-ref Array))
       (type-alias Obj (type-object ("x" (type-number))))
-      (type-alias Fn (type-function ((type-number) (type-string)) (type-boolean)))
+      (type-alias Fn (type-function (type-number) (type-string) (type-boolean)))
       (type-alias Uni (type-union (type-number) (type-string)))
       (type-alias Int (type-intersection (type-number) (type-string)))
-      (type-assert 1 (type-ref "Num")))
-  `, { enableTsc: false });
+      (type-assert 1 (type-ref Num)))
+  `, );
 
+  if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
 
   const astDump = result.events.find(e => e.kind === "astDump");
-  const ast = (astDump?.data as { ast: Program })?.ast;
+  const ast = (astDump?.data as { ast: any })?.ast;
 
-  const aliases = ast.body.filter((s): s is TypeAliasStmt => s.kind === "type-alias");
+  const aliases = ast.body.filter((s: any) => s.kind === "type-alias");
   assert.strictEqual(aliases.length, 11);
-  assert.strictEqual(aliases[0].typeAnnotation.kind, "type-number");
-  assert.strictEqual(aliases[1].typeAnnotation.kind, "type-string");
-  assert.strictEqual(aliases[2].typeAnnotation.kind, "type-boolean");
-  assert.strictEqual(aliases[3].typeAnnotation.kind, "type-null");
-  assert.strictEqual(aliases[4].typeAnnotation.kind, "type-undefined");
-  assert.strictEqual(aliases[5].typeAnnotation.kind, "type-literal");
-  assert.strictEqual(aliases[6].typeAnnotation.kind, "type-array");
-  assert.strictEqual(aliases[7].typeAnnotation.kind, "type-object");
-  assert.strictEqual(aliases[8].typeAnnotation.kind, "type-function");
-  assert.strictEqual(aliases[9].typeAnnotation.kind, "type-union");
-  assert.strictEqual(aliases[10].typeAnnotation.kind, "type-intersection");
+  assert.strictEqual(aliases[0].typeValue.kind, "type-number");
+  assert.strictEqual(aliases[1].typeValue.kind, "type-string");
+  assert.strictEqual(aliases[2].typeValue.kind, "type-boolean");
+  assert.strictEqual(aliases[3].typeValue.kind, "type-null");
+  assert.strictEqual(aliases[4].typeValue.kind, "type-undefined");
+  assert.strictEqual(aliases[5].typeValue.kind, "type-literal");
+  assert.strictEqual(aliases[6].typeValue.kind, "type-ref");
+  assert.strictEqual(aliases[7].typeValue.kind, "type-object-literal");
+  assert.strictEqual(aliases[8].typeValue.kind, "type-function");
+  assert.strictEqual(aliases[9].typeValue.kind, "type-union");
+  assert.strictEqual(aliases[10].typeValue.kind, "type-intersection");
 
   const lastStmt = ast.body[ast.body.length - 1];
   assert.strictEqual(lastStmt.kind, "exprStmt");
-  const typeAssert = (lastStmt.expr as TypeAssertExpr);
+  const typeAssert = lastStmt.expr;
   assert.strictEqual(typeAssert.kind, "type-assert");
-  assert.strictEqual(typeAssert.typeAnnotation.kind, "type-ref");
+  assert.strictEqual(typeAssert.assertedType.kind, "type-ref");
 });

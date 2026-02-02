@@ -4,15 +4,15 @@
 
 import test from "node:test";
 import assert from "node:assert";
-import { compilePhase0 } from "../../../src/api";
+import { compile } from "../../../src/api";
 
 test("lisp-style semicolon comment", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (fn foo ((x)) x)
       ; this is a comment
       (foo 1))
-  `, { enableTsc: false });
+  `, );
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /foo\(1\)/);
@@ -20,20 +20,20 @@ test("lisp-style semicolon comment", async () => {
 });
 
 test("lisp-style inline comment", async () => {
-  const result = await compilePhase0(`(program (fn foo ((x)) x) (foo 1) ; inline comment
-  )`, { enableTsc: false });
+  const result = await compile(`(program (fn foo ((x)) x) (foo 1) ; inline comment
+  )`, );
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /foo\(1\)/);
 });
 
 test("c-style double-slash comment", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (fn bar ((x)) x)
       // this is a C-style comment
       (bar 2))
-  `, { enableTsc: false });
+  `, );
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /bar\(2\)/);
@@ -41,12 +41,12 @@ test("c-style double-slash comment", async () => {
 });
 
 test("c-style block comment", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (fn baz ((x)) x)
       /* block comment */
       (baz 3))
-  `, { enableTsc: false });
+  `, );
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /baz\(3\)/);
@@ -54,21 +54,21 @@ test("c-style block comment", async () => {
 });
 
 test("multi-line block comment", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (fn qux ((x)) x)
       /* this is
          a multi-line
          block comment */
       (qux 4))
-  `, { enableTsc: false });
+  `, );
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /qux\(4\)/);
 });
 
 test("mixed comment styles", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (fn a ((x)) x)
       (fn b ((x)) x)
@@ -79,7 +79,7 @@ test("mixed comment styles", async () => {
       (b 2)
       /* block comment */
       (c 3))
-  `, { enableTsc: false });
+  `, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /a\(1\)/);
   assert.match(result.tsSource, /b\(2\)/);
@@ -87,7 +87,7 @@ test("mixed comment styles", async () => {
 });
 
 test("comment at end of file", async () => {
-  const result = await compilePhase0(`(program (fn foo ((x)) x) (foo 1)) ; trailing comment`, { enableTsc: false });
+  const result = await compile(`(program (fn foo ((x)) x) (foo 1)) ; trailing comment`, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /foo\(1\)/);
 });

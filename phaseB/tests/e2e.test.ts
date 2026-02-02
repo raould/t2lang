@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { compilePhaseA } from "../../phaseA/dist/api.js";
+import { compile } from "../../phaseA/dist/api.js";
 
 const cliPath = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
 const sampleSource = `
@@ -32,14 +32,14 @@ function cleanup(filePath: string) {
   }
 }
 
-async function compileExpected(): Promise<string> {
-  const result = await compilePhaseA(sampleSource, { prettyOption: "pretty", logLevel: "none" });
+async function compileWithPhaseA(source: string): Promise<string> {
+  const result = await compile(source, { prettyOption: "pretty", logLevel: "none" });
   return result.tsSource.trim();
 }
 
-test("phaseB CLI compiles a simple example end-to-end", async () => {
-  const inputPath = writeTempInput(sampleSource);
-  const expected = await compileExpected();
+async function expectCliMatches(source: string): Promise<void> {
+  const expected = await compileWithPhaseA(source);
+  const inputPath = writeTempInput(source);
   try {
     const result = spawnSync(process.execPath, [cliPath, "--stdout", inputPath], {
       encoding: "utf8",
@@ -57,4 +57,26 @@ test("phaseB CLI compiles a simple example end-to-end", async () => {
   } finally {
     cleanup(inputPath);
   }
+}
+
+test("phaseB CLI compiles a simple example end-to-end", async () => {
+  await expectCliMatches(sampleSource);
+});
+
+test("phaseB CLI preserves async callable flags end-to-end", async () => {
+  const source = `
+(program
+  (fn async asyncCallable ((value))
+    (return value)))
+`;
+  await expectCliMatches(source);
+});
+
+test("phaseB CLI preserves generator callable flags end-to-end", async () => {
+  const source = `
+(program
+  (fn generator generatorCallable ((value))
+    (return value)))
+`;
+  await expectCliMatches(source);
 });

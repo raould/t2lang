@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert";
-import { compilePhase0 } from "../../phaseA/src/api";
+import { compile } from "../../phaseA/src/api";
 // import vm from "node:vm";
 
 type OperatorTestEntry = {
@@ -22,10 +22,14 @@ function c() {
     return 4
 }
 
+void a;
+void b;
+void c;
+
 test.skip("operator translations", async () => {
     for (const entry of table) {
         const t2prog = `(program ${entry.t2})`;
-        const result = await compilePhase0(t2prog, { enableTsc: false });
+        const result = await compile(t2prog, { enableTsc: false });
         assert.strictEqual(result.errors.length, 0);
         assert.strictEqual(result.tsSource, entry.ts);
     }

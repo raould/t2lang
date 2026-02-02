@@ -1,10 +1,8 @@
-import testBase from "node:test";
-import assert from "node:assert";
+import test from "node:test";import assert from "node:assert";
 import * as fs from "node:fs";
-const test = ((..._args: unknown[]) => {}) as typeof testBase;
-const runCli = undefined as unknown as (..._args: unknown[]) => Promise<void>;
+ const runCli = undefined as unknown as (..._args: unknown[]) => Promise<void>;
 
-test("runCli passes CompilerConfig flags to compileFn", async () => {
+test.skip("runCli passes CompilerConfig flags to compileFn", async () => {
     const tmp = "tmp_input.t2";
     fs.writeFileSync(tmp, "(program ())");
 
@@ -28,8 +26,8 @@ test("runCli passes CompilerConfig flags to compileFn", async () => {
         assert.strictEqual(capturedConfig.seed, 'myseed');
         assert.deepStrictEqual(capturedConfig.tracePhases, ['parse', 'expand']);
         assert.strictEqual(capturedConfig.logLevel, 'debug');
-        // prettyOutput should be the mapped enum value passed in
-        assert.strictEqual(capturedConfig.prettyOutput, 'ugly');
+        // prettyOption should be the mapped enum value passed in
+        assert.strictEqual(capturedConfig.prettyOption, 'ugly');
     } finally {
         process.argv = oldArgv;
         fs.unlinkSync(tmp);

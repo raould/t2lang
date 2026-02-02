@@ -66,7 +66,7 @@ import {
   YieldExpr,
 } from "./phaseA1.js";
 export interface CompilerConfig {
-  prettyOutput?: "pretty" | "ugly";
+  prettyOption?: "pretty" | "ugly";
   emitTypes?: boolean;
 }
 
@@ -118,7 +118,7 @@ export async function generateCode(program: Program, config: CompilerConfig = {}
   const requiresAsync = programRequiresAsync(program);
   let tsLines = lines;
   let lineShift = 0;
-  if (config.prettyOutput === "pretty") {
+  if (config.prettyOption === "pretty") {
     tsLines = ["{", ...tsLines, "}"];
     lineShift += 1;
   }
@@ -318,6 +318,13 @@ async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
     return { lines: ["export {};"], mappings: [mappingFromSpan(stmt.span, 0)] };
   }
   if (stmt instanceof FunctionExpr) {
+    if (stmt.callableKind === "lambda") {
+      const text = await emitFunctionExpression(stmt, false);
+      return {
+        lines: [`${text};`],
+        mappings: [mappingFromSpan(stmt.span, 0)],
+      };
+    }
     const text = await emitFunctionExpression(stmt, true);
     return {
       lines: [text],
@@ -545,7 +552,7 @@ async function emitFunctionExpression(expr: FunctionExpr, asDeclaration = false)
   const generator = expr.generator ? "*" : "";
   const { typeParams, params, returnAnnotation } = await emitFunctionSignature(expr);
   const bodyText = await renderFunctionBody(expr);
-  const canUseArrow = !asDeclaration && !expr.generator;
+  const canUseArrow = !asDeclaration && !expr.generator && expr.callableKind === "lambda";
   if (canUseArrow) {
     return `${prefix}${typeParams}(${params.join(", ")})${returnAnnotation} => ${bodyText}`;
   }

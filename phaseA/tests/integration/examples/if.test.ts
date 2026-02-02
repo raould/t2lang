@@ -2,20 +2,18 @@
  * Test for if expressions
  */
 
-import testBase from "node:test";
-import assert from "node:assert";
-import { compilePhase0 } from "../../../src/api";
-const test = ((..._args: unknown[]) => {}) as typeof testBase;
-
+import test from "node:test";import assert from "node:assert";
+import { compile } from "../../../src/api";
+ 
 test("if with then only", async () => {
-  const result = await compilePhase0(`(program (fn foo ((x)) x) (if true (foo 1)))`, { enableTsc: false });
+  const result = await compile(`(program (fn foo ((x)) x) (if true (foo 1)))`, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /if \(true\)/);
   assert.match(result.tsSource, /foo\(1\)/);
 });
 
 test("if with then and else", async () => {
-  const result = await compilePhase0(`(program (fn foo ((x)) x) (fn bar ((x)) x) (if false (foo 1) (bar 2)))`, { enableTsc: false });
+  const result = await compile(`(program (fn foo ((x)) x) (fn bar ((x)) x) (if false (foo 1) (bar 2)))`, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /if \(false\)/);
   assert.match(result.tsSource, /foo\(1\)/);
@@ -24,25 +22,25 @@ test("if with then and else", async () => {
 });
 
 test("if with identifier condition", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (fn foo ((x)) x)
       (fn bar ((x)) x)
       (let* ((x true))
         (if x (foo 1) (bar 2))))
-  `, { enableTsc: false });
+  `, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /if \(x\)/);
 });
 
 test("if with call condition", async () => {
-  const result = await compilePhase0(`(program (fn isReady () true) (fn go () null) (if (isReady) (go)))`, { enableTsc: false });
+  const result = await compile(`(program (fn isReady () true) (fn go () null) (if (isReady) (go)))`, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /if \(isReady\(\)\)/);
 });
 
 test("nested if expressions", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (fn a () null)
       (fn b () null)
@@ -50,14 +48,14 @@ test("nested if expressions", async () => {
       (if true
         (if false (a) (b))
         (c)))
-  `, { enableTsc: false });
+  `, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /if \(true\)/);
   assert.match(result.tsSource, /if \(false\)/);
 });
 
 test("if with block branches", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (fn foo ((x)) x)
       (fn bar ((x)) x)
@@ -68,7 +66,7 @@ test("if with block branches", async () => {
           (bar 2))
         (block
           (baz 3))))
-  `, { enableTsc: false });
+  `, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /if \(true\)/);
   assert.match(result.tsSource, /foo\(1\)/);

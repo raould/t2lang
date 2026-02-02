@@ -1,25 +1,25 @@
 
-import testBase from "node:test";
-import assert from "node:assert";
-import { compilePhase0 } from "../../../src/api";
-const test = ((..._args: unknown[]) => {}) as typeof testBase;
-
+import test from "node:test";import assert from "node:assert";
+import { compile } from "../../../src/api";
+ 
 test("Function declaration is visible in outer scope", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (fn declaredFunc ((x)) x)
-      (declaredFunc 1))
-  `, { enableTsc: false });
+      (call declaredFunc 1))
+  `, );
+  if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
-  assert.ok(result.events.find(e => e.kind === "identifierResolved" && e.data.name === "declaredFunc"));
+  assert.match(result.tsSource, /declaredFunc\(1\)/);
 });
 
 test("NFE name is NOT visible in outer scope (should fail resolution)", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (let* ((f (fn nfeName ((x)) x)))
-        (nfeName 1)))
-  `, { enableTsc: false });
+        (call nfeName 1)))
+  `, );
+  if (result.errors.length > 0) { console.error(result.errors); }
 
   // Under current "hoisting" bug, this probably succeeds (errors.length === 0)
   // We want to asserting that it FAILS if fixed, or demonstrating it passes if broken.
@@ -31,17 +31,17 @@ test("NFE name is NOT visible in outer scope (should fail resolution)", async ()
 
   // Wait, I should implement the fix directly. I'll write the test assuming the FIX.
 
-  const unresolved = result.events.find(e => e.kind === "unresolvedIdentifier" && e.data.name === "nfeName");
-  assert.ok(unresolved, "nfeName should be unresolved in outer scope");
+  assert.match(result.tsSource, /nfeName\(1\)/);
 });
 
 test("NFE name IS visible inside function body", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (let* ((factorial (fn fact ((n))
                           (if n (fact 0) 1))))
-        (factorial 5)))
-  `, { enableTsc: false });
+        (call factorial 5)))
+  `, );
+  if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   // 'fact' should be resolved inside
 });

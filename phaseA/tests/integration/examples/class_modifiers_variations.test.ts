@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { compilePhase0 } from '../../../src/api';
+import { compile } from '../../../src/api';
 
 test('various class field modifier combinations are emitted', async () => {
   const src = `
@@ -21,7 +21,7 @@ test('various class field modifier combinations are emitted', async () => {
           (field public static readonly "psr" 6)))
     )
   `;
-  const result = await compilePhase0(src, { enableTsc: false });
+  const result = await compile(src, );
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
 

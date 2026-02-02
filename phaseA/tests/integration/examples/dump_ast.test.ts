@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert";
-import { compilePhase0 } from "../../../src/api";
+import { compile } from "../../../src/api";
 
 test("dumpAst=true emits parse astDump event", async () => {
     const src = `(program (let* ((x 1)) x))`;
-    const result = await compilePhase0(src, { dumpAst: true, enableTsc: false });
+    const result = await compile(src, { dumpAst: true, enableTsc: false });
     if (result.errors.length > 0) { console.error(result.errors); }
     assert.strictEqual(result.errors.length, 0);
     const hasAstDump = result.events.some(e => e.kind === "astDump" && e.phase === "parse");
@@ -15,7 +15,7 @@ test("dumpAst=true emits parse astDump event", async () => {
 
 test("dumpAst=false does not emit parse astDump event", async () => {
     const src = `(program (let* ((x 1)) x))`;
-    const result = await compilePhase0(src, { dumpAst: false, enableTsc: false });
+    const result = await compile(src, { dumpAst: false, enableTsc: false });
     if (result.errors.length > 0) { console.error(result.errors); }
     assert.strictEqual(result.errors.length, 0);
     const hasAstDump = result.events.some(e => e.kind === "astDump" && e.phase === "parse");

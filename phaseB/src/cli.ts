@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { ParseError, parsePhaseBRaw } from "./reader.js";
 import type { PhaseBNode, ReaderErrorCode } from "./reader.js";
 import type { SourceLoc } from "./location.js";
-import { compilePhaseA } from "../../phaseA/dist/api.js";
+import { compilePhaseA0 } from "../../phaseA/dist/api.js";
 import {
   DEFAULT_ERROR_FORMAT,
   Diagnostic,
@@ -100,7 +100,7 @@ export async function main(argv: string[]): Promise<void> {
       useColor: args.color,
     };
 
-    const result = await compilePhaseA(source, {
+    const result = await compilePhaseA0(source, {
       sourcePath,
       seed: args.seed,
       prettyOption,

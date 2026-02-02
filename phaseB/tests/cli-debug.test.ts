@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { compilePhaseA } from "../../phaseA/dist/api.js";
+import { compile } from "../../phaseA/dist/api.js";
 
 const cliPath = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
 const sampleSource = `
@@ -33,7 +33,7 @@ function cleanup(filePath: string) {
 }
 
 async function compileExpected(): Promise<string> {
-  const result = await compilePhaseA(sampleSource, { prettyOption: "pretty", logLevel: "none" });
+  const result = await compile(sampleSource, { prettyOption: "pretty", logLevel: "none" });
   return result.tsSource.trim();
 }
 

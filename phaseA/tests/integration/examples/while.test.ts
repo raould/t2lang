@@ -2,32 +2,30 @@
  * Test for while loops
  */
 
-import testBase from "node:test";
-import assert from "node:assert";
-import { compilePhase0 } from "../../../src/api";
-const test = ((..._args: unknown[]) => {}) as typeof testBase;
-
+import test from "node:test";import assert from "node:assert";
+import { compile } from "../../../src/api";
+ 
 test("simple while loop", async () => {
-  const result = await compilePhase0(`(program (fn foo () null) (while true (foo)))`, { enableTsc: false });
+  const result = await compile(`(program (fn foo () null) (while true (foo)))`, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /while \(true\)/);
   assert.match(result.tsSource, /foo\(\)/);
 });
 
 test("while with variable condition", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (fn process () null)
       (let* ((running true))
         (while running
           (process))))
-  `, { enableTsc: false });
+  `, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /while \(running\)/);
 });
 
 test("while with multiple body statements", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (fn a () null)
       (fn b () null)
@@ -36,7 +34,7 @@ test("while with multiple body statements", async () => {
         (a)
         (b)
         (c)))
-  `, { enableTsc: false });
+  `, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /a\(\)/);
   assert.match(result.tsSource, /b\(\)/);
@@ -44,7 +42,7 @@ test("while with multiple body statements", async () => {
 });
 
 test("while with call condition", async () => {
-  const result = await compilePhase0(`(program (fn hasMore () true) (fn process () null) (while (hasMore) (process)))`, { enableTsc: false });
+  const result = await compile(`(program (fn hasMore () true) (fn process () null) (while (hasMore) (process)))`, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /while \(hasMore\(\)\)/);
 });

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { compilePhase0 } from '../../../src/api';
+import { compile } from '../../../src/api';
 
 test('class field modifiers are emitted in TS output', async () => {
   const src = `
@@ -13,7 +13,7 @@ test('class field modifiers are emitted in TS output', async () => {
             (assign (prop this "y") 2)))))
     )
   `;
-  const result = await compilePhase0(src, { enableTsc: false });
+  const result = await compile(src, );
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   // emitted TS should include modifiers for the fields

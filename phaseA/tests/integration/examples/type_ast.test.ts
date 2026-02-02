@@ -2,26 +2,25 @@
  * Tests for extended type AST forms and type-alias
  */
 
-import testBase from "node:test";
-import assert from "node:assert";
-import { compilePhase0 } from "../../../src/api";
-const test = ((..._args: unknown[]) => {}) as typeof testBase;
-
+import test from "node:test";import assert from "node:assert";
+import { compile } from "../../../src/api";
+ 
 test("extended type nodes and type-alias", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (type-alias Foo (type-object ("x" (type-number)) ("y" (type-string))))
-      (type-alias Fn (type-function ((type-number) (type-string)) (type-boolean)))
-      (let* ((v (obj (field "x" 1) (field "y" "ok"))))
-        (type-assert v (type-ref "Foo"))
+      (type-alias Fn (type-function (type-number) (type-string) (type-boolean)))
+      (let* ((v (object ("x" 1) ("y" "ok"))))
+        (type-assert v (type-ref Foo))
         (type-assert true (type-boolean))
         (type-assert null (type-null))
         (type-assert undefined (type-undefined))
         (type-assert "hi" (type-literal "hi"))))
-  `, { enableTsc: false });
+  `, );
 
+  if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
-  assert.match(result.tsSource, /type Foo = \{ x: number, y: string \}/);
+  assert.match(result.tsSource, /type Foo = \{ x: number; y: string \}/);
   assert.match(result.tsSource, /type Fn = \(number, string\) => boolean/);
   assert.match(result.tsSource, /\(v as Foo\)/);
   assert.match(result.tsSource, /\(true as boolean\)/);

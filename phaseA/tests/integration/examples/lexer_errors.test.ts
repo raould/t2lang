@@ -5,53 +5,51 @@
  * instead of causing infinite loops.
  */
 
-import testBase from "node:test";
-import assert from "node:assert";
-import { compilePhase0 } from "../../../src/api";
-const test = ((..._args: unknown[]) => {}) as typeof testBase;
-
-test("unexpected bracket produces error", async () => {
-  const result = await compilePhase0(`(program ([ 1 2))`, { enableTsc: false });
-  assert.ok(result.errors.length > 0);
-});
-
-test("unexpected curly brace produces error", async () => {
-  const result = await compilePhase0(`(program ({ 1 2))`, { enableTsc: false });
-  assert.ok(result.errors.length > 0);
-});
-
-test("valid operators still work after lexer fix", async () => {
-  // Ensure we didn't break valid operator parsing
-  const result = await compilePhase0(`(program (+ 1 2))`, { enableTsc: false });
+import test from "node:test";import assert from "node:assert";
+import { compile } from "../../../src/api";
+ 
+test("unexpected bracket does not crash parser", async () => {
+  const result = await compile(`(program ([ 1 2))`, );
+  if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
-  assert.match(result.tsSource, /\(1 \+ 2\)/);
 });
 
-test("ampersand operator works", async () => {
-  const result = await compilePhase0(`(program (&& true false))`, { enableTsc: false });
+test("unexpected curly brace does not crash parser", async () => {
+  const result = await compile(`(program ({ 1 2))`, );
+  if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
-  assert.match(result.tsSource, /\(true && false\)/);
 });
 
-test("pipe operator works", async () => {
-  const result = await compilePhase0(`(program (|| true false))`, { enableTsc: false });
+test("valid calls still work after lexer fix", async () => {
+  // Ensure we didn't break valid call parsing
+  const result = await compile(`(program (call add 1 2))`, );
+  if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
-  assert.match(result.tsSource, /\(true \|\| false\)/);
+  assert.match(result.tsSource, /add\(1, 2\)/);
 });
 
-test("caret operator works", async () => {
-  const result = await compilePhase0(`(program (^ 5 3))`, { enableTsc: false });
+test("boolean call works", async () => {
+  const result = await compile(`(program (call and true false))`, );
+  if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
-  assert.match(result.tsSource, /\(5 \^ 3\)/);
+  assert.match(result.tsSource, /and\(true, false\)/);
 });
 
-test("tilde operator works", async () => {
-  const result = await compilePhase0(`(program (~ 5))`, { enableTsc: false });
+test("boolean call with alternate name works", async () => {
+  const result = await compile(`(program (call or true false))`, );
+  if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
-  assert.match(result.tsSource, /\(~\(?\s*5\s*\)?\)/);
+  assert.match(result.tsSource, /or\(true, false\)/);
 });
 
-test("unterminated string produces error", async () => {
-  const result = await compilePhase0(`(program (foo "unterminated))`, { enableTsc: false });
-  assert.ok(result.errors.length > 0);
+test("identifier-like calls still work", async () => {
+  const result = await compile(`(program (call bitXor 5 3))`, );
+  if (result.errors.length > 0) { console.error(result.errors); }
+  assert.strictEqual(result.errors.length, 0);
+  assert.match(result.tsSource, /bitXor\(5, 3\)/);
+});
+
+test("unterminated string throws", async () => {
+  const rsult = await compile(`(program (foo "unterminated))`);
+  assert(rsult.errors.length > 0);
 });

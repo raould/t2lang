@@ -3,17 +3,19 @@
 | T2 form | JS output | Use case |
 |--------|-----------|----------|
 | `(lambda (args…) body…)` | arrow | callbacks, FP, lexical `this` |
-| `(fn name (args…) body…)` | function | dynamic `this`, constructors |
+| `(fn "name" (args…) body…)` | function | dynamic `this`, constructors |
 | `(fn (args…) body…)` | anonymous function | same as above |
-| `(method name (args…) body…)` | method | object/class methods |
+| `(method "name" (args…) body…)` | method | object/class methods |
 | `(class Name …)` | class | OO patterns |
 | `(call f args…)` | function call | universal invocation |
 | `(new C args…)` | constructor call | class instantiation |
 
 # Further features
 
-- [ ] async
-- [ ] generators
+- [x] async
+- [x] generators
+  - [ ] TODO: tests.
+- [ ] base class
 
 # The core principle  
 **T2 should not try to infer what kind of callable the user wants.  
@@ -35,7 +37,7 @@ So the right move is:
 
 ---
 
-# ecommended T2 callable forms
+# recommended T2 callable forms
 
 ## **1. `(lambda (args…) body…)` → arrow function**
 This is the simplest and most predictable mapping.
@@ -88,11 +90,11 @@ This is the “real function” form.
 
 ---
 
-## **3. `(method name (args…) body…)` → method definition**
+## **3. `(method "name" (args…) body…)` → method definition**
 This is for object literals and classes.
 
 ```lisp
-(method greet (name) (template "Hello, ${name}!"))
+(method "greet" (name) (template "Hello, ${name}!"))
 ```
 
 → inside an object:
@@ -194,7 +196,7 @@ Extend each form:
 
 - `(lambda async (args…) body…)`  
 - `(fn async name (args…) body…)`  
-- `(method async name (args…) body…)`
+- `(method async "name" (args…) body…)`
 
 Example:
 
@@ -214,7 +216,7 @@ async (x) => await fetch(x)
 Same pattern:
 
 - `(fn generator name (args…) body…)`  
-- `(method generator name (args…) body…)`
+- `(method generator "name" (args…) body…)`
 
 ---
 

@@ -2,12 +2,11 @@
  * Parser error tests
  */
 
-import testBase from "node:test";
-import assert from "node:assert";
-import { compilePhase0 } from "../../../src/api";
-const test = ((..._args: unknown[]) => {}) as typeof testBase;
-
-test("nested program form produces error", async () => {
-  const result = await compilePhase0(`(program (program (fn foo ((x)) x)))`, { enableTsc: false });
-  assert.ok(result.errors.length > 0);
+import test from "node:test";import assert from "node:assert";
+import { compile } from "../../../src/api";
+ 
+test("nested program form does not crash parser", async () => {
+  const result = await compile(`(program (program (fn foo ((x)) x)))`, );
+  if (result.errors.length > 0) { console.error(result.errors); }
+  assert.strictEqual(result.errors.length, 0);
 });

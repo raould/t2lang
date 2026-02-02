@@ -31,6 +31,8 @@ import {
   IndexExpr,
   ObjectExpr,
   NewExpr,
+  FunctionExpr,
+  ClassExpr,
 } from "../src/phaseA1.js";
 
 test("parseSource skips comments and preserves original line numbers", () => {
@@ -191,6 +193,28 @@ test("parseSource handles import/export statements", () => {
   assert.ok(exportDefault.spec.defaultExport instanceof CallExpr);
 });
 
+test("parseSource handles class extends/implements", () => {
+  const source = `(program
+    (class Child
+      (extends Parent)
+      (implements Foo Bar)
+      (class-body
+        (method "constructor" ()
+          (call super))))
+  )`;
+
+  const program = parseSource(source);
+  const classExpr = program.body[0];
+  assert.ok(classExpr instanceof ClassExpr);
+  assert.ok(classExpr.extends instanceof Identifier);
+  assert.strictEqual((classExpr.extends as Identifier).name, "Parent");
+  assert.strictEqual(classExpr.implements?.length, 2);
+  assert.ok(classExpr.implements?.[0] instanceof Identifier);
+  assert.ok(classExpr.implements?.[1] instanceof Identifier);
+  assert.strictEqual((classExpr.implements?.[0] as Identifier).name, "Foo");
+  assert.strictEqual((classExpr.implements?.[1] as Identifier).name, "Bar");
+});
+
 test("parseSource handles type expressions and assertions", () => {
   const source = `(program
     (type-alias OptionalValue
@@ -265,4 +289,28 @@ test("parseSource handles type expressions and assertions", () => {
   assert.ok(assertExpr instanceof TypeAssertExpr);
   assert.ok(assertExpr.assertedType instanceof TypeRef);
   assert.strictEqual(assertExpr.assertedType.identifier.name, "Box");
+});
+
+test("parseSource honors async callable flags", () => {
+  const source = `(program
+    (fn async ((value))
+      (return value))
+  )`;
+
+  const [functionStmt] = parseSource(source).body;
+  assert.ok(functionStmt instanceof FunctionExpr);
+  assert.strictEqual(functionStmt.async, true);
+  assert.strictEqual(functionStmt.generator, false);
+});
+
+test("parseSource honors generator callable flags", () => {
+  const source = `(program
+    (fn generator ((value))
+      (return value))
+  )`;
+
+  const [functionStmt] = parseSource(source).body;
+  assert.ok(functionStmt instanceof FunctionExpr);
+  assert.strictEqual(functionStmt.generator, true);
+  assert.strictEqual(functionStmt.async, false);
 });

@@ -1,0 +1,1475 @@
+
+> phaseA@0.1.0 test
+> npm run build && node ./scripts/run-tests.mjs
+
+
+> phaseA@0.1.0 build
+> tsc --project tsconfig.json
+
+Found 61 test files.
+[32m✔ compilePhaseA0 parses/serializes/codegens simple let* [90m(12.599088ms)[39m[39m
+[32m✔ compilePhaseA0 generates for loops [90m(10.894327ms)[39m[39m
+[32m✔ compilePhaseA0 emits control-flow nesting [90m(11.227655ms)[39m[39m
+[32m✔ compilePhaseA0 emits prop/index/object/new output [90m(4.280138ms)[39m[39m
+[32m✔ compilePhaseA0 emits import/export statements [90m(4.253154ms)[39m[39m
+[32m✔ compilePhaseA0 emits async function keyword [90m(5.267557ms)[39m[39m
+[32m✔ compilePhaseA0 emits generator function keyword [90m(1.205915ms)[39m[39m
+[32m✔ generateCode emits lambda expressions [90m(0.927666ms)[39m[39m
+[32m✔ generateCode emits fn expressions [90m(1.111636ms)[39m[39m
+[32m✔ compilePhaseA0 emits type alias definitions [90m(5.212306ms)[39m[39m
+[32m✔ generateCode emits async generator with type params [90m(4.849396ms)[39m[39m
+[32m✔ empty array [90m(28.099811ms)[39m[39m
+[32m✔ array with numbers [90m(12.513223ms)[39m[39m
+[32m✔ array with strings [90m(4.725967ms)[39m[39m
+[32m✔ array with mixed types [90m(1.78145ms)[39m[39m
+[32m✔ nested arrays [90m(3.306025ms)[39m[39m
+[32m✔ array assigned to variable [90m(16.97888ms)[39m[39m
+[32m✔ empty array [90m(15.344737ms)[39m[39m
+[32m✔ array with numbers [90m(9.30388ms)[39m[39m
+[32m✔ array with strings [90m(4.786478ms)[39m[39m
+[32m✔ array with mixed types [90m(3.216282ms)[39m[39m
+[32m✔ nested arrays [90m(5.472647ms)[39m[39m
+[32m✔ array assigned to variable [90m(12.623011ms)[39m[39m
+[32m✔ simple assignment [90m(35.078005ms)[39m[39m
+[32m✔ assignment to property [90m(10.312645ms)[39m[39m
+[32m✔ assignment to array index [90m(8.651285ms)[39m[39m
+[32m✔ simple for loop [90m(11.068032ms)[39m[39m
+[32m✔ for loop with null init [90m(4.4011ms)[39m[39m
+[32m✔ infinite for loop [90m(2.577582ms)[39m[39m
+[32m✔ array index [90m(2.76875ms)[39m[39m
+[32m✔ nested index [90m(2.57984ms)[39m[39m
+[32m✔ index with expression [90m(5.040339ms)[39m[39m
+[32m✔ new with no args [90m(3.822087ms)[39m[39m
+[32m✔ new with args [90m(2.641342ms)[39m[39m
+[32m✔ new with multiple args [90m(8.108866ms)[39m[39m
+[32m✔ combined usage [90m(6.263726ms)[39m[39m
+[32m✔ simple assignment [90m(19.624998ms)[39m[39m
+[32m✔ assignment to property [90m(3.686778ms)[39m[39m
+[32m✔ assignment to array index [90m(4.817854ms)[39m[39m
+[32m✔ simple for loop [90m(9.98268ms)[39m[39m
+[32m✔ for loop with null init [90m(5.205752ms)[39m[39m
+[32m✔ infinite for loop [90m(7.614714ms)[39m[39m
+[32m✔ array index [90m(2.497283ms)[39m[39m
+[32m✔ nested index [90m(1.914537ms)[39m[39m
+[32m✔ index with expression [90m(2.329412ms)[39m[39m
+[32m✔ new with no args [90m(5.573689ms)[39m[39m
+[32m✔ new with args [90m(3.769357ms)[39m[39m
+[32m✔ new with multiple args [90m(1.905982ms)[39m[39m
+[32m✔ combined usage [90m(6.083926ms)[39m[39m
+[32m✔ block with nested let and call [90m(61.711863ms)[39m[39m
+[32m✔ block with nested let and call [90m(34.412197ms)[39m[39m
+[32m✔ class modifiers end-to-end: compile to JS and run [90m(231.896787ms)[39m[39m
+[32m✔ class field modifiers are emitted in TS output [90m(17.988661ms)[39m[39m
+[32m✔ readonly field is emitted and not enforced by t2lang [90m(27.210918ms)[39m[39m
+[32m✔ various class field modifier combinations are emitted [90m(21.943427ms)[39m[39m
+[32m✔ simple class with field [90m(17.08551ms)[39m[39m
+[32m✔ class with method [90m(10.751266ms)[39m[39m
+[32m✔ class with method params [90m(3.315254ms)[39m[39m
+[32m✔ class with field and method [90m(6.718813ms)[39m[39m
+[32m✔ simple type assert [90m(3.514442ms)[39m[39m
+[32m✔ type assert on expression [90m(2.672449ms)[39m[39m
+[32m✔ throw error [90m(6.222058ms)[39m[39m
+[32m✔ throw variable [90m(3.838876ms)[39m[39m
+[32m✔ simple try-catch [90m(6.992038ms)[39m[39m
+[32m✔ try-catch with finally [90m(5.116063ms)[39m[39m
+[32m✔ try-catch with multiple statements [90m(8.720393ms)[39m[39m
+[32m✔ try-catch with empty catch body still emits catch [90m(5.557387ms)[39m[39m
+[32m✔ simple class with field [90m(12.105626ms)[39m[39m
+[32m✔ class with method [90m(15.111171ms)[39m[39m
+[32m✔ class with method params [90m(2.597768ms)[39m[39m
+[32m✔ class with field and method [90m(2.981207ms)[39m[39m
+[32m✔ simple type assert [90m(5.009394ms)[39m[39m
+[32m✔ type assert on expression [90m(2.154542ms)[39m[39m
+[32m✔ throw error [90m(5.377047ms)[39m[39m
+[32m✔ throw variable [90m(1.182617ms)[39m[39m
+[32m✔ simple try-catch [90m(3.479692ms)[39m[39m
+[32m✔ try-catch with finally [90m(6.177517ms)[39m[39m
+[32m✔ try-catch with multiple statements [90m(3.65189ms)[39m[39m
+[32m✔ try-catch with empty catch body still emits catch [90m(2.485946ms)[39m[39m
+[32m✔ lisp-style semicolon comment [90m(15.672913ms)[39m[39m
+[32m✔ lisp-style inline comment [90m(4.276542ms)[39m[39m
+[32m✔ c-style double-slash comment [90m(4.419544ms)[39m[39m
+[32m✔ c-style block comment [90m(2.731648ms)[39m[39m
+[32m✔ multi-line block comment [90m(2.244955ms)[39m[39m
+[32m✔ mixed comment styles [90m(4.315135ms)[39m[39m
+[32m✔ comment at end of file [90m(2.202598ms)[39m[39m
+[32m✔ lisp-style semicolon comment [90m(14.821504ms)[39m[39m
+[32m✔ lisp-style inline comment [90m(4.052618ms)[39m[39m
+[32m✔ c-style double-slash comment [90m(4.401262ms)[39m[39m
+[32m✔ c-style block comment [90m(3.12729ms)[39m[39m
+[32m✔ multi-line block comment [90m(2.778916ms)[39m[39m
+[32m✔ mixed comment styles [90m(4.952961ms)[39m[39m
+[32m✔ comment at end of file [90m(2.120623ms)[39m[39m
+[32m✔ const binding [90m(20.35843ms)[39m[39m
+[32m✔ const sequential binding - later can reference earlier [90m(4.52556ms)[39m[39m
+[32m✔ const with multiple bindings [90m(8.82426ms)[39m[39m
+[32m✔ let still produces let keyword [90m(6.599143ms)[39m[39m
+[32m✔ const binding [90m(20.840932ms)[39m[39m
+[32m✔ const sequential binding - later can reference earlier [90m(7.134481ms)[39m[39m
+[32m✔ const with multiple bindings [90m(5.462853ms)[39m[39m
+[32m✔ let still produces let keyword [90m(3.237358ms)[39m[39m
+DEBUGOUTPUT_PARSED:SANITY
+[DEBUG] Parsed AST: nodeCount=0
+
+DEBUGOUTPUT_CODEGEN:SANITY
+[DEBUG] Codegen output: size=3
+
+[32m✔ T2_DEBUG_PARSE prints parsed AST in phase0 [90m(13.837839ms)[39m[39m
+[32m✔ T2_DEBUG_CODEGEN prints codegen output in phase0 [90m(1.790767ms)[39m[39m
+[32m✔ let declaration as expression [90m(26.390673ms)[39m[39m
+[32m✔ let declaration as expression [90m(36.162401ms)[39m[39m
+[32m✔ dotted method invocation emits method call [90m(90.580415ms)[39m[39m
+[32m✔ dumpAst=true emits parse astDump event [90m(12.114323ms)[39m[39m
+[32m✔ dumpAst=false does not emit parse astDump event [90m(3.968174ms)[39m[39m
+{
+function greet(name) {
+return name;
+}
+}
+[31m✖ named with atom param [90m(19.540596ms)[39m[39m
+[31m✖ named with typed param [90m(1.695573ms)[39m[39m
+[32m✔ named function with no params [90m(3.876516ms)[39m[39m
+[32m✔ named function with params [90m(5.828478ms)[39m[39m
+[32m✔ function with return [90m(3.965759ms)[39m[39m
+[32m✔ function with empty return [90m(1.338495ms)[39m[39m
+[32m✔ anonymous function (lambda) [90m(3.72877ms)[39m[39m
+[32m✔ lambda as callback [90m(7.645115ms)[39m[39m
+[32m✔ function with multiple statements in body [90m(7.747743ms)[39m[39m
+[31m✖ fn returns last expression without explicit return [90m(8.4335ms)[39m[39m
+[31m✖ fn supports inline return type annotation (plain sexpr) [90m(5.175176ms)[39m[39m
+[31m✖ fn annotated return type mismatch produces error [90m(4.823394ms)[39m[39m
+[32m✔ function with return [90m(14.744537ms)[39m[39m
+[32m✔ function with empty return [90m(4.158065ms)[39m[39m
+[32m✔ anonymous function (lambda) [90m(4.759113ms)[39m[39m
+[32m✔ lambda as callback [90m(8.230626ms)[39m[39m
+[32m✔ function with multiple statements in body [90m(4.361826ms)[39m[39m
+[31m✖ generic function (simple typeparam) emits generic syntax [90m(22.775044ms)[39m[39m
+[31m✖ generic function with extends constraint emits extends [90m(1.175644ms)[39m[39m
+[31m✖ generic type param with default emits = default [90m(0.736648ms)[39m[39m
+[31m✖ multiple type parameters and usage in type alias emits params [90m(1.461996ms)[39m[39m
+[31m✖ explicit type application via type-app form emits <...> at use site [90m(2.060938ms)[39m[39m
+[31m✖ malformed duplicate type param names produce syntax error [90m(6.410408ms)[39m[39m
+[31m✖ multiple type params with mixed constraints and defaults [90m(0.629562ms)[39m[39m
+[31m✖ type application with multiple type args [90m(2.433476ms)[39m[39m
+[31m✖ nested type applications [90m(0.967765ms)[39m[39m
+[31m✖ generic class with type params [90m(0.907233ms)[39m[39m
+[31m✖ type alias referencing another generic type alias [90m(0.754369ms)[39m[39m
+[32m✔ function with type params calling another generic function [90m(6.016413ms)[39m[39m
+[31m✖ constraint that is a type-app [90m(1.098219ms)[39m[39m
+[31m✖ default that is a complex type [90m(1.78096ms)[39m[39m
+[31m✖ type param in interface [90m(6.156344ms)[39m[39m
+[31m✖ Function declaration is visible in outer scope [90m(36.564603ms)[39m[39m
+[31m✖ NFE name is NOT visible in outer scope (should fail resolution) [90m(8.437013ms)[39m[39m
+[32m✔ NFE name IS visible inside function body [90m(6.30988ms)[39m[39m
+[32m✔ if with then only [90m(20.885667ms)[39m[39m
+[32m✔ if with then and else [90m(9.167748ms)[39m[39m
+[32m✔ if with identifier condition [90m(6.252535ms)[39m[39m
+[32m✔ if with call condition [90m(2.922843ms)[39m[39m
+[32m✔ nested if expressions [90m(3.804208ms)[39m[39m
+[32m✔ if with block branches [90m(4.236842ms)[39m[39m
+[32m✔ if with then only [90m(21.948074ms)[39m[39m
+[32m✔ if with then and else [90m(6.727551ms)[39m[39m
+[32m✔ if with identifier condition [90m(5.481196ms)[39m[39m
+[32m✔ if with call condition [90m(3.692432ms)[39m[39m
+[32m✔ nested if expressions [90m(4.608739ms)[39m[39m
+[32m✔ if with block branches [90m(7.364464ms)[39m[39m
+[32m✔ backtick lexes as punct [90m(2.008939ms)[39m[39m
+[31m✖ unexpected bracket produces error [90m(24.727874ms)[39m[39m
+[31m✖ unexpected curly brace produces error [90m(6.512553ms)[39m[39m
+[32m✔ valid operators still work after lexer fix [90m(2.804068ms)[39m[39m
+[32m✔ ampersand operator works [90m(2.259953ms)[39m[39m
+[32m✔ pipe operator works [90m(4.053524ms)[39m[39m
+[31m✖ caret operator works [90m(2.817421ms)[39m[39m
+[31m✖ tilde operator works [90m(2.392752ms)[39m[39m
+[31m✖ unterminated string produces error [90m(0.550818ms)[39m[39m
+[31m✖ unexpected bracket produces error [90m(37.683545ms)[39m[39m
+[31m✖ unexpected curly brace produces error [90m(7.521123ms)[39m[39m
+[32m✔ valid operators still work after lexer fix [90m(6.034409ms)[39m[39m
+[32m✔ ampersand operator works [90m(3.22665ms)[39m[39m
+[32m✔ pipe operator works [90m(3.838848ms)[39m[39m
+[31m✖ caret operator works [90m(2.638603ms)[39m[39m
+[31m✖ tilde operator works [90m(2.632492ms)[39m[39m
+[31m✖ unterminated string produces error [90m(0.477601ms)[39m[39m
+[32m✔ boolean literal true [90m(16.305128ms)[39m[39m
+[32m✔ boolean literal false [90m(7.040178ms)[39m[39m
+[32m✔ null literal [90m(4.251522ms)[39m[39m
+[32m✔ undefined literal [90m(1.812019ms)[39m[39m
+[32m✔ mixed literals in let binding [90m(5.916404ms)[39m[39m
+[31m✖ string literal escapes [90m(6.702922ms)[39m[39m
+[32m✔ boolean literal true [90m(35.94544ms)[39m[39m
+[32m✔ boolean literal false [90m(4.339865ms)[39m[39m
+[32m✔ null literal [90m(3.197708ms)[39m[39m
+[32m✔ undefined literal [90m(3.429555ms)[39m[39m
+[32m✔ mixed literals in let binding [90m(4.422002ms)[39m[39m
+[31m✖ string literal escapes [90m(9.632288ms)[39m[39m
+[31m✖ empty object [90m(15.03324ms)[39m[39m
+[31m✖ object with string value [90m(13.166869ms)[39m[39m
+[31m✖ object with number value [90m(4.546295ms)[39m[39m
+[31m✖ object with multiple fields [90m(5.156638ms)[39m[39m
+[31m✖ nested object [90m(8.604042ms)[39m[39m
+[31m✖ object with array field [90m(2.244231ms)[39m[39m
+[31m✖ object assigned to variable [90m(14.698069ms)[39m[39m
+[31m✖ empty object [90m(55.045727ms)[39m[39m
+[31m✖ object with string value [90m(19.90174ms)[39m[39m
+[31m✖ object with number value [90m(8.871889ms)[39m[39m
+[31m✖ object with multiple fields [90m(15.358562ms)[39m[39m
+[31m✖ nested object [90m(10.06159ms)[39m[39m
+[31m✖ object with array field [90m(7.090304ms)[39m[39m
+[31m✖ object assigned to variable [90m(16.525123ms)[39m[39m
+[31m✖ arithmetic operators [90m(45.763973ms)[39m[39m
+[32m✔ comparison operators [90m(13.877399ms)[39m[39m
+[31m✖ logical operators [90m(3.500329ms)[39m[39m
+[32m✔ unary typeof [90m(2.739323ms)[39m[39m
+[32m✔ nested operators [90m(1.516033ms)[39m[39m
+[32m✔ operators in function [90m(3.914367ms)[39m[39m
+[31m✖ operator with wrong arity becomes regular call [90m(2.566144ms)[39m[39m
+[31m✖ arithmetic operators [90m(92.362999ms)[39m[39m
+[32m✔ comparison operators [90m(40.477846ms)[39m[39m
+[31m✖ logical operators [90m(28.534542ms)[39m[39m
+[32m✔ unary typeof [90m(4.509271ms)[39m[39m
+[32m✔ nested operators [90m(1.285606ms)[39m[39m
+[32m✔ operators in function [90m(13.203247ms)[39m[39m
+[31m✖ operator with wrong arity becomes regular call [90m(1.612676ms)[39m[39m
+[32m✔ basic parse: call [90m(49.786747ms)[39m[39m
+[31m✖ parse import-default [90m(5.535143ms)[39m[39m
+[31m✖ parse import-named [90m(10.700727ms)[39m[39m
+[31m✖ parse import-all [90m(1.372421ms)[39m[39m
+[31m✖ parse export named [90m(8.582877ms)[39m[39m
+[31m✖ parse export-default [90m(1.227139ms)[39m[39m
+[31m✖ identifier location uses start position [90m(2.004476ms)[39m[39m
+[32m✔ basic parse: call [90m(36.594425ms)[39m[39m
+[31m✖ parse import-default [90m(3.749232ms)[39m[39m
+[31m✖ parse import-named [90m(1.865644ms)[39m[39m
+[31m✖ parse import-all [90m(1.484064ms)[39m[39m
+[31m✖ parse export named [90m(2.87188ms)[39m[39m
+[31m✖ parse export-default [90m(3.817736ms)[39m[39m
+[31m✖ identifier location uses start position [90m(5.332437ms)[39m[39m
+[31m✖ nested program form produces error [90m(129.631716ms)[39m[39m
+[31m✖ nested program form produces error [90m(68.861878ms)[39m[39m
+[32m✔ simple property access [90m(17.2236ms)[39m[39m
+[32m✔ console.log via prop and call [90m(11.151273ms)[39m[39m
+[32m✔ chained property access [90m(3.836756ms)[39m[39m
+[32m✔ property access in let binding [90m(4.246595ms)[39m[39m
+[32m✔ method call on object [90m(3.071038ms)[39m[39m
+[32m✔ implicit call still works [90m(1.942536ms)[39m[39m
+[32m✔ simple property access [90m(40.957699ms)[39m[39m
+[32m✔ console.log via prop and call [90m(11.631987ms)[39m[39m
+[32m✔ chained property access [90m(4.089238ms)[39m[39m
+[32m✔ property access in let binding [90m(4.922296ms)[39m[39m
+[32m✔ method call on object [90m(2.842817ms)[39m[39m
+[32m✔ implicit call still works [90m(1.839282ms)[39m[39m
+[31m✖ unresolved identifier emits event [90m(27.907385ms)[39m[39m
+[31m✖ unresolved identifier emits event [90m(22.609805ms)[39m[39m
+[31m✖ runCli passes CompilerConfig flags to compileFn [90m(4.653453ms)[39m[39m
+[31m✖ extended type nodes and type-alias [90m(5.01812ms)[39m[39m
+[31m✖ extended type nodes and type-alias [90m(9.588196ms)[39m[39m
+[31m✖ multiple type errors are aggregated [90m(16.062298ms)[39m[39m
+[31m✖ multiple type errors are aggregated [90m(41.898101ms)[39m[39m
+[31m✖ parse full type AST forms [90m(13.674385ms)[39m[39m
+[31m✖ parse full type AST forms [90m(8.35936ms)[39m[39m
+[32m✔ simple while loop [90m(12.485639ms)[39m[39m
+[32m✔ while with variable condition [90m(7.393543ms)[39m[39m
+[32m✔ while with multiple body statements [90m(7.870178ms)[39m[39m
+[32m✔ while with call condition [90m(2.985691ms)[39m[39m
+[32m✔ simple while loop [90m(17.636192ms)[39m[39m
+[32m✔ while with variable condition [90m(6.740455ms)[39m[39m
+[32m✔ while with multiple body statements [90m(5.273683ms)[39m[39m
+[32m✔ while with call condition [90m(2.397658ms)[39m[39m
+[32m✔ parseSource skips comments and preserves original line numbers [90m(6.583373ms)[39m[39m
+[32m✔ parseSource handles for loops [90m(1.788471ms)[39m[39m
+[32m✔ parseSource handles control-flow nesting [90m(1.882605ms)[39m[39m
+[32m✔ parseSource handles prop/index/object/new expressions [90m(1.211982ms)[39m[39m
+[32m✔ parseSource handles import/export statements [90m(1.94585ms)[39m[39m
+[32m✔ parseSource handles type expressions and assertions [90m(3.070175ms)[39m[39m
+[32m✔ parseSource honors async callable flags [90m(1.165099ms)[39m[39m
+[32m✔ parseSource honors generator callable flags [90m(0.434305ms)[39m[39m
+[
+  {
+    message: 'T2A:Invalid assignment target',
+    span: { start: 0, end: 0, source: 'phaseA0-tests:lit:lit' },
+    stage: 'parse',
+    code: 'T2:0002'
+  }
+]
+[32m✔ phaseA0 processes literal expressions without diagnostics [90m(4.591182ms)[39m[39m
+[32m✔ phaseA0 allows assignments to identifiers [90m(0.651935ms)[39m[39m
+[32m✔ phaseA0 reports diagnostics for invalid assignment targets [90m(1.782842ms)[39m[39m
+[32m✔ phaseA0 runs let* bindings sequentially [90m(0.932206ms)[39m[39m
+[32m✔ phaseA0 evaluates for-classic loops [90m(0.97159ms)[39m[39m
+[32m✔ phaseA0 handles for-of iterations [90m(0.790988ms)[39m[39m
+[32m✔ phaseA0 inspects switch cases [90m(0.657725ms)[39m[39m
+[32m✔ phaseA0 marches through try/catch/finally [90m(2.144064ms)[39m[39m
+[32m✔ phaseA0 evaluates function bodies with returns [90m(0.825285ms)[39m[39m
+[32m✔ phaseA0 visits class bodies [90m(0.715592ms)[39m[39m
+[32m✔ phaseA1 binds array patterns inside let* [90m(3.345515ms)[39m[39m
+[32m✔ phaseA1 supports object pattern bindings [90m(0.718711ms)[39m[39m
+[32m✔ phaseA1 visits spread expressions inside arrays [90m(0.797292ms)[39m[39m
+[32m✔ phaseA1 evaluates ternary expressions [90m(0.645926ms)[39m[39m
+[32m✔ phaseA1 registers import bindings [90m(0.652514ms)[39m[39m
+[32m✔ phaseA1 processes export statements [90m(0.627692ms)[39m[39m
+[32m✔ phaseA1 handles type aliases with parameters [90m(1.029936ms)[39m[39m
+[32m✔ phaseA1 processes interface definitions [90m(0.417691ms)[39m[39m
+[32m✔ phaseA1 accepts typed functions and asserts [90m(0.720015ms)[39m[39m
+[32m✔ phaseA1 traverses decorator-rich classes [90m(1.25352ms)[39m[39m
+[32m✔ serialize program with literal expression [90m(2.917401ms)[39m[39m
+[32m✔ serialize for-of with array pattern binding [90m(0.916661ms)[39m[39m
+[32m✔ serialize/deserialize roundtrip preserves AST shape [90m(0.985983ms)[39m[39m
+[34mℹ tests 288[39m
+[34mℹ suites 0[39m
+[34mℹ pass 212[39m
+[34mℹ fail 76[39m
+[34mℹ cancelled 0[39m
+[34mℹ skipped 0[39m
+[34mℹ todo 0[39m
+[34mℹ duration_ms 7700.941539[39m
+
+[31m✖ failing tests:[39m
+
+test at tests/integration/examples/function.test.ts:1:99
+[31m✖ named with atom param [90m(19.540596ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /function greet1\(name\)/. Input:
+  
+  '{\nfunction greet(name) {\nreturn name;\n}\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/function.test.ts:13:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nfunction greet(name) {\nreturn name;\n}\n}',
+    expected: /function greet1\(name\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/function.test.ts:1:358
+[31m✖ named with typed param [90m(1.695573ms)[39m[39m
+  Error: Type expressions must be lists
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1900:13)
+      at Parser.parseFnParam (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1096:44)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:59)
+      at Array.map (<anonymous>)
+      at Parser.parseFnSignature (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:35)
+      at Parser.buildCallable (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1052:28)
+      at Parser.buildFunction (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:998:17)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:375:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+
+test at tests/integration/examples/function_implicit_return.test.ts:1:99
+[31m✖ fn returns last expression without explicit return [90m(8.4335ms)[39m[39m
+  Error: Type expressions must be lists
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1900:13)
+      at Parser.parseFnParam (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1096:44)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:59)
+      at Array.map (<anonymous>)
+      at Parser.parseFnSignature (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:35)
+      at Parser.buildCallable (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1052:28)
+      at Parser.buildFunction (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:998:17)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:375:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+
+test at tests/integration/examples/function_return_type.test.ts:1:99
+[31m✖ fn supports inline return type annotation (plain sexpr) [90m(5.175176ms)[39m[39m
+  Error: Type expressions must be lists
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1900:13)
+      at Parser.parseFnParam (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1096:44)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:59)
+      at Array.map (<anonymous>)
+      at Parser.parseFnSignature (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:35)
+      at Parser.buildCallable (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1052:28)
+      at Parser.buildFunction (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:998:17)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:375:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+
+test at tests/integration/examples/function_return_type_mismatch.test.ts:1:99
+[31m✖ fn annotated return type mismatch produces error [90m(4.823394ms)[39m[39m
+  Error: Type expressions must be lists
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1900:13)
+      at Parser.parseFnParam (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1096:44)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:59)
+      at Array.map (<anonymous>)
+      at Parser.parseFnSignature (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:35)
+      at Parser.buildCallable (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1052:28)
+      at Parser.buildFunction (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:998:17)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:375:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+
+test at tests/integration/examples/generics.test.ts:1:99
+[31m✖ generic function (simple typeparam) emits generic syntax [90m(22.775044ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: expected emitted TS to contain "<T>"
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/generics.test.ts:9:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '{\nlet identity = function(typeparams, T) {\nx(T)();\nreturns(T);\nreturn x;\n};\n}',
+    expected: /<T>/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/generics.test.ts:1:565
+[31m✖ generic function with extends constraint emits extends [90m(1.175644ms)[39m[39m
+  Error: Unknown type constructor extends
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1972:15)
+      at Parser.parseFnParam (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1096:44)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:59)
+      at Array.map (<anonymous>)
+      at Parser.parseFnSignature (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:35)
+      at Parser.buildCallable (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1052:28)
+      at Parser.buildFunction (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:998:17)
+      at Parser.nodeToExpression (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:754:21)
+      at Parser.nodeToBinding (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:602:29)
+      at Parser.buildLetStar (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:410:28)
+
+test at tests/integration/examples/generics.test.ts:1:984
+[31m✖ generic type param with default emits = default [90m(0.736648ms)[39m[39m
+  Error: Unknown type constructor default
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1972:15)
+      at Parser.parseFnParam (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1096:44)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:59)
+      at Array.map (<anonymous>)
+      at Parser.parseFnSignature (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:35)
+      at Parser.buildCallable (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1052:28)
+      at Parser.buildFunction (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:998:17)
+      at Parser.nodeToExpression (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:754:21)
+      at Parser.nodeToBinding (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:602:29)
+      at Parser.buildLetStar (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:410:28)
+
+test at tests/integration/examples/generics.test.ts:1:1386
+[31m✖ multiple type parameters and usage in type alias emits params [90m(1.461996ms)[39m[39m
+  Error: Type expressions must be lists
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1900:13)
+      at Parser.nodeToTypeField (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1635:64)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1530:63)
+      at Array.map (<anonymous>)
+      at Parser.buildTypeObject (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1530:43)
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1924:21)
+      at Parser.buildTypeAlias (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1747:28)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:387:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+
+test at tests/integration/examples/generics.test.ts:1:1911
+[31m✖ explicit type application via type-app form emits <...> at use site [90m(2.060938ms)[39m[39m
+  Error: Type expressions must be lists
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1900:13)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1718:47)
+      at Array.map (<anonymous>)
+      at Parser.buildTypeApp (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1718:27)
+      at Parser.nodeToExpression (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:766:21)
+      at Parser.buildCall (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:780:25)
+      at Parser.nodeToExpression (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:736:21)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:400:38)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:425:74)
+      at Array.map (<anonymous>)
+
+test at tests/integration/examples/generics.test.ts:1:2396
+[31m✖ malformed duplicate type param names produce syntax error [90m(6.410408ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: expected parse/type syntax error for duplicate type param names
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/generics.test.ts:46:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/generics.test.ts:1:2732
+[31m✖ multiple type params with mixed constraints and defaults [90m(0.629562ms)[39m[39m
+  Error: Unknown type constructor extends
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1972:15)
+      at Parser.parseFnParam (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1096:44)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:59)
+      at Array.map (<anonymous>)
+      at Parser.parseFnSignature (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:35)
+      at Parser.buildCallable (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1052:28)
+      at Parser.buildFunction (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:998:17)
+      at Parser.nodeToExpression (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:754:21)
+      at Parser.nodeToBinding (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:602:29)
+      at Parser.buildLetStar (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:410:28)
+
+test at tests/integration/examples/generics.test.ts:1:3183
+[31m✖ type application with multiple type args [90m(2.433476ms)[39m[39m
+  Error: Unterminated list
+      at Parser.parseList (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:303:15)
+      at Parser.parseNode (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:268:21)
+      at Parser.parseProgram (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:326:23)
+      at parseSource (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:2001:17)
+      at compilePhaseA0 (/home/superman/Dev/t2lang2/phaseA/src/api.ts:107:31)
+      at async compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:149:18)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/generics.test.ts:58:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/generics.test.ts:1:3623
+[31m✖ nested type applications [90m(0.967765ms)[39m[39m
+  Error: Unterminated list
+      at Parser.parseList (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:303:15)
+      at Parser.parseNode (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:268:21)
+      at Parser.parseProgram (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:326:23)
+      at parseSource (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:2001:17)
+      at compilePhaseA0 (/home/superman/Dev/t2lang2/phaseA/src/api.ts:107:31)
+      at async compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:149:18)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/generics.test.ts:65:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/generics.test.ts:1:4035
+[31m✖ generic class with type params [90m(0.907233ms)[39m[39m
+  Error: class-body must start with (class-body ...)
+      at Parser.buildClassBody (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1113:13)
+      at Parser.buildClass (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1107:23)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:384:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+      at Parser.parseProgram (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:41)
+      at parseSource (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:2001:17)
+      at compilePhaseA0 (/home/superman/Dev/t2lang2/phaseA/src/api.ts:107:31)
+      at async compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:149:18)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/generics.test.ts:72:18)
+
+test at tests/integration/examples/generics.test.ts:1:4419
+[31m✖ type alias referencing another generic type alias [90m(0.754369ms)[39m[39m
+  Error: Type expressions must be lists
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1900:13)
+      at Parser.nodeToTypeField (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1635:64)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1530:63)
+      at Array.map (<anonymous>)
+      at Parser.buildTypeObject (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1530:43)
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1924:21)
+      at Parser.buildTypeAlias (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1747:28)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:387:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+
+test at tests/integration/examples/generics.test.ts:1:5351
+[31m✖ constraint that is a type-app [90m(1.098219ms)[39m[39m
+  Error: Unknown type constructor extends
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1972:15)
+      at Parser.parseFnParam (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1096:44)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:59)
+      at Array.map (<anonymous>)
+      at Parser.parseFnSignature (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:35)
+      at Parser.buildCallable (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1052:28)
+      at Parser.buildFunction (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:998:17)
+      at Parser.nodeToExpression (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:754:21)
+      at Parser.nodeToBinding (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:602:29)
+      at Parser.buildLetStar (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:410:28)
+
+test at tests/integration/examples/generics.test.ts:1:5755
+[31m✖ default that is a complex type [90m(1.78096ms)[39m[39m
+  Error: Unknown type constructor default
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1972:15)
+      at Parser.parseFnParam (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1096:44)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:59)
+      at Array.map (<anonymous>)
+      at Parser.parseFnSignature (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1083:35)
+      at Parser.buildCallable (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1052:28)
+      at Parser.buildFunction (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:998:17)
+      at Parser.nodeToExpression (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:754:21)
+      at Parser.nodeToBinding (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:602:29)
+      at Parser.buildLetStar (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:410:28)
+
+test at tests/integration/examples/generics.test.ts:1:6157
+[31m✖ type param in interface [90m(6.156344ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: expected generic interface
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/generics.test.ts:109:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: '{\ninterface(IContainer, typeparams(T()), method("get", [], T));\n}',
+    expected: /interface IContainer<T>/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/hoisting_scoping.test.ts:1:99
+[31m✖ Function declaration is visible in outer scope [90m(36.564603ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(result.events.find(e => e.kind === "identifierResolved" && e.data.name === "declaredFunc"))
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/hoisting_scoping.test.ts:12:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/hoisting_scoping.test.ts:5:163
+[31m✖ NFE name is NOT visible in outer scope (should fail resolution) [90m(8.437013ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: nfeName should be unresolved in outer scope
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/hoisting_scoping.test.ts:33:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/lexer_errors.test.ts:1:99
+[31m✖ unexpected bracket produces error [90m(24.727874ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(result.errors.length > 0)
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/lexer_errors.test.ts:13:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/lexer_errors.test.ts:1:252
+[31m✖ unexpected curly brace produces error [90m(6.512553ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(result.errors.length > 0)
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/lexer_errors.test.ts:18:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/lexer_errors.test.ts:1:1042
+[31m✖ caret operator works [90m(2.817421ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\(5 \^ 3\)/. Input:
+  
+  '{\n^(5, 3);\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/lexer_errors.test.ts:43:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\n^(5, 3);\n}',
+    expected: /\(5 \^ 3\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/lexer_errors.test.ts:1:1234
+[31m✖ tilde operator works [90m(2.392752ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\(~\(?\s*5\s*\)?\)/. Input:
+  
+  '{\n~(5);\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/lexer_errors.test.ts:49:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\n~(5);\n}',
+    expected: /\(~\(?\s*5\s*\)?\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/lexer_errors.test.ts:1:1432
+[31m✖ unterminated string produces error [90m(0.550818ms)[39m[39m
+  Error: Unterminated list
+      at Parser.parseList (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:303:15)
+      at Parser.parseNode (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:268:21)
+      at Parser.parseList (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:321:26)
+      at Parser.parseNode (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:268:21)
+      at Parser.parseProgram (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:326:23)
+      at parseSource (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:2001:17)
+      at compilePhaseA0 (/home/superman/Dev/t2lang2/phaseA/src/api.ts:107:31)
+      at async compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:149:18)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/lexer_errors.test.ts:53:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+
+test at tests/integration/examples/lexer_errors_tsc.test.ts:1:285
+[31m✖ unexpected bracket produces error [90m(37.683545ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(nonTsc(result.errors).length > 0)
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/lexer_errors_tsc.test.ts:15:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/lexer_errors_tsc.test.ts:1:445
+[31m✖ unexpected curly brace produces error [90m(7.521123ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(nonTsc(result.errors).length > 0)
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/lexer_errors_tsc.test.ts:20:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/lexer_errors_tsc.test.ts:1:1263
+[31m✖ caret operator works [90m(2.638603ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\(5 \^ 3\)/. Input:
+  
+  '{\n^(5, 3);\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/lexer_errors_tsc.test.ts:45:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\n^(5, 3);\n}',
+    expected: /\(5 \^ 3\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/lexer_errors_tsc.test.ts:1:1462
+[31m✖ tilde operator works [90m(2.632492ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\(~\(?\s*5\s*\)?\)/. Input:
+  
+  '{\n~(5);\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/lexer_errors_tsc.test.ts:51:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\n~(5);\n}',
+    expected: /\(~\(?\s*5\s*\)?\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/lexer_errors_tsc.test.ts:1:1667
+[31m✖ unterminated string produces error [90m(0.477601ms)[39m[39m
+  Error: Unterminated list
+      at Parser.parseList (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:303:15)
+      at Parser.parseNode (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:268:21)
+      at Parser.parseList (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:321:26)
+      at Parser.parseNode (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:268:21)
+      at Parser.parseProgram (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:326:23)
+      at parseSource (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:2001:17)
+      at compilePhaseA0 (/home/superman/Dev/t2lang2/phaseA/src/api.ts:107:31)
+      at async compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:149:18)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/lexer_errors_tsc.test.ts:55:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+
+test at tests/integration/examples/literals.test.ts:9:255
+[31m✖ string literal escapes [90m(6.702922ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\\["]line2\\["]/. Input:
+  
+  '{\nfunction foo(x) {\nx;\n}\nfoo("line1\\\\n\\\\", line2\\"");\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/literals.test.ts:58:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nfunction foo(x) {\nx;\n}\nfoo("line1\\\\n\\\\", line2\\"");\n}',
+    expected: /\\["]line2\\["]/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/literals_tsc.test.ts:9:313
+[31m✖ string literal escapes [90m(9.632288ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\\["]line2\\["]/. Input:
+  
+  '{\nfunction foo(x) {\nx;\n}\nfoo("line1\\\\n\\\\", line2\\"");\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/literals_tsc.test.ts:64:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nfunction foo(x) {\nx;\n}\nfoo("line1\\\\n\\\\", line2\\"");\n}',
+    expected: /\\["]line2\\["]/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/object.test.ts:1:99
+[31m✖ empty object [90m(15.03324ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\{ {2}\}/. Input:
+  
+  '{\nobj();\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/object.test.ts:11:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nobj();\n}',
+    expected: /\{ {2}\}/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/object.test.ts:1:279
+[31m✖ object with string value [90m(13.166869ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /"name": "John"/. Input:
+  
+  '{\nobj(field("name", "John"));\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/object.test.ts:17:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nobj(field("name", "John"));\n}',
+    expected: /"name": "John"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/object.test.ts:1:499
+[31m✖ object with number value [90m(4.546295ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /"age": 30/. Input:
+  
+  '{\nobj(field("age", 30));\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/object.test.ts:23:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nobj(field("age", 30));\n}',
+    expected: /"age": 30/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/object.test.ts:1:709
+[31m✖ object with multiple fields [90m(5.156638ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /"name": "John"/. Input:
+  
+  '{\nobj(field("name", "John"), field("age", 30), field("active", true));\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/object.test.ts:35:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nobj(field("name", "John"), field("age", 30), field("active", true));\n}',
+    expected: /"name": "John"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/object.test.ts:7:205
+[31m✖ nested object [90m(8.604042ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /"user":/. Input:
+  
+  '{\nobj(field("user", obj(field("name", "John"))));\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/object.test.ts:47:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nobj(field("user", obj(field("name", "John"))));\n}',
+    expected: /"user":/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/object.test.ts:11:156
+[31m✖ object with array field [90m(2.244231ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /"items": \[1, 2, 3\]/. Input:
+  
+  '{\nobj(field("items", [1, 2, 3]));\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/object.test.ts:58:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nobj(field("items", [1, 2, 3]));\n}',
+    expected: /"items": \[1, 2, 3\]/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/object.test.ts:15:122
+[31m✖ object assigned to variable [90m(14.698069ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /const person = \{ "name": "John" \}/. Input:
+  
+  '{\n' +
+    'const foo = function(x) {\n' +
+    'x;\n' +
+    '};\n' +
+    'const person = obj(field("name", "John"));\n' +
+    'foo(person);\n' +
+    '}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/object.test.ts:69:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nconst foo = function(x) {\nx;\n};\nconst person = obj(field("name", "John"));\nfoo(person);\n}',
+    expected: /const person = \{ "name": "John" \}/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/object_tsc.test.ts:1:285
+[31m✖ empty object [90m(55.045727ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\{ {2}\}/. Input:
+  
+  '{\nobj();\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/object_tsc.test.ts:13:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nobj();\n}',
+    expected: /\{ {2}\}/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/object_tsc.test.ts:1:472
+[31m✖ object with string value [90m(19.90174ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /"name": "John"/. Input:
+  
+  '{\nobj(field("name", "John"));\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/object_tsc.test.ts:19:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nobj(field("name", "John"));\n}',
+    expected: /"name": "John"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/object_tsc.test.ts:1:699
+[31m✖ object with number value [90m(8.871889ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /"age": 30/. Input:
+  
+  '{\nobj(field("age", 30));\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/object_tsc.test.ts:25:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nobj(field("age", 30));\n}',
+    expected: /"age": 30/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/object_tsc.test.ts:1:916
+[31m✖ object with multiple fields [90m(15.358562ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /"name": "John"/. Input:
+  
+  '{\nobj(field("name", "John"), field("age", 30), field("active", true));\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/object_tsc.test.ts:37:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nobj(field("name", "John"), field("age", 30), field("active", true));\n}',
+    expected: /"name": "John"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/object_tsc.test.ts:7:212
+[31m✖ nested object [90m(10.06159ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /"user":/. Input:
+  
+  '{\nobj(field("user", obj(field("name", "John"))));\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/object_tsc.test.ts:49:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nobj(field("user", obj(field("name", "John"))));\n}',
+    expected: /"user":/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/object_tsc.test.ts:11:163
+[31m✖ object with array field [90m(7.090304ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /"items": \[1, 2, 3\]/. Input:
+  
+  '{\nobj(field("items", [1, 2, 3]));\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/object_tsc.test.ts:60:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nobj(field("items", [1, 2, 3]));\n}',
+    expected: /"items": \[1, 2, 3\]/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/object_tsc.test.ts:15:129
+[31m✖ object assigned to variable [90m(16.525123ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /const person = \{ "name": "John" \}/. Input:
+  
+  '{\n' +
+    'const foo = function(x) {\n' +
+    'x;\n' +
+    '};\n' +
+    'const person = obj(field("name", "John"));\n' +
+    'foo(person);\n' +
+    '}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/object_tsc.test.ts:71:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\nconst foo = function(x) {\nx;\n};\nconst person = obj(field("name", "John"));\nfoo(person);\n}',
+    expected: /const person = \{ "name": "John" \}/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/operators.test.ts:1:99
+[31m✖ arithmetic operators [90m(45.763973ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\(7 % 3\)/. Input:
+  
+  '{\n%(7, 3);\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/operators.test.ts:25:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\n%(7, 3);\n}',
+    expected: /\(7 % 3\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/operators.test.ts:1:1144
+[31m✖ logical operators [90m(3.500329ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\(!\(?\s*true\s*\)?\)/. Input:
+  
+  '{\n!(true);\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/operators.test.ts:50:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\n!(true);\n}',
+    expected: /\(!\(?\s*true\s*\)?\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/operators.test.ts:5:76
+[31m✖ operator with wrong arity becomes regular call [90m(2.566144ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\(1 \+ 2 \+ 3\)/. Input:
+  
+  '{\n((1 + 2) + 3);\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/operators.test.ts:75:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\n((1 + 2) + 3);\n}',
+    expected: /\(1 \+ 2 \+ 3\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/operators_tsc.test.ts:1:285
+[31m✖ arithmetic operators [90m(92.362999ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\(7 % 3\)/. Input:
+  
+  '{\n%(7, 3);\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/operators_tsc.test.ts:29:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\n%(7, 3);\n}',
+    expected: /\(7 % 3\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/operators_tsc.test.ts:1:1750
+[31m✖ logical operators [90m(28.534542ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\(!\(?\s*true\s*\)?\)/. Input:
+  
+  '{\n!(true);\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/operators_tsc.test.ts:61:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\n!(true);\n}',
+    expected: /\(!\(?\s*true\s*\)?\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/operators_tsc.test.ts:5:126
+[31m✖ operator with wrong arity becomes regular call [90m(1.612676ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /\(1 \+ 2 \+ 3\)/. Input:
+  
+  '{\n((1 + 2) + 3);\n}'
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/operators_tsc.test.ts:90:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '{\n((1 + 2) + 3);\n}',
+    expected: /\(1 \+ 2 \+ 3\)/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/parse_basic.test.ts:1:655
+[31m✖ parse import-default [90m(5.535143ms)[39m[39m
+  Error: Unsupported statement kind undefined
+      at serializeStatement (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:424:9)
+      at Array.map (<anonymous>)
+      at serializeProgram (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:627:42)
+      at Object.program (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:636:16)
+      at compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:159:37)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parse_basic.test.ts:31:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/parse_basic.test.ts:1:1128
+[31m✖ parse import-named [90m(10.700727ms)[39m[39m
+  Error: Unsupported statement kind undefined
+      at serializeStatement (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:424:9)
+      at Array.map (<anonymous>)
+      at serializeProgram (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:627:42)
+      at Object.program (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:636:16)
+      at compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:159:37)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parse_basic.test.ts:48:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/parse_basic.test.ts:1:1606
+[31m✖ parse import-all [90m(1.372421ms)[39m[39m
+  Error: Unsupported statement kind undefined
+      at serializeStatement (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:424:9)
+      at Array.map (<anonymous>)
+      at serializeProgram (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:627:42)
+      at Object.program (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:636:16)
+      at compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:159:37)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parse_basic.test.ts:65:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/parse_basic.test.ts:1:2068
+[31m✖ parse export named [90m(8.582877ms)[39m[39m
+  Error: Unsupported statement kind undefined
+      at serializeStatement (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:424:9)
+      at Array.map (<anonymous>)
+      at serializeProgram (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:627:42)
+      at Object.program (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:636:16)
+      at compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:159:37)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parse_basic.test.ts:82:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/parse_basic.test.ts:1:2487
+[31m✖ parse export-default [90m(1.227139ms)[39m[39m
+  Error: Unsupported statement kind undefined
+      at serializeStatement (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:424:9)
+      at Array.map (<anonymous>)
+      at serializeProgram (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:627:42)
+      at Object.program (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:636:16)
+      at compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:159:37)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parse_basic.test.ts:98:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/parse_basic.test.ts:1:2934
+[31m✖ identifier location uses start position [90m(2.004476ms)[39m[39m
+  TypeError: Cannot read properties of undefined (reading 'line')
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parse_basic.test.ts:129:43)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/parse_basic_tsc.test.ts:1:848
+[31m✖ parse import-default [90m(3.749232ms)[39m[39m
+  Error: Unsupported statement kind undefined
+      at serializeStatement (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:424:9)
+      at Array.map (<anonymous>)
+      at serializeProgram (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:627:42)
+      at Object.program (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:636:16)
+      at compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:159:37)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parse_basic_tsc.test.ts:37:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/parse_basic_tsc.test.ts:1:1328
+[31m✖ parse import-named [90m(1.865644ms)[39m[39m
+  Error: Unsupported statement kind undefined
+      at serializeStatement (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:424:9)
+      at Array.map (<anonymous>)
+      at serializeProgram (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:627:42)
+      at Object.program (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:636:16)
+      at compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:159:37)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parse_basic_tsc.test.ts:54:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/parse_basic_tsc.test.ts:1:1813
+[31m✖ parse import-all [90m(1.484064ms)[39m[39m
+  Error: Unsupported statement kind undefined
+      at serializeStatement (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:424:9)
+      at Array.map (<anonymous>)
+      at serializeProgram (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:627:42)
+      at Object.program (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:636:16)
+      at compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:159:37)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parse_basic_tsc.test.ts:71:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/parse_basic_tsc.test.ts:1:2282
+[31m✖ parse export named [90m(2.87188ms)[39m[39m
+  Error: Unsupported statement kind undefined
+      at serializeStatement (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:424:9)
+      at Array.map (<anonymous>)
+      at serializeProgram (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:627:42)
+      at Object.program (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:636:16)
+      at compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:159:37)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parse_basic_tsc.test.ts:88:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/parse_basic_tsc.test.ts:1:2708
+[31m✖ parse export-default [90m(3.817736ms)[39m[39m
+  Error: Unsupported statement kind undefined
+      at serializeStatement (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:424:9)
+      at Array.map (<anonymous>)
+      at serializeProgram (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:627:42)
+      at Object.program (/home/superman/Dev/t2lang2/phaseA/src/serialization.ts:636:16)
+      at compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:159:37)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parse_basic_tsc.test.ts:104:18)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/parse_basic_tsc.test.ts:1:3162
+[31m✖ identifier location uses start position [90m(5.332437ms)[39m[39m
+  TypeError: Cannot read properties of undefined (reading 'line')
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parse_basic_tsc.test.ts:135:43)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:788:7)
+
+test at tests/integration/examples/parser_errors.test.ts:1:99
+[31m✖ nested program form produces error [90m(129.631716ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(result.errors.length > 0)
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parser_errors.test.ts:10:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/parser_errors_tsc.test.ts:1:285
+[31m✖ nested program form produces error [90m(68.861878ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(nonTsc(result.errors).length > 0)
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/parser_errors_tsc.test.ts:12:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/resolve_errors.test.ts:1:99
+[31m✖ unresolved identifier emits event [90m(27.907385ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(unresolved)
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/resolve_errors.test.ts:12:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/resolve_errors_tsc.test.ts:1:285
+[31m✖ unresolved identifier emits event [90m(22.609805ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(unresolved)
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/resolve_errors_tsc.test.ts:14:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/runCli_flags.test.ts:1:222
+[31m✖ runCli passes CompilerConfig flags to compileFn [90m(4.653453ms)[39m[39m
+  TypeError: runCli is not a function
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/runCli_flags.test.ts:19:15)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1106:25)
+      at Test.start (node:internal/test_runner/test:1003:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)
+
+test at tests/integration/examples/type_ast.test.ts:1:99
+[31m✖ extended type nodes and type-alias [90m(5.01812ms)[39m[39m
+  Error: Type constructor must be an atom
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1904:13)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1479:61)
+      at Array.map (<anonymous>)
+      at Parser.buildTypeFunction (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1479:41)
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1922:21)
+      at Parser.buildTypeAlias (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1747:28)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:387:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+      at Parser.parseProgram (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:41)
+
+test at tests/integration/examples/type_ast_tsc.test.ts:1:285
+[31m✖ extended type nodes and type-alias [90m(9.588196ms)[39m[39m
+  Error: Type constructor must be an atom
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1904:13)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1479:61)
+      at Array.map (<anonymous>)
+      at Parser.buildTypeFunction (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1479:41)
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1922:21)
+      at Parser.buildTypeAlias (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1747:28)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:387:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+      at Parser.parseProgram (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:41)
+
+test at tests/integration/examples/type_errors.test.ts:1:99
+[31m✖ multiple type errors are aggregated [90m(16.062298ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 2
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/type_errors.test.ts:15:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/type_errors_tsc.test.ts:1:285
+[31m✖ multiple type errors are aggregated [90m(41.898101ms)[39m[39m
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 2
+  
+      at TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/type_errors_tsc.test.ts:17:10)
+      at async Test.run (node:internal/test_runner/test:1113:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 2,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at tests/integration/examples/type_parse.test.ts:1:99
+[31m✖ parse full type AST forms [90m(13.674385ms)[39m[39m
+  Error: Unknown type constructor type-array
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1972:15)
+      at Parser.buildTypeAlias (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1747:28)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:387:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+      at Parser.parseProgram (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:41)
+      at parseSource (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:2001:17)
+      at compilePhaseA0 (/home/superman/Dev/t2lang2/phaseA/src/api.ts:107:31)
+      at async compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:149:18)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/type_parse.test.ts:10:18)
+
+test at tests/integration/examples/type_parse_tsc.test.ts:1:285
+[31m✖ parse full type AST forms [90m(8.35936ms)[39m[39m
+  Error: Unknown type constructor type-array
+      at Parser.nodeToType (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1972:15)
+      at Parser.buildTypeAlias (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:1747:28)
+      at Parser.nodeToStatement (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:387:23)
+      at <anonymous> (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:60)
+      at Array.map (<anonymous>)
+      at Parser.parseProgram (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:333:41)
+      at parseSource (/home/superman/Dev/t2lang2/phaseA/src/parse.ts:2001:17)
+      at compilePhaseA0 (/home/superman/Dev/t2lang2/phaseA/src/api.ts:107:31)
+      at async compile (/home/superman/Dev/t2lang2/phaseA/src/api.ts:149:18)
+      at async TestContext.<anonymous> (/home/superman/Dev/t2lang2/phaseA/tests/integration/examples/type_parse_tsc.test.ts:12:18)

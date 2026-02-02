@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { compilePhase0 } from '../../../src/api';
+import { compile } from '../../../src/api';
 
 test('readonly field is emitted and not enforced by t2lang', async () => {
   const src = `
@@ -12,7 +12,7 @@ test('readonly field is emitted and not enforced by t2lang', async () => {
             (assign (prop this "x") 1)))))
     )
   `;
-  const result = await compilePhase0(src, { enableTsc: false });
+  const result = await compile(src, );
   // t2lang should not enforce readonly; TypeScript will handle it.
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);

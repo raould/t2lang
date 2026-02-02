@@ -4,16 +4,16 @@
 
 import test from "node:test";
 import assert from "node:assert";
-import { compilePhase0 } from "../../../src/api";
+import { compile } from "../../../src/api";
 
 // Class tests
 test("simple class with field", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (class Person
         (class-body
           (field "name" "John"))))
-  `, { enableTsc: false });
+  `, );
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /class Person/);
@@ -21,7 +21,7 @@ test("simple class with field", async () => {
 });
 
 test("class with method", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (let* ((console (obj (field "log" (fn ((x)) x)))))
         (class Greeter
@@ -29,7 +29,7 @@ test("class with method", async () => {
             (method "greet" ()
               (call (prop console "log") "Hello")))))
     )
-  `, { enableTsc: false });
+  `, );
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /class Greeter/);
@@ -38,14 +38,14 @@ test("class with method", async () => {
 });
 
 test("class with method params", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (class Calculator
         (class-body
           (method "add" ((a) (b))
             (return (+ a b)))))
     )
-  `, { enableTsc: false });
+  `, );
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /add\(a, b\)/);
@@ -53,14 +53,14 @@ test("class with method params", async () => {
 });
 
 test("class with field and method", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (class Counter
         (class-body
           (field "count" 0)
           (method "increment" ()
             (assign (prop this "count") (+ (prop this "count") 1))))))
-  `, { enableTsc: false });
+  `, );
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /count = 0/);
@@ -69,33 +69,33 @@ test("class with field and method", async () => {
 
 // Type assert tests
 test("simple type assert", async () => {
-  const result = await compilePhase0(`(program (let* ((x 1)) (type-assert x (type-number))))`, { enableTsc: false });
+  const result = await compile(`(program (let* ((x 1)) (type-assert x (type-number))))`, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /\(x as number\)/);
 });
 
 test("type assert on expression", async () => {
-  const result = await compilePhase0(`(program (fn getValue () "ok") (type-assert (getValue) (type-string)))`, { enableTsc: false });
+  const result = await compile(`(program (fn getValue () "ok") (type-assert (getValue) (type-string)))`, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /\(getValue\(\) as string\)/);
 });
 
 // Throw tests
 test("throw error", async () => {
-  const result = await compilePhase0(`(program (let* ((Error (fn ((x)) x))) (throw (new Error "oops"))))`, { enableTsc: false });
+  const result = await compile(`(program (let* ((Error (fn ((x)) x))) (throw (new Error "oops"))))`, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /throw new Error\("oops"\)/);
 });
 
 test("throw variable", async () => {
-  const result = await compilePhase0(`(program (let* ((e "oops")) (throw e)))`, { enableTsc: false });
+  const result = await compile(`(program (let* ((e "oops")) (throw e)))`, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /throw e/);
 });
 
 // Try-catch tests
 test("simple try-catch", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (let* ((riskyOp (fn () null))
             (log (fn ((x)) x)))
@@ -103,7 +103,7 @@ test("simple try-catch", async () => {
           (riskyOp)
           (catch e
             (log e)))))
-  `, { enableTsc: false });
+  `, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /try \{/);
   assert.match(result.tsSource, /riskyOp\(\)/);
@@ -112,7 +112,7 @@ test("simple try-catch", async () => {
 });
 
 test("try-catch with finally", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (let* ((open (fn () null))
              (close (fn () null))
@@ -123,7 +123,7 @@ test("try-catch with finally", async () => {
             (log e))
           (finally
             (close)))))
-  `, { enableTsc: false });
+  `, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /try \{/);
   assert.match(result.tsSource, /catch \(e\)/);
@@ -132,7 +132,7 @@ test("try-catch with finally", async () => {
 });
 
 test("try-catch with multiple statements", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (let* ((step1 (fn () null))
              (step2 (fn () null))
@@ -144,7 +144,7 @@ test("try-catch with multiple statements", async () => {
           (catch err
             (log err)
             (recover)))))
-  `, { enableTsc: false });
+  `, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /step1\(\)/);
   assert.match(result.tsSource, /step2\(\)/);
@@ -153,13 +153,13 @@ test("try-catch with multiple statements", async () => {
 });
 
 test("try-catch with empty catch body still emits catch", async () => {
-  const result = await compilePhase0(`
+  const result = await compile(`
     (program
       (let* ((risky (fn () null)))
         (try
           (risky)
           (catch e))))
-  `, { enableTsc: false });
+  `, );
   assert.strictEqual(result.errors.length, 0);
   assert.match(result.tsSource, /try \{/);
   assert.match(result.tsSource, /catch \(e\)/);

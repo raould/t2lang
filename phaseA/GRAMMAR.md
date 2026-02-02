@@ -2,7 +2,8 @@
 
 Tokens:
 ```
-<identifier> ::= /[a-zA-Z_$][a-zA-Z0-9_$]*/
+<identifier> ::= <identifier-char> <identifier-char>*
+<identifier-char> ::= /* any character except whitespace, "(" or ")" */
 <number>     ::= /[0-9]+(\.[0-9]+)?/  ; integers and floats
 <string>     ::= '"' <chars> '"' | "'" <chars> "'"
 <boolean>    ::= "true" | "false"
@@ -66,7 +67,11 @@ Tokens:
 <fn> ::= "(" "fn" <callable-flag>* <identifier>? <fn-signature> <statement>* ")"
 <lambda> ::= "(" "lambda" <callable-flag>* <fn-signature> <statement>* ")"
 <method> ::= "(" "method" <callable-flag>* <string> <fn-signature> <statement>* ")"
-<class> ::= "(" "class" <identifier> <class-body> ")"
+<class> ::= "(" "class" <identifier> <class-heritage>* <class-body> ")"
+<class-heritage> ::= <class-extends>
+                  | <class-implements>
+<class-extends> ::= "(" "extends" <expression> ")"
+<class-implements> ::= "(" "implements" <expression>+ ")"
 <import> ::= "(" "import" <import-spec> ")"
 <export> ::= "(" "export" <export-spec> ")"
 <type-alias> ::= "(" "type-alias" <identifier> <type-params>? <type> ")"
@@ -168,4 +173,5 @@ Tokens:
 - Scope metadata (TDZ, const/let distinctions, hoisting flags) attaches to the nodes above but is not reflected in the EBNF; the resolver uses the metadata to enforce TypeScript semantics.
 - `<prop>` only covers literal property names; computed-property access should go through `<index>` so Phase B can rewrite dynamic keys without introducing new grammar forms.
 - `<ternary>` is the canonical expression that produces a value from a conditional without requiring a statement context ie TypeScript's `?:`.
+- TODO: support ECMAScript specificaiton for <identifier>.
 ```

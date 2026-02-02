@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert";
-import { compilePhaseA } from "../src/api.js";
+import { compilePhaseA0 } from "../src/api.js";
 import { generateCode } from "../src/codegen.js";
 import {
   Program,
@@ -29,9 +29,9 @@ const makeTypeRef = (name: string): TypeRef => new TypeRef({ identifier: mkIdent
 const makeTypePrimitive = (kind: TypePrimitive["kind"]): TypePrimitive =>
   new TypePrimitive({ kind, span: makeSpan(`type:${kind}`) });
 
-test("compilePhaseA parses/serializes/codegens simple let*", async () => {
+test("compilePhaseA0 parses/serializes/codegens simple let*", async () => {
   const source = `(program (let* (x 42) x))`;
-  const result = await compilePhaseA(source);
+  const result = await compilePhaseA0(source);
   if (result.diagnostics.length > 0) {
     console.error(result.diagnostics);
   }
@@ -41,7 +41,7 @@ test("compilePhaseA parses/serializes/codegens simple let*", async () => {
   assert.ok(result.tsSource.includes("x"));
 });
 
-test("compilePhaseA generates for loops", async () => {
+test("compilePhaseA0 generates for loops", async () => {
   const source = `(program
     (for classic
       (assign i 0)
@@ -55,7 +55,7 @@ test("compilePhaseA generates for loops", async () => {
       ((value) (call fetchValues))
       (call log value))
   )`;
-  const result = await compilePhaseA(source);
+  const result = await compilePhaseA0(source);
   if (result.diagnostics.length > 0) {
     console.error(result.diagnostics);
   }
@@ -64,7 +64,7 @@ test("compilePhaseA generates for loops", async () => {
   assert.ok(result.tsSource.includes("for await (let value of fetchValues())"));
 });
 
-test("compilePhaseA emits control-flow nesting", async () => {
+test("compilePhaseA0 emits control-flow nesting", async () => {
   const source = `(program
     (throw 42)
     (try
@@ -77,7 +77,7 @@ test("compilePhaseA emits control-flow nesting", async () => {
       (case 1 (call branchOne))
       (case 2 (call branchTwo))
       (default (call fallback))))`;
-  const result = await compilePhaseA(source);
+  const result = await compilePhaseA0(source);
   assert.ok(result.tsSource.includes("throw 42"));
   assert.ok(result.tsSource.includes("try {"));
   assert.ok(result.tsSource.includes("catch (err)"));
@@ -85,7 +85,7 @@ test("compilePhaseA emits control-flow nesting", async () => {
   assert.ok(result.tsSource.includes("switch (x)"));
 });
 
-test("compilePhaseA emits prop/index/object/new output", async () => {
+test("compilePhaseA0 emits prop/index/object/new output", async () => {
   const source = `(program
     (let* (obj (object ("foo" 1) ("bar" 2)))
     (call log
@@ -93,7 +93,7 @@ test("compilePhaseA emits prop/index/object/new output", async () => {
       (index obj (call getKey))
       (new Widget obj)))
   )`;
-  const result = await compilePhaseA(source);
+  const result = await compilePhaseA0(source);
   if (result.diagnostics.length > 0) {
     console.error(result.diagnostics);
   }
@@ -103,7 +103,7 @@ test("compilePhaseA emits prop/index/object/new output", async () => {
   assert.ok(result.tsSource.includes("new Widget(obj)"));
 });
 
-test("compilePhaseA emits import/export statements", async () => {
+test("compilePhaseA0 emits import/export statements", async () => {
   const source = `(program
     (import (import-spec "./default" (default Default)))
     (import (import-spec "./named" (named (Foo alias) Bar)))
@@ -111,7 +111,7 @@ test("compilePhaseA emits import/export statements", async () => {
     (export (export-spec (named Bar)))
     (export (export-spec (default (call Default 42))))
   )`;
-  const result = await compilePhaseA(source);
+  const result = await compilePhaseA0(source);
   if (result.diagnostics.length > 0) {
     console.error(result.diagnostics);
   }
@@ -122,7 +122,25 @@ test("compilePhaseA emits import/export statements", async () => {
   assert.ok(result.tsSource.includes("export default Default(42);"));
 });
 
-test("generateCode emits function expressions", async () => {
+test("compilePhaseA0 emits async function keyword", async () => {
+  const source = `(program
+    (fn async sample ((value))
+      (return value))
+  )`;
+  const result = await compilePhaseA0(source);
+  assert.ok(result.tsSource.includes("async function sample"));
+});
+
+test("compilePhaseA0 emits generator function keyword", async () => {
+  const source = `(program
+    (fn generator sample ((value))
+      (return value))
+  )`;
+  const result = await compilePhaseA0(source);
+  assert.ok(result.tsSource.includes("function* sample"));
+});
+
+test("generateCode emits lambda expressions", async () => {
   const paramId = mkIdentifier("value");
   const fn = new FunctionExpr({
     signature: { parameters: [{ name: paramId }] },
@@ -133,6 +151,7 @@ test("generateCode emits function expressions", async () => {
       }),
     ],
     span: makeSpan("function"),
+    callableKind: "lambda",
   });
   const stmt = new ExprStmt({ expr: fn, span: makeSpan("expr") });
   const program = new Program({ body: [stmt], span: makeSpan("program") });
@@ -141,7 +160,26 @@ test("generateCode emits function expressions", async () => {
   assert.ok(result.tsSource.includes("return value;"));
 });
 
-test("compilePhaseA emits type alias definitions", async () => {
+test("generateCode emits fn expressions", async () => {
+  const paramId = mkIdentifier("value");
+  const fn = new FunctionExpr({
+    signature: { parameters: [{ name: paramId }] },
+    body: [
+      new ReturnExpr({
+        span: makeSpan("return"),
+        value: mkIdentifier("value"),
+      }),
+    ],
+    span: makeSpan("function"),
+    callableKind: "fn",
+  });
+  const stmt = new ExprStmt({ expr: fn, span: makeSpan("expr") });
+  const program = new Program({ body: [stmt], span: makeSpan("program") });
+  const result = await generateCode(program);
+  assert.match(result.tsSource, /function\s*\(/);
+});
+
+test("compilePhaseA0 emits type alias definitions", async () => {
   const source = `(program
     (type-alias OptionalValue
       (typeparams (T (extends (type-string)) (default (type-number))))
@@ -156,7 +194,7 @@ test("compilePhaseA emits type alias definitions", async () => {
         optional
         (type-null)))
 )`;
-  const result = await compilePhaseA(source);
+  const result = await compilePhaseA0(source);
   assert.ok(
     result.tsSource.includes("type OptionalValue<T extends string = number> = T | null;")
   );

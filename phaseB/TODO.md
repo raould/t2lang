@@ -1,5 +1,9 @@
 # Phase B Implementation Plan
 
+## 0. fix references to Phase A compiler.
+
+- [ ] Phase B is depending on the inner-compiler API of Phase A, which is surprising.
+
 ## 1. Project Setup
 - [x] Initialize `phaseB/package.json`
 - [x] Initialize `phaseB/tsconfig.json` (reference common or Copy phaseA's config)
@@ -93,5 +97,22 @@
 
 ## 11 other sugar
 
-- [ ] "(fn (x) x)" must be rewritten for phase A as "(fn ((x)) x)".
-- [ ] "for (;" must be rewritten for phase A as "for (null;".
+- [ ] `(fn (x) x)` lowers to phase A as `(fn ((x)) x)`.
+- [ ] `for (;` lowers to phase A as `for (null;`.
+
+## 12 identifiers vs. strings
+
+Keep the Phase A grammar strict (it already expects strings for prop/method keys), but allow Phase B’s surface syntax to accept bare identifiers for those cases and then lower them into the Phase A shape.
+* functon name in `fn`.
+* method name in `method`.
+* property name in `prop`.
+* possibly type-field?
+- [ ] `(method <identifier>` lowers to phase A as `(method "identifier"`
+- [ ] Extend the Phase B grammar/parser so (method …) and (prop …)/(field …) accept identifier tokens for names and store them as symbols rather than forcing a quoted string.
+- [ ] When lowering to Phase A, translate those identifiers into strings at the last step so the downstream AST/serialization continues to work without any additional churn.
+- [ ] Update the sugar/expander rules and integration tests to exercise the new ergonomic syntax (e.g., (prop console log) and (method foo proxy (args) …)), ensuring the lowered output still matches Phase A’s expectations.
+
+## 13 more sugar for function signatures and types
+
+- [ ] `(program (let* ((g (fn (typeparams (T (extends string))) ((s T)) (returns T) (return s))))))` can be written in phase B as `(program (let* ((g (fn <typeparams (T extends string)> ((s: T)) (:T) (return s))))))`
+- [ ] make examples of more than one typeparams in a single function signature.

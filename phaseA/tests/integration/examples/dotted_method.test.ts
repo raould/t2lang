@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { compilePhase0 } from '../../../src/api';
+import { compile } from '../../../src/api';
 
 test('dotted method invocation emits method call', async () => {
   const src = `
@@ -11,7 +11,7 @@ test('dotted method invocation emits method call', async () => {
           (field "lastName" "")
           (field "age" 0)
 
-          (method "constructor" (firstName lastName age)
+          (method "constructor" ((firstName) (lastName) (age))
             (assign (prop this "firstName") firstName)
             (assign (prop this "lastName") lastName)
             (assign (prop this "age") age))
@@ -23,7 +23,7 @@ test('dotted method invocation emits method call', async () => {
         (call (prop console "log") (call (prop person "getFullName"))))
     )
   `;
-  const result = await compilePhase0(src, { enableTsc: false });
+  const result = await compile(src, );
   if (result.errors.length > 0) { console.error(result.errors); }
   assert.strictEqual(result.errors.length, 0);
   // Expect the emitted JS/TS to call the method, not pass it as a value

@@ -1045,6 +1045,12 @@ class Parser {
       entries = entries.slice(1);
     }
 
+    let typeParams: TypeParam[] | undefined;
+    if (entries.length > 0 && this.isTypeParamsList(entries[0])) {
+      typeParams = this.parseTypeParams(entries[0]);
+      entries = entries.slice(1);
+    }
+
     const signatureNode = entries[0];
     if (!signatureNode || signatureNode.type !== "list") {
       throw new Error(`${kind} requires a signature list`);
@@ -1052,8 +1058,7 @@ class Parser {
     const signature = this.parseFnSignature(signatureNode);
     entries = entries.slice(1);
 
-    let typeParams: TypeParam[] | undefined;
-    if (entries.length > 0 && this.isTypeParamsList(entries[0])) {
+    if (!typeParams && entries.length > 0 && this.isTypeParamsList(entries[0])) {
       typeParams = this.parseTypeParams(entries[0]);
       entries = entries.slice(1);
     }
@@ -1080,16 +1085,21 @@ class Parser {
       returnType = this.nodeToType(entries[entries.length - 1]);
       paramNodes = entries.slice(0, -1);
     }
+    for (const paramNode of paramNodes) {
+      if (paramNode.type === "atom") {
+        throw new Error("fn signature parameters must be lists like ((x string) (y))");
+      }
+    }
     const parameters = paramNodes.map((paramNode) => this.parseFnParam(paramNode));
     return { parameters, returnType };
   }
 
   private parseFnParam(node: Node): { name: Identifier; typeAnnotation?: TypeNode } {
-    if (node.type === "atom") {
-      return { name: this.nodeToIdentifier(node, "fn param name") };
-    }
     if (node.type !== "list" || node.elements.length === 0) {
       throw new Error("fn param must be a list with a name");
+    }
+    if (node.elements.length > 2) {
+      throw new Error("fn param must contain a name and optional type");
     }
     const [nameNode, typeNode] = node.elements;
     const name = this.nodeToIdentifier(nameNode, "fn param name");
@@ -1099,13 +1109,52 @@ class Parser {
 
   private buildClass(node: ListNode): ClassExpr {
     const span = node.span;
-    const [, nameNode, bodyNode] = node.elements;
-    if (!nameNode || !bodyNode || bodyNode.type !== "list") {
+    const [, nameNode, ...restNodes] = node.elements;
+    if (!nameNode) {
       throw new Error("class requires a name and class-body");
     }
     const name = this.nodeToIdentifier(nameNode, "class name");
+    let bodyNode: ListNode | undefined;
+    let extendsExpr: Expression | null | undefined;
+    let implementsExprs: Expression[] | undefined;
+    for (const child of restNodes) {
+      if (child.type === "list" && child.elements.length > 0 && child.elements[0].type === "atom") {
+        const head = child.elements[0].value;
+        if (head === "class-body") {
+          if (bodyNode) {
+            throw new Error("class may only contain a single class-body");
+          }
+          bodyNode = child;
+          continue;
+        }
+        if (head === "extends") {
+          if (extendsExpr) {
+            throw new Error("class cannot have multiple extends clauses");
+          }
+          if (child.elements.length !== 2) {
+            throw new Error("extends clause requires exactly one expression");
+          }
+          extendsExpr = this.nodeToExpression(child.elements[1]);
+          continue;
+        }
+        if (head === "implements") {
+          if (implementsExprs) {
+            throw new Error("class cannot have multiple implements clauses");
+          }
+          if (child.elements.length < 2) {
+            throw new Error("implements clause requires at least one expression");
+          }
+          implementsExprs = child.elements.slice(1).map((impl) => this.nodeToExpression(impl));
+          continue;
+        }
+      }
+      throw new Error("class requires a name and class-body");
+    }
+    if (!bodyNode) {
+      throw new Error("class requires a name and class-body");
+    }
     const body = this.buildClassBody(bodyNode);
-    return new ClassExpr({ name, body, span });
+    return new ClassExpr({ name, body, span, extends: extendsExpr, implements: implementsExprs });
   }
 
   private buildClassBody(node: ListNode): { statements: ClassMember[] } {
@@ -1476,8 +1525,94 @@ class Parser {
       throw new Error("type-function requires at least a return type");
     }
     const returns = this.nodeToType(entries[entries.length - 1]);
-    const params = entries.slice(0, -1).map((child) => this.nodeToType(child));
+    const params = this.parseTypeFunctionParams(entries.slice(0, -1));
     return new TypeFunction({ typeParams, params, returns, span });
+  }
+
+  private parseTypeFunctionParams(nodes: Node[]): TypeNode[] {
+    if (nodes.length === 0) {
+      return [];
+    }
+    const params: TypeNode[] = [];
+    let hasTyped = false;
+    let hasUntyped = false;
+    for (const node of nodes) {
+      const entries = this.expandTypeFunctionParamNode(node);
+      for (const entry of entries) {
+        params.push(entry.typeNode);
+        if (entry.hasType) {
+          hasTyped = true;
+        } else {
+          hasUntyped = true;
+        }
+      }
+    }
+    if (hasTyped && hasUntyped) {
+      throw new Error("type-function parameters must either all specify types or none of them do");
+    }
+    return params;
+  }
+
+  private expandTypeFunctionParamNode(node: Node): Array<{ typeNode: TypeNode; hasType: boolean }> {
+    if (this.isTypeLikeNode(node)) {
+      return [{ typeNode: this.nodeToType(node), hasType: true }];
+    }
+    if (node.type !== "list") {
+      throw new Error("type-function parameters must be type expressions or parameter descriptors");
+    }
+    if (node.elements.length === 0) {
+      return [];
+    }
+    if (node.elements.every((child) => child.type === "atom")) {
+      return this.expandAtomParamSequence(node.elements as AtomNode[]);
+    }
+    const entries: Array<{ typeNode: TypeNode; hasType: boolean }> = [];
+    for (const child of node.elements) {
+      entries.push(...this.expandTypeFunctionParamNode(child));
+    }
+    return entries;
+  }
+
+  private expandAtomParamSequence(atoms: AtomNode[]): Array<{ typeNode: TypeNode; hasType: boolean }> {
+    const entries: Array<{ typeNode: TypeNode; hasType: boolean }> = [];
+    let i = 0;
+    let sawTyped = false;
+    let sawUntyped = false;
+    while (i < atoms.length) {
+      const current = atoms[i];
+      const next = atoms[i + 1];
+      if (next && this.isTypeAtom(next)) {
+        entries.push({ typeNode: this.nodeToType(next), hasType: true });
+        sawTyped = true;
+        i += 2;
+        continue;
+      }
+      entries.push({ typeNode: this.createAnyType(current.span), hasType: false });
+      sawUntyped = true;
+      i += 1;
+    }
+    if (sawTyped && sawUntyped) {
+      throw new Error("type-function parameters must either all specify types or none of them do");
+    }
+    return entries;
+  }
+
+  private isTypeLikeNode(node: Node): boolean {
+    if (node.type === "atom") {
+      return this.isTypeAtom(node);
+    }
+    return this.isTypeNodeList(node);
+  }
+
+  private isTypeAtom(atom: AtomNode): boolean {
+    if (PRIMITIVE_NAME_MAP[atom.value]) {
+      return true;
+    }
+    return atom.value.startsWith("type-");
+  }
+
+  private createAnyType(span: Span): TypePrimitive {
+    return new TypePrimitive({ kind: "type-any", span });
   }
 
   private buildTFn(node: ListNode): TypeFunction {
@@ -1896,6 +2031,14 @@ class Parser {
   }
 
   private nodeToType(node: Node): TypeNode {
+    if (node.type === "atom") {
+      const primitiveKind = PRIMITIVE_NAME_MAP[node.value];
+      if (primitiveKind) {
+        return new TypePrimitive({ kind: primitiveKind, span: node.span });
+      }
+      const identifier = this.nodeToIdentifier(node, "type reference");
+      return new TypeRef({ identifier, span: node.span });
+    }
     if (node.type !== "list" || node.elements.length === 0) {
       throw new Error("Type expressions must be lists");
     }
