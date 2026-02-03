@@ -54,6 +54,7 @@ Where `value` is a string, number, or boolean literal.
 `(t:indexed obj-type index-type)`  ;; `T[K]`
 `(t:conditional check extends then else)`
 `(t:infer name)`
+`(t:this)`
 `(t:mapped ...)`  ;; for mapped types, spec TBD
 
 ## Validation

@@ -24,6 +24,7 @@ import {
   ContinueStmt,
   ExprStmt,
   CallExpr,
+  CallWithThisExpr,
   PropExpr,
   IndexExpr,
   NewExpr,
@@ -32,6 +33,7 @@ import {
   ThrowExpr,
   TryCatchExpr,
   FunctionExpr,
+  FnParam,
   CallableKind,
   ClassExpr,
   ClassMember,
@@ -42,6 +44,9 @@ import {
   ExportStmt,
   TypeAliasStmt,
   InterfaceStmt,
+  EnumStmt,
+  EnumMember,
+  NamespaceStmt,
   ImportSpec,
   ExportSpec,
   NamedImport,
@@ -58,16 +63,23 @@ import {
   TypeIndexed,
   TypeConditional,
   TypeInfer,
+  TypeThis,
   TypeRef,
   TypeFunction,
   TypeObject,
   TypeUnion,
   TypeIntersection,
   TypeLiteral,
+  TypeTemplateLiteral,
   TypeMapped,
   TypeApp,
   TypeNode,
   TypeAssertExpr,
+  TemplateExpr,
+  NonNullAssertExpr,
+  IndexSignature,
+  StaticBlockStmt,
+  DefaultPattern,
 } from "./phaseA1.js";
 
 export type SerializedSpan = { start: number; end: number; source: string };
@@ -93,15 +105,39 @@ export type SerializedExportSpec = {
 export type SerializedCatchClause = { binding?: SerializedBinding; body: SerializedStatement[] };
 export type SerializedFinallyClause = { body: SerializedStatement[] };
 
+export type SerializedEnumMember = { name: string; value?: SerializedExpression };
+export type SerializedNamespaceStmt = { kind: "namespace"; name: SerializedIdentifier; body: SerializedStatement[]; span: SerializedSpan };
+export type SerializedStaticBlock = { kind: "static-block"; body: SerializedStatement[]; span: SerializedSpan };
+
+export type SerializedIndexSignature = {
+  kind: "index-signature";
+  key: SerializedIdentifier;
+  keyType: SerializedTypeNode;
+  valueType: SerializedTypeNode;
+  readonlyFlag?: boolean;
+  span: SerializedSpan;
+};
+
+export type SerializedParamProperty = { access?: "public" | "protected" | "private"; readonly?: boolean };
+export type SerializedFnParam = {
+  name: SerializedIdentifier;
+  typeAnnotation?: SerializedTypeNode;
+  paramProperty?: SerializedParamProperty;
+  defaultValue?: SerializedExpression;
+};
+
 export type SerializedExpression =
   | SerializedLiteral
   | SerializedIdentifier
   | { kind: "call"; callee: SerializedExpression; args: SerializedExpression[]; span: SerializedSpan }
+  | { kind: "call-with-this"; fn: SerializedExpression; thisArg: SerializedExpression; args: SerializedExpression[]; span: SerializedSpan }
   | { kind: "prop"; object: SerializedExpression; name: string; maybeNull: boolean; span: SerializedSpan }
   | { kind: "index"; object: SerializedExpression; index: SerializedExpression; maybeNull: boolean; span: SerializedSpan }
   | { kind: "new"; callee: SerializedExpression; args: SerializedExpression[]; span: SerializedSpan }
   | ({ kind: "array" } & { elements: SerializedExpression[]; span: SerializedSpan })
   | ({ kind: "object" } & { fields: { key: string; value: SerializedExpression }[]; span: SerializedSpan })
+  | ({ kind: "template" } & { parts: SerializedExpression[]; span: SerializedSpan })
+  | ({ kind: "non-null" } & { expr: SerializedExpression; span: SerializedSpan })
   | { kind: "throw"; argument: SerializedExpression; span: SerializedSpan }
   | {
       kind: "try";
@@ -124,14 +160,17 @@ export type SerializedExpression =
       typeParams?: SerializedTypeParam[];
       async?: boolean;
       generator?: boolean;
-      signature: { parameters: { name: SerializedIdentifier }[]; returnType?: SerializedTypeNode };
+      abstract?: boolean;
+      overload?: boolean;
+      signature: { parameters: SerializedFnParam[]; returnType?: SerializedTypeNode };
       body: SerializedStatement[];
       span: SerializedSpan;
     }
-  | ({ kind: "class" } & { name?: SerializedIdentifier; extends?: SerializedExpression; implements?: SerializedExpression[]; body: SerializedStatement[]; span: SerializedSpan });
+  | ({ kind: "class" } & { name?: SerializedIdentifier; typeParams?: SerializedTypeParam[]; extends?: SerializedExpression; implements?: SerializedExpression[]; decorators?: SerializedExpression[]; abstract?: boolean; body: SerializedStatement[]; span: SerializedSpan });
 
 export type SerializedStatement =
   | { kind: "block"; statements: SerializedStatement[]; span: SerializedSpan }
+  | SerializedStaticBlock
   | { kind: "if"; test: SerializedExpression; consequent: SerializedStatement; alternate?: SerializedStatement; span: SerializedSpan }
   | { kind: "while"; condition: SerializedExpression; body: SerializedStatement; span: SerializedSpan }
   | { kind: "let*"; isConst: boolean; bindings: SerializedBinding[]; body: SerializedStatement[]; span: SerializedSpan }
@@ -147,7 +186,10 @@ export type SerializedStatement =
   | { kind: "import"; spec: SerializedImportSpec; span: SerializedSpan }
   | { kind: "export"; spec: SerializedExportSpec; span: SerializedSpan }
   | { kind: "type-alias"; name: SerializedIdentifier; typeValue: SerializedTypeNode; typeParams?: SerializedTypeParam[]; span: SerializedSpan }
-  | { kind: "type-interface"; name: SerializedIdentifier; fields: SerializedTypeField[]; span: SerializedSpan }
+  | { kind: "type-interface"; name: SerializedIdentifier; fields: SerializedTypeField[]; indexSignatures?: SerializedIndexSignature[]; span: SerializedSpan }
+  | SerializedIndexSignature
+  | { kind: "enum"; name: SerializedIdentifier; members: SerializedEnumMember[]; span: SerializedSpan }
+  | SerializedNamespaceStmt
   | {
       kind: "fn";
       callableKind?: CallableKind;
@@ -156,11 +198,13 @@ export type SerializedStatement =
       typeParams?: SerializedTypeParam[];
       async?: boolean;
       generator?: boolean;
-      signature: { parameters: { name: SerializedIdentifier }[]; returnType?: SerializedTypeNode };
+      abstract?: boolean;
+      overload?: boolean;
+      signature: { parameters: SerializedFnParam[]; returnType?: SerializedTypeNode };
       body: SerializedStatement[];
       span: SerializedSpan;
     }
-  | { kind: "class"; name?: SerializedIdentifier; extends?: SerializedExpression; implements?: SerializedExpression[]; body: SerializedStatement[]; span: SerializedSpan };
+  | { kind: "class"; name?: SerializedIdentifier; typeParams?: SerializedTypeParam[]; extends?: SerializedExpression; implements?: SerializedExpression[]; decorators?: SerializedExpression[]; abstract?: boolean; body: SerializedStatement[]; span: SerializedSpan };
 
 export type SerializedBinding = {
   target: SerializedBindingTarget;
@@ -171,9 +215,13 @@ export type SerializedBindingTarget =
   | SerializedIdentifier
   | { kind: "array-pattern"; elements: SerializedBindingTarget[]; span: SerializedSpan; rest?: SerializedBindingTarget }
   | { kind: "object-pattern"; properties: { key: string; target: SerializedBindingTarget }[]; span: SerializedSpan; rest?: SerializedBindingTarget }
-  | { kind: "rest"; target: SerializedBindingTarget; span: SerializedSpan };
+  | { kind: "rest"; target: SerializedBindingTarget; span: SerializedSpan }
+  | { kind: "default"; target: SerializedBindingTarget; defaultValue: SerializedExpression; span: SerializedSpan };
 
 export type SerializedTypeNode = { kind: string; span: SerializedSpan } & Record<string, any>;
+type SerializedTypeTemplatePart =
+  | { kind: "text"; value: string }
+  | { kind: "type"; typeNode: SerializedTypeNode };
 type SerializedTypeParam = {
   name: SerializedIdentifier;
   span: SerializedSpan;
@@ -205,6 +253,20 @@ export async function serializeIdentifier(id: Identifier): Promise<SerializedIde
   return { kind: "identifier", name: id.name, span: await serializeSpan(id.span) };
 }
 
+async function serializeFnParam(param: { name: Identifier; typeAnnotation?: TypeNode; paramProperty?: { access?: "public" | "protected" | "private"; readonly?: boolean }; defaultValue?: Expression }): Promise<SerializedFnParam> {
+  const serialized: SerializedFnParam = { name: await serializeIdentifier(param.name) };
+  if (param.typeAnnotation) {
+    serialized.typeAnnotation = await serializeTypeNode(param.typeAnnotation);
+  }
+  if (param.paramProperty) {
+    serialized.paramProperty = { ...param.paramProperty };
+  }
+  if (param.defaultValue) {
+    serialized.defaultValue = await serializeExpression(param.defaultValue);
+  }
+  return serialized;
+}
+
 export async function serializeLiteral(lit: Literal): Promise<SerializedLiteral> {
   return { kind: "literal", value: lit.value, span: await serializeSpan(lit.span) };
 }
@@ -220,6 +282,12 @@ export async function serializeExpression(expr: Expression): Promise<SerializedE
     const callee = await serializeExpression(expr.callee);
     const args = await Promise.all(expr.args.map(serializeExpression));
     return { kind: "call", callee, args, span: await serializeSpan(expr.span) };
+  }
+  if (expr instanceof CallWithThisExpr) {
+    const fn = await serializeExpression(expr.fn);
+    const thisArg = await serializeExpression(expr.thisArg);
+    const args = await Promise.all(expr.args.map(serializeExpression));
+    return { kind: "call-with-this", fn, thisArg, args, span: await serializeSpan(expr.span) };
   }
   if (expr instanceof PropExpr) {
     const object = await serializeExpression(expr.object);
@@ -242,6 +310,13 @@ export async function serializeExpression(expr: Expression): Promise<SerializedE
   if (expr instanceof ObjectExpr) {
     const fields = await Promise.all(expr.fields.map(async (f) => ({ key: f.key, value: await serializeExpression(f.value) })));
     return { kind: "object", fields, span: await serializeSpan(expr.span) };
+  }
+  if (expr instanceof TemplateExpr) {
+    const parts = await Promise.all(expr.parts.map(serializeExpression));
+    return { kind: "template", parts, span: await serializeSpan(expr.span) };
+  }
+  if (expr instanceof NonNullAssertExpr) {
+    return { kind: "non-null", expr: await serializeExpression(expr.expr), span: await serializeSpan(expr.span) };
   }
   if (expr instanceof ThrowExpr) {
     const argument = await serializeExpression(expr.argument);
@@ -274,10 +349,8 @@ export async function serializeExpression(expr: Expression): Promise<SerializedE
     };
   }
   if (expr instanceof FunctionExpr) {
-    const parameters = await Promise.all(expr.signature.parameters.map(async (p) => ({ name: await serializeIdentifier(p.name) })));
-    const signature: { parameters: { name: SerializedIdentifier }[]; returnType?: SerializedTypeNode } = {
-      parameters,
-    };
+    const parameters = await Promise.all(expr.signature.parameters.map((p) => serializeFnParam(p)));
+    const signature: { parameters: SerializedFnParam[]; returnType?: SerializedTypeNode } = { parameters };
     if (expr.signature.returnType) {
       signature.returnType = await serializeTypeNode(expr.signature.returnType);
     }
@@ -290,6 +363,8 @@ export async function serializeExpression(expr: Expression): Promise<SerializedE
       typeParams: expr.typeParams ? await Promise.all(expr.typeParams.map(serializeTypeParam)) : undefined,
       async: expr.async,
       generator: expr.generator,
+      abstract: expr.abstract,
+      overload: expr.overload,
       signature,
       body,
       span: await serializeSpan(expr.span),
@@ -302,6 +377,8 @@ export async function serializeExpression(expr: Expression): Promise<SerializedE
       name: expr.name ? await serializeIdentifier(expr.name) : undefined,
       extends: expr.extends ? await serializeExpression(expr.extends) : undefined,
       implements: expr.implements ? await Promise.all(expr.implements.map(serializeExpression)) : undefined,
+      decorators: expr.decorators ? await Promise.all(expr.decorators.map(serializeExpression)) : undefined,
+      abstract: expr.abstract,
       body,
       span: await serializeSpan(expr.span),
     };
@@ -337,6 +414,14 @@ async function serializeBindingPattern(target: BindingTarget): Promise<Serialize
   if (target instanceof RestPattern) {
     return { kind: "rest", target: await serializeBindingPattern(target.target), span: await serializeSpan(target.span) };
   }
+  if (target instanceof DefaultPattern) {
+    return {
+      kind: "default",
+      target: await serializeBindingPattern(target.target),
+      defaultValue: await serializeExpression(target.defaultValue),
+      span: await serializeSpan(target.span),
+    };
+  }
   throw new Error(`Unsupported binding target ${(target as any).__brand}`);
 }
 
@@ -344,6 +429,10 @@ export async function serializeStatement(stmt: Statement): Promise<SerializedSta
   if (stmt instanceof BlockStmt) {
     const statements = await Promise.all(stmt.statements.map(serializeStatement));
     return { kind: "block", statements, span: await serializeSpan(stmt.span) };
+  }
+  if (stmt instanceof StaticBlockStmt) {
+    const body = await Promise.all(stmt.statements.map(serializeStatement));
+    return { kind: "static-block", body, span: await serializeSpan(stmt.span) };
   }
   if (stmt instanceof IfStmt) {
     const consequent = await serializeStatement(stmt.consequent);
@@ -454,12 +543,34 @@ export async function serializeStatement(stmt: Statement): Promise<SerializedSta
       kind: "type-interface",
       name: await serializeIdentifier(stmt.name),
       fields: await Promise.all(stmt.body.fields.map(serializeTypeField)),
+      indexSignatures: stmt.body.indexSignatures
+        ? await Promise.all(stmt.body.indexSignatures.map(serializeIndexSignature))
+        : undefined,
+      span: await serializeSpan(stmt.span),
+    };
+  }
+  if (stmt instanceof IndexSignature) {
+    return serializeIndexSignature(stmt);
+  }
+  if (stmt instanceof EnumStmt) {
+    return {
+      kind: "enum",
+      name: await serializeIdentifier(stmt.name),
+      members: await Promise.all(stmt.members.map(serializeEnumMember)),
+      span: await serializeSpan(stmt.span),
+    };
+  }
+  if (stmt instanceof NamespaceStmt) {
+    return {
+      kind: "namespace",
+      name: await serializeIdentifier(stmt.name),
+      body: await Promise.all(stmt.body.map(serializeStatement)),
       span: await serializeSpan(stmt.span),
     };
   }
   if (stmt instanceof FunctionExpr) {
-    const parameters = await Promise.all(stmt.signature.parameters.map(async (p) => ({ name: await serializeIdentifier(p.name) })));
-    const signature: { parameters: { name: SerializedIdentifier }[]; returnType?: SerializedTypeNode } = { parameters };
+    const parameters = await Promise.all(stmt.signature.parameters.map((p) => serializeFnParam(p)));
+    const signature: { parameters: SerializedFnParam[]; returnType?: SerializedTypeNode } = { parameters };
     if (stmt.signature.returnType) {
       signature.returnType = await serializeTypeNode(stmt.signature.returnType);
     }
@@ -471,6 +582,8 @@ export async function serializeStatement(stmt: Statement): Promise<SerializedSta
       typeParams: stmt.typeParams ? await Promise.all(stmt.typeParams.map(serializeTypeParam)) : undefined,
       async: stmt.async,
       generator: stmt.generator,
+      abstract: stmt.abstract,
+      overload: stmt.overload,
       signature,
       body: await Promise.all(stmt.body.map(serializeStatement)),
       span: await serializeSpan(stmt.span),
@@ -480,13 +593,27 @@ export async function serializeStatement(stmt: Statement): Promise<SerializedSta
     return {
       kind: "class",
       name: stmt.name ? await serializeIdentifier(stmt.name) : undefined,
+      typeParams: stmt.typeParams ? await Promise.all(stmt.typeParams.map(serializeTypeParam)) : undefined,
       extends: stmt.extends ? await serializeExpression(stmt.extends) : undefined,
       implements: stmt.implements ? await Promise.all(stmt.implements.map(serializeExpression)) : undefined,
+      decorators: stmt.decorators ? await Promise.all(stmt.decorators.map(serializeExpression)) : undefined,
+      abstract: stmt.abstract,
       body: await Promise.all(stmt.body.statements.map(serializeStatement)),
       span: await serializeSpan(stmt.span),
     };
   }
   throw new Error(`Unsupported statement kind ${(stmt as any).__brand}`);
+}
+
+async function serializeIndexSignature(stmt: IndexSignature): Promise<SerializedIndexSignature> {
+  return {
+    kind: "index-signature",
+    key: await serializeIdentifier(stmt.key),
+    keyType: await serializeTypeNode(stmt.keyType),
+    valueType: await serializeTypeNode(stmt.valueType),
+    readonlyFlag: stmt.readonlyFlag,
+    span: await serializeSpan(stmt.span),
+  };
 }
 
 async function serializeTypeParam(param: TypeParam): Promise<SerializedTypeParam> {
@@ -509,6 +636,13 @@ async function serializeTypeField(field: TypeField): Promise<SerializedTypeField
     optional: field.optional,
     readonlyFlag: field.readonlyFlag,
     span: await serializeSpan(field.span),
+  };
+}
+
+async function serializeEnumMember(member: EnumMember): Promise<SerializedEnumMember> {
+  return {
+    name: member.name,
+    value: member.value ? await serializeExpression(member.value) : undefined,
   };
 }
 
@@ -553,12 +687,14 @@ function isTypeNodeValue(value: Expression | TypeNode): value is TypeNode {
     value instanceof TypeIndexed ||
     value instanceof TypeConditional ||
     value instanceof TypeInfer ||
+    value instanceof TypeThis ||
     value instanceof TypeRef ||
     value instanceof TypeFunction ||
     value instanceof TypeObject ||
     value instanceof TypeUnion ||
     value instanceof TypeIntersection ||
     value instanceof TypeLiteral ||
+    value instanceof TypeTemplateLiteral ||
     value instanceof TypeMapped ||
     value instanceof TypeApp
   );
@@ -635,6 +771,9 @@ async function serializeTypeNode(node: TypeNode): Promise<SerializedTypeNode> {
       span: await serializeSpan(node.span),
     };
   }
+  if (node instanceof TypeThis) {
+    return { kind: "type-this", span: await serializeSpan(node.span) };
+  }
   if (node instanceof TypeRef) {
     return {
       kind: "type-ref",
@@ -677,6 +816,21 @@ async function serializeTypeNode(node: TypeNode): Promise<SerializedTypeNode> {
     return {
       kind: "type-literal",
       value: await Promise.all(node.value.map(serializeLiteral)),
+      span: await serializeSpan(node.span),
+    };
+  }
+  if (node instanceof TypeTemplateLiteral) {
+    const parts: SerializedTypeTemplatePart[] = [];
+    for (const part of node.parts) {
+      if (typeof part === "string") {
+        parts.push({ kind: "text", value: part });
+        continue;
+      }
+      parts.push({ kind: "type", typeNode: await serializeTypeNode(part) });
+    }
+    return {
+      kind: "type-template",
+      parts,
       span: await serializeSpan(node.span),
     };
   }
@@ -741,6 +895,15 @@ export async function deserializeIdentifier(serialized: SerializedIdentifier): P
   return new Identifier({ name: serialized.name, span: await deserializeSpan(serialized.span) });
 }
 
+async function deserializeFnParam(serialized: SerializedFnParam): Promise<FnParam> {
+  return {
+    name: await deserializeIdentifier(serialized.name),
+    typeAnnotation: serialized.typeAnnotation ? await deserializeTypeNode(serialized.typeAnnotation) : undefined,
+    paramProperty: serialized.paramProperty ? { ...serialized.paramProperty } : undefined,
+    defaultValue: serialized.defaultValue ? await deserializeExpression(serialized.defaultValue) : undefined,
+  };
+}
+
 export async function deserializeLiteral(serialized: SerializedLiteral): Promise<Literal> {
   return new Literal({ value: serialized.value, span: await deserializeSpan(serialized.span) });
 }
@@ -771,6 +934,13 @@ async function deserializeBindingPattern(serialized: SerializedBindingTarget): P
       span: await deserializeSpan(serialized.span),
     });
   }
+  if (serialized.kind === "default") {
+    return new DefaultPattern({
+      target: await deserializeBindingPattern(serialized.target),
+      defaultValue: await deserializeExpression(serialized.defaultValue),
+      span: await deserializeSpan(serialized.span),
+    });
+  }
   throw new Error("Unknown binding target kind");
 }
 
@@ -790,6 +960,13 @@ export async function deserializeExpression(serialized: SerializedExpression): P
     case "call":
       return new CallExpr({
         callee: await deserializeExpression(serialized.callee),
+        args: await Promise.all(serialized.args.map(deserializeExpression)),
+        span: await deserializeSpan(serialized.span),
+      });
+    case "call-with-this":
+      return new CallWithThisExpr({
+        fn: await deserializeExpression(serialized.fn),
+        thisArg: await deserializeExpression(serialized.thisArg),
         args: await Promise.all(serialized.args.map(deserializeExpression)),
         span: await deserializeSpan(serialized.span),
       });
@@ -820,6 +997,16 @@ export async function deserializeExpression(serialized: SerializedExpression): P
         fields: await Promise.all(serialized.fields.map(async (field) => ({ key: field.key, value: await deserializeExpression(field.value) }))),
         span: await deserializeSpan(serialized.span),
       });
+    case "template":
+      return new TemplateExpr({
+        parts: await Promise.all(serialized.parts.map(deserializeExpression)),
+        span: await deserializeSpan(serialized.span),
+      });
+    case "non-null":
+      return new NonNullAssertExpr({
+        expr: await deserializeExpression(serialized.expr),
+        span: await deserializeSpan(serialized.span),
+      });
     case "throw":
       return new ThrowExpr({ argument: await deserializeExpression(serialized.argument), span: await deserializeSpan(serialized.span) });
     case "try": {
@@ -846,8 +1033,8 @@ export async function deserializeExpression(serialized: SerializedExpression): P
         span: await deserializeSpan(serialized.span),
       });
     case "fn": {
-      const signature: { parameters: { name: Identifier }[]; returnType?: TypeNode } = {
-        parameters: await Promise.all(serialized.signature.parameters.map(async (p) => ({ name: await deserializeIdentifier(p.name) }))),
+      const signature: { parameters: FnParam[]; returnType?: TypeNode } = {
+        parameters: await Promise.all(serialized.signature.parameters.map(deserializeFnParam)),
       };
       if (serialized.signature.returnType) {
         signature.returnType = await deserializeTypeNode(serialized.signature.returnType);
@@ -860,6 +1047,8 @@ export async function deserializeExpression(serialized: SerializedExpression): P
         typeParams,
         async: serialized.async,
         generator: serialized.generator,
+        abstract: serialized.abstract,
+        overload: serialized.overload,
         callableKind: serialized.callableKind,
         name: serialized.name ? await deserializeIdentifier(serialized.name) : undefined,
         methodName: serialized.methodName,
@@ -873,8 +1062,11 @@ export async function deserializeExpression(serialized: SerializedExpression): P
         body: classBody,
         span: await deserializeSpan(serialized.span),
         name: serialized.name ? await deserializeIdentifier(serialized.name) : undefined,
+        typeParams: serialized.typeParams ? await Promise.all(serialized.typeParams.map(deserializeTypeParam)) : undefined,
         extends: serialized.extends ? await deserializeExpression(serialized.extends) : undefined,
         implements: serialized.implements ? await Promise.all(serialized.implements.map(deserializeExpression)) : undefined,
+        decorators: serialized.decorators ? await Promise.all(serialized.decorators.map(deserializeExpression)) : undefined,
+        abstract: serialized.abstract,
       });
     }
     default:
@@ -888,6 +1080,10 @@ export async function deserializeStatement(serialized: SerializedStatement): Pro
     case "block": {
       const statements = await Promise.all(serialized.statements.map(deserializeStatement));
       return new BlockStmt({ statements, span });
+    }
+    case "static-block": {
+      const statements = await Promise.all(serialized.body.map(deserializeStatement));
+      return new StaticBlockStmt({ statements, span });
     }
     case "if": {
       const consequent = await deserializeStatement(serialized.consequent);
@@ -964,13 +1160,32 @@ export async function deserializeStatement(serialized: SerializedStatement): Pro
     case "type-interface":
       return new InterfaceStmt({
         name: await deserializeIdentifier(serialized.name),
-        body: { fields: await Promise.all(serialized.fields.map(deserializeTypeField)) },
+        body: {
+          fields: await Promise.all(serialized.fields.map(deserializeTypeField)),
+          indexSignatures: serialized.indexSignatures
+            ? await Promise.all(serialized.indexSignatures.map(deserializeIndexSignature))
+            : undefined,
+        },
+        span,
+      });
+    case "index-signature":
+      return deserializeIndexSignature(serialized);
+    case "enum":
+      return new EnumStmt({
+        name: await deserializeIdentifier(serialized.name),
+        members: await Promise.all(serialized.members.map(deserializeEnumMember)),
+        span,
+      });
+    case "namespace":
+      return new NamespaceStmt({
+        name: await deserializeIdentifier(serialized.name),
+        body: await Promise.all(serialized.body.map(deserializeStatement)),
         span,
       });
     case "fn":
       {
-        const signature: { parameters: { name: Identifier }[]; returnType?: TypeNode } = {
-          parameters: await Promise.all(serialized.signature.parameters.map(async (p) => ({ name: await deserializeIdentifier(p.name) }))),
+        const signature: { parameters: FnParam[]; returnType?: TypeNode } = {
+          parameters: await Promise.all(serialized.signature.parameters.map(deserializeFnParam)),
         };
         if (serialized.signature.returnType) {
           signature.returnType = await deserializeTypeNode(serialized.signature.returnType);
@@ -983,6 +1198,8 @@ export async function deserializeStatement(serialized: SerializedStatement): Pro
           typeParams,
           async: serialized.async,
           generator: serialized.generator,
+          abstract: serialized.abstract,
+          overload: serialized.overload,
           callableKind: serialized.callableKind,
           name: serialized.name ? await deserializeIdentifier(serialized.name) : undefined,
           methodName: serialized.methodName,
@@ -996,13 +1213,26 @@ export async function deserializeStatement(serialized: SerializedStatement): Pro
         body: classBody,
         span,
         name: serialized.name ? await deserializeIdentifier(serialized.name) : undefined,
+        typeParams: serialized.typeParams ? await Promise.all(serialized.typeParams.map(deserializeTypeParam)) : undefined,
         extends: serialized.extends ? await deserializeExpression(serialized.extends) : undefined,
         implements: serialized.implements ? await Promise.all(serialized.implements.map(deserializeExpression)) : undefined,
+        decorators: serialized.decorators ? await Promise.all(serialized.decorators.map(deserializeExpression)) : undefined,
+        abstract: serialized.abstract,
       });
     }
     default:
       throw new Error(`Unsupported statement kind ${(serialized as SerializedStatement).kind}`);
   }
+}
+
+async function deserializeIndexSignature(serialized: SerializedIndexSignature): Promise<IndexSignature> {
+  return new IndexSignature({
+    key: await deserializeIdentifier(serialized.key),
+    keyType: await deserializeTypeNode(serialized.keyType),
+    valueType: await deserializeTypeNode(serialized.valueType),
+    readonlyFlag: serialized.readonlyFlag,
+    span: await deserializeSpan(serialized.span),
+  });
 }
 
 async function deserializeTypeParam(serialized: SerializedTypeParam): Promise<TypeParam> {
@@ -1025,6 +1255,13 @@ async function deserializeTypeField(serialized: SerializedTypeField): Promise<Ty
     readonlyFlag: serialized.readonlyFlag,
     span: await deserializeSpan(serialized.span),
   });
+}
+
+async function deserializeEnumMember(serialized: SerializedEnumMember): Promise<EnumMember> {
+  return {
+    name: serialized.name,
+    value: serialized.value ? await deserializeExpression(serialized.value) : undefined,
+  };
 }
 
 async function deserializeNamedImport(serialized: SerializedNamedImport): Promise<NamedImport> {
@@ -1096,6 +1333,8 @@ async function deserializeTypeNode(serialized: SerializedTypeNode): Promise<Type
       });
     case "type-infer":
       return new TypeInfer({ name: await deserializeIdentifier(serialized.name), span });
+    case "type-this":
+      return new TypeThis({ span });
     case "type-ref":
       return new TypeRef({
         identifier: await deserializeIdentifier(serialized.identifier),
@@ -1117,6 +1356,19 @@ async function deserializeTypeNode(serialized: SerializedTypeNode): Promise<Type
       return new TypeIntersection({ types: await Promise.all(serialized.types.map(deserializeTypeNode)), span });
     case "type-literal":
       return new TypeLiteral({ value: await Promise.all(serialized.value.map(deserializeLiteral)), span });
+    case "type-template":
+      return new TypeTemplateLiteral({
+        parts: await Promise.all(serialized.parts.map(async (part: { kind: string; value?: string; typeNode?: SerializedTypeNode }) => {
+          if (part.kind === "text") {
+            return part.value ?? "";
+          }
+          if (part.kind === "type" && part.typeNode) {
+            return deserializeTypeNode(part.typeNode);
+          }
+          throw new Error("Invalid template literal type part");
+        })),
+        span,
+      });
     case "type-mapped":
       return new TypeMapped({
         typeParam: await deserializeTypeParam(serialized.typeParam),

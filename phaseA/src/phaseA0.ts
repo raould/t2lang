@@ -291,6 +291,21 @@ export class CallExpr {
   }
 }
 
+export class CallWithThisExpr {
+  private readonly __brand!: "call-with-this";
+  readonly fn: Expression;
+  readonly thisArg: Expression;
+  readonly args: Expression[];
+  readonly span: Span;
+
+  constructor(data: { fn: Expression; thisArg: Expression; args: Expression[]; span: Span }) {
+    this.fn = data.fn;
+    this.thisArg = data.thisArg;
+    this.args = data.args;
+    this.span = data.span;
+  }
+}
+
 export class PropExpr {
   private readonly __brand!: "prop";
   readonly object: Expression;
@@ -352,6 +367,17 @@ export class ObjectExpr {
   }
 }
 
+export class TemplateExpr {
+  private readonly __brand!: "template";
+  readonly parts: Expression[];
+  readonly span: Span;
+
+  constructor(data: { parts: Expression[]; span: Span }) {
+    this.parts = data.parts;
+    this.span = data.span;
+  }
+}
+
 export class ThrowExpr {
   private readonly __brand!: "throw";
   readonly argument: Expression;
@@ -395,7 +421,22 @@ export interface FnSignature {
   parameters: FnParam[];
 }
 
-export type CallableKind = "fn" | "lambda" | "method";
+export interface EnumMember { name: string; value?: Expression; }
+
+export class NamespaceStmt {
+  private readonly __brand!: "namespace";
+  readonly name: Identifier;
+  readonly body: Statement[];
+  readonly span: Span;
+
+  constructor(data: { name: Identifier; body: Statement[]; span: Span }) {
+    this.name = data.name;
+    this.body = data.body;
+    this.span = data.span;
+  }
+}
+
+export type CallableKind = "fn" | "lambda" | "method" | "getter" | "setter";
 
 export class FunctionExpr {
   private readonly __brand!: "fn";
@@ -405,14 +446,18 @@ export class FunctionExpr {
   readonly callableKind: CallableKind;
   readonly name?: Identifier;
   readonly methodName?: string;
+  readonly abstract?: boolean;
+  readonly overload?: boolean;
 
-  constructor(data: { signature: FnSignature; body: Statement[]; span: Span; callableKind?: CallableKind; name?: Identifier; methodName?: string }) {
+  constructor(data: { signature: FnSignature; body: Statement[]; span: Span; callableKind?: CallableKind; name?: Identifier; methodName?: string; abstract?: boolean; overload?: boolean }) {
     this.signature = data.signature;
     this.body = data.body;
     this.span = data.span;
     this.callableKind = data.callableKind ?? "fn";
     this.name = data.name;
     this.methodName = data.methodName;
+    this.abstract = data.abstract;
+    this.overload = data.overload;
   }
 }
 
@@ -421,14 +466,40 @@ export class ClassExpr {
   readonly body: Statement[];
   readonly span: Span;
   readonly name?: Identifier;
+  readonly abstract?: boolean;
 
-  constructor(data: { body: Statement[]; span: Span; name?: Identifier }) {
+  constructor(data: { body: Statement[]; span: Span; name?: Identifier; abstract?: boolean }) {
     this.body = data.body;
     this.span = data.span;
     this.name = data.name;
+    this.abstract = data.abstract;
   }
 }
 
+export class EnumStmt {
+  private readonly __brand!: "enum";
+  readonly name: Identifier;
+  readonly members: EnumMember[];
+  readonly span: Span;
+
+  constructor(data: { name: Identifier; members: EnumMember[]; span: Span }) {
+    this.name = data.name;
+    this.members = data.members;
+    this.span = data.span;
+  }
+}
+
+
+export class NonNullAssertExpr {
+  private readonly __brand!: "non-null";
+  readonly expr: Expression;
+  readonly span: Span;
+
+  constructor(data: { expr: Expression; span: Span }) {
+    this.expr = data.expr;
+    this.span = data.span;
+  }
+}
 // --- Union Types ---
 
 export type Statement =
@@ -446,21 +517,26 @@ export type Statement =
   | ContinueStmt
   | ExprStmt
   | FunctionExpr
-  | ClassExpr;
+  | ClassExpr
+  | EnumStmt
+  | NamespaceStmt;
 
 export type Expression =
   | Literal
   | Identifier
   | CallExpr
+  | CallWithThisExpr
   | PropExpr
   | IndexExpr
   | NewExpr
   | ArrayExpr
   | ObjectExpr
+  | TemplateExpr
   | ThrowExpr
   | TryCatchExpr
   | FunctionExpr
-  | ClassExpr;
+  | ClassExpr
+  | NonNullAssertExpr;
 
 export class Program {
   private readonly __brand!: "program";
@@ -600,6 +676,14 @@ export async function createProcessor(ctx: Context) {
       }
       return expr;
     }
+    if (expr instanceof CallWithThisExpr) {
+      await evaluateExpression(expr.fn);
+      await evaluateExpression(expr.thisArg);
+      for (const a of expr.args) {
+        await evaluateExpression(a);
+      }
+      return expr;
+    }
     if (expr instanceof PropExpr) {
       await evaluateExpression(expr.object);
       return expr;
@@ -626,6 +710,16 @@ export async function createProcessor(ctx: Context) {
       for (const f of expr.fields) {
         await evaluateExpression(f.value);
       }
+      return expr;
+    }
+    if (expr instanceof TemplateExpr) {
+      for (const part of expr.parts) {
+        await evaluateExpression(part);
+      }
+      return expr;
+    }
+    if (expr instanceof NonNullAssertExpr) {
+      await evaluateExpression(expr.expr);
       return expr;
     }
     if (expr instanceof ThrowExpr) {

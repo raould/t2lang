@@ -56,8 +56,35 @@ export class RestPattern {
   }
 }
 
-export type BindingTarget = Identifier | ArrayPattern | ObjectPattern | RestPattern;
+export class DefaultPattern {
+  private readonly __brand!: "default";
+  readonly target: BindingTarget;
+  readonly defaultValue: Expression;
+  readonly span: Span;
+
+  constructor(data: { target: BindingTarget; defaultValue: Expression; span: Span }) {
+    this.target = data.target;
+    this.defaultValue = data.defaultValue;
+    this.span = data.span;
+  }
+}
+
+export type BindingTarget = Identifier | ArrayPattern | ObjectPattern | RestPattern | DefaultPattern;
 export interface Binding { target: BindingTarget; init?: Expression; }
+
+export interface EnumMember { name: string; value?: Expression; }
+
+export class NamespaceStmt {
+  private readonly __brand!: "namespace";
+  readonly name: Identifier;
+  readonly body: Statement[];
+  readonly span: Span;
+  constructor(data: { name: Identifier; body: Statement[]; span: Span }) {
+    this.name = data.name;
+    this.body = data.body;
+    this.span = data.span;
+  }
+}
 
 // --- Statements ---
 
@@ -66,6 +93,16 @@ export class BlockStmt {
   readonly statements: Statement[];
   readonly span: Span;
   constructor(data: { statements: Statement[]; span: Span }) { this.statements = data.statements; this.span = data.span; }
+}
+
+export class StaticBlockStmt {
+  private readonly __brand!: "static-block";
+  readonly statements: Statement[];
+  readonly span: Span;
+  constructor(data: { statements: Statement[]; span: Span }) {
+    this.statements = data.statements;
+    this.span = data.span;
+  }
 }
 
 export class IfStmt {
@@ -163,6 +200,18 @@ export class ReturnExpr {
   constructor(data: { span: Span; value?: Expression; typeId?: number }) { this.span = data.span; this.value = data.value; this.typeId = data.typeId; }
 }
 
+export class EnumStmt {
+  private readonly __brand!: "enum";
+  readonly name: Identifier;
+  readonly members: EnumMember[];
+  readonly span: Span;
+  constructor(data: { name: Identifier; members: EnumMember[]; span: Span }) {
+    this.name = data.name;
+    this.members = data.members;
+    this.span = data.span;
+  }
+}
+
 export class BreakStmt {
   private readonly __brand!: "break";
   readonly span: Span;
@@ -193,6 +242,20 @@ export class CallExpr {
   readonly args: Expression[];
   readonly span: Span;
   constructor(data: { callee: Expression; args: Expression[]; span: Span }) { this.callee = data.callee; this.args = data.args; this.span = data.span; }
+}
+
+export class CallWithThisExpr {
+  private readonly __brand!: "call-with-this";
+  readonly fn: Expression;
+  readonly thisArg: Expression;
+  readonly args: Expression[];
+  readonly span: Span;
+  constructor(data: { fn: Expression; thisArg: Expression; args: Expression[]; span: Span }) {
+    this.fn = data.fn;
+    this.thisArg = data.thisArg;
+    this.args = data.args;
+    this.span = data.span;
+  }
 }
 
 export class PropExpr {
@@ -239,6 +302,13 @@ export class ObjectExpr {
   constructor(data: { fields: { key: string; value: Expression }[]; span: Span }) { this.fields = data.fields; this.span = data.span; }
 }
 
+export class TemplateExpr {
+  private readonly __brand!: "template";
+  readonly parts: Expression[];
+  readonly span: Span;
+  constructor(data: { parts: Expression[]; span: Span }) { this.parts = data.parts; this.span = data.span; }
+}
+
 export class ThrowExpr {
   private readonly __brand!: "throw";
   readonly argument: Expression;
@@ -260,10 +330,15 @@ export class TryCatchExpr {
   }
 }
 
-export interface FnParam { name: Identifier; typeAnnotation?: TypeNode; }
+export interface FnParam {
+  name: Identifier;
+  typeAnnotation?: TypeNode;
+  paramProperty?: { access?: "public" | "protected" | "private"; readonly?: boolean };
+  defaultValue?: Expression;
+}
 export interface FnSignature { parameters: FnParam[]; returnType?: TypeNode; }
 
-export type CallableKind = "fn" | "lambda" | "method";
+export type CallableKind = "fn" | "lambda" | "method" | "getter" | "setter";
 
 export class FunctionExpr {
   private readonly __brand!: "fn";
@@ -276,6 +351,8 @@ export class FunctionExpr {
   readonly typeParams?: TypeParam[];
   readonly async?: boolean;
   readonly generator?: boolean;
+  readonly abstract?: boolean;
+  readonly overload?: boolean;
   constructor(data: {
     signature: FnSignature;
     body: Statement[];
@@ -283,6 +360,8 @@ export class FunctionExpr {
     typeParams?: TypeParam[];
     async?: boolean;
     generator?: boolean;
+    abstract?: boolean;
+    overload?: boolean;
     callableKind?: CallableKind;
     name?: Identifier;
     methodName?: string;
@@ -293,13 +372,15 @@ export class FunctionExpr {
     this.typeParams = data.typeParams;
     this.async = data.async;
     this.generator = data.generator;
+    this.abstract = data.abstract;
+    this.overload = data.overload;
     this.callableKind = data.callableKind ?? "fn";
     this.name = data.name;
     this.methodName = data.methodName;
   }
 }
 
-export type ClassMember = BlockStmt | IfStmt | WhileStmt | LetStarExpr | ForClassic | ForOf | ForAwait | SwitchStmt | AssignExpr | ReturnExpr | BreakStmt | ContinueStmt | ExprStmt | FunctionExpr | ClassExpr;
+export type ClassMember = BlockStmt | StaticBlockStmt | IfStmt | WhileStmt | LetStarExpr | ForClassic | ForOf | ForAwait | SwitchStmt | AssignExpr | ReturnExpr | BreakStmt | ContinueStmt | ExprStmt | FunctionExpr | ClassExpr | IndexSignature;
 export interface ClassBody { statements: ClassMember[]; }
 
 export class ClassExpr {
@@ -307,14 +388,16 @@ export class ClassExpr {
   readonly body: ClassBody;
   readonly span: Span;
   readonly name?: Identifier;
+  readonly typeParams?: TypeParam[];
   readonly decorators?: Expression[];
   readonly extends?: Expression | null;
   readonly implements?: Expression[];
+  readonly abstract?: boolean;
   readonly constructorStmt?: Statement | null;
   readonly staticBlocks?: Statement[];
-  constructor(data: { body: ClassBody; span: Span; name?: Identifier; decorators?: Expression[]; extends?: Expression | null; implements?: Expression[]; constructorStmt?: Statement | null; staticBlocks?: Statement[] }) {
-    this.body = data.body; this.span = data.span; this.name = data.name; this.decorators = data.decorators;
-    this.extends = data.extends; this.implements = data.implements; this.constructorStmt = data.constructorStmt; this.staticBlocks = data.staticBlocks;
+  constructor(data: { body: ClassBody; span: Span; name?: Identifier; typeParams?: TypeParam[]; decorators?: Expression[]; extends?: Expression | null; implements?: Expression[]; abstract?: boolean; constructorStmt?: Statement | null; staticBlocks?: Statement[] }) {
+    this.body = data.body; this.span = data.span; this.name = data.name; this.typeParams = data.typeParams; this.decorators = data.decorators;
+    this.extends = data.extends; this.implements = data.implements; this.abstract = data.abstract; this.constructorStmt = data.constructorStmt; this.staticBlocks = data.staticBlocks;
   }
 }
 
@@ -360,6 +443,13 @@ export class TypeAssertExpr {
   readonly assertedType: TypeNode;
   readonly span: Span;
   constructor(data: { expr: Expression; assertedType: TypeNode; span: Span }) { this.expr = data.expr; this.assertedType = data.assertedType; this.span = data.span; }
+}
+
+export class NonNullAssertExpr {
+  private readonly __brand!: "non-null";
+  readonly expr: Expression;
+  readonly span: Span;
+  constructor(data: { expr: Expression; span: Span }) { this.expr = data.expr; this.span = data.span; }
 }
 
 // --- Type System ---
@@ -517,6 +607,12 @@ export class TypeInfer {
   constructor(data: { name: Identifier; span: Span }) { this.name = data.name; this.span = data.span; }
 }
 
+export class TypeThis {
+  private readonly __brand!: "type-this";
+  readonly span: Span;
+  constructor(data: { span: Span }) { this.span = data.span; }
+}
+
 export class TypeRef {
   private readonly __brand!: "type-ref";
   readonly identifier: Identifier;
@@ -564,6 +660,13 @@ export class TypeLiteral {
   constructor(data: { value: Literal[]; span: Span }) { this.value = data.value; this.span = data.span; }
 }
 
+export class TypeTemplateLiteral {
+  private readonly __brand!: "type-template";
+  readonly parts: Array<string | TypeNode>;
+  readonly span: Span;
+  constructor(data: { parts: Array<string | TypeNode>; span: Span }) { this.parts = data.parts; this.span = data.span; }
+}
+
 export class TypeMapped {
   private readonly __brand!: "type-mapped";
   readonly typeParam: TypeParam;
@@ -586,6 +689,21 @@ export class TypeApp {
   readonly span: Span;
   constructor(data: { expr: Expression | TypeNode; typeArgs: TypeNode[]; span: Span }) { this.expr = data.expr; this.typeArgs = data.typeArgs; this.span = data.span; }
 }
+export class IndexSignature {
+  private readonly __brand!: "index-signature";
+  readonly key: Identifier;
+  readonly keyType: TypeNode;
+  readonly valueType: TypeNode;
+  readonly span: Span;
+  readonly readonlyFlag?: boolean;
+  constructor(data: { key: Identifier; keyType: TypeNode; valueType: TypeNode; span: Span; readonlyFlag?: boolean }) {
+    this.key = data.key;
+    this.keyType = data.keyType;
+    this.valueType = data.valueType;
+    this.span = data.span;
+    this.readonlyFlag = data.readonlyFlag;
+  }
+}
 
 export type TypeNode =
   | TypePrimitive
@@ -598,12 +716,14 @@ export type TypeNode =
   | TypeIndexed
   | TypeConditional
   | TypeInfer
+  | TypeThis
   | TypeRef
   | TypeFunction
   | TypeObject
   | TypeUnion
   | TypeIntersection
   | TypeLiteral
+  | TypeTemplateLiteral
   | TypeMapped
   | TypeApp;
 
@@ -641,7 +761,7 @@ export class TypeAliasStmt {
   }
 }
 
-export interface InterfaceBody { fields: TypeField[]; }
+export interface InterfaceBody { fields: TypeField[]; indexSignatures?: IndexSignature[]; }
 
 export class InterfaceStmt {
   private readonly __brand!: "type-interface";
@@ -653,8 +773,8 @@ export class InterfaceStmt {
 
 // --- Union Types ---
 
-export type Statement = ClassMember | ImportStmt | ExportStmt | TypeAliasStmt | InterfaceStmt;
-export type Expression = Literal | Identifier | CallExpr | PropExpr | IndexExpr | NewExpr | ArrayExpr | ObjectExpr | ThrowExpr | TryCatchExpr | FunctionExpr | ClassExpr | SpreadExpr | TernaryExpr | AwaitExpr | YieldExpr | TypeAssertExpr | TypeApp;
+export type Statement = ClassMember | EnumStmt | NamespaceStmt | ImportStmt | ExportStmt | TypeAliasStmt | InterfaceStmt;
+export type Expression = Literal | Identifier | CallExpr | CallWithThisExpr | PropExpr | IndexExpr | NewExpr | ArrayExpr | ObjectExpr | TemplateExpr | ThrowExpr | TryCatchExpr | FunctionExpr | ClassExpr | SpreadExpr | TernaryExpr | AwaitExpr | YieldExpr | TypeAssertExpr | NonNullAssertExpr | TypeApp;
 
 export class Program {
   private readonly __brand!: "program";
@@ -721,6 +841,7 @@ export async function createProcessor(ctx: Context) {
     value instanceof TypeUnion ||
     value instanceof TypeIntersection ||
     value instanceof TypeLiteral ||
+    value instanceof TypeTemplateLiteral ||
     value instanceof TypeMapped ||
     value instanceof TypeApp;
   async function registerIdentifier(_id: Identifier, _isConst: boolean): Promise<void> { /* stub */ }
@@ -751,6 +872,9 @@ export async function createProcessor(ctx: Context) {
       }
     } else if (target instanceof RestPattern) {
       await resolveBindingTarget(target.target, isConst);
+    } else if (target instanceof DefaultPattern) {
+      await resolveBindingTarget(target.target, isConst);
+      await evaluateExpression(target.defaultValue);
     }
   }
 
@@ -769,6 +893,12 @@ export async function createProcessor(ctx: Context) {
     await emitStatementTrace("start", stmt);
     try {
       if (stmt instanceof BlockStmt) {
+        await withScope(async () => {
+          for (const s of stmt.statements) {
+            await processStatement(s);
+          }
+        });
+      } else if (stmt instanceof StaticBlockStmt) {
         await withScope(async () => {
           for (const s of stmt.statements) {
             await processStatement(s);
@@ -834,6 +964,12 @@ export async function createProcessor(ctx: Context) {
         await evaluateExpression(stmt.expr);
       } else if (stmt instanceof FunctionExpr || stmt instanceof ClassExpr) {
         await evaluateExpression(stmt);
+      } else if (stmt instanceof EnumStmt) {
+        for (const member of stmt.members) {
+          if (member.value) {
+            await evaluateExpression(member.value);
+          }
+        }
       } else if (stmt instanceof ImportStmt) {
         await processImport(stmt);
       } else if (stmt instanceof ExportStmt) {
@@ -842,6 +978,15 @@ export async function createProcessor(ctx: Context) {
         await processTypeAlias(stmt);
       } else if (stmt instanceof InterfaceStmt) {
         await processInterface(stmt);
+      } else if (stmt instanceof NamespaceStmt) {
+        await withScope(async () => {
+          for (const child of stmt.body) {
+            await processStatement(child);
+          }
+        });
+      } else if (stmt instanceof IndexSignature) {
+        await evaluateType(stmt.keyType);
+        await evaluateType(stmt.valueType);
       } else {
         ctx.diagnostics.push(A0.createDiagnostic(RESOLVE_STAGE, "T2:0003", (stmt as Statement).span));
       }
@@ -864,6 +1009,14 @@ export async function createProcessor(ctx: Context) {
         }
         return expr;
       }
+        if (expr instanceof CallWithThisExpr) {
+          await evaluateExpression(expr.fn);
+          await evaluateExpression(expr.thisArg);
+          for (const a of expr.args) {
+            await evaluateExpression(a);
+          }
+          return expr;
+        }
       if (expr instanceof PropExpr) {
         await evaluateExpression(expr.object);
         return expr;
@@ -889,6 +1042,12 @@ export async function createProcessor(ctx: Context) {
       if (expr instanceof ObjectExpr) {
         for (const f of expr.fields) {
           await evaluateExpression(f.value);
+        }
+        return expr;
+      }
+      if (expr instanceof TemplateExpr) {
+        for (const part of expr.parts) {
+          await evaluateExpression(part);
         }
         return expr;
       }
@@ -939,6 +1098,11 @@ export async function createProcessor(ctx: Context) {
       }
       if (expr instanceof ClassExpr) {
         await withScope(async () => {
+          if (expr.typeParams) {
+            for (const p of expr.typeParams) {
+              await evaluateTypeParam(p);
+            }
+          }
           if (expr.extends) {
             await evaluateExpression(expr.extends);
           }
@@ -995,6 +1159,10 @@ export async function createProcessor(ctx: Context) {
       if (expr instanceof TypeAssertExpr) {
         await evaluateExpression(expr.expr);
         await evaluateType(expr.assertedType);
+        return expr;
+      }
+      if (expr instanceof NonNullAssertExpr) {
+        await evaluateExpression(expr.expr);
         return expr;
       }
       ctx.diagnostics.push(A0.createDiagnostic(RESOLVE_STAGE, "T2:0004", (expr as Expression).span));
@@ -1103,6 +1271,9 @@ export async function createProcessor(ctx: Context) {
     if (typeNode instanceof TypeInfer) {
       return;
     }
+    if (typeNode instanceof TypeThis) {
+      return;
+    }
     if (typeNode instanceof TypeRef) {
       if (typeNode.typeArgs) {
         for (const arg of typeNode.typeArgs) {
@@ -1114,6 +1285,14 @@ export async function createProcessor(ctx: Context) {
     if (typeNode instanceof TypeUnion || typeNode instanceof TypeIntersection) {
       for (const t of typeNode.types) {
         await evaluateType(t);
+      }
+      return;
+    }
+    if (typeNode instanceof TypeTemplateLiteral) {
+      for (const part of typeNode.parts) {
+        if (typeof part !== "string") {
+          await evaluateType(part);
+        }
       }
       return;
     }

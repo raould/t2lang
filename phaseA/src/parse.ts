@@ -3,6 +3,7 @@ import {
   ExprStmt,
   LetStarExpr,
   BlockStmt,
+  StaticBlockStmt,
   AssignExpr,
   ReturnExpr,
   BreakStmt,
@@ -31,6 +32,7 @@ import {
   ArrayPattern,
   ObjectPattern,
   RestPattern,
+  DefaultPattern,
   CatchClause,
   FinallyClause,
   Expression,
@@ -38,8 +40,10 @@ import {
   ClassMember,
   Span,
   CallExpr,
+  CallWithThisExpr,
   ArrayExpr,
   FunctionExpr,
+  FnParam,
   CallableKind,
   ClassExpr,
   SpreadExpr,
@@ -58,6 +62,7 @@ import {
   TypeObject,
   TypeParam,
   TypePrimitive,
+  TypeTemplateLiteral,
   TypeRef,
   TypeUnion,
   TypeVar,
@@ -69,7 +74,14 @@ import {
   TypeIndexed,
   TypeConditional,
   TypeInfer,
+  TypeThis,
   InterfaceStmt,
+  EnumStmt,
+  EnumMember,
+  NamespaceStmt,
+  NonNullAssertExpr,
+  TemplateExpr,
+  IndexSignature,
 } from "./phaseA1.js";
 
 interface Token {
@@ -380,6 +392,12 @@ class Parser {
         if (head.value === "method") {
           return this.buildMethod(node);
         }
+        if (head.value === "getter") {
+          return this.buildGetter(node);
+        }
+        if (head.value === "setter") {
+          return this.buildSetter(node);
+        }
         if (head.value === "class") {
           return this.buildClass(node);
         }
@@ -395,9 +413,61 @@ class Parser {
         if (head.value === "export" || head.value === "export-default") {
           return this.buildExport(node);
         }
+        if (head.value === "enum") {
+          return this.buildEnum(node);
+        }
+        if (head.value === "namespace") {
+          return this.buildNamespace(node);
+        }
+        if (head.value === "index-signature") {
+          return this.buildIndexSignature(node);
+        }
+        if (head.value === "static-block") {
+          return this.buildStaticBlock(node);
+        }
       }
     }
     return new ExprStmt({ expr: this.nodeToExpression(node), span: node.span });
+  }
+
+  private buildEnum(node: ListNode): EnumStmt {
+    const span = node.span;
+    const [, nameNode, bodyNode] = node.elements;
+    if (!nameNode || !bodyNode || bodyNode.type !== "list") {
+      throw new Error("enum requires a name and enum-body");
+    }
+    const name = this.nodeToIdentifier(nameNode, "enum name");
+    if (bodyNode.elements.length === 0 || bodyNode.elements[0].type !== "atom" || bodyNode.elements[0].value !== "enum-body") {
+      throw new Error("enum-body must start with (enum-body ...)");
+    }
+    const members: EnumMember[] = bodyNode.elements.slice(1).map((child) => this.buildEnumMember(child));
+    return new EnumStmt({ name, members, span });
+  }
+
+  private buildEnumMember(node: Node): EnumMember {
+    if (node.type !== "list" || node.elements.length === 0 || node.elements.length > 2) {
+      throw new Error("enum member must be (\"Name\" value?)");
+    }
+    const [nameNode, valueNode] = node.elements;
+    if (nameNode.type !== "atom" || nameNode.tokenType !== "string") {
+      throw new Error("enum member name must be a string literal");
+    }
+    const value = valueNode ? this.nodeToExpression(valueNode) : undefined;
+    return { name: nameNode.value, value };
+  }
+
+  private buildNamespace(node: ListNode): NamespaceStmt {
+    const span = node.span;
+    const [, nameNode, bodyNode] = node.elements;
+    if (!nameNode || !bodyNode || bodyNode.type !== "list") {
+      throw new Error("namespace requires a name and namespace-body");
+    }
+    const name = this.nodeToIdentifier(nameNode, "namespace name");
+    if (bodyNode.elements.length === 0 || bodyNode.elements[0].type !== "atom" || bodyNode.elements[0].value !== "namespace-body") {
+      throw new Error("namespace-body must start with (namespace-body ...)");
+    }
+    const statements = bodyNode.elements.slice(1).map((child) => this.nodeToStatement(child));
+    return new NamespaceStmt({ name, body: statements, span });
   }
 
   private buildLetStar(node: ListNode, isConst: boolean): LetStarExpr {
@@ -475,6 +545,16 @@ class Parser {
     const bodyNodes = node.elements.slice(1);
     const statements = bodyNodes.map((child) => this.nodeToStatement(child));
     return new BlockStmt({ statements, span });
+  }
+
+  private buildStaticBlock(node: ListNode): StaticBlockStmt {
+    const span = node.span;
+    if (node.elements.length === 0 || node.elements[0].type !== "atom" || node.elements[0].value !== "static-block") {
+      throw new Error("static-block must start with (static-block ...)");
+    }
+    const bodyNodes = node.elements.slice(1);
+    const statements = bodyNodes.map((child) => this.nodeToStatement(child));
+    return new StaticBlockStmt({ statements, span });
   }
 
   private buildIf(node: ListNode): IfStmt {
@@ -619,6 +699,9 @@ class Parser {
         if (head.value === "rest") {
           return this.buildRestPattern(node);
         }
+        if (head.value === "default") {
+          return this.buildDefaultPattern(node);
+        }
       }
     }
     throw new Error("Invalid binding target");
@@ -631,8 +714,11 @@ class Parser {
     }
     const expressionHeads = new Set([
       "call",
+      "call-with-this",
       "array",
       "object",
+      "template",
+      "non-null",
       "prop",
       "index",
       "new",
@@ -696,6 +782,20 @@ class Parser {
     return new RestPattern({ target: this.nodeToBindingTarget(targetNode), span });
   }
 
+  private buildDefaultPattern(node: ListNode): DefaultPattern {
+    const span = node.span;
+    const [, targetNode, valueNode] = node.elements;
+    if (!targetNode || !valueNode) {
+      throw new Error("default pattern requires a target and value");
+    }
+    const target = this.nodeToBindingTarget(targetNode);
+    if (target instanceof RestPattern) {
+      throw new Error("default pattern cannot wrap rest");
+    }
+    const defaultValue = this.nodeToExpression(valueNode);
+    return new DefaultPattern({ target, defaultValue, span });
+  }
+
   private buildStatementSequence(nodes: Node[], span: Span): Statement {
     if (nodes.length === 1) {
       return this.nodeToStatement(nodes[0]);
@@ -720,6 +820,12 @@ class Parser {
       if (head.value === "object") {
         return this.buildObject(node);
       }
+      if (head.value === "template") {
+        return this.buildTemplate(node);
+      }
+      if (head.value === "non-null") {
+        return this.buildNonNullAssert(node);
+      }
       if (head.value === "spread") {
         return this.buildSpread(node);
       }
@@ -734,6 +840,9 @@ class Parser {
       }
       if (head.value === "call") {
         return this.buildCall(node);
+      }
+      if (head.value === "call-with-this") {
+        return this.buildCallWithThis(node);
       }
       if (head.value === "ternary") {
         return this.buildTernary(node);
@@ -782,6 +891,18 @@ class Parser {
     return new CallExpr({ callee, args, span });
   }
 
+  private buildCallWithThis(node: ListNode): CallWithThisExpr {
+    const span = node.span;
+    const [, fnNode, thisArgNode, ...argNodes] = node.elements;
+    if (!fnNode || !thisArgNode) {
+      throw new Error("call-with-this requires a function, thisArg, and optional args");
+    }
+    const fn = this.nodeToExpression(fnNode);
+    const thisArg = this.nodeToExpression(thisArgNode);
+    const args = argNodes.map((child) => this.nodeToExpression(child));
+    return new CallWithThisExpr({ fn, thisArg, args, span });
+  }
+
   private buildProp(node: ListNode): PropExpr {
     const span = node.span;
     const [, objectNode, nameNode] = node.elements;
@@ -825,6 +946,21 @@ class Parser {
       return { key: keyNode.value, value: this.nodeToExpression(valueNode) };
     });
     return new ObjectExpr({ fields, span });
+  }
+
+  private buildTemplate(node: ListNode): TemplateExpr {
+    const span = node.span;
+    const parts = node.elements.slice(1).map((child) => this.nodeToExpression(child));
+    return new TemplateExpr({ parts, span });
+  }
+
+  private buildNonNullAssert(node: ListNode): NonNullAssertExpr {
+    const span = node.span;
+    const [, exprNode] = node.elements;
+    if (!exprNode) {
+      throw new Error("non-null requires an expression");
+    }
+    return new NonNullAssertExpr({ expr: this.nodeToExpression(exprNode), span });
   }
 
   private buildSpread(node: ListNode): SpreadExpr {
@@ -1006,11 +1142,21 @@ class Parser {
     return this.buildCallable(node, "method");
   }
 
+  private buildGetter(node: ListNode): FunctionExpr {
+    return this.buildCallable(node, "getter");
+  }
+
+  private buildSetter(node: ListNode): FunctionExpr {
+    return this.buildCallable(node, "setter");
+  }
+
   private buildCallable(node: ListNode, kind: CallableKind): FunctionExpr {
     const span = node.span;
     let entries = node.elements.slice(1);
     let async = false;
     let generator = false;
+    let abstract = false;
+    let overload = false;
     while (entries.length > 0) {
       const head = entries[0];
       if (head.type === "atom") {
@@ -1021,6 +1167,16 @@ class Parser {
         }
         if (head.value === "generator") {
           generator = true;
+          entries = entries.slice(1);
+          continue;
+        }
+        if (head.value === "abstract") {
+          abstract = true;
+          entries = entries.slice(1);
+          continue;
+        }
+        if (head.value === "overload") {
+          overload = true;
           entries = entries.slice(1);
           continue;
         }
@@ -1036,10 +1192,10 @@ class Parser {
       entries = entries.slice(1);
     }
 
-    if (kind === "method") {
+    if (kind === "method" || kind === "getter" || kind === "setter") {
       const nameNode = entries[0];
       if (!nameNode || nameNode.type !== "atom" || nameNode.tokenType !== "string") {
-        throw new Error("method requires a string name");
+        throw new Error(`${kind} requires a string name`);
       }
       methodName = nameNode.value;
       entries = entries.slice(1);
@@ -1058,9 +1214,65 @@ class Parser {
     const signature = this.parseFnSignature(signatureNode);
     entries = entries.slice(1);
 
+    const hasParamProperty = signature.parameters.some((param) => param.paramProperty);
+    if (hasParamProperty) {
+      if (kind !== "method" || methodName !== "constructor") {
+        throw new Error("parameter properties are only allowed in constructors");
+      }
+      if (overload) {
+        throw new Error("parameter properties are not allowed in constructor overloads");
+      }
+    }
+
+    if (abstract && kind !== "method" && kind !== "getter" && kind !== "setter") {
+      throw new Error("abstract is only valid for methods/getters/setters");
+    }
+    if (kind === "lambda" && abstract) {
+      throw new Error("lambda cannot be abstract");
+    }
+    if (abstract && entries.length > 0) {
+      throw new Error("abstract callables cannot have a body");
+    }
+    if (overload && kind !== "fn" && kind !== "method") {
+      throw new Error("overload is only valid for functions and methods");
+    }
+    if (overload && kind === "lambda") {
+      throw new Error("lambda cannot be overload");
+    }
+    if (overload && kind === "fn" && !name) {
+      throw new Error("overload requires a named function");
+    }
+    if (overload && abstract) {
+      throw new Error("overload cannot be abstract");
+    }
+
+    if (kind === "getter" && signature.parameters.length !== 0) {
+      throw new Error("getter must declare zero parameters");
+    }
+    if (kind === "setter") {
+      if (signature.parameters.length !== 1) {
+        throw new Error("setter must declare exactly one parameter");
+      }
+      if (signature.returnType) {
+        throw new Error("setter cannot declare a return type");
+      }
+    }
+    if (signature.parameters.length > 0 && signature.parameters[0].name.name === "this") {
+      if (kind === "lambda") {
+        throw new Error("lambda cannot declare a this parameter");
+      }
+      if (kind === "getter" || kind === "setter") {
+        throw new Error("accessors cannot declare a this parameter");
+      }
+    }
+
     if (!typeParams && entries.length > 0 && this.isTypeParamsList(entries[0])) {
       typeParams = this.parseTypeParams(entries[0]);
       entries = entries.slice(1);
+    }
+
+    if (overload && entries.length > 0) {
+      throw new Error("overload signatures cannot have a body");
     }
 
     const body = entries.map((child) => this.nodeToStatement(child));
@@ -1071,13 +1283,15 @@ class Parser {
       typeParams,
       async,
       generator,
+      abstract,
+      overload: overload ? true : undefined,
       callableKind: kind,
       name,
       methodName,
     });
   }
 
-  private parseFnSignature(node: ListNode): { parameters: { name: Identifier; typeAnnotation?: TypeNode }[]; returnType?: TypeNode } {
+  private parseFnSignature(node: ListNode): { parameters: FnParam[]; returnType?: TypeNode } {
     const entries = node.elements;
     let returnType: TypeNode | undefined;
     let paramNodes = entries;
@@ -1091,20 +1305,117 @@ class Parser {
       }
     }
     const parameters = paramNodes.map((paramNode) => this.parseFnParam(paramNode));
+    const thisParamIndex = parameters.findIndex((param) => param.name.name === "this");
+    if (thisParamIndex >= 0) {
+      if (thisParamIndex !== 0) {
+        throw new Error("this parameter must be first");
+      }
+      if (!parameters[0].typeAnnotation) {
+        throw new Error("this parameter requires a type annotation");
+      }
+      if (parameters.length > 1 && parameters.slice(1).some((param) => param.name.name === "this")) {
+        throw new Error("this parameter cannot be repeated");
+      }
+    }
     return { parameters, returnType };
   }
 
-  private parseFnParam(node: Node): { name: Identifier; typeAnnotation?: TypeNode } {
+  private parseFnParam(node: Node): { name: Identifier; typeAnnotation?: TypeNode; paramProperty?: { access?: "public" | "protected" | "private"; readonly?: boolean }; defaultValue?: Expression } {
     if (node.type !== "list" || node.elements.length === 0) {
       throw new Error("fn param must be a list with a name");
     }
-    if (node.elements.length > 2) {
-      throw new Error("fn param must contain a name and optional type");
+
+    const elements = node.elements;
+    if (elements[0].type === "atom" && elements[0].value === "this") {
+      if (elements.length !== 2) {
+        throw new Error("this parameter requires a type annotation");
+      }
+      return { name: this.nodeToIdentifier(elements[0], "fn param name"), typeAnnotation: this.nodeToType(elements[1]) };
     }
-    const [nameNode, typeNode] = node.elements;
-    const name = this.nodeToIdentifier(nameNode, "fn param name");
-    const typeAnnotation = typeNode ? this.nodeToType(typeNode) : undefined;
-    return { name, typeAnnotation };
+
+    let idx = 0;
+    const modifiers: string[] = [];
+    while (idx < elements.length) {
+      const entry = elements[idx];
+      if (entry.type === "atom" && entry.tokenType === "atom") {
+        const value = entry.value;
+        if (value === "public" || value === "private" || value === "protected" || value === "readonly") {
+          modifiers.push(value);
+          idx++;
+          continue;
+        }
+      }
+      break;
+    }
+
+    if (idx >= elements.length) {
+      throw new Error("fn param must include a name");
+    }
+
+    const name = this.nodeToIdentifier(elements[idx], "fn param name");
+    idx++;
+
+    if (name.name === "this") {
+      throw new Error("this parameter must be declared without modifiers");
+    }
+
+    let typeAnnotation: TypeNode | undefined;
+    let defaultValue: Expression | undefined;
+    if (idx < elements.length) {
+      const next = elements[idx];
+      if (next.type === "atom" && next.value === "default") {
+        idx++;
+        if (idx >= elements.length) {
+          throw new Error("default requires a value expression");
+        }
+        defaultValue = this.nodeToExpression(elements[idx]);
+        idx++;
+      } else {
+        typeAnnotation = this.nodeToType(next);
+        idx++;
+        const maybeDefault = elements[idx];
+        if (idx < elements.length && maybeDefault.type === "atom" && maybeDefault.value === "default") {
+          idx++;
+          if (idx >= elements.length) {
+            throw new Error("default requires a value expression");
+          }
+          defaultValue = this.nodeToExpression(elements[idx]);
+          idx++;
+        }
+      }
+    }
+    if (idx < elements.length) {
+      throw new Error("fn param must contain a name, optional type, and optional default value");
+    }
+
+    let paramProperty: { access?: "public" | "protected" | "private"; readonly?: boolean } | undefined;
+    if (modifiers.length > 0) {
+      let access: "public" | "protected" | "private" | undefined;
+      let readonlyFlag = false;
+      for (const modifier of modifiers) {
+        if (modifier === "readonly") {
+          if (readonlyFlag) {
+            throw new Error("parameter property cannot repeat readonly");
+          }
+          readonlyFlag = true;
+          continue;
+        }
+        if (access) {
+          throw new Error("parameter property cannot specify multiple access modifiers");
+        }
+        access = modifier as "public" | "protected" | "private";
+      }
+      const property: { access?: "public" | "protected" | "private"; readonly?: boolean } = {};
+      if (access) {
+        property.access = access;
+      }
+      if (readonlyFlag) {
+        property.readonly = true;
+      }
+      paramProperty = property;
+    }
+
+    return { name, typeAnnotation, paramProperty, defaultValue };
   }
 
   private buildClass(node: ListNode): ClassExpr {
@@ -1114,17 +1425,47 @@ class Parser {
       throw new Error("class requires a name and class-body");
     }
     const name = this.nodeToIdentifier(nameNode, "class name");
+    let typeParams: TypeParam[] | undefined;
     let bodyNode: ListNode | undefined;
     let extendsExpr: Expression | null | undefined;
     let implementsExprs: Expression[] | undefined;
+    let abstract = false;
+    let decorators: Expression[] | undefined;
     for (const child of restNodes) {
       if (child.type === "list" && child.elements.length > 0 && child.elements[0].type === "atom") {
         const head = child.elements[0].value;
+        if (head === "typeparams") {
+          if (typeParams) {
+            throw new Error("class cannot declare typeparams more than once");
+          }
+          typeParams = this.parseTypeParams(child);
+          continue;
+        }
         if (head === "class-body") {
           if (bodyNode) {
             throw new Error("class may only contain a single class-body");
           }
           bodyNode = child;
+          continue;
+        }
+        if (head === "decorators") {
+          if (decorators) {
+            throw new Error("class cannot have multiple decorators clauses");
+          }
+          if (child.elements.length < 2) {
+            throw new Error("decorators clause requires at least one expression");
+          }
+          decorators = child.elements.slice(1).map((dec) => this.nodeToExpression(dec));
+          continue;
+        }
+        if (head === "abstract") {
+          if (abstract) {
+            throw new Error("class cannot declare abstract more than once");
+          }
+          if (child.elements.length !== 1) {
+            throw new Error("abstract clause takes no arguments");
+          }
+          abstract = true;
           continue;
         }
         if (head === "extends") {
@@ -1154,7 +1495,7 @@ class Parser {
       throw new Error("class requires a name and class-body");
     }
     const body = this.buildClassBody(bodyNode);
-    return new ClassExpr({ name, body, span, extends: extendsExpr, implements: implementsExprs });
+    return new ClassExpr({ name, body, span, typeParams, extends: extendsExpr, implements: implementsExprs, abstract, decorators });
   }
 
   private buildClassBody(node: ListNode): { statements: ClassMember[] } {
@@ -1166,6 +1507,7 @@ class Parser {
       const stmt = this.nodeToStatement(child);
       if (
         stmt instanceof BlockStmt ||
+        stmt instanceof StaticBlockStmt ||
         stmt instanceof IfStmt ||
         stmt instanceof WhileStmt ||
         stmt instanceof LetStarExpr ||
@@ -1179,7 +1521,8 @@ class Parser {
         stmt instanceof ContinueStmt ||
         stmt instanceof ExprStmt ||
         stmt instanceof FunctionExpr ||
-        stmt instanceof ClassExpr
+        stmt instanceof ClassExpr ||
+        stmt instanceof IndexSignature
       ) {
         statements.push(stmt);
       } else {
@@ -1200,12 +1543,46 @@ class Parser {
     return new InterfaceStmt({ name, body, span });
   }
 
-  private buildInterfaceBody(node: ListNode): { fields: TypeField[] } {
+  private buildInterfaceBody(node: ListNode): { fields: TypeField[]; indexSignatures?: IndexSignature[] } {
     if (node.elements.length === 0 || node.elements[0].type !== "atom" || node.elements[0].value !== "interface-body") {
       throw new Error("interface-body must start with (interface-body ...)");
     }
-    const fields = node.elements.slice(1).map((child) => this.nodeToTypeField(child));
-    return { fields };
+    const fields: TypeField[] = [];
+    const indexSignatures: IndexSignature[] = [];
+    for (const child of node.elements.slice(1)) {
+      if (child.type === "list" && child.elements.length > 0) {
+        const head = child.elements[0];
+        if (head.type === "atom" && head.value === "index-signature") {
+          indexSignatures.push(this.buildIndexSignature(child));
+          continue;
+        }
+      }
+      fields.push(this.nodeToTypeField(child));
+    }
+    return { fields, indexSignatures: indexSignatures.length > 0 ? indexSignatures : undefined };
+  }
+
+  private buildIndexSignature(node: ListNode): IndexSignature {
+    const span = node.span;
+    const [, paramNode, valueTypeNode, ...rest] = node.elements;
+    if (!paramNode || !valueTypeNode || paramNode.type !== "list") {
+      throw new Error("index-signature requires a (name type) pair and a value type");
+    }
+    if (paramNode.elements.length < 2) {
+      throw new Error("index-signature parameter must include name and type");
+    }
+    const key = this.nodeToIdentifier(paramNode.elements[0], "index-signature key");
+    const keyType = this.nodeToType(paramNode.elements[1]);
+    const valueType = this.nodeToType(valueTypeNode);
+    let readonlyFlag: boolean | undefined;
+    for (const child of rest) {
+      if (child.type === "atom" && child.value === "readonly") {
+        readonlyFlag = true;
+        continue;
+      }
+      throw new Error("index-signature only supports optional readonly modifier");
+    }
+    return new IndexSignature({ key, keyType, valueType, readonlyFlag, span });
   }
 
   private buildImport(node: ListNode): ImportStmt {
@@ -1736,6 +2113,13 @@ class Parser {
     return new TypeInfer({ name, span });
   }
 
+  private buildTypeThis(node: ListNode): TypeThis {
+    if (node.elements.length !== 1) {
+      throw new Error("type-this does not take arguments");
+    }
+    return new TypeThis({ span: node.span });
+  }
+
   private nodeToTypeField(node: Node): TypeField {
     if (node.type !== "list" || node.elements.length < 2) {
       throw new Error("type-object fields must be (key type)");
@@ -1792,6 +2176,17 @@ class Parser {
     const span = node.span;
     const values = node.elements.slice(1).map((child) => this.nodeToLiteral(child));
     return new TypeLiteral({ value: values, span });
+  }
+
+  private buildTypeTemplate(node: ListNode): TypeTemplateLiteral {
+    const span = node.span;
+    const parts = node.elements.slice(1).map((child) => {
+      if (child.type === "atom" && child.tokenType === "string") {
+        return child.value;
+      }
+      return this.nodeToType(child);
+    });
+    return new TypeTemplateLiteral({ parts, span });
   }
 
   private nodeToLiteral(node: Node): Literal {
@@ -1908,12 +2303,14 @@ class Parser {
       "type-object",
       "type-symbol",
       "type-bigint",
+      "type-this",
       "type-ref",
       "type-function",
       "type-object",
       "type-union",
       "type-intersection",
       "type-literal",
+      "type-template",
       "type-mapped",
       "type-app",
     ]);
@@ -1929,6 +2326,8 @@ class Parser {
       "t:array",
       "t:nullable",
       "t:literal",
+      "t:template",
+      "t:this",
       "t:keyof",
       "t:typeof",
       "t:indexed",
@@ -2071,6 +2470,10 @@ class Parser {
         return this.buildTypeIntersection(node);
       case "type-literal":
         return this.buildTypeLiteral(node);
+      case "type-template":
+        return this.buildTypeTemplate(node);
+      case "type-this":
+        return this.buildTypeThis(node);
       case "type-mapped":
         return this.buildTypeMapped(node);
       case "type-app":
@@ -2097,6 +2500,10 @@ class Parser {
         return this.buildTNullable(node);
       case "t:literal":
         return this.buildTypeLiteral(node);
+      case "t:template":
+        return this.buildTypeTemplate(node);
+      case "t:this":
+        return this.buildTypeThis(node);
       case "t:keyof":
         return this.buildTKeyof(node);
       case "t:typeof":

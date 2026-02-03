@@ -116,3 +116,27 @@ Keep the Phase A grammar strict (it already expects strings for prop/method ke
 
 - [ ] `(program (let* ((g (fn (typeparams (T (extends string))) ((s T)) (returns T) (return s))))))` can be written in phase B as `(program (let* ((g (fn <typeparams (T extends string)> ((s: T)) (:T) (return s))))))`
 - [ ] make examples of more than one typeparams in a single function signature.
+
+## 14 macro test cases
+
+### debug print (multiple vars)
+
+```
+(defmacro show-vars [& xs]
+  `(do
+     ~@(for [x xs]
+         `(println ~(str x) "=" ~x))))
+```
+
+Usage:
+```
+(let [a 10
+      b 20]
+  (show-vars a b))
+```
+
+Output:
+```
+a = 10
+b = 20
+```

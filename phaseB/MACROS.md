@@ -46,6 +46,10 @@ Generates a unique symbol for the current expansion context to avoid naming coll
 
 The expansion engine seeds the `GensymGenerator` deterministically so expansions are reproducible given the same source and compiler seed.
 
+### `macroexpand`
+
+Provide basic debugging information.
+
 ## Expansion Process
 
 1.  **Macro Registry**: The compiler maintains a simplified environment of defined macros.
@@ -115,3 +119,4 @@ When macros fail, Phase B reports diagnostics with full expansion context. See [
 1. **Validate inputs early**: Check argument count and forms at the start of your macro body.
 2. **Use descriptive gensym prefixes**: `(gensym "loop-temp")` is easier to trace than `(gensym "x")`.
 3. **Preserve source locations**: Prefer `~expr` when injecting user code so the original `.loc` survives into the expanded AST.
+

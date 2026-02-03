@@ -6,6 +6,7 @@ import {
   Literal,
   Identifier,
   CallExpr,
+  CallWithThisExpr,
   PropExpr,
   IndexExpr,
   ObjectExpr,
@@ -16,8 +17,10 @@ import {
   ArrayPattern,
   ObjectPattern,
   RestPattern,
+  DefaultPattern,
   ArrayExpr,
   BlockStmt,
+  StaticBlockStmt,
   AssignExpr,
   ReturnExpr,
   IfStmt,
@@ -43,6 +46,7 @@ import {
   TypeFunction,
   TypeIntersection,
   TypeLiteral,
+  TypeTemplateLiteral,
   TypeMapped,
   TypeNode,
   TypeObject,
@@ -59,8 +63,15 @@ import {
   TypeIndexed,
   TypeConditional,
   TypeInfer,
+  TypeThis,
+  IndexSignature,
   InterfaceStmt,
+  EnumStmt,
+  EnumMember,
+  NamespaceStmt,
   SpreadExpr,
+  TemplateExpr,
+  NonNullAssertExpr,
   TernaryExpr,
   AwaitExpr,
   YieldExpr,
@@ -143,6 +154,26 @@ export async function generateCode(program: Program, config: CompilerConfig = {}
 }
 
 async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
+  if (stmt instanceof StaticBlockStmt) {
+    const lines: string[] = ["static {"];
+    const mappings: EmittedStatement["mappings"] = [];
+    for (const inner of stmt.statements) {
+      const emitted = await emitStatement(inner);
+      const baseOffset = lines.length;
+      for (const line of emitted.lines) {
+        lines.push(`  ${line}`);
+      }
+      for (const mapping of emitted.mappings) {
+        mappings.push({
+          lineOffset: baseOffset + mapping.lineOffset,
+          original: mapping.original,
+          source: mapping.source,
+        });
+      }
+    }
+    lines.push("}");
+    return { lines, mappings };
+  }
   if (stmt instanceof ExprStmt) {
     if (stmt.expr instanceof TryCatchExpr) {
       return await emitTryCatchStatement(stmt.expr);
@@ -344,6 +375,12 @@ async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
   if (stmt instanceof InterfaceStmt) {
     return await emitInterface(stmt);
   }
+  if (stmt instanceof EnumStmt) {
+    return await emitEnum(stmt);
+  }
+  if (stmt instanceof NamespaceStmt) {
+    return await emitNamespace(stmt);
+  }
   if (stmt instanceof ForClassic) {
     const initClause = stmt.init ? await clauseFromStatement(stmt.init) : "";
     const condition = stmt.condition ? await emitExpression(stmt.condition) : "";
@@ -461,6 +498,13 @@ async function emitExpression(expr: Expression): Promise<string> {
     const args = await Promise.all(expr.args.map(emitExpression));
     return `${callee}(${args.join(", ")})`;
   }
+  if (expr instanceof CallWithThisExpr) {
+    const fn = await emitExpression(expr.fn);
+    const thisArg = await emitExpression(expr.thisArg);
+    const args = await Promise.all(expr.args.map(emitExpression));
+    const callArgs = [thisArg, ...args].join(", ");
+    return `${fn}.call(${callArgs})`;
+  }
   if (expr instanceof ArrayExpr) {
     const entries = await Promise.all(expr.elements.map(emitExpression));
     return `[${entries.join(", ")}]`;
@@ -497,6 +541,10 @@ async function emitExpression(expr: Expression): Promise<string> {
     const value = await emitExpression(expr.expr);
     const typeText = await emitTypeNode(expr.assertedType);
     return `(${value} as ${typeText})`;
+  }
+  if (expr instanceof NonNullAssertExpr) {
+    const value = await emitExpression(expr.expr);
+    return `(${value})!`;
   }
   if (expr instanceof TypeApp) {
     // Safety check: The target of a TypeApp in an expression context must be an expression,
@@ -535,6 +583,18 @@ async function emitExpression(expr: Expression): Promise<string> {
     );
     return `{ ${entries.join(", ")} }`;
   }
+  if (expr instanceof TemplateExpr) {
+    const parts: string[] = [];
+    for (const part of expr.parts) {
+      if (part instanceof Literal && typeof part.value === "string") {
+        parts.push(escapeTemplateText(part.value));
+        continue;
+      }
+      const exprText = await emitExpression(part);
+      parts.push(`\${${exprText}}`);
+    }
+    return `\`${parts.join("")}\``;
+  }
   if (expr instanceof NewExpr) {
     const calleeExpr = await emitExpression(expr.callee);
     const args = await Promise.all(expr.args.map(emitExpression));
@@ -551,6 +611,13 @@ async function emitFunctionExpression(expr: FunctionExpr, asDeclaration = false)
   const prefix = expr.async ? "async " : "";
   const generator = expr.generator ? "*" : "";
   const { typeParams, params, returnAnnotation } = await emitFunctionSignature(expr);
+  if (expr.overload) {
+    if (!asDeclaration) {
+      throw new Error("overload signatures cannot be emitted as expressions");
+    }
+    const namePart = expr.name ? ` ${expr.name.name}` : "";
+    return `${prefix}function${generator}${namePart}${typeParams}(${params.join(", ")})${returnAnnotation};`;
+  }
   const bodyText = await renderFunctionBody(expr);
   const canUseArrow = !asDeclaration && !expr.generator && expr.callableKind === "lambda";
   if (canUseArrow) {
@@ -564,8 +631,12 @@ async function emitFunctionSignature(expr: FunctionExpr): Promise<{ typeParams: 
   const typeParams = await emitTypeParams(expr.typeParams);
   const params = await Promise.all(
     expr.signature.parameters.map(async (param) => {
+      const paramProperty = param.paramProperty;
+      const access = paramProperty?.access ? `${paramProperty.access} ` : "";
+      const readonlyPrefix = paramProperty?.readonly ? "readonly " : "";
       const annotation = param.typeAnnotation ? `: ${await emitTypeNode(param.typeAnnotation)}` : "";
-      return `${param.name.name}${annotation}`;
+      const defaultValue = param.defaultValue ? ` = ${await emitExpression(param.defaultValue)}` : "";
+      return `${access}${readonlyPrefix}${param.name.name}${annotation}${defaultValue}`;
     })
   );
   const returnAnnotation = expr.signature.returnType ? `: ${await emitTypeNode(expr.signature.returnType)}` : "";
@@ -574,7 +645,7 @@ async function emitFunctionSignature(expr: FunctionExpr): Promise<{ typeParams: 
 
 async function renderFunctionBody(expr: FunctionExpr): Promise<string> {
   const bodyStatements = expr.body.slice();
-  if (expr.callableKind === "method" && bodyStatements.length > 0) {
+  if ((expr.callableKind === "method" || expr.callableKind === "getter") && bodyStatements.length > 0) {
     const lastIndex = bodyStatements.length - 1;
     const lastStmt = bodyStatements[lastIndex];
     if (lastStmt instanceof ExprStmt) {
@@ -595,25 +666,71 @@ async function emitMethodDefinition(expr: FunctionExpr): Promise<string> {
   if (!expr.methodName) {
     throw new Error("method requires a name");
   }
+  const isConstructor = expr.methodName === "constructor";
+  if (expr.callableKind === "getter" && expr.signature.parameters.length !== 0) {
+    throw new Error("getter must declare zero parameters");
+  }
+  if (expr.callableKind === "setter" && expr.signature.parameters.length !== 1) {
+    throw new Error("setter must declare exactly one parameter");
+  }
+  if (isConstructor && (expr.async || expr.generator)) {
+    throw new Error("constructor cannot be async or generator");
+  }
+  if (isConstructor && expr.abstract) {
+    throw new Error("constructor cannot be abstract");
+  }
   const { typeParams, params, returnAnnotation } = await emitFunctionSignature(expr);
-  const bodyText = await renderFunctionBody(expr);
   const prefix = expr.async ? "async " : "";
   const generator = expr.generator ? "*" : "";
-  const key = formatObjectKey(expr.methodName);
-  return `${prefix}${generator}${key}${typeParams}(${params.join(", ")})${returnAnnotation} ${bodyText}`;
+  const key = formatClassMemberKey(expr.methodName);
+  const accessorPrefix = expr.callableKind === "getter" ? "get " : expr.callableKind === "setter" ? "set " : "";
+  const abstractPrefix = expr.abstract ? "abstract " : "";
+  if (isConstructor) {
+    if (expr.overload) {
+      return `constructor(${params.join(", ")});`;
+    }
+    const bodyText = await renderFunctionBody(expr);
+    return `constructor(${params.join(", ")}) ${bodyText}`;
+  }
+  if (expr.abstract || expr.overload) {
+    return `${abstractPrefix}${prefix}${accessorPrefix}${generator}${key}${typeParams}(${params.join(", ")})${returnAnnotation};`;
+  }
+  const bodyText = await renderFunctionBody(expr);
+  return `${prefix}${accessorPrefix}${generator}${key}${typeParams}(${params.join(", ")})${returnAnnotation} ${bodyText}`;
 }
 
 async function emitClassExpression(expr: ClassExpr): Promise<string> {
   const name = expr.name ? ` ${expr.name.name}` : "";
+  const typeParams = await emitTypeParams(expr.typeParams);
+  const abstractPrefix = expr.abstract ? "abstract " : "";
   const extendsClause = expr.extends ? ` extends ${await emitExpression(expr.extends)}` : "";
   const implementsClause = expr.implements && expr.implements.length > 0
     ? ` implements ${await Promise.all(expr.implements.map(emitExpression)).then((items) => items.join(", "))}`
     : "";
-  const lines: string[] = [`class${name}${extendsClause}${implementsClause} {`];
+  const decoratorLines: string[] = [];
+  if (expr.decorators) {
+    for (const dec of expr.decorators) {
+      const decText = await emitExpression(dec);
+      decoratorLines.push(`@${decText}`);
+    }
+  }
+  const lines: string[] = [...decoratorLines, `${abstractPrefix}class${name}${typeParams}${extendsClause}${implementsClause} {`];
   for (const stmt of expr.body.statements) {
-    if (stmt instanceof FunctionExpr && stmt.callableKind === "method") {
+    if (stmt instanceof StaticBlockStmt) {
+      const emitted = await emitStatement(stmt);
+      for (const line of emitted.lines) {
+        lines.push(`  ${line}`);
+      }
+      continue;
+    }
+    if (stmt instanceof FunctionExpr && (stmt.callableKind === "method" || stmt.callableKind === "getter" || stmt.callableKind === "setter")) {
       const methodText = await emitMethodDefinition(stmt);
       lines.push(`  ${methodText}`);
+      continue;
+    }
+    if (stmt instanceof IndexSignature) {
+      const indexText = await emitIndexSignature(stmt);
+      lines.push(`  ${indexText};`);
       continue;
     }
     const classField = await tryEmitClassField(stmt);
@@ -729,6 +846,19 @@ function formatClassFieldModifiers(descriptor: ClassFieldDescriptor): string {
 }
 
 function formatClassFieldKey(key: string): string {
+  return formatClassMemberKey(key);
+}
+
+const PRIVATE_FIELD_REGEX = /^#[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+function isPrivateFieldName(name: string): boolean {
+  return PRIVATE_FIELD_REGEX.test(name);
+}
+
+function formatClassMemberKey(key: string): string {
+  if (isPrivateFieldName(key)) {
+    return key;
+  }
   if (isIdentifierName(key)) {
     return key;
   }
@@ -740,6 +870,36 @@ async function emitTypeField(field: TypeField): Promise<string> {
   const readonlyPrefix = field.readonlyFlag ? "readonly " : "";
   const optionalSuffix = field.optional ? "?" : "";
   return `${readonlyPrefix}${formatObjectKey(field.key)}${optionalSuffix}: ${valueText}`;
+}
+
+async function emitEnum(stmt: EnumStmt): Promise<EmittedStatement> {
+  const members = await Promise.all(stmt.members.map(emitEnumMember));
+  return {
+    lines: [`enum ${stmt.name.name} {`, ...members.map((line) => `  ${line}`), `}`],
+    mappings: [mappingFromSpan(stmt.span, 0)],
+  };
+}
+
+async function emitEnumMember(member: EnumMember): Promise<string> {
+  if (member.value) {
+    const valueText = await emitExpression(member.value);
+    return `${formatObjectKey(member.name)} = ${valueText},`;
+  }
+  return `${formatObjectKey(member.name)},`;
+}
+
+async function emitNamespace(stmt: NamespaceStmt): Promise<EmittedStatement> {
+  const bodyLines: string[] = [];
+  for (const inner of stmt.body) {
+    const emitted = await emitStatement(inner);
+    for (const line of emitted.lines) {
+      bodyLines.push(`  ${line}`);
+    }
+  }
+  return {
+    lines: [`namespace ${stmt.name.name} {`, ...bodyLines, `}`],
+    mappings: [mappingFromSpan(stmt.span, 0)],
+  };
 }
 
 function formatNamedImportEntry(entry: NamedImport): string {
@@ -799,6 +959,12 @@ async function emitBindingTarget(target: BindingTarget): Promise<string> {
   if (target instanceof ObjectPattern) {
     const fields = await Promise.all(
       target.properties.map(async (property) => {
+        if (property.target instanceof DefaultPattern && property.target.target instanceof Identifier) {
+          const defaultText = await emitExpression(property.target.defaultValue);
+          if (property.target.target.name === property.key) {
+            return `${property.key} = ${defaultText}`;
+          }
+        }
         const valueText = await emitBindingTarget(property.target);
         return valueText === property.key ? property.key : `${property.key}: ${valueText}`;
       })
@@ -815,6 +981,11 @@ async function emitBindingTarget(target: BindingTarget): Promise<string> {
   if (target instanceof RestPattern) {
     const inner = await emitBindingTarget(target.target);
     return `...${inner}`;
+  }
+  if (target instanceof DefaultPattern) {
+    const inner = await emitBindingTarget(target.target);
+    const defaultValue = await emitExpression(target.defaultValue);
+    return `${inner} = ${defaultValue}`;
   }
   throw new Error("Unsupported binding target in codegen");
 }
@@ -862,10 +1033,27 @@ async function emitTypeAlias(stmt: TypeAliasStmt): Promise<EmittedStatement> {
 
 async function emitInterface(stmt: InterfaceStmt): Promise<EmittedStatement> {
   const fields = await Promise.all(stmt.body.fields.map(emitTypeField));
+  const indexSignatures = stmt.body.indexSignatures
+    ? await Promise.all(stmt.body.indexSignatures.map(emitIndexSignature))
+    : [];
+  const lines: string[] = [`interface ${stmt.name.name} {`];
+  for (const field of fields) {
+    lines.push(`  ${field};`);
+  }
+  for (const indexSig of indexSignatures) {
+    lines.push(`  ${indexSig};`);
+  }
   return {
-    lines: [`interface ${stmt.name.name} {`, ...fields.map((line) => `  ${line};`), `}`],
+    lines: [...lines, `}`],
     mappings: [mappingFromSpan(stmt.span, 0)],
   };
+}
+
+async function emitIndexSignature(node: IndexSignature): Promise<string> {
+  const keyType = await emitTypeNode(node.keyType);
+  const valueType = await emitTypeNode(node.valueType);
+  const readonlyPrefix = node.readonlyFlag ? "readonly " : "";
+  return `${readonlyPrefix}[${node.key.name}: ${keyType}]: ${valueType}`;
 }
 
 async function emitTypeParams(params?: TypeParam[]): Promise<string> {
@@ -963,6 +1151,9 @@ async function emitTypeNode(node: TypeNode): Promise<string> {
   if (node instanceof TypeInfer) {
     return `infer ${node.name.name}`;
   }
+  if (node instanceof TypeThis) {
+    return "this";
+  }
   if (node instanceof TypeRef) {
     const args = node.typeArgs ? await Promise.all(node.typeArgs.map(emitTypeNode)) : [];
     const suffix = args.length > 0 ? `<${args.join(", ")}>` : "";
@@ -989,6 +1180,18 @@ async function emitTypeNode(node: TypeNode): Promise<string> {
   if (node instanceof TypeLiteral) {
     const entries = await Promise.all(node.value.map((literal) => formatLiteral(literal.value)));
     return entries.join(" | ");
+  }
+  if (node instanceof TypeTemplateLiteral) {
+    const parts: string[] = [];
+    for (const part of node.parts) {
+      if (typeof part === "string") {
+        parts.push(escapeTemplateText(part));
+        continue;
+      }
+      const typeText = await emitTypeNode(part);
+      parts.push(`\${${typeText}}`);
+    }
+    return `\`${parts.join("")}\``;
   }
   if (node instanceof TypeMapped) {
     return emitTypeMapped(node);
@@ -1023,15 +1226,21 @@ function isTypeNodeValue(value: unknown): value is TypeNode {
     value instanceof TypeIndexed ||
     value instanceof TypeConditional ||
     value instanceof TypeInfer ||
+    value instanceof TypeThis ||
     value instanceof TypeRef ||
     value instanceof TypeFunction ||
     value instanceof TypeObject ||
     value instanceof TypeUnion ||
     value instanceof TypeIntersection ||
     value instanceof TypeLiteral ||
+    value instanceof TypeTemplateLiteral ||
     value instanceof TypeMapped ||
     value instanceof TypeApp
   );
+}
+
+function escapeTemplateText(value: string): string {
+  return value.replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
 }
 
 function mappingFromSpan(span: { source: string; startLine?: number; startColumn?: number }, lineOffset: number) {

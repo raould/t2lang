@@ -6,6 +6,10 @@ import {
   ExprStmt,
   ArrayExpr,
   Identifier,
+  StaticBlockStmt,
+  DefaultPattern,
+  ArrayPattern,
+  ObjectPattern,
   ForClassic,
   ForOf,
   ForAwait,
@@ -33,6 +37,15 @@ import {
   NewExpr,
   FunctionExpr,
   ClassExpr,
+  EnumStmt,
+  NamespaceStmt,
+  InterfaceStmt,
+  TemplateExpr,
+  TypeTemplateLiteral,
+  NonNullAssertExpr,
+  CallWithThisExpr,
+  IndexSignature,
+  TypeThis,
 } from "../src/phaseA1.js";
 
 test("parseSource skips comments and preserves original line numbers", () => {
@@ -213,6 +226,322 @@ test("parseSource handles class extends/implements", () => {
   assert.ok(classExpr.implements?.[1] instanceof Identifier);
   assert.strictEqual((classExpr.implements?.[0] as Identifier).name, "Foo");
   assert.strictEqual((classExpr.implements?.[1] as Identifier).name, "Bar");
+});
+
+test("parseSource handles abstract class and abstract method", () => {
+  const source = `(program
+    (class Animal
+      (abstract)
+      (class-body
+        (method abstract "makeSound" ((type-void)))))
+  )`;
+
+  const program = parseSource(source);
+  const classExpr = program.body[0];
+  assert.ok(classExpr instanceof ClassExpr);
+  assert.strictEqual(classExpr.abstract, true);
+  const member = classExpr.body.statements[0];
+  assert.ok(member instanceof FunctionExpr);
+  assert.strictEqual((member as FunctionExpr).callableKind, "method");
+  assert.strictEqual((member as FunctionExpr).abstract, true);
+});
+
+test("parseSource handles function overload signatures", () => {
+  const source = `(program
+    (fn overload process ((x (type-string)) (type-string)))
+    (fn overload process ((x (type-number)) (type-number)))
+    (fn process ((x (type-union (type-string) (type-number))) (type-string))
+      (return x))
+  )`;
+
+  const program = parseSource(source);
+  const overloadOne = program.body[0];
+  const overloadTwo = program.body[1];
+  const impl = program.body[2];
+
+  assert.ok(overloadOne instanceof FunctionExpr);
+  assert.ok(overloadTwo instanceof FunctionExpr);
+  assert.ok(impl instanceof FunctionExpr);
+  assert.strictEqual((overloadOne as FunctionExpr).overload, true);
+  assert.strictEqual((overloadTwo as FunctionExpr).overload, true);
+  assert.strictEqual((impl as FunctionExpr).overload, undefined);
+});
+
+test("parseSource handles this parameter in functions", () => {
+  const source = `(program
+    (fn handler ((this (type-ref HTMLElement)) (e (type-ref Event)))
+      (return e))
+  )`;
+
+  const program = parseSource(source);
+  const handler = program.body[0];
+  assert.ok(handler instanceof FunctionExpr);
+  assert.strictEqual(handler.signature.parameters[0].name.name, "this");
+  assert.strictEqual(handler.signature.parameters[1].name.name, "e");
+});
+
+test("parseSource handles template literal expressions", () => {
+  const source = `(program
+    (template "Hello, " name "!"))`;
+
+  const program = parseSource(source);
+  const [exprStmt] = program.body;
+  assert.ok(exprStmt instanceof ExprStmt);
+  assert.ok(exprStmt.expr instanceof TemplateExpr);
+  const templateExpr = exprStmt.expr as TemplateExpr;
+  assert.strictEqual(templateExpr.parts.length, 3);
+  assert.ok(templateExpr.parts[0] instanceof Literal);
+  assert.ok(templateExpr.parts[1] instanceof Identifier);
+});
+
+test("parseSource handles template literal types", () => {
+  const source = `(program
+    (type-alias Greeting (type-template "Hello, " (type-string) "!")))`;
+
+  const program = parseSource(source);
+  const [alias] = program.body;
+  assert.ok(alias instanceof TypeAliasStmt);
+  const typeValue = (alias as TypeAliasStmt).typeValue;
+  assert.ok(typeValue instanceof TypeTemplateLiteral);
+  const templateType = typeValue as TypeTemplateLiteral;
+  assert.strictEqual(templateType.parts.length, 3);
+});
+
+test("parseSource handles non-null assertions", () => {
+  const source = `(program
+    (non-null value))`;
+
+  const program = parseSource(source);
+  const [exprStmt] = program.body;
+  assert.ok(exprStmt instanceof ExprStmt);
+  assert.ok(exprStmt.expr instanceof NonNullAssertExpr);
+});
+
+test("parseSource handles call-with-this", () => {
+  const source = `(program
+    (call-with-this (prop obj "method") obj 1 2))`;
+
+  const program = parseSource(source);
+  const [exprStmt] = program.body;
+  assert.ok(exprStmt instanceof ExprStmt);
+  assert.ok(exprStmt.expr instanceof CallWithThisExpr);
+});
+
+test("parseSource handles constructor overloads", () => {
+  const source = `(program
+    (class Box
+      (class-body
+        (method overload "constructor" ((value (type-string))))
+        (method overload "constructor" ((value (type-number))))
+        (method "constructor" ((value (type-union (type-string) (type-number))))))))`;
+
+  const program = parseSource(source);
+  const classExpr = program.body[0];
+  assert.ok(classExpr instanceof ClassExpr);
+  const members = (classExpr as ClassExpr).body.statements;
+  assert.strictEqual(members.length, 3);
+  assert.ok(members[0] instanceof FunctionExpr);
+  assert.strictEqual((members[0] as FunctionExpr).overload, true);
+});
+
+test("parseSource handles index signatures", () => {
+  const source = `(program
+    (class Box
+      (class-body
+        (index-signature (key (type-string)) (type-number))))
+    (type-interface Bag
+      (interface-body
+        (index-signature (key (type-string)) (type-number)))))`;
+
+  const program = parseSource(source);
+  const classExpr = program.body[0];
+  assert.ok(classExpr instanceof ClassExpr);
+  const classMember = (classExpr as ClassExpr).body.statements[0];
+  assert.ok(classMember instanceof IndexSignature);
+
+  const interfaceStmt = program.body[1];
+  assert.ok(interfaceStmt instanceof InterfaceStmt);
+  const indexSignatures = (interfaceStmt as InterfaceStmt).body.indexSignatures;
+  assert.ok(indexSignatures && indexSignatures.length === 1);
+});
+
+test("parseSource handles generic classes", () => {
+  const source = `(program
+    (class Box
+      (typeparams (T))
+      (class-body)))`;
+
+  const program = parseSource(source);
+  const classExpr = program.body[0];
+  assert.ok(classExpr instanceof ClassExpr);
+  assert.ok((classExpr as ClassExpr).typeParams);
+});
+
+test("parseSource handles static blocks", () => {
+  const source = `(program
+    (class Box
+      (class-body
+        (static-block
+          (assign x 1)))))`;
+
+  const program = parseSource(source);
+  const classExpr = program.body[0];
+  assert.ok(classExpr instanceof ClassExpr);
+  const member = (classExpr as ClassExpr).body.statements[0];
+  assert.ok(member instanceof StaticBlockStmt);
+});
+
+test("parseSource handles parameter properties", () => {
+  const source = `(program
+    (class Person
+      (class-body
+        (method "constructor" ((public name (type-string)) (readonly age (type-number)))))))`;
+
+  const program = parseSource(source);
+  const classExpr = program.body[0];
+  assert.ok(classExpr instanceof ClassExpr);
+  const constructor = (classExpr as ClassExpr).body.statements[0];
+  assert.ok(constructor instanceof FunctionExpr);
+  const params = (constructor as FunctionExpr).signature.parameters;
+  assert.strictEqual(params.length, 2);
+  assert.deepStrictEqual(params[0].paramProperty, { access: "public" });
+  assert.deepStrictEqual(params[1].paramProperty, { readonly: true });
+});
+
+test("parseSource handles default parameters", () => {
+  const source = `(program
+    (fn greet ((name (type-string) default "world") (punct default "!"))
+      (return name)))`;
+
+  const program = parseSource(source);
+  const fnExpr = program.body[0];
+  assert.ok(fnExpr instanceof FunctionExpr);
+  const params = (fnExpr as FunctionExpr).signature.parameters;
+  assert.strictEqual(params.length, 2);
+  assert.ok(params[0].defaultValue instanceof Literal);
+  assert.ok(params[1].defaultValue instanceof Literal);
+});
+
+test("parseSource handles destructuring defaults", () => {
+  const source = `(program
+    (let* (((array-pattern (default x 1) y) (array 1 2))))
+    (let* (((object-pattern ("a" (default a 1)) ("b" b)) obj))))`;
+
+  const program = parseSource(source);
+  const arrayLet = program.body[0];
+  assert.ok(arrayLet instanceof LetStarExpr);
+  const arrayTarget = (arrayLet as LetStarExpr).bindings[0].target;
+  assert.ok(arrayTarget instanceof ArrayPattern);
+  assert.ok((arrayTarget as ArrayPattern).elements[0] instanceof DefaultPattern);
+
+  const objectLet = program.body[1];
+  assert.ok(objectLet instanceof LetStarExpr);
+  const objectTarget = (objectLet as LetStarExpr).bindings[0].target;
+  assert.ok(objectTarget instanceof ObjectPattern);
+  const firstProp = (objectTarget as ObjectPattern).properties[0];
+  assert.ok(firstProp.target instanceof DefaultPattern);
+});
+
+test("parseSource handles this types", () => {
+  const source = `(program
+    (type-alias Self (type-this)))`;
+
+  const program = parseSource(source);
+  const alias = program.body[0];
+  assert.ok(alias instanceof TypeAliasStmt);
+  assert.ok((alias as TypeAliasStmt).typeValue instanceof TypeThis);
+});
+
+test("parseSource handles enum declarations", () => {
+  const source = `(program
+    (enum Direction
+      (enum-body
+        ("Up" 0)
+        ("Down" 1)
+        ("Left")
+        ("Right")))
+  )`;
+
+  const program = parseSource(source);
+  const enumStmt = program.body[0];
+  assert.ok(enumStmt instanceof EnumStmt);
+  assert.strictEqual(enumStmt.name.name, "Direction");
+  assert.strictEqual(enumStmt.members.length, 4);
+  assert.strictEqual(enumStmt.members[0].name, "Up");
+  assert.strictEqual(enumStmt.members[1].name, "Down");
+});
+
+test("parseSource handles namespace declarations", () => {
+  const source = `(program
+    (namespace Utils
+      (namespace-body
+        (fn helper ((x (type-number)) (type-number))
+          (return x))
+        (export (export-spec (named helper)))))
+  )`;
+
+  const program = parseSource(source);
+  const namespaceStmt = program.body[0];
+  assert.ok(namespaceStmt instanceof NamespaceStmt);
+  assert.strictEqual(namespaceStmt.name.name, "Utils");
+  assert.strictEqual(namespaceStmt.body.length, 2);
+});
+
+test("parseSource handles class decorators", () => {
+  const source = `(program
+    (class C
+      (decorators sealed)
+      (class-body
+        (method "constructor" ()
+          (return this))))
+  )`;
+
+  const program = parseSource(source);
+  const classExpr = program.body[0];
+  assert.ok(classExpr instanceof ClassExpr);
+  assert.ok(classExpr.decorators);
+  assert.strictEqual(classExpr.decorators?.length, 1);
+  assert.ok(classExpr.decorators?.[0] instanceof Identifier);
+});
+
+test("parseSource handles interface declaration merging", () => {
+  const source = `(program
+    (type-interface Box
+      (interface-body
+        (width (type-number))))
+    (type-interface Box
+      (interface-body
+        (height (type-number))))
+  )`;
+
+  const program = parseSource(source);
+  const first = program.body[0];
+  const second = program.body[1];
+  assert.ok(first instanceof InterfaceStmt);
+  assert.ok(second instanceof InterfaceStmt);
+  assert.strictEqual(first.name.name, "Box");
+  assert.strictEqual(second.name.name, "Box");
+});
+
+test("parseSource handles class getters and setters", () => {
+  const source = `(program
+    (class C
+      (class-body
+        (getter "value" ((type-number))
+          (prop this "value"))
+        (setter "value" ((v (type-number)))
+          (assign (prop this "value") v))))
+  )`;
+
+  const program = parseSource(source);
+  const classExpr = program.body[0];
+  assert.ok(classExpr instanceof ClassExpr);
+  const members = classExpr.body.statements;
+  assert.strictEqual(members.length, 2);
+  assert.ok(members[0] instanceof FunctionExpr);
+  assert.ok(members[1] instanceof FunctionExpr);
+  assert.strictEqual((members[0] as FunctionExpr).callableKind, "getter");
+  assert.strictEqual((members[1] as FunctionExpr).callableKind, "setter");
 });
 
 test("parseSource handles type expressions and assertions", () => {

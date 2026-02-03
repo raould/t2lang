@@ -36,14 +36,22 @@ Tokens:
               | <fn>
               | <lambda>
               | <method>
+              | <getter>
+              | <setter>
               | <class>
               | <import>
               | <export>
+              | <enum>
+              | <namespace>
               | <type-alias>
               | <type-interface>
+              | <index-signature>
+              | <static-block>
 
 <binding> ::= "(" <binding-target> <expression>? ")"
-<param> ::= "(" <identifier> <type>? ")"
+<param> ::= "(" <param-modifier>* <identifier> <type>? ("default" <expression>)? ")"
+          | "(" "this" <type> ")"
+<param-modifier> ::= "public" | "protected" | "private" | "readonly"
 <fn-signature> ::= "(" <param>* ")" <type>?
 
 <init> ::= <expression>
@@ -53,8 +61,10 @@ Tokens:
 <import-spec> ::= "(" "import-spec" <expression>* ")"
 <export-spec> ::= "(" "export-spec" <expression>* ")"
 <interface-body> ::= "(" "interface-body" <expression>* ")"
+<index-signature> ::= "(" "index-signature" "(" <identifier> <type> ")" <type> ("readonly")? ")"
 
 <block> ::= "(" "block" <statement>* ")"
+<static-block> ::= "(" "static-block" <statement>* ")"  ; class-body only
 <if> ::= "(" "if" <expression> <statement> (<statement>)? ")"
 <scope-loop> ::= "(" "while" <expression> <statement> ")"
 <for-classic> ::= "(" "for" "classic" <init>? <condition>? <update>? <statement> ")"
@@ -63,17 +73,28 @@ Tokens:
 <let-star> ::= "(" "let*" <binding>* <statement>* ")"
 <const-star> ::= "(" "const*" <binding>* <statement>* ")"
 <assign> ::= "(" "assign" <expression> <expression> ")"
-<callable-flag> ::= "async" | "generator"
+<callable-flag> ::= "async" | "generator" | "abstract" | "overload"
 <fn> ::= "(" "fn" <callable-flag>* <identifier>? <fn-signature> <statement>* ")"
 <lambda> ::= "(" "lambda" <callable-flag>* <fn-signature> <statement>* ")"
-<method> ::= "(" "method" <callable-flag>* <string> <fn-signature> <statement>* ")"
-<class> ::= "(" "class" <identifier> <class-heritage>* <class-body> ")"
+<method> ::= "(" "method" <callable-flag>* <string> <fn-signature> <statement>* ")" ; "method" is very unfortunate, ideally the method name should be an <identifier> as in other callables.
+<getter> ::= "(" "getter" <callable-flag>* <string> <fn-signature> <statement>* ")"
+<setter> ::= "(" "setter" <callable-flag>* <string> <fn-signature> <statement>* ")"
+<class> ::= "(" "class" <identifier> <type-params>? <class-heritage>* <class-body> ")"
 <class-heritage> ::= <class-extends>
                   | <class-implements>
+                  | <class-abstract>
+                  | <class-decorators>
 <class-extends> ::= "(" "extends" <expression> ")"
 <class-implements> ::= "(" "implements" <expression>+ ")"
+<class-abstract> ::= "(" "abstract" ")"
+<class-decorators> ::= "(" "decorators" <expression>+ ")"
 <import> ::= "(" "import" <import-spec> ")"
 <export> ::= "(" "export" <export-spec> ")"
+<enum> ::= "(" "enum" <identifier> <enum-body> ")"
+<enum-body> ::= "(" "enum-body" <enum-member>* ")"
+<enum-member> ::= "(" <string> <expression>? ")"
+<namespace> ::= "(" "namespace" <identifier> <namespace-body> ")"
+<namespace-body> ::= "(" "namespace-body" <statement>* ")"
 <type-alias> ::= "(" "type-alias" <identifier> <type-params>? <type> ")"
 <type-interface> ::= "(" "type-interface" <identifier> <interface-body> ")"
 <switch> ::= "(" "switch" <expression> <case>* <default>? ")"
@@ -87,11 +108,13 @@ Tokens:
                      | <array-pattern>
                      | <object-pattern>
                      | <rest-target>
+                     | <default-target>
 
 <array-pattern> ::= "(" "array-pattern" <binding-target>* <rest-target>? ")"  ; `[a, ...rest]`
 <object-pattern> ::= "(" "object-pattern" <object-pattern-field>* <rest-target>? ")"  ; `{a, b: {c}}`
 <object-pattern-field> ::= "(" <string> <binding-target> ")"
 <rest-target> ::= "(" "rest" <binding-target> ")"  ; `...rest` in arrays/objects
+<default-target> ::= "(" "default" <binding-target> <expression> ")"  ; destructuring defaults
 ```
 
 ## Expressions
@@ -99,6 +122,7 @@ Tokens:
 <expression> ::= <literal>
                | <identifier>
                | <call>
+               | <call-with-this>
                | <prop>
                | <index>
                | <new>
@@ -110,6 +134,8 @@ Tokens:
                | <type-object>
                | <type-function>
                | <type-literal>
+               | <template>
+               | <non-null>
                | <type-union>
                | <type-intersection>
                | <type-ref>
@@ -118,6 +144,7 @@ Tokens:
                | <ternary>
 
 <call> ::= "(" "call" <expression> <expression>* ")"
+<call-with-this> ::= "(" "call-with-this" <expression> <expression> <expression>* ")"
 <prop> ::= "(" "prop" <expression> <string> ")"  ; literal property names only; computed cases use <index>
 <index> ::= "(" "index" <expression> <expression> ")"
 <new> ::= "(" "new" <expression> <expression>* ")"
@@ -129,6 +156,8 @@ Tokens:
 <object> ::= "(" "object" <object-field>* ")"
 <object-field> ::= "(" <string> <expression> ")"
 <ternary> ::= "(" "ternary" <expression> <expression> <expression> ")"
+<template> ::= "(" "template" <expression>* ")"
+<non-null> ::= "(" "non-null" <expression> ")"
 ```
 
 ## Type Expressions
@@ -139,7 +168,9 @@ Tokens:
          | <type-object>
          | <type-union>
          | <type-intersection>
+         | <type-this>
          | <type-mapped>
+         | <type-template>
          | <type-literal>
 
 <type-primitive> ::= "type-string" | "type-number" | "type-boolean" | "type-null" | "type-undefined"
@@ -150,6 +181,8 @@ Tokens:
 <type-union> ::= "(" "type-union" <type>+ ")"
 <type-intersection> ::= "(" "type-intersection" <type>+ ")"
 <type-literal> ::= "(" "type-literal" <literal>* ")"
+<type-this> ::= "(" "type-this" ")"
+<type-template> ::= "(" "type-template" (<string> | <type>)* ")"
 <type-mapped> ::= "(" "type-mapped" <type-param> <value-type> <name-remap>? <readonly-modifier>? <optional-modifier>? <via>? ")"
 <value-type> ::= <type>              ; the mapped value expression
 <name-remap> ::= <type>               ; optional `as` clause renaming keys
