@@ -1,5 +1,7 @@
 # T2 Programming Language: Sexprs for TypeScript
 
+Trying to save TypeScript from itself, one parenthasis at a time.
+
 ## quick start
 
 ```bash
