@@ -119,3 +119,27 @@ test("unquote-splicing reader macro wraps a symbol", () => {
   assert.strictEqual((node as ListNode).elements[0].kind, "symbol");
   assert.strictEqual(((node as ListNode).elements[0] as SymbolNode).name, "unquote-splicing");
 });
+
+test("defreadermacro registers prefix and strips definition", () => {
+  const nodes = parsePhaseBRaw("(defreadermacro \"#\" quote)\n#(foo bar)", "reader-macro.t2");
+  assert.strictEqual(nodes.length, 1);
+  const list = nodes[0] as ListNode;
+  assert.strictEqual(list.kind, "list");
+  const head = list.elements[0] as SymbolNode;
+  assert.strictEqual(head.name, "quote");
+  assert.strictEqual((list.elements[1] as ListNode).kind, "list");
+});
+
+test("unknown reader macro prefix throws", () => {
+  assert.throws(
+    () => parsePhaseBRaw("(defreadermacro \"#\" quote)\n@(foo)", "reader-macro.t2"),
+    (error) => error instanceof ParseError && error.code === "E008"
+  );
+});
+
+test("invalid defreadermacro definition throws", () => {
+  assert.throws(
+    () => parsePhaseBRaw("(defreadermacro \"#\" 1)\n#(foo)", "reader-macro.t2"),
+    (error) => error instanceof ParseError && error.code === "E009"
+  );
+});

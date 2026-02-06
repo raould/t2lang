@@ -37,7 +37,9 @@ export type ReaderErrorCode =
   | "E004"
   | "E005"
   | "E006"
-  | "E007";
+  | "E007"
+  | "E008"
+  | "E009";
 
 export type PhaseBKind =
   | "symbol"
@@ -84,7 +86,10 @@ export function parsePhaseB(source: string, file = "<input>"): Program {
 
 export function parsePhaseBRaw(source: string, file = "<input>"): PhaseBNode[] {
   const parsed = parseSexpr(source, file);
-  const rewritten = rewriteAssignments(parsed);
+  const readerMacros = collectReaderMacroRegistry(parsed);
+  const macroParsed = readerMacros.hasMacros ? parseSexpr(source, file, readerMacros.registry, true) : parsed;
+  const stripped = readerMacros.hasMacros ? stripReaderMacroDefs(macroParsed) : macroParsed;
+  const rewritten = rewriteAssignments(stripped);
   const nodes = rewritten.map(wrapPhaseBNode);
   return applySugar(nodes);
 }
@@ -157,9 +162,46 @@ interface ParserState {
   line: number;
   column: number;
   file: string;
+  readerMacros?: ReaderMacroRegistry;
+  strictReaderMacros?: boolean;
 }
 
-export function parseSexpr(source: string, file = "<input>"): SExprNode[] {
+type ReaderMacroDefinition = {
+  prefix: string;
+  expansion: string;
+  loc: SourceLoc;
+};
+
+class ReaderMacroRegistry {
+  private readonly macros = new Map<string, string>();
+
+  register(prefix: string, expansion: string): void {
+    this.macros.set(prefix, expansion);
+  }
+
+  get(prefix: string): string | undefined {
+    return this.macros.get(prefix);
+  }
+
+  has(prefix: string): boolean {
+    return this.macros.has(prefix);
+  }
+
+  isEmpty(): boolean {
+    return this.macros.size === 0;
+  }
+
+  prefixesByLength(): string[] {
+    return [...this.macros.keys()].sort((a, b) => b.length - a.length);
+  }
+}
+
+export function parseSexpr(
+  source: string,
+  file = "<input>",
+  readerMacros: ReaderMacroRegistry | null = null,
+  strictReaderMacros = false
+): SExprNode[] {
   const state: ParserState = {
     source,
     index: 0,
@@ -167,6 +209,8 @@ export function parseSexpr(source: string, file = "<input>"): SExprNode[] {
     line: 1,
     column: 1,
     file,
+    readerMacros: readerMacros ?? undefined,
+    strictReaderMacros,
   };
 
   const nodes: SExprNode[] = [];
@@ -180,6 +224,84 @@ export function parseSexpr(source: string, file = "<input>"): SExprNode[] {
   return nodes;
 }
 
+function collectReaderMacroRegistry(nodes: SExprNode[]): { registry: ReaderMacroRegistry; hasMacros: boolean } {
+  const registry = new ReaderMacroRegistry();
+  for (const node of nodes) {
+    if (!isListNode(node)) {
+      continue;
+    }
+    const def = parseReaderMacroDefinition(node);
+    if (def) {
+      registry.register(def.prefix, def.expansion);
+    }
+  }
+  return { registry, hasMacros: !registry.isEmpty() };
+}
+
+function stripReaderMacroDefs(nodes: SExprNode[]): SExprNode[] {
+  return nodes.filter((node) => !parseReaderMacroDefinition(node));
+}
+
+function parseReaderMacroDefinition(node: SExprNode): ReaderMacroDefinition | null {
+  if (!isListNode(node)) {
+    return null;
+  }
+  const [head, prefixNode, expansionNode, ...rest] = node.elements;
+  if (!isSymbolNode(head) || head.name !== "defreadermacro") {
+    return null;
+  }
+  if (rest.length > 0) {
+    throw new ParseError("invalid reader macro definition", node.loc, "E009");
+  }
+  const prefix = extractReaderMacroPrefix(prefixNode, node.loc);
+  const expansion = extractReaderMacroExpansion(expansionNode, node.loc);
+  return { prefix, expansion, loc: node.loc };
+}
+
+function extractReaderMacroPrefix(node: SExprNode | undefined, loc: SourceLoc): string {
+  if (!node) {
+    throw new ParseError("invalid reader macro definition", loc, "E009");
+  }
+  if (node.kind === "symbol") {
+    return validateReaderMacroPrefix(node.name, loc);
+  }
+  if (node.kind === "literal" && typeof node.value === "string") {
+    return validateReaderMacroPrefix(node.value, loc);
+  }
+  throw new ParseError("invalid reader macro definition", loc, "E009");
+}
+
+function validateReaderMacroPrefix(prefix: string, loc: SourceLoc): string {
+  if (!prefix.trim()) {
+    throw new ParseError("invalid reader macro prefix", loc, "E009");
+  }
+  if (/\s/.test(prefix)) {
+    throw new ParseError("invalid reader macro prefix", loc, "E009");
+  }
+  if (/^[A-Za-z0-9]/.test(prefix)) {
+    throw new ParseError("invalid reader macro prefix", loc, "E009");
+  }
+  if (/[()\[\]{}";,]/.test(prefix)) {
+    throw new ParseError("invalid reader macro prefix", loc, "E009");
+  }
+  return prefix;
+}
+
+function extractReaderMacroExpansion(node: SExprNode | undefined, loc: SourceLoc): string {
+  if (!node || node.kind !== "symbol") {
+    throw new ParseError("invalid reader macro definition", loc, "E009");
+  }
+  return node.name;
+}
+
+function isListNode(node: SExprNode | undefined): node is ListNode {
+  return Boolean(node && node.kind === "list");
+}
+
+function isSymbolNode(node: SExprNode | undefined): node is SymbolNode {
+  return Boolean(node && node.kind === "symbol");
+}
+
 function readNode(state: ParserState): SExprNode {
   skipWhitespace(state);
   if (state.index >= state.length) {
@@ -188,6 +310,13 @@ function readNode(state: ParserState): SExprNode {
   const char = peek(state);
   if (!char) {
     throw createError(state, "unexpected end of input", "E001");
+  }
+  const macroNode = readRegisteredReaderMacro(state);
+  if (macroNode) {
+    return macroNode;
+  }
+  if (state.strictReaderMacros && isUnknownReaderMacroStart(state)) {
+    throw createError(state, "unknown reader macro prefix", "E008");
   }
   if (char === "'") {
     const startLine = state.line;
@@ -239,6 +368,61 @@ function readNode(state: ParserState): SExprNode {
     return readString(state);
   }
   return readAtom(state);
+}
+
+const BUILTIN_READER_MACRO_PREFIXES = new Set(["'", "`", "~", ":"]);
+
+function readRegisteredReaderMacro(state: ParserState): SExprNode | null {
+  const registry = state.readerMacros;
+  if (!registry || registry.isEmpty()) {
+    return null;
+  }
+  const prefixes = registry.prefixesByLength();
+  for (const prefix of prefixes) {
+    if (matchPrefix(state, prefix)) {
+      const startLine = state.line;
+      const startColumn = state.column;
+      consumePrefix(state, prefix);
+      const macroName = registry.get(prefix);
+      if (!macroName) {
+        return null;
+      }
+      return readReaderMacro(state, macroName, startLine, startColumn, prefix.length);
+    }
+  }
+  return null;
+}
+
+function isUnknownReaderMacroStart(state: ParserState): boolean {
+  const char = peek(state);
+  const next = peekNext(state);
+  if (!char || !next) {
+    return false;
+  }
+  if (BUILTIN_READER_MACRO_PREFIXES.has(char)) {
+    return false;
+  }
+  if (!isPossibleMacroPrefixChar(char)) {
+    return false;
+  }
+  return next === "(";
+}
+
+function isPossibleMacroPrefixChar(char: string): boolean {
+  if (isWhitespace(char)) {
+    return false;
+  }
+  return !/[A-Za-z0-9]/.test(char);
+}
+
+function matchPrefix(state: ParserState, prefix: string): boolean {
+  return state.source.startsWith(prefix, state.index);
+}
+
+function consumePrefix(state: ParserState, prefix: string): void {
+  for (let i = 0; i < prefix.length; i += 1) {
+    readChar(state);
+  }
 }
 
 
