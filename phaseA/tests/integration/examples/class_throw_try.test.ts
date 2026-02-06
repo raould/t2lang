@@ -14,8 +14,8 @@ test("simple class with field", async () => {
         (class-body
           (field "name" "John"))))
   `, );
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /class Person/);
   assert.match(result.tsSource, /name = "John"/);
 });
@@ -30,8 +30,8 @@ test("class with method", async () => {
               (call (prop console "log") "Hello")))))
     )
   `, );
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /class Greeter/);
   assert.match(result.tsSource, /greet\(\)/);
   assert.match(result.tsSource, /console\.log/);
@@ -46,8 +46,8 @@ test("class with method params", async () => {
             (return (+ a b)))))
     )
   `, );
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /add\(a, b\)/);
   assert.match(result.tsSource, /return \(a \+ b\)/);
 });
@@ -61,8 +61,8 @@ test("class with field and method", async () => {
           (method "increment" ()
             (assign (prop this "count") (+ (prop this "count") 1))))))
   `, );
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /count = 0/);
   assert.match(result.tsSource, /increment\(\)/);
 });
@@ -70,26 +70,26 @@ test("class with field and method", async () => {
 // Type assert tests
 test("simple type assert", async () => {
   const result = await compile(`(program (let* ((x 1)) (type-assert x (type-number))))`, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /\(x as number\)/);
 });
 
 test("type assert on expression", async () => {
   const result = await compile(`(program (fn getValue () "ok") (type-assert (getValue) (type-string)))`, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /\(getValue\(\) as string\)/);
 });
 
 // Throw tests
 test("throw error", async () => {
   const result = await compile(`(program (let* ((Error (fn ((x)) x))) (throw (new Error "oops"))))`, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /throw new Error\("oops"\)/);
 });
 
 test("throw variable", async () => {
   const result = await compile(`(program (let* ((e "oops")) (throw e)))`, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /throw e/);
 });
 
@@ -104,7 +104,7 @@ test("simple try-catch", async () => {
           (catch e
             (log e)))))
   `, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /try \{/);
   assert.match(result.tsSource, /riskyOp\(\)/);
   assert.match(result.tsSource, /catch \(e\)/);
@@ -124,7 +124,7 @@ test("try-catch with finally", async () => {
           (finally
             (close)))))
   `, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /try \{/);
   assert.match(result.tsSource, /catch \(e\)/);
   assert.match(result.tsSource, /finally \{/);
@@ -145,7 +145,7 @@ test("try-catch with multiple statements", async () => {
             (log err)
             (recover)))))
   `, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /step1\(\)/);
   assert.match(result.tsSource, /step2\(\)/);
   assert.match(result.tsSource, /log\(err\)/);
@@ -160,7 +160,7 @@ test("try-catch with empty catch body still emits catch", async () => {
           (risky)
           (catch e))))
   `, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /try \{/);
   assert.match(result.tsSource, /catch \(e\)/);
 });

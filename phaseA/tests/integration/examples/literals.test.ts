@@ -7,29 +7,29 @@ import { compile } from "../../../src/api";
  
 test("boolean literal true", async () => {
   const result = await compile(`(program (fn foo ((x)) x) (call foo true))`, );
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /foo\(true\)/);
 });
 
 test("boolean literal false", async () => {
   const result = await compile(`(program (fn foo ((x)) x) (call foo false))`, );
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /foo\(false\)/);
 });
 
 test("null literal", async () => {
   const result = await compile(`(program (fn foo ((x)) x) (call foo null))`, );
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /foo\(null\)/);
 });
 
 test("undefined literal", async () => {
   const result = await compile(`(program (fn foo ((x)) x) (call foo undefined))`, );
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /foo\(undefined\)/);
 });
 
@@ -43,8 +43,8 @@ test("mixed literals in let binding", async () => {
             (d undefined))
         (call foo a b c d)))
   `, );
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /let a = true/);
   assert.match(result.tsSource, /let b = false/);
   assert.match(result.tsSource, /let c = null/);
@@ -58,8 +58,30 @@ test("string literal escapes", async () => {
       (call foo "line1\nline2")
     )
   `, );
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /\\n/);
   assert.match(result.tsSource, /line2/);
+});
+
+test("template literal multiline backtick", async () => {
+  const source = String.raw`
+    (program
+      (fn foo ((x)) x)
+      (call foo ` + "`" + String.raw`foo
+bar` + "`" + String.raw`)
+    )
+  `;
+  const result = await compile(source, );
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
+  assert.match(result.tsSource, /"foo\\nbar"/);
+});
+
+test("string literal backslash line continuation", async () => {
+  const source = "(program (fn foo ((x)) x) (call foo \"foo\\\nbar\"))";
+  const result = await compile(source, );
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
+  assert.match(result.tsSource, /"foobar"/);
 });

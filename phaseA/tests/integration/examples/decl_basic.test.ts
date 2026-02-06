@@ -8,11 +8,9 @@ test("let declaration as expression", async () => {
 
   const result = await compile(source, {
     prettyOption: "pretty",
-    logLevel: "none",
-    enableTsc: false
   });
 
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
 
   const ts = result.tsSource.trim();
   assert.strictEqual(ts, "{\nlet foo = (x) => {\nx;\n};\nlet x = 42;\nfoo(x);\n}");

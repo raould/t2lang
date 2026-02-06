@@ -295,11 +295,15 @@ export class ArrayExpr {
   constructor(data: { elements: Expression[]; span: Span }) { this.elements = data.elements; this.span = data.span; }
 }
 
+export type ObjectField =
+  | { kind: "field"; key: string; value: Expression }
+  | { kind: "spread"; expr: Expression };
+
 export class ObjectExpr {
   private readonly __brand!: "object";
-  readonly fields: { key: string; value: Expression }[];
+  readonly fields: ObjectField[];
   readonly span: Span;
-  constructor(data: { fields: { key: string; value: Expression }[]; span: Span }) { this.fields = data.fields; this.span = data.span; }
+  constructor(data: { fields: ObjectField[]; span: Span }) { this.fields = data.fields; this.span = data.span; }
 }
 
 export class TemplateExpr {
@@ -1041,7 +1045,11 @@ export async function createProcessor(ctx: Context) {
       }
       if (expr instanceof ObjectExpr) {
         for (const f of expr.fields) {
-          await evaluateExpression(f.value);
+          if (f.kind === "spread") {
+            await evaluateExpression(f.expr);
+          } else {
+            await evaluateExpression(f.value);
+          }
         }
         return expr;
       }

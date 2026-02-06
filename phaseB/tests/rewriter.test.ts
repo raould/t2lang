@@ -4,6 +4,7 @@ import type { ListNode, SymbolNode } from "../src/reader.js";
 import { parseSexpr } from "../src/reader.js";
 import { rewriteAssignments } from "../src/rewriter.js";
 import { resetGensym } from "../src/gensym.js";
+import { normalizeGensymName } from "./test_utils.js";
 
 test("rewrites assignment sugar into assign", () => {
   const nodes = parseSexpr("(:= foo bar)", "rewriter.t2");
@@ -51,8 +52,8 @@ test("rewrites dotted method calls into call/prop", () => {
   assert.strictEqual(propHead.kind, "symbol");
   assert.strictEqual((propHead as { name: string }).name, "prop");
   assert.strictEqual(target.kind, "list");
-  assert.strictEqual(methodName.kind, "literal");
-  assert.strictEqual((methodName as { value: unknown }).value, "method");
+  assert.strictEqual(methodName.kind, "symbol");
+  assert.strictEqual((methodName as SymbolNode).name, "method");
   const nested = target as ListNode;
   assert.strictEqual(nested.kind, "list");
   const [nestedHead, nestedTarget, nestedProp] = nested.elements;
@@ -60,8 +61,8 @@ test("rewrites dotted method calls into call/prop", () => {
   assert.strictEqual((nestedHead as { name: string }).name, "prop");
   assert.strictEqual(nestedTarget.kind, "symbol");
   assert.strictEqual((nestedTarget as { name: string }).name, "obj");
-  assert.strictEqual(nestedProp.kind, "literal");
-  assert.strictEqual((nestedProp as { value: unknown }).value, "inner");
+  assert.strictEqual(nestedProp.kind, "symbol");
+  assert.strictEqual((nestedProp as SymbolNode).name, "inner");
   assert.strictEqual(args.length, 2);
   assert.strictEqual(args[0].kind, "literal");
   assert.strictEqual(args[1].kind, "literal");
@@ -82,10 +83,10 @@ test("rewrites dotted symbol accesses into prop calls", () => {
   assert.strictEqual((innerHead as { name: string }).name, "prop");
   assert.strictEqual(innerTarget.kind, "symbol");
   assert.strictEqual((innerTarget as { name: string }).name, "obj");
-  assert.strictEqual(innerProp.kind, "literal");
-  assert.strictEqual((innerProp as { value: unknown }).value, "inner");
-  assert.strictEqual(methodName.kind, "literal");
-  assert.strictEqual((methodName as { value: unknown }).value, "prop");
+  assert.strictEqual(innerProp.kind, "symbol");
+  assert.strictEqual((innerProp as SymbolNode).name, "inner");
+  assert.strictEqual(methodName.kind, "symbol");
+  assert.strictEqual((methodName as SymbolNode).name, "prop");
 });
 
 test("rewrites parallel let bindings into let* with temps", () => {
@@ -106,24 +107,24 @@ test("rewrites parallel let bindings into let* with temps", () => {
   assert.strictEqual(rebindB.kind, "list");
   const [tempASym, tempAVal] = (tempA as ListNode).elements;
   assert.strictEqual(tempASym.kind, "symbol");
-  assert.strictEqual((tempASym as SymbolNode).name, "let_tmp_1");
+  assert.strictEqual(normalizeGensymName((tempASym as SymbolNode).name), "let_tmp_1");
   assert.strictEqual(tempAVal.kind, "symbol");
   assert.strictEqual((tempAVal as SymbolNode).name, "b");
   const [tempBSym, tempBVal] = (tempB as ListNode).elements;
   assert.strictEqual(tempBSym.kind, "symbol");
-  assert.strictEqual((tempBSym as SymbolNode).name, "let_tmp_2");
+  assert.strictEqual(normalizeGensymName((tempBSym as SymbolNode).name), "let_tmp_2");
   assert.strictEqual(tempBVal.kind, "symbol");
   assert.strictEqual((tempBVal as SymbolNode).name, "a");
   const [rebindATarget, rebindAValue] = (rebindA as ListNode).elements;
   assert.strictEqual(rebindATarget.kind, "symbol");
   assert.strictEqual((rebindATarget as SymbolNode).name, "a");
   assert.strictEqual(rebindAValue.kind, "symbol");
-  assert.strictEqual((rebindAValue as SymbolNode).name, "let_tmp_1");
+  assert.strictEqual(normalizeGensymName((rebindAValue as SymbolNode).name), "let_tmp_1");
   const [rebindBTarget, rebindBValue] = (rebindB as ListNode).elements;
   assert.strictEqual(rebindBTarget.kind, "symbol");
   assert.strictEqual((rebindBTarget as SymbolNode).name, "b");
   assert.strictEqual(rebindBValue.kind, "symbol");
-  assert.strictEqual((rebindBValue as SymbolNode).name, "let_tmp_2");
+  assert.strictEqual(normalizeGensymName((rebindBValue as SymbolNode).name), "let_tmp_2");
   assert.strictEqual(body.kind, "list");
   assert.strictEqual(((body as ListNode).elements[0] as SymbolNode).name, "assign");
 });

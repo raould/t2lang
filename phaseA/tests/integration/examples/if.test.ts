@@ -7,14 +7,14 @@ import { compile } from "../../../src/api";
  
 test("if with then only", async () => {
   const result = await compile(`(program (fn foo ((x)) x) (if true (foo 1)))`, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /if \(true\)/);
   assert.match(result.tsSource, /foo\(1\)/);
 });
 
 test("if with then and else", async () => {
   const result = await compile(`(program (fn foo ((x)) x) (fn bar ((x)) x) (if false (foo 1) (bar 2)))`, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /if \(false\)/);
   assert.match(result.tsSource, /foo\(1\)/);
   assert.match(result.tsSource, /else/);
@@ -29,13 +29,13 @@ test("if with identifier condition", async () => {
       (let* ((x true))
         (if x (foo 1) (bar 2))))
   `, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /if \(x\)/);
 });
 
 test("if with call condition", async () => {
   const result = await compile(`(program (fn isReady () true) (fn go () null) (if (isReady) (go)))`, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /if \(isReady\(\)\)/);
 });
 
@@ -49,7 +49,7 @@ test("nested if expressions", async () => {
         (if false (a) (b))
         (c)))
   `, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /if \(true\)/);
   assert.match(result.tsSource, /if \(false\)/);
 });
@@ -67,7 +67,7 @@ test("if with block branches", async () => {
         (block
           (baz 3))))
   `, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /if \(true\)/);
   assert.match(result.tsSource, /foo\(1\)/);
   assert.match(result.tsSource, /bar\(2\)/);

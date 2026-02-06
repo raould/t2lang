@@ -1,11 +1,14 @@
 import { parseSource } from "./parse.js";
 import { generateCode } from "./codegen.js";
 import { serializeLazy, SerializedProgram, SerializedProgramThunk } from "./serialization.js";
-import { createProcessor, Context, Diagnostic, Program } from "./phaseA1.js";
+import { createProcessor, Context, Program } from "./phaseA1.js";
+import type { Diagnostic, Span } from "./phaseA1.js";
 import { ArrayEventSink, CompilerEvent, CompilerStage, EventSeverity } from "./events.js";
 import { PhaseACompilerContext } from "./compilerContext.js";
 
-export interface CompilePhaseA0Config {
+export type { Diagnostic, Span };
+
+export interface CompilePhaseAConfig {
   prettyOption?: "pretty" | "ugly";
   emitTypes?: boolean;
   seed?: string;
@@ -13,11 +16,8 @@ export interface CompilePhaseA0Config {
   logLevel?: EventSeverity;
   compilerContext?: PhaseACompilerContext;
   sourcePath?: string;
-}
-
-export interface CompilePhaseAConfig
-  extends CompilePhaseA0Config {
   dumpAst?: boolean;
+  program?: Program;
 }
 
 export interface SnapshotRecord {
@@ -27,7 +27,7 @@ export interface SnapshotRecord {
   stamp: string;
 }
 
-export interface CompilePhaseA0Result {
+export interface CompilePhaseAResult {
   tsSource: string;
   mappings: Array<{ generated: { line: number; column: number }; original: { line: number; column: number }; source: string }>;
   diagnostics: Diagnostic[];
@@ -35,20 +35,14 @@ export interface CompilePhaseA0Result {
   events: CompilerEvent[];
 }
 
-export interface CompilePhaseAResult {
-  tsSource: string;
-  errors: Diagnostic[];
-  events: Array<{ kind: string; phase?: CompilerStage; data?: unknown }>;
-}
-
-const DEFAULT_CONFIG: CompilePhaseA0Config = {
+const DEFAULT_CONFIG: CompilePhaseAConfig = {
   prettyOption: "pretty",
   emitTypes: false,
   seed: "default",
   logLevel: "debug",
 };
 
-export async function compilePhaseA0(source: string, config: CompilePhaseA0Config = {}): Promise<CompilePhaseA0Result> {
+export async function compile(source: string, config: CompilePhaseAConfig = {}): Promise<CompilePhaseAResult> {
   const finalConfig = { ...DEFAULT_CONFIG, ...config };
   const sourcePath = finalConfig.sourcePath ?? "input.t2";
   try {
@@ -103,7 +97,7 @@ export async function compilePhaseA0(source: string, config: CompilePhaseA0Confi
     };
 
     await emitTrace("parse", "start");
-    const parsedProgram = await parseSource(source, finalConfig.sourcePath ?? "input.t2");
+    const parsedProgram = finalConfig.program ?? await parseSource(source, finalConfig.sourcePath ?? "input.t2");
     if (process.env.T2_DEBUG_PARSE === "1") {
       const nodeCount = parsedProgram.body.length;
       console.error(`[DEBUG] Parsed AST: nodeCount=${nodeCount}`);
@@ -132,6 +126,33 @@ export async function compilePhaseA0(source: string, config: CompilePhaseA0Confi
     await emitStage("codegen", resolvedProgram);
     await emitTrace("codegen", "done");
 
+    if (finalConfig.dumpAst !== false) {
+      const parseSnapshot = snapshots.find((s) => s.stage === "parse");
+      if (parseSnapshot) {
+        await compilerContext.events.emit({
+          phase: "parse",
+          kind: "astDump",
+          timestamp: Date.now(),
+          seed: compilerContext.seed,
+          stamp: compilerContext.stamp,
+          severity: "info",
+          data: { ast: await parseSnapshot.program() },
+        });
+      }
+      const resolveSnapshot = snapshots.find((s) => s.stage === "resolve");
+      if (resolveSnapshot) {
+        await compilerContext.events.emit({
+          phase: "resolve",
+          kind: "resolveDump",
+          timestamp: Date.now(),
+          seed: compilerContext.seed,
+          stamp: compilerContext.stamp,
+          severity: "info",
+          data: { ast: await resolveSnapshot.program() },
+        });
+      }
+    }
+
     return {
       tsSource,
       mappings,
@@ -154,33 +175,6 @@ export async function compilePhaseA0(source: string, config: CompilePhaseA0Confi
       events: [],
     };
   }
-}
-
-export async function compile(
-  source: string,
-  options: CompilePhaseAConfig = {}
-): Promise<CompilePhaseAResult> {
-  const result = await compilePhaseA0(source, options);
-
-  const events: Array<{ kind: string; phase?: CompilerStage; data?: unknown }> = [];
-  const parseSnapshot = result.snapshots.find((entry) => entry.stage === "parse");
-  const resolveSnapshot = result.snapshots.find((entry) => entry.stage === "resolve");
-
-  if (options.dumpAst !== false && parseSnapshot) {
-    const ast = await parseSnapshot.program();
-    events.push({ kind: "astDump", phase: "parse", data: { ast } });
-  }
-
-  if (resolveSnapshot) {
-    const ast = await resolveSnapshot.program();
-    events.push({ kind: "resolveDump", phase: "resolve", data: { ast } });
-  }
-
-  return {
-    tsSource: result.tsSource,
-    errors: result.diagnostics,
-    events,
-  };
 }
 
 export async function evaluateSnapshot(snapshot: SnapshotRecord): Promise<SerializedProgram> {

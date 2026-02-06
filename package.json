@@ -1,6 +1,9 @@
 {
   "name": "t2lang",
   "private": true,
+  "workspaces": [
+    "t2lang-runtime"
+  ],
   "scripts": {
     "build": "npm --prefix phaseB run build",
     "test": "npm --prefix phaseA test && npm --prefix phaseB test",

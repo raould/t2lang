@@ -9,7 +9,7 @@
  */
 
 import type { CompilerStage } from "./events.js";
-import { requireRegistryEntry } from "./errorRegistry.js";
+import { requireRegistryEntry } from "../../common/dist/errorRegistry.js";
 
 // ============================================================================
 // LAYER A0 - Core Runtime Calculus

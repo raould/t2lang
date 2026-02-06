@@ -1,3 +1,4 @@
+import { reportError } from "../../common/dist/errorRegistry.js";
 import {
   Program,
   Statement,
@@ -550,9 +551,7 @@ async function emitExpression(expr: Expression): Promise<string> {
     // Safety check: The target of a TypeApp in an expression context must be an expression,
     // not a static type node like TypeRef or TypePrimitive.
     if (isTypeNodeValue(expr.expr)) {
-      throw new Error(
-        `Codegen Error: TypeApp in expression context has an invalid target: ${expr.expr.constructor.name}. Expected an expression.`
-      );
+      throw reportError("T2:0312", { target: expr.expr.constructor.name });
     }
     const target = await emitExpression(expr.expr as Expression);
     const typeArgs = await Promise.all(expr.typeArgs.map(emitTypeNode));
@@ -576,6 +575,10 @@ async function emitExpression(expr: Expression): Promise<string> {
     }
     const entries = await Promise.all(
       expr.fields.map(async (field) => {
+        if (field.kind === "spread") {
+          const valueText = await emitExpression(field.expr);
+          return `...${valueText}`;
+        }
         const valueText = await emitExpression(field.value);
         const keyText = formatObjectKey(field.key);
         return `${keyText}: ${valueText}`;
@@ -613,7 +616,7 @@ async function emitFunctionExpression(expr: FunctionExpr, asDeclaration = false)
   const { typeParams, params, returnAnnotation } = await emitFunctionSignature(expr);
   if (expr.overload) {
     if (!asDeclaration) {
-      throw new Error("overload signatures cannot be emitted as expressions");
+      throw reportError("T2:0226");
     }
     const namePart = expr.name ? ` ${expr.name.name}` : "";
     return `${prefix}function${generator}${namePart}${typeParams}(${params.join(", ")})${returnAnnotation};`;
@@ -664,20 +667,20 @@ async function renderFunctionBody(expr: FunctionExpr): Promise<string> {
 
 async function emitMethodDefinition(expr: FunctionExpr): Promise<string> {
   if (!expr.methodName) {
-    throw new Error("method requires a name");
+    throw reportError("T2:0207");
   }
   const isConstructor = expr.methodName === "constructor";
   if (expr.callableKind === "getter" && expr.signature.parameters.length !== 0) {
-    throw new Error("getter must declare zero parameters");
+    throw reportError("T2:0180");
   }
   if (expr.callableKind === "setter" && expr.signature.parameters.length !== 1) {
-    throw new Error("setter must declare exactly one parameter");
+    throw reportError("T2:0239");
   }
   if (isConstructor && (expr.async || expr.generator)) {
-    throw new Error("constructor cannot be async or generator");
+    throw reportError("T2:0142");
   }
   if (isConstructor && expr.abstract) {
-    throw new Error("constructor cannot be abstract");
+    throw reportError("T2:0141");
   }
   const { typeParams, params, returnAnnotation } = await emitFunctionSignature(expr);
   const prefix = expr.async ? "async " : "";
@@ -987,7 +990,7 @@ async function emitBindingTarget(target: BindingTarget): Promise<string> {
     const defaultValue = await emitExpression(target.defaultValue);
     return `${inner} = ${defaultValue}`;
   }
-  throw new Error("Unsupported binding target in codegen");
+  throw reportError("T2:0302");
 }
 
 async function emitTryCatchStatement(expr: TryCatchExpr): Promise<EmittedStatement> {
@@ -1201,7 +1204,7 @@ async function emitTypeNode(node: TypeNode): Promise<string> {
     const typeArgs = await Promise.all(node.typeArgs.map(emitTypeNode));
     return `${target}<${typeArgs.join(", ")}>`;
   }
-  throw new Error("Unsupported type node");
+  throw reportError("T2:0309");
 }
 
 async function emitTypeMapped(node: TypeMapped): Promise<string> {
@@ -1350,7 +1353,12 @@ function containsAsyncExpression(expr: Expression): boolean {
     return containsAsyncExpression(expr.expr);
   }
   if (expr instanceof ObjectExpr) {
-    return expr.fields.some((field) => containsAsyncExpression(field.value));
+    return expr.fields.some((field) => {
+      if (field.kind === "spread") {
+        return containsAsyncExpression(field.expr);
+      }
+      return containsAsyncExpression(field.value);
+    });
   }
   if (expr instanceof NewExpr) {
     if (containsAsyncExpression(expr.callee)) {
@@ -1419,10 +1427,17 @@ function containsAsyncExpression(expr: Expression): boolean {
 }
  
 const OPERATOR_SYMBOLS: Record<string, string> = {
+  "!": "!",
   "+": "+",
   "-": "-",
   "*": "*",
   "/": "/",
+  "**": "**",
+  "%": "%",
+  ",": ",",
+  "<<": "<<",
+  ">>": ">>",
+  ">>>": ">>>",
   "<": "<",
   ">": ">",
   "<=": "<=",
@@ -1431,6 +1446,9 @@ const OPERATOR_SYMBOLS: Record<string, string> = {
   "===": "===",
   "!=": "!=",
   "!==": "!==",
+  "&": "&",
+  "^": "^",
+  "|": "|",
   "&&": "&&",
   "||": "||",
   "??": "??",
@@ -1441,7 +1459,7 @@ function formatOperatorExpression(operator: string, operands: string[]): string 
     return "";
   }
   if (operands.length === 1) {
-    if (operator === "-" || operator === "+") {
+    if (operator === "-" || operator === "+" || operator === "!") {
       return `${operator}${operands[0]}`;
     }
     return operands[0];

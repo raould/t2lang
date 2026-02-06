@@ -174,6 +174,32 @@ test("parseSource handles prop/index/object/new expressions", () => {
   assert.strictEqual(newExpr.args.length, 1);
 });
 
+test("parseSource ignores comma separators in lists", () => {
+  const source = `(program
+    (call log 1, 2)
+    (array 1, 2, 3)
+    (object ("a" 1), ("b" 2))
+    (fn ((x), (y)) (return x))
+  )`;
+
+  const program = parseSource(source);
+  const callStmt = program.body[0] as ExprStmt;
+  assert.ok(callStmt.expr instanceof CallExpr);
+  assert.strictEqual(callStmt.expr.args.length, 2);
+
+  const arrayStmt = program.body[1] as ExprStmt;
+  assert.ok(arrayStmt.expr instanceof ArrayExpr);
+  assert.strictEqual(arrayStmt.expr.elements.length, 3);
+
+  const objectStmt = program.body[2] as ExprStmt;
+  assert.ok(objectStmt.expr instanceof ObjectExpr);
+  assert.strictEqual(objectStmt.expr.fields.length, 2);
+
+  const fnStmt = program.body[3];
+  assert.ok(fnStmt instanceof FunctionExpr);
+  assert.strictEqual(fnStmt.signature.parameters.length, 2);
+});
+
 test("parseSource handles import/export statements", () => {
   const source = `(program
     (import (import-spec "./default" (default Default)))

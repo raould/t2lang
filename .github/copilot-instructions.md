@@ -1,3 +1,4 @@
+* read staging-guardrails.md.
 * read all .md files in Phase A to get context on the goals and design.
 * currently we are working on Phase A only.
 * Phase 0 and Phase 1 are for reference only.

@@ -1,5 +1,7 @@
 # Phase A/B AST Node Reference
 
+Note: this has likely gotten out of date, GRAMMER.md is the lesser wrong.
+
 | Node Name | S-expr Keyword | Fields (with types) | Phase | Notes |
 | --- | --- | --- | --- | --- |
 | Program | `program` | `body: Stmt[]` | A1 | Root wrapper. Always emitted as `(program ...)` and holds the sequential statement stream. |
@@ -34,13 +36,13 @@
 | TryCatchExpr | `try` | `body: Stmt`, `catchClause?: CatchClause`, `finallyClause?: FinallyClause` | A1 | Includes auxiliary nodes for `catch`/`finally`. |
 | CatchClause | `catch` | `binding?: Binding`, `body: Stmt[]` | A1 | Optional binding to capture exception value. |
 | FinallyClause | `finally` | `body: Stmt[]` | A1 | Executes irrespective of throw. |
-| ArrayExpr | `array` | `elements: Expr[]` | A1 | Phase B rewrites spread/rest into `elements` containing `SpreadExpr`. |
-| ObjectExpr | `object` | `fields: Array<{ key: string; value: Expr }>` | A1 | Same as arrays; spread fields lowered into `SpreadExpr`. |
+| ArrayExpr | `array` | `elements: Expr[]` | A1 | Elements may include `SpreadExpr` entries; commas can appear as separators in source lists. |
+| ObjectExpr | `object` | `fields: ObjectField[]` | A1 | `ObjectField` is either `{ kind: "field"; key: string; value: Expr }` or `{ kind: "spread"; expr: Expr }`. Commas can appear as separators in source lists. |
 | TemplateExpr | `template` | `parts: Expr[]` | A1 | Interpolated template literals; string literals become raw segments and other expressions become `${...}` slots. |
 | NonNullAssertExpr | `non-null` | `expr: Expr` | A1 | Non-null assertion; emits postfix `!` in TypeScript. |
 | AwaitExpr | `await` | `argument: Expr` | A1 | Rewritten only inside `async` contexts by Phase B. |
 | YieldExpr | `yield` | `argument: Expr | null`, `delegate: boolean` | A1 | Handles both `yield` and `yield*`; Phase B resolves iterator protocol. |
-| SpreadExpr | `spread` | `expr: Expr` | A1 | Represents every `...` spread/rest after Phase B rewrites. |
+| SpreadExpr | `spread` | `expr: Expr`, `kind: "array" \| "object" \| "rest"` | A1 | Represents every `...` spread/rest after Phase B rewrites. |
 | FunctionExpr | `fn` | `callableKind: CallableKind`, `name?: Identifier`, `methodName?: string`, `signature: FnSignature`, `typeParams?: TypeParam[]`, `body: Stmt[]`, `async?: boolean`, `generator?: boolean`, `abstract?: boolean`, `overload?: boolean` | A1 | Covers `fn`, `lambda`, `method`, `getter`, and `setter` forms; Phase B records metadata for decorators, params, `this` annotation. |
 | FnParam | helper | `name: Identifier`, `typeAnnotation?: TypeNode`, `paramProperty?: { access?: "public" \| "protected" \| "private"; readonly?: boolean }`, `defaultValue?: Expr` | A1 | Parameter property metadata and default values; parameter properties are only valid on constructor parameters. |
 | ClassExpr | `class` | `name?: Identifier`, `typeParams?: TypeParam[]`, `body: ClassBody`, `decorators?: Expr[]`, `extends?: Expr | null`, `implements?: Expr[]`, `abstract?: boolean`, `constructor?: Stmt | null`, `staticBlocks?: Stmt[]` | A1 | Includes metadata for TypeScript sugar (decorators, modifiers, implements). |

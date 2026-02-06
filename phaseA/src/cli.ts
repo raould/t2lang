@@ -4,7 +4,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError, Option } from "commander";
-import { compilePhaseA0, SnapshotRecord } from "./api.js";
+import { compile, SnapshotRecord } from "./api.js";
 import {
   CompilerEvent,
   CompilerStage,
@@ -185,7 +185,7 @@ export async function main(argv: string[]): Promise<void> {
     sourceMap: { [sourcePath]: source },
     useColor,
   };
-  const result = await compilePhaseA0(source, {
+  const result = await compile(source, {
     sourcePath,
     seed: options.seed,
     emitTypes: options.emitTypes,

@@ -1,3 +1,15 @@
+# Macro Execution Sandbox Boundaries
+
+To ensure safe and predictable macro expansion, the t2lang compiler enforces the following sandbox boundaries:
+
+1. **Recursion Depth Limit**: Macro expansion is limited to a maximum depth of **100**. Exceeding this limit will trigger a compilation error to prevent infinite recursion.
+2. **No Side Effects**: Macros must be pure functions of their input AST. The following are strictly prohibited during macro expansion:
+   - **No File System Access**: Macros cannot read from or write to the file system.
+   - **No Network Access**: Macros cannot perform HTTP requests or any other network operations.
+   - **No System Calls**: Macros cannot execute shell commands or interact with the operating system.
+
+These boundaries ensure that the compilation process remains deterministic, secure, and performant.
+
 # Pseudo-code Macro examples.
 
 Until Phase B macros are working, the syntax here is pseudocode.

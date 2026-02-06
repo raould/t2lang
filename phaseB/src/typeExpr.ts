@@ -1,4 +1,4 @@
-import { reportError } from "./errorRegistry.js";
+import { reportError } from "../../common/dist/errorRegistry.js";
 
 type Token = { type: "identifier"; value: string } | { type: "punc"; value: string };
 type TokenStream = { tokens: Token[]; pos: number };
@@ -27,7 +27,7 @@ export function parseTypeExpression(input: string): TypeAst {
   const expr = parseUnion(stream);
   if (!atEnd(stream)) {
     const leftover = stream.tokens[stream.pos];
-    throw reportError("E110", { token: leftover?.value ?? "<end>" });
+    throw reportError("T2:0110", { token: leftover?.value ?? "<end>" });
   }
   return expr;
 }
@@ -220,7 +220,7 @@ function parseQuotedString(token: string): string {
 function nextIdentifier(stream: TokenStream): string {
   const token = stream.tokens[stream.pos];
   if (!token || token.type !== "identifier") {
-    throw reportError("E111", { token: token?.value ?? "<end>" });
+    throw reportError("T2:0111", { token: token?.value ?? "<end>" });
   }
   stream.pos += 1;
   return token.value;
@@ -252,7 +252,7 @@ function peekPunc(stream: TokenStream, value: string): boolean {
 function expectPunc(stream: TokenStream, value: string): void {
   if (!matchPunc(stream, value)) {
     const token = stream.tokens[stream.pos];
-    throw reportError("E112", {
+    throw reportError("T2:0112", {
       value,
       found: token?.value ?? "<end>",
     });

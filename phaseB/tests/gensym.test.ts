@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert";
 import { gensym, resetGensym } from "../src/gensym.js";
+import { normalizeGensymName } from "./test_utils.js";
 
 test.beforeEach(() => {
   resetGensym();
@@ -10,8 +11,8 @@ test("gensym produces unique names", () => {
   const first = gensym();
   const second = gensym();
   assert.notStrictEqual(first, second);
-  assert.match(first, /^G__\d+$/);
-  assert.match(second, /^G__\d+$/);
+  assert.match(normalizeGensymName(first), /^T2:G_\d+$/);
+  assert.match(normalizeGensymName(second), /^T2:G_\d+$/);
 });
 
 test("gensym respects custom prefixes", () => {

@@ -15,7 +15,7 @@
 - [x] async
 - [x] generators
   - [ ] TODO: tests.
-- [ ] base class
+- [x] base class
 
 # The core principle  
 **T2 should not try to infer what kind of callable the user wants.  

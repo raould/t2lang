@@ -1,1 +1,0 @@
-- [ ] Grammar must support some form of (extends Base) clause for Classes. The grammar only shows a generic class-body containing statements.

@@ -14,8 +14,8 @@ test('readonly field is emitted and not enforced by t2lang', async () => {
   `;
   const result = await compile(src, );
   // t2lang should not enforce readonly; TypeScript will handle it.
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /readonly x/);
   // assignment should still be emitted in method body
   assert.match(result.tsSource, /this\.x = 1/);

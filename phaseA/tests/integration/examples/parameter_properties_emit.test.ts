@@ -11,7 +11,7 @@ test("parameter properties emit in constructor signature", async () => {
             (return)))))
   `;
   const result = await compile(src);
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /constructor\(public name: string, readonly age: number\)/);
 });

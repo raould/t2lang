@@ -77,14 +77,19 @@ import {
   TypeAssertExpr,
   TemplateExpr,
   NonNullAssertExpr,
+  TernaryExpr,
   IndexSignature,
   StaticBlockStmt,
   DefaultPattern,
 } from "./phaseA1.js";
+import { reportError } from "../../common/dist/errorRegistry.js";
 
 export type SerializedSpan = { start: number; end: number; source: string };
 export type SerializedIdentifier = { kind: "identifier"; name: string; span: SerializedSpan };
 export type SerializedLiteral = { kind: "literal"; value: Literal["value"]; span: SerializedSpan };
+export type SerializedObjectField =
+  | { kind: "field"; key: string; value: SerializedExpression }
+  | { kind: "spread"; expr: SerializedExpression };
 
 export type SerializedNamedImport = { imported: string; local: SerializedIdentifier };
 export type SerializedImportSpec = {
@@ -135,9 +140,10 @@ export type SerializedExpression =
   | { kind: "index"; object: SerializedExpression; index: SerializedExpression; maybeNull: boolean; span: SerializedSpan }
   | { kind: "new"; callee: SerializedExpression; args: SerializedExpression[]; span: SerializedSpan }
   | ({ kind: "array" } & { elements: SerializedExpression[]; span: SerializedSpan })
-  | ({ kind: "object" } & { fields: { key: string; value: SerializedExpression }[]; span: SerializedSpan })
+  | ({ kind: "object" } & { fields: SerializedObjectField[]; span: SerializedSpan })
   | ({ kind: "template" } & { parts: SerializedExpression[]; span: SerializedSpan })
   | ({ kind: "non-null" } & { expr: SerializedExpression; span: SerializedSpan })
+  | { kind: "ternary"; test: SerializedExpression; consequent: SerializedExpression; alternate: SerializedExpression; span: SerializedSpan }
   | { kind: "throw"; argument: SerializedExpression; span: SerializedSpan }
   | {
       kind: "try";
@@ -308,7 +314,14 @@ export async function serializeExpression(expr: Expression): Promise<SerializedE
     return { kind: "array", elements, span: await serializeSpan(expr.span) };
   }
   if (expr instanceof ObjectExpr) {
-    const fields = await Promise.all(expr.fields.map(async (f) => ({ key: f.key, value: await serializeExpression(f.value) })));
+    const fields = await Promise.all(
+      expr.fields.map(async (field) => {
+        if (field.kind === "spread") {
+          return { kind: "spread", expr: await serializeExpression(field.expr) } as const;
+        }
+        return { kind: "field", key: field.key, value: await serializeExpression(field.value) } as const;
+      })
+    );
     return { kind: "object", fields, span: await serializeSpan(expr.span) };
   }
   if (expr instanceof TemplateExpr) {
@@ -317,6 +330,15 @@ export async function serializeExpression(expr: Expression): Promise<SerializedE
   }
   if (expr instanceof NonNullAssertExpr) {
     return { kind: "non-null", expr: await serializeExpression(expr.expr), span: await serializeSpan(expr.span) };
+  }
+  if (expr instanceof TernaryExpr) {
+    return {
+      kind: "ternary",
+      test: await serializeExpression(expr.test),
+      consequent: await serializeExpression(expr.consequent),
+      alternate: await serializeExpression(expr.alternate),
+      span: await serializeSpan(expr.span),
+    };
   }
   if (expr instanceof ThrowExpr) {
     const argument = await serializeExpression(expr.argument);
@@ -383,7 +405,7 @@ export async function serializeExpression(expr: Expression): Promise<SerializedE
       span: await serializeSpan(expr.span),
     };
   }
-  throw new Error(`Unsupported expression kind ${(expr as any).__brand}`);
+  throw reportError("T2:0303", { kind: (expr as any).__brand });
 }
 
 export async function serializeBindingTarget(target: Binding): Promise<SerializedBinding> {
@@ -422,7 +444,7 @@ async function serializeBindingPattern(target: BindingTarget): Promise<Serialize
       span: await serializeSpan(target.span),
     };
   }
-  throw new Error(`Unsupported binding target ${(target as any).__brand}`);
+  throw reportError("T2:0301", { kind: (target as any).__brand });
 }
 
 export async function serializeStatement(stmt: Statement): Promise<SerializedStatement> {
@@ -602,7 +624,7 @@ export async function serializeStatement(stmt: Statement): Promise<SerializedSta
       span: await serializeSpan(stmt.span),
     };
   }
-  throw new Error(`Unsupported statement kind ${(stmt as any).__brand}`);
+  throw reportError("T2:0307", { kind: (stmt as any).__brand });
 }
 
 async function serializeIndexSignature(stmt: IndexSignature): Promise<SerializedIndexSignature> {
@@ -866,7 +888,7 @@ async function serializeTypeNode(node: TypeNode): Promise<SerializedTypeNode> {
     }
     return { ...serialized, exprMode: "expression", expr: await serializeExpression(node.expr) };
   }
-  throw new Error("Unsupported type node");
+  throw reportError("T2:0309");
 }
 
 export async function serializeProgram(program: Program): Promise<SerializedProgram> {
@@ -941,7 +963,7 @@ async function deserializeBindingPattern(serialized: SerializedBindingTarget): P
       span: await deserializeSpan(serialized.span),
     });
   }
-  throw new Error("Unknown binding target kind");
+  throw reportError("T2:0294");
 }
 
 export async function deserializeBinding(serialized: SerializedBinding): Promise<Binding> {
@@ -994,7 +1016,14 @@ export async function deserializeExpression(serialized: SerializedExpression): P
       return new ArrayExpr({ elements: await Promise.all(serialized.elements.map(deserializeExpression)), span: await deserializeSpan(serialized.span) });
     case "object":
       return new ObjectExpr({
-        fields: await Promise.all(serialized.fields.map(async (field) => ({ key: field.key, value: await deserializeExpression(field.value) }))),
+        fields: await Promise.all(
+          serialized.fields.map(async (field) => {
+            if (field.kind === "spread") {
+              return { kind: "spread", expr: await deserializeExpression(field.expr) } as const;
+            }
+            return { kind: "field", key: field.key, value: await deserializeExpression(field.value) } as const;
+          })
+        ),
         span: await deserializeSpan(serialized.span),
       });
     case "template":
@@ -1005,6 +1034,13 @@ export async function deserializeExpression(serialized: SerializedExpression): P
     case "non-null":
       return new NonNullAssertExpr({
         expr: await deserializeExpression(serialized.expr),
+        span: await deserializeSpan(serialized.span),
+      });
+    case "ternary":
+      return new TernaryExpr({
+        test: await deserializeExpression(serialized.test),
+        consequent: await deserializeExpression(serialized.consequent),
+        alternate: await deserializeExpression(serialized.alternate),
         span: await deserializeSpan(serialized.span),
       });
     case "throw":
@@ -1070,7 +1106,7 @@ export async function deserializeExpression(serialized: SerializedExpression): P
       });
     }
     default:
-      throw new Error(`Unsupported expression kind ${(serialized as SerializedExpression).kind}`);
+      throw reportError("T2:0303", { kind: (serialized as SerializedExpression).kind });
   }
 }
 
@@ -1221,7 +1257,7 @@ export async function deserializeStatement(serialized: SerializedStatement): Pro
       });
     }
     default:
-      throw new Error(`Unsupported statement kind ${(serialized as SerializedStatement).kind}`);
+      throw reportError("T2:0307", { kind: (serialized as SerializedStatement).kind });
   }
 }
 
@@ -1365,7 +1401,7 @@ async function deserializeTypeNode(serialized: SerializedTypeNode): Promise<Type
           if (part.kind === "type" && part.typeNode) {
             return deserializeTypeNode(part.typeNode);
           }
-          throw new Error("Invalid template literal type part");
+          throw reportError("T2:0202");
         })),
         span,
       });
@@ -1386,7 +1422,7 @@ async function deserializeTypeNode(serialized: SerializedTypeNode): Promise<Type
       return new TypeApp({ expr, typeArgs: await Promise.all(serialized.typeArgs.map(deserializeTypeNode)), span });
     }
     default:
-      throw new Error(`Unsupported serialized type node ${(serialized as SerializedTypeNode).kind}`);
+      throw reportError("T2:0306", { kind: (serialized as SerializedTypeNode).kind });
   }
 }
 

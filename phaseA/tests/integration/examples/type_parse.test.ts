@@ -22,8 +22,8 @@ test("parse full type AST forms", async () => {
       (type-assert 1 (type-ref Num)))
   `, );
 
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
 
   const astDump = result.events.find(e => e.kind === "astDump");
   const ast = (astDump?.data as { ast: any })?.ast;

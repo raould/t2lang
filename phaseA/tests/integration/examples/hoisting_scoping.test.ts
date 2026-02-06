@@ -8,8 +8,8 @@ test("Function declaration is visible in outer scope", async () => {
       (fn declaredFunc ((x)) x)
       (call declaredFunc 1))
   `, );
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /declaredFunc\(1\)/);
 });
 
@@ -19,7 +19,7 @@ test("NFE name is NOT visible in outer scope (should fail resolution)", async ()
       (let* ((f (fn nfeName ((x)) x)))
         (call nfeName 1)))
   `, );
-  if (result.errors.length > 0) { console.error(result.errors); }
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
 
   // Under current "hoisting" bug, this probably succeeds (errors.length === 0)
   // We want to asserting that it FAILS if fixed, or demonstrating it passes if broken.
@@ -41,7 +41,7 @@ test("NFE name IS visible inside function body", async () => {
                           (if n (fact 0) 1))))
         (call factorial 5)))
   `, );
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   // 'fact' should be resolved inside
 });

@@ -10,8 +10,8 @@ test("index signatures emit in classes and interfaces", async () => {
   (type-interface Bag
     (interface-body
       (index-signature (key (type-string)) (type-number)))))`);
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /class Box \{\s*\[key: string\]: number;/s);
   assert.match(result.tsSource, /interface Bag \{\s*\[key: string\]: number;/s);
 });

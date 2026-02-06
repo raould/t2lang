@@ -9,3 +9,5 @@ export { expand } from "./expander.js";
 export { gensym, resetGensym } from "./gensym.js";
 export { rewriteAssignments } from "./rewriter.js";
 export { lowerPhaseB } from "./lower.js";
+export { compile } from "./api.js";
+export type { CompilePhaseBConfig, CompilePhaseBResult } from "./api.js";

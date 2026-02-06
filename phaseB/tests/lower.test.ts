@@ -5,10 +5,23 @@ import { lowerPhaseB } from "../src/lower.js";
 import {
   AssignExpr,
   ExprStmt,
+  CallExpr,
   Identifier,
   LetStarExpr,
   Literal,
-} from "../../phaseA/dist/phaseA0.js";
+  ForClassic,
+  FunctionExpr,
+  PropExpr,
+  ReturnExpr,
+  ObjectExpr,
+  ArrayExpr,
+  SpreadExpr,
+  ArrayPattern,
+  RestPattern,
+  TypePrimitive,
+  TypeUnion,
+  TypeApp,
+} from "../../phaseA/dist/phaseA1.js";
 
 test("lowerPhaseB produces LetStarExpr for let bindings", () => {
   const [node] = parsePhaseBRaw("(let ((x : string 1)) x)", "lower-let.t2");
@@ -34,4 +47,181 @@ test("lowerPhaseB emits AssignExpr for assign forms", () => {
   assert.strictEqual(stmt.target.name, "foo");
   assert.ok(stmt.value instanceof Literal);
   assert.strictEqual(stmt.value.value, 42);
+});
+
+test("lowerPhaseB emits ForClassic for for forms", () => {
+  const [node] = parsePhaseBRaw("(for (; true null) (assign x 1))", "lower-for.test.t2");
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof ForClassic);
+  assert.ok(stmt instanceof ForClassic);
+  assert.ok(stmt.condition instanceof Literal);
+  assert.strictEqual(stmt.condition.value, true);
+  assert.ok(stmt.init instanceof ExprStmt);
+  assert.ok(stmt.init.expr instanceof Literal);
+  assert.strictEqual((stmt.init.expr as Literal).value, null);
+  assert.strictEqual(stmt.update, undefined);
+});
+
+test("lowerPhaseB emits FunctionExpr for method with identifier name", () => {
+  const [node] = parsePhaseBRaw("(method myMethod (x) (assign x 1))", "lower-method.test.t2");
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof FunctionExpr);
+  assert.ok(stmt instanceof FunctionExpr);
+  assert.strictEqual(stmt.callableKind, "method");
+  assert.strictEqual(stmt.methodName, "myMethod");
+});
+
+test("lowerPhaseB lowers prop expressions using identifier names to strings", () => {
+  const [node] = parsePhaseBRaw("(assign (prop console log) 42)", "lower-prop-string.test.t2");
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof AssignExpr) as AssignExpr | undefined;
+  assert.ok(stmt);
+  const target = stmt!.target;
+  assert.ok(target instanceof PropExpr);
+  const propTarget = target as PropExpr;
+  assert.strictEqual(propTarget.name, "log");
+  assert.ok(propTarget.object instanceof Identifier);
+  assert.strictEqual(propTarget.object.name, "console");
+});
+
+test("lowerPhaseB lowers method names built from identifiers to strings", () => {
+  const [node] = parsePhaseBRaw("(method proxy ((value)) (return value))", "lower-method-identifier.test.t2");
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof FunctionExpr) as FunctionExpr | undefined;
+  assert.ok(stmt);
+  assert.strictEqual(stmt?.methodName, "proxy");
+});
+
+test("lowerPhaseB emits ReturnExpr wrapping ObjectExpr", () => {
+  const [node] = parsePhaseBRaw(
+    "(program (return (object (\"number\" 42) (\"string\" \"alpha\"))))",
+    "lower-return-object.test.t2"
+  );
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof ReturnExpr);
+  assert.ok(stmt instanceof ReturnExpr);
+  assert.ok((stmt as ReturnExpr).value instanceof ObjectExpr);
+  const obj = (stmt as ReturnExpr).value as ObjectExpr;
+  assert.strictEqual(obj.fields.length, 2);
+  assert.strictEqual(obj.fields[0].key, "number");
+  assert.strictEqual(obj.fields[1].key, "string");
+});
+
+test("lowerPhaseB lowers array literals with spread entries", () => {
+  const [node] = parsePhaseBRaw("[1 ...xs 3]", "lower-array-spread.t2");
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof ExprStmt) as ExprStmt | undefined;
+  assert.ok(stmt);
+  assert.ok(stmt!.expr instanceof ArrayExpr);
+  const arrayExpr = stmt!.expr as ArrayExpr;
+  assert.strictEqual(arrayExpr.elements.length, 3);
+  assert.ok(arrayExpr.elements[1] instanceof SpreadExpr);
+  const spread = arrayExpr.elements[1] as SpreadExpr;
+  assert.ok(spread.expr instanceof Identifier);
+  assert.strictEqual(spread.expr.name, "xs");
+});
+
+test("lowerPhaseB lowers spread in call arguments", () => {
+  const [node] = parsePhaseBRaw("(call foo ...xs)", "lower-call-spread.t2");
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof ExprStmt) as ExprStmt | undefined;
+  assert.ok(stmt);
+  assert.ok(stmt!.expr instanceof CallExpr);
+  const call = stmt!.expr as CallExpr;
+  assert.ok(call.args[0] instanceof SpreadExpr);
+  const spread = call.args[0] as SpreadExpr;
+  assert.ok(spread.expr instanceof Identifier);
+  assert.strictEqual(spread.expr.name, "xs");
+});
+
+test("lowerPhaseB ignores comma separators in call arguments", () => {
+  const [node] = parsePhaseBRaw("(call foo 1, 2)", "lower-call-commas.t2");
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof ExprStmt) as ExprStmt | undefined;
+  assert.ok(stmt);
+  assert.ok(stmt!.expr instanceof CallExpr);
+  const call = stmt!.expr as CallExpr;
+  assert.strictEqual(call.args.length, 2);
+  assert.ok(call.args[0] instanceof Literal);
+  assert.ok(call.args[1] instanceof Literal);
+});
+
+test("lowerPhaseB lowers array-pattern rest bindings", () => {
+  const [node] = parsePhaseBRaw(
+    "(let (((array-pattern a (rest rest)) xs)) (return a))",
+    "lower-array-pattern-rest.t2"
+  );
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof LetStarExpr) as LetStarExpr | undefined;
+  assert.ok(stmt);
+  const binding = stmt!.bindings.find((entry) => entry.target instanceof ArrayPattern);
+  assert.ok(binding);
+  const pattern = binding!.target as ArrayPattern;
+  assert.strictEqual(pattern.elements.length, 1);
+  assert.ok(pattern.rest instanceof RestPattern);
+  const rest = pattern.rest as RestPattern;
+  assert.ok(rest.target instanceof Identifier);
+  assert.strictEqual(rest.target.name, "rest");
+});
+
+test("lowerPhaseB preserves async/generator flags", () => {
+  const [asyncNode] = parsePhaseBRaw("(fn async asyncCallable ((value)) (return value))", "lower-async.test.t2");
+  const asyncProgram = lowerPhaseB([asyncNode]);
+  const asyncStmt = asyncProgram.body.find((entry) => entry instanceof FunctionExpr);
+  assert.ok(asyncStmt instanceof FunctionExpr);
+  assert.strictEqual(asyncStmt.async, true);
+  assert.strictEqual(asyncStmt.name?.name, "asyncCallable");
+  assert.strictEqual(asyncStmt.signature.parameters[0].name.name, "value");
+
+  const [generatorNode] = parsePhaseBRaw("(fn generator generatorCallable ((value)) (return value))", "lower-generator.test.t2");
+  const generatorProgram = lowerPhaseB([generatorNode]);
+  const generatorStmt = generatorProgram.body.find((entry) => entry instanceof FunctionExpr);
+  assert.ok(generatorStmt instanceof FunctionExpr);
+  assert.strictEqual(generatorStmt.generator, true);
+  assert.strictEqual(generatorStmt.name?.name, "generatorCallable");
+});
+
+test("lowerPhaseB unwraps program wrappers", () => {
+  const [node] = parsePhaseBRaw("(program (assign foo 42))", "lower-program.test.t2");
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof AssignExpr);
+  assert.ok(stmt instanceof AssignExpr);
+});
+
+test("lowerPhaseB lowers primitive parameter annotations", () => {
+  const [node] = parsePhaseBRaw("(fn (x : Number) (return x))", "lower-param-primitive.t2");
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof FunctionExpr) as FunctionExpr | undefined;
+  assert.ok(stmt);
+  const param = stmt.signature.parameters[0];
+  assert.ok(param.typeAnnotation instanceof TypePrimitive);
+  assert.strictEqual(param.typeAnnotation.kind, "type-number");
+});
+
+test("lowerPhaseB lowers union parameter annotations", () => {
+  const [node] = parsePhaseBRaw("(fn (x : (Foo | Bar)) (return x))", "lower-param-union.t2");
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof FunctionExpr) as FunctionExpr | undefined;
+  assert.ok(stmt);
+  const param = stmt.signature.parameters[0];
+  assert.ok(param.typeAnnotation instanceof TypeUnion);
+});
+
+test("lowerPhaseB lowers generic parameter annotations", () => {
+  const [node] = parsePhaseBRaw("(fn (x : Foo<Bar>) (return x))", "lower-param-generic.t2");
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof FunctionExpr) as FunctionExpr | undefined;
+  assert.ok(stmt);
+  const param = stmt.signature.parameters[0];
+  assert.ok(param.typeAnnotation instanceof TypeApp);
+  assert.ok(param.typeAnnotation!.typeArgs.length > 0);
+});
+
+test("lowerPhaseB captures return type annotations", () => {
+  const [node] = parsePhaseBRaw("(fn (x) : Number (return x))", "lower-return-type.t2");
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof FunctionExpr) as FunctionExpr | undefined;
+  assert.ok(stmt);
+  assert.ok(stmt.signature.returnType instanceof TypePrimitive);
+  assert.strictEqual(stmt.signature.returnType.kind, "type-number");
 });

@@ -23,7 +23,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc --project tsconfig.json",
+    "build": "tsc --project ../common/tsconfig.json && tsc --project tsconfig.json",
     "clean": "npm run clean-examples; rimraf dist",
     "clean-examples": "rimraf --glob examples/**/*.ts",
     "test": "npm run build && node ./scripts/run-tests.mjs",

@@ -23,29 +23,47 @@ a.b.c
 
 ### Canonical Rewrite (Phase A)
 ```lisp
-(prop obj "prop")
-(call (prop obj "method") arg)
-(prop (prop a "b") "c")
+(prop obj prop)
+(call (prop obj method) arg)
+(prop (prop a b) c)
 ```
 
 ### Rules
 1.  **Dotted Atoms**: Identifiers containing dots (and no whitespace) are split.
-2.  **Method Calls**: A list `(obj.method args...)` transforms into `(call (prop obj "method") args...)`.
-3.  **Property Access**: A bare atom `obj.prop` transform into `(prop obj "prop")`.
+2.  **Method Calls**: A list `(obj.method args...)` transforms into `(call (prop obj method) args...)`.
+3.  **Property Access**: A bare atom `obj.prop` transform into `(prop obj prop)`.
 
 ## 2. Infix Operators [x]
 
-While Phase A requires prefix operators `(call + a b)`, Phase B aims to support infix expressions for common math and logic.
+- [ ] Phase B to support (infix (1 + 2 * 3))
+- [ ] Phase B to support :(1 + 2 * 3)
 
-### Sugar
+### Grammar
+
+```lisp
+(infix (1 + 2 * 3))
+(infix (x && y || z))
+```
+
 ```typescript
 (1 + 2 * 3)
 (x && y || z)
 ```
 
-### Canonical Rewrite
+### Sugar using leading-colon reader macro ".(<infix expression>)"
+
 ```lisp
+:(1 + 2 * 3)
+:(x && y || z)
+```
+
+### T2 Sugar Rewrite multiple steps in Phase B
+```lisp
+(+ 1 (* 2 3))
 (call + 1 (call * 2 3))
+```
+```lisp
+(|| (&& x y) z)
 (call || (call && x y) z)
 ```
 
@@ -55,10 +73,10 @@ While Phase A requires prefix operators `(call + a b)`, Phase B aims to support 
 
 ### Implementation
 
-- Phase B now rewrites lists that look like `operand operator operand …` into nested `(call <operator> …)` forms using the JavaScript precedence table shown below.
+- Phase B now rewrites `(infix (...))` forms (and the `:(...)` reader macro) into nested `(call <operator> …)` forms using the JavaScript precedence table shown below.
 - The rewrite lives in `phaseB/src/sugar.ts` and runs inside `applySugar`, so `lower.ts` only ever sees canonical `call` nodes and the corresponding operators are never touched again.
 - Supported operators include `+ - * / % << >> >>> < <= > >= in instanceof == != === !== & ^ | && || ??` (see the precedence table below for their ordering and associativity).
-- Regression coverage lives in `phaseB/tests/sugar.test.ts`, which asserts the addition rewrite plus precedence and logical chaining scenarios.
+- Regression coverage lives in `phaseB/tests/sugar-infix.test.ts`, which asserts the addition rewrite plus precedence and logical chaining scenarios.
 
 ## 3. Literal Shorthands [x]
 
@@ -77,6 +95,39 @@ Allowed to use implicit keys or shorthand syntax.
 (object
   ("name" name)
   ("age" 30))
+
+### Optional Keys
+Phase B supports `?` suffixes on object literal keys to conditionally include a property only when the value is not nil (null/undefined). This avoids the common JS pitfall where falsy values like `0`, `""`, and `false` get dropped.
+
+**Sugar**:
+```lisp
+{name "Alice" role? maybe-role age? maybe-age}
+```
+
+**Rewrite**:
+```lisp
+(object
+  ("name" "Alice")
+  (spread (if (!= maybe-role null) (object ("role" maybe-role)) (object)))
+  (spread (if (!= maybe-age null) (object ("age" maybe-age)) (object))))
+```
+
+**Optional punning**:
+```lisp
+{role? age?}
+```
+
+**Rewrite**:
+```lisp
+(object
+  (spread (if (!= role null) (object ("role" role)) (object)))
+  (spread (if (!= age null) (object ("age" age)) (object))))
+```
+
+**Notes**:
+- Uses `!= null` to match both `null` and `undefined`.
+- Falsy values like `0`, `""`, and `false` are included.
+- Multiple optional keys compile to multiple spreads in order of appearance.
 ```
 
 ### Array Literals
@@ -154,8 +205,8 @@ Phase A strictly requires `let*` and `const*` with specific nesting. Phase B all
 **Rewrite**:
 ```lisp
 (assign x 10)
-(assign (prop obj "prop") 20)
-(assign (prop obj "prop") 20)
+(assign (prop obj prop) 20)
+(assign (prop obj prop) 20)
 ```
 
 ## 6. Function Definitions [x]
@@ -186,7 +237,7 @@ See [phaseB/ERRORS.md](phaseB/ERRORS.md) for the diagnostics Surface B surfaces 
 (let* ((tmp obj))
   (if (== tmp null)
       undefined
-      (prop tmp "prop")))
+      (prop tmp prop)))
 ```
 
 **Method call** `obj?.method(args...)`:
@@ -194,7 +245,7 @@ See [phaseB/ERRORS.md](phaseB/ERRORS.md) for the diagnostics Surface B surfaces 
 (let* ((tmp obj))
   (if (== tmp null)
       undefined
-      ((prop tmp "method") args...)))
+      ((prop tmp method) args...)))
 ```
 
 **Callable check** `expr?.(args...)`:
@@ -215,9 +266,9 @@ When the callable target is a method access (e.g., `obj.method?.(a, b)`), the re
 **Rewrite:**
 ```lisp
 (let* ((tmp-obj obj)
-       (tmp-fn (prop tmp-obj "method")))
+     (tmp-fn (prop tmp-obj method)))
   (if (== tmp-fn null)
-      undefined
+    undefined
       (call-with-this tmp-fn tmp-obj a b)))
 ```
 
@@ -332,4 +383,32 @@ Phase B parses TypeScript-style type annotations and rewrites them to the struct
 - Precedence in TypeScript, JavaScript, ECMAScript must bes tested. We need to build extensive tests that have JavaScript tests being compard with T2 versions thereof to assert that T2 is not genrating incorrect output. This means generating many small tests in javascript which try to cover precedence + evaluation order + short-circuiting with high sensitivity. Then create a T2 version of the same test. Run the matched .js and .t2 pair and assert the output is the same. (Unfortunately it is a bit of a combinatorial explosion.)
   - [ ] validate the t2lang precedence implementation matches EVALUATION_PRECEDENCE.json
   - [ ] implement fully parenthasized type-level precedence. See TYPE_PRECEDENCE.md
+
+  ## 11. Template interpolation macro [x]
+
+  Phase B provides a built-in macro-like sugar, `template-with`, to interpolate fixed values into a template string. It parses `${key}` placeholders inside a string literal and replaces them with values supplied as key/value pairs.
+
+  **Sugar:**
+  ```lisp
+  (template-with "Hello ${name}, age ${age}!"
+    (name "Ada")
+    (age 42))
+  ```
+
+  **Rewrite (conceptual):**
+  ```lisp
+  (call
+    (lambda (tmpl_1 tmpl_2)
+      (return
+        (template "Hello " tmpl_1 ", age " tmpl_2 "!")))
+    "Ada"
+    42)
+  ```
+
+  **Rules:**
+  - The first argument must be a string literal.
+  - Each following argument must be a `(key value)` pair.
+  - Placeholders are identifiers only (`${name}`), not expressions.
+  - Values must be literals (strings, numbers, booleans, or null).
+  - The expansion wraps the template in an IIFE, and parameters use `gensym` to avoid collisions.
 

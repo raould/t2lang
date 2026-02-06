@@ -12,6 +12,6 @@ test("type assertions do not emit errors yet", async () => {
       (type-assert 123 (type-boolean)))
   `, );
 
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
 });

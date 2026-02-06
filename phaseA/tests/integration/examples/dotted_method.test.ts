@@ -24,8 +24,8 @@ test('dotted method invocation emits method call', async () => {
     )
   `;
   const result = await compile(src, );
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   // Expect the emitted JS/TS to call the method, not pass it as a value
   assert.match(result.tsSource, /console\.log\(person\.getFullName\(\)\)/);
 });

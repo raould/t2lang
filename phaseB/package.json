@@ -21,19 +21,21 @@
     "dist"
   ],
   "scripts": {
-      "build": "npm --prefix ../phaseA run build; tsc --project tsconfig.json",
-      "clean": "rimraf dist",
-      "test": "npm run build; node ./scripts/run-tests.mjs",
-      "lint": "ESLINT_USE_FLAT_CONFIG=true eslint --ignore-pattern 'dist/**' --ignore-pattern 'node_modules/**' . --ext .ts",
-      "phaseb": "tsx ./src/cli.ts"
+    "build": "npm --prefix ../phaseA run build; tsc --project tsconfig.json",
+    "clean": "rimraf dist",
+    "test": "npm run build && node ./scripts/run-tests.mjs",
+    "lint": "ESLINT_USE_FLAT_CONFIG=true eslint --ignore-pattern 'dist/**' --ignore-pattern 'node_modules/**' . --ext .ts",
+    "phaseb": "tsx ./src/cli.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "commander": "^11.1.0",
     "eslint": "^9.0.0",
     "globals": "^15.0.0",
+    "lodash": "^4.17.23",
     "prettier": "^3.8.0",
     "rimraf": "^6.1.2",
     "tsx": "^4.21.0",

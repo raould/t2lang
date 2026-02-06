@@ -11,58 +11,58 @@ test("basic parse: call", async () => {
     dumpAst: false,
   });
 
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /foo\(42\)/);
 });
 
 test("parse import-default", async () => {
   const source = `(program (import (import-spec "bar" (default foo))))`;
 
-  const result = await compile(source, { enableTsc: false, dumpAst: false });
+  const result = await compile(source, { dumpAst: false });
 
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /import foo from "bar";/);
 });
 
 test("parse import-named", async () => {
   const source = `(program (import (import-spec "bar" (named (a b) c))))`;
 
-  const result = await compile(source, { enableTsc: false, dumpAst: false });
+  const result = await compile(source, { dumpAst: false });
 
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /import \{ a as b, c \} from "bar";/);
 });
 
 test("parse import-all", async () => {
   const source = `(program (import (import-spec "bar" (namespace foo))))`;
 
-  const result = await compile(source, { enableTsc: false, dumpAst: false });
+  const result = await compile(source, { dumpAst: false });
 
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /import \* as foo from "bar";/);
 });
 
 test("parse export named", async () => {
   const source = `(program (export (export-spec (named foo))))`;
 
-  const result = await compile(source, { enableTsc: false, dumpAst: false });
+  const result = await compile(source, { dumpAst: false });
 
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /export \{ foo \};/);
 });
 
 test("parse export-default", async () => {
   const source = `(program (export (export-spec (default 42))))`;
 
-  const result = await compile(source, { enableTsc: false, dumpAst: false });
+  const result = await compile(source, { dumpAst: false });
 
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /export default 42;/);
 });
 
@@ -74,8 +74,8 @@ test("identifier location uses start position", async () => {
   `;
 
   const result = await compile(source, );
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
 
   const astDump = result.events.find(e => e.kind === "astDump");
   const ast = (astDump?.data as { ast: Program })?.ast;

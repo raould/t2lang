@@ -3,10 +3,16 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { ParseError, parsePhaseBRaw } from "./reader.js";
-import type { PhaseBNode, ReaderErrorCode } from "./reader.js";
+import { Command, CommanderError, Option } from "commander";
+import { ParseError } from "./reader.js";
+import type { ReaderErrorCode } from "./reader.js";
 import type { SourceLoc } from "./location.js";
-import { compilePhaseA0 } from "../../phaseA/dist/api.js";
+import { compile } from "./api.js";
+import type {
+  SnapshotRecord,
+  Diagnostic as PhaseADiagnostic,
+  Span as PhaseASpan,
+} from "../../phaseA/dist/api.js";
 import {
   DEFAULT_ERROR_FORMAT,
   Diagnostic,
@@ -24,277 +30,171 @@ import {
   EventSeverity,
   isEventSeverity,
 } from "../../phaseA/dist/events.js";
-import { lowerPhaseB } from "./lower.js";
 
-const CLI_NAME = "t2b";
 const VALID_LOG_PHASES: CompilerStage[] = ["parse", "resolve", "typecheck", "codegen"];
 const VALID_PRETTY_OPTIONS = ["pretty", "ugly"] as const;
 
 type PrettyOption = (typeof VALID_PRETTY_OPTIONS)[number];
 
-interface CliArgs {
-  inputPath?: string;
-  format: ErrorFormat;
-  showHelp: boolean;
-  color: boolean;
+interface CliOptions {
   output?: string;
-  stdout: boolean;
-  seed: string;
-  prettyOption: PrettyOption;
-  log: boolean;
-  logLevel: EventSeverity;
-  logPhases: string[];
-  trace: boolean;
-  tracePhases: string[];
-  dumpAst: boolean;
+  stdout?: boolean;
+  log?: boolean;
+  logPhases?: string[];
+  seed?: string;
+  prettyOption?: PrettyOption;
+  logLevel?: "debug" | "info" | "warn" | "error";
+  trace?: boolean;
+  tracePhases?: string[];
+  dumpAst?: boolean;
+  errorFormat?: string;
+  color?: boolean;
+  noColor?: boolean;
 }
 
-class CliError extends Error {}
-
 export async function main(argv: string[]): Promise<void> {
+  const cmd = buildCommand();
   try {
-    const args = parseArguments(argv);
-    if (args.showHelp) {
-      printHelp();
-      return;
-    }
-
-    if (!args.inputPath) {
-      printHelp();
-      process.exitCode = 1;
-      return;
-    }
-
-    const { source, actualPath } = await readSource(args.inputPath);
-    let parsedNodes: PhaseBNode[] = [];
-    try {
-      parsedNodes = parsePhaseBRaw(source, actualPath);
-    } catch (error) {
-      handleParserFailure(error, args.format, {
-        sourceMap: { [actualPath]: source },
-        useColor: args.color,
-      });
-      return;
-    }
-
-    const normalizedProgram = lowerPhaseB(parsedNodes);
-    if (args.dumpAst) {
-      console.error("Normalized Phase A AST:");
-      console.error(JSON.stringify(normalizedProgram, stringifyFilter, 2));
-    }
-
-    const isStdin = actualPath === "<stdin>";
-    const writeStdout = args.stdout || isStdin;
-    const sourcePath = actualPath;
-    const prettyOption = args.prettyOption;
-    const compilerStamp = await loadCompilerStamp();
-    const compilerContext = {
-      events: new ArrayEventSink(),
-      seed: args.seed,
-      stamp: compilerStamp,
-      logLevel: args.logLevel,
-    };
-
-    const diagContext: DiagnosticContext = {
-      sourceMap: { [sourcePath]: source },
-      useColor: args.color,
-    };
-
-    const result = await compilePhaseA0(source, {
-      sourcePath,
-      seed: args.seed,
-      prettyOption,
-      logLevel: args.logLevel,
-      compilerContext,
-    });
-
-    const normalizedDiagnostics = normalizePhaseADiagnostics(result.diagnostics);
-    if (normalizedDiagnostics.length > 0) {
-      console.error("Compilation produced diagnostics:");
-      console.error(formatDiagnostics(normalizedDiagnostics, args.format, diagContext));
-      process.exitCode = 1;
-      return;
-    }
-
-    const target = args.output ?? (isStdin ? "stdout.ts" : getDefaultOutput(args.inputPath));
-    if (writeStdout) {
-      console.log(result.tsSource);
-    } else {
-      await fs.mkdir(path.dirname(target), { recursive: true });
-      await fs.writeFile(target, result.tsSource, "utf8");
-      console.error(`Compiled ${args.inputPath} -> ${target}`);
-    }
-
-    const logPhases = new Set<string>(args.logPhases);
-    if (args.log) {
-      logPhases.add("all");
-    }
-    const tracePhases = new Set<string>(args.tracePhases);
-    if (args.trace) {
-      tracePhases.add("all");
-    }
-
-    for (const event of result.events) {
-      logEvent(event, logPhases, args.logLevel);
-      await logTraceEvent(event, tracePhases, args.logLevel);
-    }
+    await cmd.parseAsync(argv);
   } catch (error) {
-    if (error instanceof CliError) {
-      console.error(error.message);
-      printHelp();
-      process.exitCode = 1;
+    if (error instanceof CommanderError) {
+      const commanderError = error as CommanderError;
+      if (commanderError.code !== "commander.helpDisplayed") {
+        console.error(commanderError.message);
+      }
       return;
     }
     throw error;
   }
-}
 
-function parseArguments(argv: string[]): CliArgs {
-  let format: ErrorFormat = DEFAULT_ERROR_FORMAT;
-  let inputPath: string | undefined;
-  let showHelp = false;
-  let color = true;
-  let output: string | undefined;
-  let stdout = false;
-  let seed = "default";
-  let prettyOption: PrettyOption = "pretty";
-  let log = false;
-  let logLevel: EventSeverity = "info";
-  const logPhases: string[] = [];
-  let trace = false;
-  let dumpAst = false;
-  const tracePhases: string[] = [];
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === "-h" || arg === "--help") {
-      showHelp = true;
-      break;
-    }
-    if (arg === "--error-format") {
-      const next = argv[++index];
-      if (!next) {
-        throw new CliError("--error-format requires a value");
-      }
-      const parsed = parseErrorFormat(next);
-      if (!parsed) {
-        throw new CliError(`Unknown error format '${next}'`);
-      }
-      format = parsed;
-      continue;
-    }
-    if (arg.startsWith("--error-format=")) {
-      const [, supplied] = arg.split("=", 2);
-      const parsed = parseErrorFormat(supplied);
-      if (!parsed) {
-        throw new CliError(`Unknown error format '${supplied}'`);
-      }
-      format = parsed;
-      continue;
-    }
-    if (arg === "--color") {
-      color = true;
-      continue;
-    }
-    if (arg === "--no-color") {
-      color = false;
-      continue;
-    }
-    if (arg === "--output") {
-      const next = argv[++index];
-      if (!next) {
-        throw new CliError("--output requires a path");
-      }
-      output = next;
-      continue;
-    }
-    if (arg === "--stdout") {
-      stdout = true;
-      continue;
-    }
-    if (arg === "--seed") {
-      const next = argv[++index];
-      if (!next) {
-        throw new CliError("--seed requires a value");
-      }
-      seed = next;
-      continue;
-    }
-    if (arg === "--pretty-option") {
-      const next = argv[++index];
-      if (!next) {
-        throw new CliError("--pretty-option requires either 'pretty' or 'ugly'");
-      }
-      if (!VALID_PRETTY_OPTIONS.includes(next as PrettyOption)) {
-        throw new CliError(`Unknown pretty option '${next}'`);
-      }
-      prettyOption = next as PrettyOption;
-      continue;
-    }
-    if (arg === "--log") {
-      log = true;
-      continue;
-    }
-    if (arg === "--log-level") {
-      const next = argv[++index];
-      if (!next) {
-        throw new CliError("--log-level requires a value");
-      }
-      if (!isEventSeverity(next)) {
-        throw new CliError(`Unknown log level '${next}'`);
-      }
-      logLevel = next;
-      continue;
-    }
-    if (arg === "--log-phases") {
-      const next = argv[++index];
-      if (!next) {
-        throw new CliError("--log-phases requires at least one phase");
-      }
-      logPhases.push(...parsePhaseList(next));
-      continue;
-    }
-    if (arg === "--trace") {
-      trace = true;
-      continue;
-    }
-    if (arg === "--trace-phases") {
-      const next = argv[++index];
-      if (!next) {
-        throw new CliError("--trace-phases requires at least one phase");
-      }
-      tracePhases.push(...parsePhaseList(next));
-      continue;
-    }
-    if (arg === "--dump-ast") {
-      dumpAst = true;
-      continue;
-    }
-    if (arg.startsWith("-")) {
-      throw new CliError(`Unknown option '${arg}'`);
-    }
-    if (inputPath) {
-      throw new CliError("Multiple input paths are not supported");
-    }
-    inputPath = arg;
+  const options = cmd.opts<CliOptions>();
+  const formatArg = options.errorFormat ?? DEFAULT_ERROR_FORMAT;
+  const format = parseErrorFormat(formatArg);
+  if (!format) {
+    throw new CommanderError(1, "error-format", `Unknown error format '${formatArg}'`);
   }
 
-  return {
-    inputPath,
-    format,
-    showHelp,
-    color,
-    output,
-    stdout,
+  const useColor = options.noColor ? false : options.color ?? true;
+  const inputPath = cmd.args[0];
+  if (!inputPath) {
+    console.error("Error: No input file specified (use '-' for stdin)");
+    process.exitCode = 1;
+    return;
+  }
+
+  const logPhases = new Set<string>(options.logPhases ?? []);
+  if (options.log) {
+    logPhases.add("all");
+  }
+  const logLevel = options.logLevel ?? "info";
+  const tracePhases = new Set<string>(options.tracePhases ?? []);
+  if (options.trace) {
+    tracePhases.add("all");
+  }
+
+  const { source, actualPath } = await readSource(inputPath);
+  const isStdin = actualPath === "<stdin>";
+  let writeStdout = Boolean(options.stdout) || isStdin;
+  if (options.output === "-") {
+    writeStdout = true;
+  }
+
+  const sourcePath = actualPath;
+  const prettyOption = options.prettyOption ?? "pretty";
+  const compilerStamp = await loadCompilerStamp();
+  const seed = options.seed ?? "default";
+  const compilerContext = {
+    events: new ArrayEventSink(),
     seed,
-    prettyOption,
-    log,
+    stamp: compilerStamp,
     logLevel,
-    logPhases,
-    trace,
-    tracePhases,
-    dumpAst,
   };
+
+  const diagContext: DiagnosticContext = {
+    sourceMap: { [sourcePath]: source },
+    useColor,
+  };
+
+  let result: Awaited<ReturnType<typeof compile>>;
+  try {
+    result = await compile(source, {
+      sourcePath,
+      seed,
+      prettyOption,
+      logLevel,
+      compilerContext,
+    });
+  } catch (error) {
+    handleParserFailure(error, format, {
+      sourceMap: { [actualPath]: source },
+      useColor,
+    });
+    return;
+  }
+
+  if (options.dumpAst) {
+    console.error("Normalized Phase A AST:");
+    console.error(JSON.stringify(result.phaseAProgram, stringifyFilter, 2));
+  }
+
+  const normalizedDiagnostics = normalizePhaseADiagnostics(result.diagnostics);
+  if (normalizedDiagnostics.length > 0) {
+    console.error("Compilation produced diagnostics:");
+    console.error(formatDiagnostics(normalizedDiagnostics, format, diagContext));
+    process.exitCode = 1;
+    return;
+  }
+
+  const target = options.output ?? (isStdin ? "stdout.ts" : getDefaultOutput(inputPath));
+  if (writeStdout) {
+    console.log(result.tsSource);
+  } else {
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, result.tsSource, "utf8");
+    console.error(`Compiled ${inputPath} -> ${target}`);
+  }
+
+  for (const event of result.events) {
+    logEvent(event, logPhases, logLevel);
+    await logTraceEvent(event, tracePhases, logLevel);
+  }
+}
+
+function buildCommand(): Command {
+  const cmd = new Command();
+  cmd
+    .name("t2b")
+    .description("Phase B t2 compiler")
+    .argument("<input>", "Input .t2 file path (use '-' for stdin)")
+    .option("-o, --output <path>", "Output file path")
+    .option("--stdout", "Write output to stdout")
+    .option("--seed <seed>", "Deterministic seed value", "default")
+    .addOption(new Option("--pretty-option <style>", "Format output").default("pretty").choices([...VALID_PRETTY_OPTIONS]))
+    .addOption(
+      new Option("--log-level <level>", "Log verbosity")
+        .default("info")
+        .choices(["debug", "info", "warn", "error"])
+    )
+    .option("--log", "Show log events for every phase")
+    .option(
+      "--log-phases <phases>",
+      "Comma-separated list of logged phases (parse, resolve, typecheck, codegen)",
+      parsePhaseList,
+      [] as string[]
+    )
+    .option("--trace", "Show trace events for every phase")
+    .option(
+      "--trace-phases <phases>",
+      "Comma-separated list of traced phases (parse, resolve, typecheck, codegen)",
+      parsePhaseList,
+      [] as string[]
+    )
+    .option("--dump-ast", "Print the Phase A AST (after sugar/macro expansion)", false)
+    .option("--error-format <format>", "Choose diagnostic output (tty, short, json)", DEFAULT_ERROR_FORMAT)
+    .option("--color", "Force colored diagnostic output")
+    .option("--no-color", "Disable diagnostic coloring")
+    .allowUnknownOption(false);
+  return cmd;
 }
 
 function parsePhaseList(value: string): string[] {
@@ -303,33 +203,14 @@ function parsePhaseList(value: string): string[] {
     .map((p) => p.trim())
     .filter(Boolean);
   if (phases.length === 0) {
-    throw new CliError("At least one phase must be specified");
+    throw new CommanderError(1, "log-phases", "--log-phases requires at least one phase");
   }
   for (const phase of phases) {
     if (!VALID_LOG_PHASES.includes(phase as CompilerStage)) {
-      throw new CliError(`Unknown phase '${phase}'`);
+      throw new CommanderError(1, "log-phases", `Unknown log phase '${phase}'`);
     }
   }
   return phases;
-}
-
-function printHelp(): void {
-  console.log(`Usage: ${CLI_NAME} [options] <input>
-\nOptions:
-  --error-format <format>  Choose diagnostic output (tty, short, json); defaults to ${DEFAULT_ERROR_FORMAT}
-  --color                  Force colored diagnostic output (default)
-  --no-color               Disable diagnostic coloring
-  --output <path>          Write TypeScript output to a file
-  --stdout                 Always print TypeScript to stdout
-  --dump-ast               Print the Phase B AST (after sugar/macro expansion) to stderr
-  --seed <value>           Deterministic seed value for compilation (default: 'default')
-  --pretty-option <style>  Format output (pretty|ugly) (default: pretty)
-  --log                    Emit compiler events as log messages
-  --log-level <level>      Set the minimum severity for emitted logs (debug, info, warn, error)
-  --log-phases <phases>    Comma-separated phases to include in logs
-  --trace                  Emit trace events and dump Phase A snapshots
-  --trace-phases <phases>  Comma-separated phases to include in traces
-  -h, --help               Show this help message`);
 }
 
 async function readSource(inputPath: string): Promise<{ source: string; actualPath: string }> {
@@ -367,26 +248,6 @@ function handleParserFailure(error: unknown, format: ErrorFormat, context: Diagn
 function getDefaultOutput(input: string): string {
   const parsed = path.parse(input);
   return path.join(parsed.dir, `${parsed.name}.ts`);
-}
-
-interface PhaseASpan {
-  source: string;
-  startLine?: number;
-  startColumn?: number;
-  endLine?: number;
-  endColumn?: number;
-}
-
-interface PhaseADiagnostic {
-  message: string;
-  span: PhaseASpan;
-  code?: string;
-  stage?: CompilerStage;
-}
-
-interface SnapshotEventData {
-  stage?: CompilerStage;
-  program?: () => Promise<unknown>;
 }
 
 function normalizePhaseADiagnostics(diags: PhaseADiagnostic[]): Diagnostic[] {
@@ -450,7 +311,7 @@ async function logTraceEvent(event: CompilerEvent, phases: Set<string>, level: E
     if (!snapshotData || typeof snapshotData !== "object") {
       return;
     }
-    const snapshot = snapshotData as SnapshotEventData;
+    const snapshot = snapshotData as SnapshotRecord;
     if (typeof snapshot.program !== "function") {
       return;
     }
@@ -579,7 +440,7 @@ async function findFileAbove(start: string, name: string): Promise<string | null
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main(process.argv.slice(2)).catch((error) => {
+  main(process.argv).catch((error) => {
     console.error(error);
     process.exitCode = 1;
   });

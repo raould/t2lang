@@ -20,6 +20,13 @@ cd OLD; npm i && npm run demo
 
 ## notes
 
+* Even though T2 already "threw one away," it really needs to do that again.
+* This implementation is, if I am lucky, akin to a dog that can play chess, albeit badly.
+* Warning: the syntax is hardly ideal. E.g. commas are often unexpected.
+* Warning: the syntax is arbitrarily hewing one way or another.
+  * more sexpry: let/let*, const/const* scope and set! inside that scope, rather than e.g. top-level procedural a la typescript.
+  * more typescripty: actually most things are left like typescript, if only because the ecosystem already is too complected.
+  * a mish-mash: you really want to use let* not let.
 * This repo works best in a GNU/Linux environment.
 * It might work on MacOS, or it might have some issues.
 * It might work on Microsoft Windows, or it might have some issues.
@@ -32,6 +39,8 @@ cd OLD; npm i && npm run demo
 * Error message are very hard to do well.
 * Not having a proper AST API for TypeScript sucks.
 * Syntax is hell.
+* Sugar is hell.
+* Sexprs really are genius, even if slightly unergonomic.
 
 ## divergances
 

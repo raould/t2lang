@@ -14,6 +14,56 @@ import type { SourceLoc } from "./location.js";
 import { gensym } from "./gensym.js";
 import { parseTypeExpression, TypeAst } from "./typeExpr.js";
 import { collectAnnotationSegment, mergeLocs, serializePhaseBNode } from "./typeAnnotationUtils.js";
+import { reportError } from "../../common/dist/errorRegistry.js";
+
+const NON_CALL_FORMS = new Set([
+  "program",
+  "fn",
+  "lambda",
+  "method",
+  "getter",
+  "setter",
+  "let",
+  "let*",
+  "const",
+  "const*",
+  "if",
+  "when",
+  "for",
+  "while",
+  "switch",
+  "try",
+  "throw",
+  "return",
+  "class",
+  "type-assert",
+  "type-app",
+  "type-alias",
+  "interface",
+  "enum",
+  "namespace",
+  "import",
+  "export",
+  "await",
+  "yield",
+  "yield*",
+  "break",
+  "continue",
+  "object",
+  "array",
+  "prop",
+  "index",
+  "new",
+  "assign",
+  "ternary",
+  "defmacro",
+  "macro",
+  "quote",
+  "quasiquote",
+  "unquote",
+  "unquote-splicing",
+  "infix",
+]);
 
 export function applySugar(nodes: PhaseBNode[]): PhaseBNode[] {
   return nodes.map(rewriteNode);
@@ -33,6 +83,29 @@ function rewriteNode(node: PhaseBNode): PhaseBNode {
 function rewriteList(node: PhaseBListNode): PhaseBNode {
   if (node.delimiter === "[") {
     return rewriteList(createArrayLiteral(node));
+  }
+  if (node.delimiter === "{") {
+    const head = node.elements[0];
+    if (!head || head.phaseKind !== "symbol" || (head as SymbolNode).name !== "object") {
+      return rewriteList(createObjectLiteral(node));
+    }
+  }
+
+  const templateRewrite = rewriteTemplateWith(node);
+  if (templateRewrite) {
+    return rewriteNode(templateRewrite);
+  }
+
+  validateNoKeywordArgs(node);
+
+  const booleanAliasRewrite = rewriteBooleanAliases(node);
+  if (booleanAliasRewrite) {
+    return rewriteNode(booleanAliasRewrite);
+  }
+
+  const mutationRewrite = rewriteMutationConvention(node);
+  if (mutationRewrite) {
+    return rewriteNode(mutationRewrite);
   }
 
   const computedAccess = rewriteComputedAccess(node);
@@ -56,13 +129,22 @@ function rewriteList(node: PhaseBListNode): PhaseBNode {
     elements[1] = rewriteLetBindings(elements[1] as PhaseBListNode);
   }
   if (head && isSymbol(head, "object")) {
-    elements = rewriteObjectFields(elements);
+    elements = rewriteObjectFields(elements, node.delimiter === "{");
+    const objectNode: PhaseBListNode = { ...node, elements };
+    const optionalRewrite = rewriteOptionalObject(objectNode);
+    if (optionalRewrite) {
+      return rewriteNode(optionalRewrite);
+    }
+  }
+
+  const infixRewritten = rewriteInfixForm(node);
+  if (infixRewritten) {
+    return rewriteNode(infixRewritten);
   }
 
   const rewrittenElements = elements.map(rewriteNode);
   const rewrittenList: PhaseBListNode = { ...node, elements: rewrittenElements };
-  const infixRewritten = rewriteInfixExpression(rewrittenList);
-  const baseList = infixRewritten ?? rewrittenList;
+  const baseList = rewrittenList;
   if (baseList.phaseKind !== "list") {
     return baseList;
   }
@@ -71,15 +153,236 @@ function rewriteList(node: PhaseBListNode): PhaseBNode {
   return optionalPropRewritten ?? listNode;
 }
 
+const TEMPLATE_PLACEHOLDER = /^[A-Za-z_][A-Za-z0-9_-]*$/;
+
+function rewriteTemplateWith(node: PhaseBListNode): PhaseBNode | null {
+  const head = node.elements[0];
+  if (!head || !isSymbol(head, "template-with")) {
+    return null;
+  }
+  const templateNode = node.elements[1];
+  if (!templateNode || !isStringLiteral(templateNode)) {
+    throw reportError("T2:0313");
+  }
+  const templateText = (templateNode as PhaseBLiteralNode).value;
+  const keySymbols = new Map<string, PhaseBSymbolNode>();
+  const params: PhaseBNode[] = [];
+  const args: PhaseBNode[] = [];
+
+  for (const pair of node.elements.slice(2)) {
+    if (pair.phaseKind !== "list") {
+      throw reportError("T2:0314");
+    }
+    const pairList = pair as PhaseBListNode;
+    if (pairList.elements.length !== 2) {
+      throw reportError("T2:0314");
+    }
+    const keyName = extractTemplateKey(pairList.elements[0]);
+    if (!keyName) {
+      throw reportError("T2:0314");
+    }
+    if (keySymbols.has(keyName)) {
+      throw reportError("T2:0319", { key: keyName });
+    }
+    const valueNode = pairList.elements[1];
+    if (!isLiteralNode(valueNode)) {
+      throw reportError("T2:0315");
+    }
+    const paramSymbol = createPhaseBSymbol(gensym("tmpl_"), pairList.loc);
+    keySymbols.set(keyName, paramSymbol);
+    params.push(wrapFunctionParam(paramSymbol));
+    args.push(clonePhaseBNode(valueNode));
+  }
+
+  const parts = buildTemplateParts(templateText, templateNode.loc, keySymbols);
+  const templateList = createPhaseBList([createPhaseBSymbol("template", node.loc), ...parts], node.loc);
+  const returnList = createPhaseBList([createPhaseBSymbol("return", node.loc), templateList], node.loc);
+  const signatureList = createPhaseBList(params, node.loc);
+  const lambdaList = createPhaseBList([createPhaseBSymbol("lambda", node.loc), signatureList, returnList], node.loc);
+  return createPhaseBList([createPhaseBSymbol("call", node.loc), lambdaList, ...args], node.loc);
+}
+
+function extractTemplateKey(node: PhaseBNode): string | null {
+  if (node.phaseKind === "symbol") {
+    return (node as SymbolNode).name;
+  }
+  if (node.phaseKind === "literal" && typeof (node as PhaseBLiteralNode).value === "string") {
+    return (node as PhaseBLiteralNode).value;
+  }
+  return null;
+}
+
+function isLiteralNode(node: PhaseBNode): node is LiteralNode & PhaseBNodeBase & { phaseKind: "literal" } {
+  return node.phaseKind === "literal";
+}
+
+function buildTemplateParts(
+  template: string,
+  loc: SourceLoc,
+  keySymbols: Map<string, PhaseBSymbolNode>
+): PhaseBNode[] {
+  const parts: PhaseBNode[] = [];
+  let cursor = 0;
+  while (cursor < template.length) {
+    const start = template.indexOf("${", cursor);
+    if (start < 0) {
+      const tail = template.slice(cursor);
+      if (tail.length > 0) {
+        parts.push(createStringLiteral(tail, loc));
+      }
+      break;
+    }
+    const prefix = template.slice(cursor, start);
+    if (prefix.length > 0) {
+      parts.push(createStringLiteral(prefix, loc));
+    }
+    const end = template.indexOf("}", start + 2);
+    if (end < 0) {
+      throw reportError("T2:0318");
+    }
+    const placeholder = template.slice(start + 2, end).trim();
+    if (!TEMPLATE_PLACEHOLDER.test(placeholder)) {
+      throw reportError("T2:0317", { placeholder });
+    }
+    const symbol = keySymbols.get(placeholder);
+    if (!symbol) {
+      throw reportError("T2:0316", { key: placeholder });
+    }
+    parts.push(clonePhaseBNode(symbol));
+    cursor = end + 1;
+  }
+  return parts;
+}
+
+function validateNoKeywordArgs(node: PhaseBListNode): void {
+  if (node.delimiter !== "(") {
+    return;
+  }
+  const head = node.elements[0];
+  if (!head || head.phaseKind !== "symbol") {
+    return;
+  }
+  const headName = (head as SymbolNode).name;
+  if (NON_CALL_FORMS.has(headName)) {
+    if (headName === "call" || headName === "call-with-this") {
+      // These are still calls, so validate their argument list.
+    } else {
+      return;
+    }
+  }
+  const startIndex = headName === "call" ? 2 : headName === "call-with-this" ? 3 : 1;
+  for (let i = startIndex; i < node.elements.length; i += 1) {
+    const entry = node.elements[i];
+    if (entry?.phaseKind === "symbol") {
+      const symbolName = (entry as SymbolNode).name;
+        if (symbolName !== ":" && symbolName.endsWith(":")) {
+          throw reportError("T2:0203");
+      }
+    }
+  }
+}
+
+function rewriteBooleanAliases(node: PhaseBListNode): PhaseBNode | null {
+  const head = node.elements[0];
+  if (!head || head.phaseKind !== "symbol") {
+    return null;
+  }
+  const name = (head as SymbolNode).name;
+  if (name !== "and" && name !== "or" && name !== "not") {
+    return null;
+  }
+  const args = node.elements.slice(1).map(rewriteNode);
+  if (name === "not") {
+    if (args.length !== 1) {
+      throw reportError("T2:0322");
+    }
+    const op = createPhaseBSymbol("!", node.loc);
+    return createPhaseBList([createPhaseBSymbol("call", node.loc), op, args[0]], node.loc);
+  }
+  if (args.length === 0) {
+    throw reportError("T2:0323", { operator: name });
+  }
+  const op = createPhaseBSymbol(name === "and" ? "&&" : "||", node.loc);
+  return createPhaseBList([createPhaseBSymbol("call", node.loc), op, ...args], node.loc);
+}
+
+const MUTATION_CONVENTION_ALIASES: Record<string, string> = {
+  "set-in": "__t2_setIn",
+  "set-in!": "__t2_setInMut",
+  "update-in": "__t2_updateIn",
+  "update-in!": "__t2_updateInMut",
+  "merge": "__t2_merge",
+  "merge!": "__t2_mergeMut",
+  "set": "__t2_set",
+  "push": "__t2_push",
+  "push!": "__t2_pushMut",
+  "pop": "__t2_pop",
+  "pop!": "__t2_popMut",
+  "sort-by": "__t2_sortBy",
+  "sort-by!": "__t2_sortByMut",
+  "reverse": "__t2_reverse",
+  "reverse!": "__t2_reverseMut",
+  "delete": "__t2_delete",
+  "delete!": "__t2_deleteMut",
+};
+
+function rewriteMutationConvention(node: PhaseBListNode): PhaseBNode | null {
+  const head = node.elements[0];
+  if (!head || head.phaseKind !== "symbol") {
+    return null;
+  }
+  const headSymbol = head as SymbolNode;
+  if (headSymbol.name === "call") {
+    const callee = node.elements[1];
+    if (!callee || callee.phaseKind !== "symbol") {
+      return null;
+    }
+    const calleeSymbol = callee as SymbolNode;
+    const mapped = MUTATION_CONVENTION_ALIASES[calleeSymbol.name];
+    if (!mapped) {
+      return null;
+    }
+    const nextElements = [...node.elements];
+    nextElements[1] = createPhaseBSymbol(mapped, calleeSymbol.loc);
+    return createPhaseBList(nextElements, node.loc);
+  }
+  const mapped = MUTATION_CONVENTION_ALIASES[headSymbol.name];
+  if (!mapped) {
+    return null;
+  }
+  const nextElements = [...node.elements];
+  nextElements[0] = createPhaseBSymbol(mapped, headSymbol.loc);
+  return createPhaseBList(nextElements, node.loc);
+}
+
 function rewriteFunctionParams(node: PhaseBListNode): PhaseBListNode {
   const elements: PhaseBNode[] = [];
+  validateCommaSeparated(node.elements, "function parameter list");
+  const paramNodes = node.elements;
   let idx = 0;
-  while (idx < node.elements.length) {
-    const target = node.elements[idx];
-    const colon = node.elements[idx + 1];
+  while (idx < paramNodes.length) {
+    const target = paramNodes[idx];
+    if (isCommaNode(target)) {
+      idx += 1;
+      continue;
+    }
+    if (target.phaseKind === "symbol") {
+      const split = splitTrailingColonSymbol(target as PhaseBSymbolNode);
+      if (split) {
+        const annotationStart = idx + 1;
+        const { annotationNode, consumed } = collectParamAnnotationSegment(paramNodes, annotationStart);
+        if (!annotationNode || consumed === 0) {
+            throw reportError("T2:0232");
+        }
+        elements.push(wrapFunctionParam(createTypeAnnotationNode(split, createPhaseBSymbol(":", split.loc), annotationNode)));
+        idx = annotationStart + consumed;
+        continue;
+      }
+    }
+    const colon = paramNodes[idx + 1];
     if (colon && isColon(colon)) {
       const annotationStart = idx + 2;
-      const { annotationNode, consumed } = collectAnnotationSegment(node.elements, annotationStart);
+      const { annotationNode, consumed } = collectParamAnnotationSegment(paramNodes, annotationStart);
       if (annotationNode && consumed > 0) {
         elements.push(wrapFunctionParam(createTypeAnnotationNode(target, colon, annotationNode)));
         idx = annotationStart + consumed;
@@ -137,7 +440,16 @@ function rewriteBindingEntry(node: PhaseBListNode): PhaseBListNode {
 
 function createArrayLiteral(node: PhaseBListNode): PhaseBListNode {
   const arraySymbol = createPhaseBSymbol("array", node.loc);
-  return createPhaseBList([arraySymbol, ...node.elements], node.loc);
+  validateCommaSeparated(node.elements, "array literal");
+  const elements = stripCommaNodes(node.elements);
+  return createPhaseBList([arraySymbol, ...elements], node.loc);
+}
+
+function createObjectLiteral(node: PhaseBListNode): PhaseBListNode {
+  const objectSymbol = createPhaseBSymbol("object", node.loc);
+  validateObjectCommaUsage(node.elements);
+  const elements = stripCommaNodes(node.elements);
+  return createPhaseBList([objectSymbol, ...elements], node.loc, "{");
 }
 
 function rewriteComputedAccess(node: PhaseBListNode): PhaseBNode | null {
@@ -192,7 +504,9 @@ function stripComputedReceiver(symbol: PhaseBSymbolNode): PhaseBSymbolNode {
   return replaced;
 }
 
-function rewriteObjectFields(elements: PhaseBNode[]): PhaseBNode[] {
+function rewriteObjectFields(elements: PhaseBNode[], allowSymbolValues: boolean): PhaseBNode[] {
+  validateObjectCommaUsage(elements.slice(1));
+  elements = stripCommaNodes(elements);
   const head = elements[0];
   if (!head || !isSymbol(head, "object")) {
     return elements;
@@ -201,6 +515,58 @@ function rewriteObjectFields(elements: PhaseBNode[]): PhaseBNode[] {
   let idx = 1;
   while (idx < elements.length) {
     const entry = elements[idx];
+    const nextEntry = elements[idx + 1];
+    if (entry.phaseKind === "symbol") {
+      const split = splitTrailingColonSymbol(entry as PhaseBSymbolNode);
+      if (split) {
+        if (!nextEntry) {
+            throw reportError("T2:0215");
+        }
+        rewritten.push(createStringKeyField(createLiteralNode(split.name, split.loc) as PhaseBLiteralNode, nextEntry));
+        idx += 2;
+        continue;
+      }
+    }
+    if (isStringLiteral(entry) && nextEntry && isColon(nextEntry)) {
+      const valueNode = elements[idx + 2];
+      if (!valueNode) {
+          throw reportError("T2:0215");
+      }
+      rewritten.push(createStringKeyField(entry as PhaseBLiteralNode, valueNode));
+      idx += 3;
+      continue;
+    }
+    if (isOptionalLiteralField(entry) && nextEntry) {
+      rewritten.push(createOptionalFieldNode(entry as PhaseBLiteralNode, nextEntry));
+      idx += 2;
+      continue;
+    }
+    if (isOptionalSymbol(entry)) {
+      if (nextEntry && !isCommaNode(nextEntry) && !isOptionalSymbol(nextEntry) && !isOptionalLiteralField(nextEntry)) {
+        rewritten.push(createOptionalFieldNode(entry as PhaseBSymbolNode, nextEntry));
+        idx += 2;
+        continue;
+      }
+      rewritten.push(createOptionalFieldNode(entry as PhaseBSymbolNode));
+      idx += 1;
+      continue;
+    }
+      if (allowSymbolValues && entry.phaseKind === "symbol" && nextEntry && !isCommaNode(nextEntry)) {
+        const nextIsOptional = isOptionalSymbol(nextEntry) || isOptionalLiteralField(nextEntry);
+        const nextIsWhen = nextEntry.phaseKind === "list" && isSymbol((nextEntry as PhaseBListNode).elements[0], "when");
+        const afterNext = elements[idx + 2];
+        const afterAfterNext = elements[idx + 3];
+        const afterNextIsWhen =
+          afterNext?.phaseKind === "list" && isSymbol((afterNext as PhaseBListNode).elements[0], "when");
+        const nextIsStringLiteral = isStringLiteral(nextEntry);
+        const stringValueAllowed = !nextIsStringLiteral || !afterNext || afterNextIsWhen || Boolean(afterAfterNext);
+        if (!nextIsOptional && !nextIsWhen && stringValueAllowed) {
+          const keyLiteral = createLiteralNode((entry as PhaseBSymbolNode).name, entry.loc) as PhaseBLiteralNode;
+          rewritten.push(createStringKeyField(keyLiteral, nextEntry));
+          idx += 2;
+          continue;
+        }
+      }
     if (entry.phaseKind === "symbol") {
       rewritten.push(createShorthandObjectField(entry as PhaseBSymbolNode));
       idx += 1;
@@ -218,10 +584,185 @@ function rewriteObjectFields(elements: PhaseBNode[]): PhaseBNode[] {
   return rewritten;
 }
 
+function isOptionalLiteralField(node: PhaseBNode): node is PhaseBLiteralNode {
+  if (!isStringLiteral(node)) {
+    return false;
+  }
+  return stripOptionalLiteral(node).optional;
+}
+
+function isOptionalSymbol(node: PhaseBNode): node is PhaseBSymbolNode {
+  return node.phaseKind === "symbol" && hasOptionalIndicator(node);
+}
+
+function createOptionalFieldNode(node: PhaseBLiteralNode, value: PhaseBNode): PhaseBListNode;
+function createOptionalFieldNode(node: PhaseBSymbolNode, value?: PhaseBNode): PhaseBListNode;
+function createOptionalFieldNode(node: PhaseBLiteralNode | PhaseBSymbolNode, value?: PhaseBNode): PhaseBListNode {
+  if (node.phaseKind === "literal") {
+    const { name } = stripOptionalLiteral(node);
+    if (!value) {
+        throw reportError("T2:0222");
+    }
+    return buildOptionalFieldNode(name, value, mergeLocs(node.loc, value.loc));
+  }
+  const trimmed = stripOptionalNode(node);
+  const keyName = nodeToString(trimmed) || "";
+  if (trimmed.phaseKind === "symbol") {
+    (trimmed as PhaseBSymbolNode).expansionStack = node.expansionStack;
+  }
+  const valueNode = value ?? trimmed;
+  return buildOptionalFieldNode(keyName, valueNode, mergeLocs(node.loc, valueNode.loc));
+}
+
+function buildOptionalFieldNode(key: string, value: PhaseBNode, loc: SourceLoc): PhaseBListNode {
+  const optionalSymbol = createPhaseBSymbol("optional-field", loc);
+  const keyLiteral = createLiteralNode(key, loc);
+  return createPhaseBList([optionalSymbol, keyLiteral, value], loc);
+}
+function rewriteOptionalObject(node: PhaseBListNode): PhaseBNode | null {
+  const head = node.elements[0];
+  if (!head || !isSymbol(head, "object")) {
+    return null;
+  }
+  const optionalEntries: PhaseBListNode[] = [];
+  const conditionalEntries: PhaseBNode[] = [];
+  const staticEntries: PhaseBNode[] = [];
+  for (let idx = 1; idx < node.elements.length; idx += 1) {
+    const entry = node.elements[idx];
+    const conditional = buildConditionalKeyBlock(entry);
+    if (conditional) {
+      conditionalEntries.push(conditional);
+      continue;
+    }
+    if (isOptionalFieldNode(entry)) {
+      optionalEntries.push(entry as PhaseBListNode);
+      continue;
+    }
+    staticEntries.push(entry);
+  }
+  if (optionalEntries.length === 0 && conditionalEntries.length === 0) {
+    return null;
+  }
+  const objectSymbol = createPhaseBSymbol("object", head.loc);
+  objectSymbol.expansionStack = head.expansionStack;
+  const optionals = optionalEntries
+    .map((entry) => buildOptionalFieldExpression(entry))
+    .filter((expr): expr is PhaseBNode => Boolean(expr));
+  const combinedEntries = [...staticEntries, ...optionals, ...conditionalEntries];
+  return createPhaseBList([objectSymbol, ...combinedEntries], node.loc);
+}
+
+function buildConditionalKeyBlock(node: PhaseBNode): PhaseBNode | null {
+  if (node.phaseKind !== "list") {
+    return null;
+  }
+  const list = node as PhaseBListNode;
+  const head = list.elements[0];
+  if (!head || !isSymbol(head, "when")) {
+    return null;
+  }
+  const condition = list.elements[1];
+  const body = list.elements[2];
+  if (!condition || !body) {
+    return null;
+  }
+  const objectBody = normalizeObjectLiteral(body);
+  if (!objectBody) {
+    return null;
+  }
+  return createConditionalObjectGuard(condition, objectBody, list.loc);
+}
+
+function normalizeObjectLiteral(node: PhaseBNode): PhaseBListNode | null {
+  if (node.phaseKind !== "list") {
+    return null;
+  }
+  const list = node as PhaseBListNode;
+  if (list.delimiter === "{") {
+    return createObjectLiteral(list);
+  }
+  const head = list.elements[0];
+  if (head && isSymbol(head, "object")) {
+    return list;
+  }
+  return null;
+}
+
+function createConditionalObjectGuard(conditionNode: PhaseBNode, objectNode: PhaseBListNode, loc: SourceLoc): PhaseBNode {
+  const condition = clonePhaseBNode(conditionNode);
+  const objectExpr = clonePhaseBNode(objectNode);
+  const guarded = createPhaseBList([
+    createPhaseBSymbol("&&", loc),
+    condition,
+    objectExpr,
+  ], loc);
+  return createObjectSpreadField(guarded, loc);
+}
+
+function isOptionalFieldNode(node: PhaseBNode): node is PhaseBListNode {
+  if (node.phaseKind !== "list") {
+    return false;
+  }
+  const list = node as PhaseBListNode;
+  const head = list.elements[0];
+  if (!head || head.phaseKind !== "symbol") {
+    return false;
+  }
+  return (head as SymbolNode).name === "optional-field";
+}
+
+function buildOptionalFieldExpression(node: PhaseBListNode): PhaseBNode | null {
+  const info = extractOptionalFieldInfo(node);
+  if (!info) {
+    return null;
+  }
+  return createOptionalFieldSpread(info.key, info.value, node.loc);
+}
+
+function extractOptionalFieldInfo(node: PhaseBListNode): { key: string; value: PhaseBNode } | null {
+  if (node.elements.length < 3) {
+    return null;
+  }
+  const keyNode = node.elements[1];
+  if (!isStringLiteral(keyNode)) {
+    return null;
+  }
+  const literal = keyNode as PhaseBLiteralNode;
+  const value = node.elements[2];
+  return { key: literal.value, value };
+}
+
+function createOptionalFieldSpread(key: string, value: PhaseBNode, loc: SourceLoc): PhaseBNode {
+  const condition = createPhaseBList([
+    createPhaseBSymbol("!=", loc),
+    clonePhaseBNode(value),
+    createLiteralNode(null, loc),
+  ], loc);
+  const property = createPhaseBList([
+    createPhaseBSymbol("object", loc),
+    createPhaseBList([createLiteralNode(key, loc), clonePhaseBNode(value)], loc),
+  ], loc);
+  const guarded = createPhaseBList([
+    createPhaseBSymbol("&&", loc),
+    condition,
+    property,
+  ], loc);
+  return createObjectSpreadField(guarded, loc);
+}
+
+function createObjectSpreadField(expr: PhaseBNode, loc: SourceLoc): PhaseBListNode {
+  return createPhaseBList([
+    createPhaseBSymbol("spread", loc),
+    createPhaseBSymbol("object", loc),
+    expr,
+  ], loc);
+}
+
 function createShorthandObjectField(symbol: PhaseBSymbolNode): PhaseBListNode {
-  const keyLiteral = createStringLiteral(symbol.name, symbol.loc);
-  const loc = mergeLocs(keyLiteral.loc, symbol.loc);
-  return createPhaseBList([keyLiteral, symbol], loc);
+  const keySymbol = createPhaseBSymbol(symbol.name, symbol.loc);
+  keySymbol.expansionStack = symbol.expansionStack;
+  const loc = mergeLocs(keySymbol.loc, symbol.loc);
+  return createPhaseBList([keySymbol, symbol], loc);
 }
 
 function createStringKeyField(key: PhaseBLiteralNode, value: PhaseBNode): PhaseBListNode {
@@ -517,8 +1058,8 @@ function createOptionalPropertyAccess(objectExpr: PhaseBNode, propertyName: stri
 
 function createProp(objectExpr: PhaseBNode, propertyName: string, loc: SourceLoc): PhaseBListNode {
   const propSymbol = createPhaseBSymbol("prop", loc);
-  const literal = createStringLiteral(propertyName, loc);
-  return createPhaseBList([propSymbol, objectExpr, literal], loc);
+  const propertySymbol = createPhaseBSymbol(propertyName, loc);
+  return createPhaseBList([propSymbol, objectExpr, propertySymbol], loc);
 }
 
 function createIndex(objectExpr: PhaseBNode, propertyExpr: PhaseBNode, loc: SourceLoc): PhaseBListNode {
@@ -605,6 +1146,9 @@ function buildOptionalDirectCall(callee: PhaseBNode, args: PhaseBNode[], loc: So
 function stripOptionalNode(node: PhaseBNode): PhaseBNode {
   if (node.phaseKind === "symbol") {
     const symbol = node as SymbolNode;
+    if (symbol.name === "??") {
+      return node;
+    }
     if (symbol.name.endsWith("?.")) {
       return createPhaseBSymbol(symbol.name.slice(0, -2), symbol.loc);
     }
@@ -633,6 +1177,9 @@ function stripOptionalNode(node: PhaseBNode): PhaseBNode {
 function hasOptionalIndicator(node: PhaseBNode): boolean {
   if (node.phaseKind === "symbol") {
     const symbolName = (node as SymbolNode).name;
+    if (symbolName === "??") {
+      return false;
+    }
     return symbolName.endsWith("?") || symbolName.endsWith("?.");
   }
   if (node.phaseKind === "literal") {
@@ -665,12 +1212,126 @@ function stripOptionalLiteral(node: PhaseBNode): { name: string; optional: boole
       return { name: literal.value, optional: false };
     }
   }
+  if (node.phaseKind === "symbol") {
+    const symbol = node as SymbolNode;
+    if (symbol.name.endsWith("?.")) {
+      return { name: symbol.name.slice(0, -2), optional: true };
+    }
+    if (symbol.name.endsWith("?")) {
+      return { name: symbol.name.slice(0, -1), optional: true };
+    }
+    return { name: symbol.name, optional: false };
+  }
   const serialized = serializePhaseBNode(node);
   return { name: serialized ?? "", optional: false };
 }
 
 function isOptionalNode(node: PhaseBNode): boolean {
   return hasOptionalIndicator(node);
+}
+
+function isCommaNode(node: PhaseBNode): boolean {
+  return node.phaseKind === "symbol" && (node as SymbolNode).name === ",";
+}
+
+function stripCommaNodes(nodes: PhaseBNode[]): PhaseBNode[] {
+  return nodes.filter((node) => !isCommaNode(node));
+}
+
+function splitTrailingColonSymbol(node: PhaseBSymbolNode): PhaseBSymbolNode | null {
+  if (!node.name.endsWith(":")) {
+    return null;
+  }
+  if (node.name.length <= 1) {
+    return null;
+  }
+  return createPhaseBSymbol(node.name.slice(0, -1), node.loc);
+}
+
+function validateCommaSeparated(nodes: PhaseBNode[], context: string): void {
+  if (!nodes.some(isCommaNode)) {
+    return;
+  }
+  if (nodes.length === 0) {
+    return;
+  }
+  if (isCommaNode(nodes[0])) {
+    throw reportError("T2:0115", { context });
+  }
+  if (isCommaNode(nodes[nodes.length - 1])) {
+    throw reportError("T2:0114", { context });
+  }
+  for (let i = 1; i < nodes.length; i += 1) {
+    if (isCommaNode(nodes[i]) && isCommaNode(nodes[i - 1])) {
+      throw reportError("T2:0113", { context });
+    }
+  }
+}
+
+function collectParamAnnotationSegment(
+  elements: PhaseBNode[],
+  startIdx: number
+): { annotationNode: PhaseBNode | null; consumed: number } {
+  if (startIdx >= elements.length) {
+    return { annotationNode: null, consumed: 0 };
+  }
+  let end = elements.length;
+  for (let i = startIdx; i < elements.length; i += 1) {
+    if (isCommaNode(elements[i])) {
+      end = i;
+      break;
+    }
+  }
+  const segment = elements.slice(startIdx, end);
+  if (segment.length === 0) {
+    return { annotationNode: null, consumed: 0 };
+  }
+  const { annotationNode } = collectAnnotationSegment(segment, 0);
+  return { annotationNode, consumed: segment.length };
+}
+
+function validateObjectCommaUsage(elements: PhaseBNode[]): void {
+  const hasComma = elements.some(isCommaNode);
+  if (!hasComma) {
+    return;
+  }
+  validateCommaSeparated(elements, "object literal");
+
+  let idx = 0;
+  while (idx < elements.length) {
+    const entry = elements[idx];
+    if (isCommaNode(entry)) {
+      idx += 1;
+      continue;
+    }
+
+    if (isStringLiteral(entry) || isOptionalLiteralField(entry)) {
+      const valueNode = elements[idx + 1];
+      if (!valueNode || isCommaNode(valueNode)) {
+        throw reportError("T2:0216");
+      }
+      idx += 2;
+      continue;
+    }
+
+    if (isOptionalSymbol(entry)) {
+      const nextNode = elements[idx + 1];
+      if (!nextNode || isCommaNode(nextNode)) {
+        if (nextNode && isCommaNode(nextNode)) {
+          const nextNonComma = elements.slice(idx + 2).find((node) => !isCommaNode(node));
+          if (nextNonComma) {
+            throw reportError("T2:0221");
+          }
+        }
+        idx += 1;
+        continue;
+      }
+      idx += 2;
+      continue;
+    }
+
+    idx += 1;
+  }
 }
 
 function isPropertyList(node: PhaseBNode): node is PhaseBListNode {
@@ -703,10 +1364,63 @@ function wrapFunctionParam(node: PhaseBNode): PhaseBNode {
   return createPhaseBList([node], node.loc);
 }
 
+function clonePhaseBNode(node: PhaseBNode): PhaseBNode {
+  switch (node.phaseKind) {
+    case "symbol": {
+      const symbol = node as PhaseBSymbolNode;
+      return { ...symbol };
+    }
+    case "literal": {
+      const literal = node as PhaseBLiteralNode;
+      return { ...literal };
+    }
+    case "dotted": {
+      const dotted = node as PhaseBDottedIdentifier;
+      return { ...dotted, parts: [...dotted.parts] };
+    }
+    case "list": {
+      const list = node as PhaseBListNode;
+      return { ...list, elements: list.elements.map((child) => clonePhaseBNode(child)) };
+    }
+    case "type-annotation": {
+      const annotation = node as PhaseBTypeAnnotation;
+      return {
+        ...annotation,
+        elements: annotation.elements.map((child) => clonePhaseBNode(child)),
+        target: clonePhaseBNode(annotation.target),
+        annotation: clonePhaseBNode(annotation.annotation),
+      };
+    }
+    default:
+      throw reportError("T2:0305", {
+        kind: (node as PhaseBNodeBase).phaseKind,
+      });
+  }
+}
+
+function nodeToString(node: PhaseBNode): string | undefined {
+  if (node.phaseKind === "literal") {
+    const literal = node as PhaseBLiteralNode;
+    if (typeof literal.value === "string") {
+      return literal.value;
+    }
+    return undefined;
+  }
+  if (node.phaseKind === "symbol") {
+    return (node as PhaseBSymbolNode).name;
+  }
+  if (node.phaseKind === "dotted") {
+    const dotted = node as PhaseBDottedIdentifier;
+    return dotted.parts.join(".");
+  }
+  return undefined;
+}
+
 export const INFIX_OPERATOR_TABLE: Record<
   string,
   { precedence: number; associativity: "left" | "right" }
 > = {
+  ",": { precedence: 1, associativity: "left" },
   "**": { precedence: 16, associativity: "right" },
   "*": { precedence: 15, associativity: "left" },
   "/": { precedence: 15, associativity: "left" },
@@ -726,6 +1440,8 @@ export const INFIX_OPERATOR_TABLE: Record<
   "!=": { precedence: 11, associativity: "left" },
   "===": { precedence: 11, associativity: "left" },
   "!==": { precedence: 11, associativity: "left" },
+  "?=": { precedence: 11, associativity: "left" },
+  "?!=": { precedence: 11, associativity: "left" },
   "&": { precedence: 10, associativity: "left" },
   "^": { precedence: 9, associativity: "left" },
   "|": { precedence: 8, associativity: "left" },
@@ -740,10 +1456,25 @@ interface InfixOperatorDescriptor {
   associativity: "left" | "right";
 }
 
-function rewriteInfixExpression(node: PhaseBListNode): PhaseBNode | null {
-  const tokenized = extractInfixTokens(node);
-  if (!tokenized) {
+const RUNTIME_ISEQUAL_NAME = "__t2_isEqual";
+
+function rewriteInfixForm(node: PhaseBListNode): PhaseBNode | null {
+  const head = node.elements[0];
+  if (!head || !isSymbol(head, "infix")) {
     return null;
+  }
+  if (node.elements.length !== 2) {
+    throw reportError("T2:0320");
+  }
+  const inner = node.elements[1];
+  if (!inner || inner.phaseKind !== "list") {
+    throw reportError("T2:0320");
+  }
+  const innerList = inner as PhaseBListNode;
+  const rewrittenInner: PhaseBListNode = { ...innerList, elements: innerList.elements.map(rewriteNode) };
+  const tokenized = extractInfixTokens(rewrittenInner);
+  if (!tokenized) {
+    throw reportError("T2:0321");
   }
   const expression = buildInfixExpression(tokenized.operands, tokenized.operators);
   if (expression.phaseKind === "list") {
@@ -820,9 +1551,37 @@ function reduceExpression(operatorStack: InfixOperatorDescriptor[], operandStack
 
 function createInfixCall(operator: InfixOperatorDescriptor, left: PhaseBNode, right: PhaseBNode): PhaseBListNode {
   const loc = mergeNodeLocs(left, operator.operator, right);
+  const operatorName = operator.operator.name;
+  if (operatorName === "?=") {
+    return createIsEqualCall(left, right, loc, operator.operator);
+  }
+  if (operatorName === "?!=") {
+    const isEqualCall = createIsEqualCall(left, right, loc, operator.operator);
+    const notSymbol = createPhaseBSymbol("!", loc);
+    notSymbol.expansionStack = operator.operator.expansionStack;
+    return createPhaseBList([createPhaseBSymbol("call", loc), notSymbol, isEqualCall], loc);
+  }
   const callHead = createPhaseBSymbol("call", loc);
   const callNode = createPhaseBList([callHead, operator.operator, left, right], loc);
   callNode.expansionStack = operator.operator.expansionStack ?? left.expansionStack ?? right.expansionStack;
+  return callNode;
+}
+
+function createIsEqualCall(
+  left: PhaseBNode,
+  right: PhaseBNode,
+  loc: SourceLoc,
+  operatorNode: PhaseBSymbolNode
+): PhaseBListNode {
+  const isEqualSymbol = createPhaseBSymbol(RUNTIME_ISEQUAL_NAME, loc);
+  isEqualSymbol.expansionStack = operatorNode.expansionStack;
+  const callNode = createPhaseBList([
+    createPhaseBSymbol("call", loc),
+    isEqualSymbol,
+    left,
+    right,
+  ], loc);
+  callNode.expansionStack = operatorNode.expansionStack ?? left.expansionStack ?? right.expansionStack;
   return callNode;
 }
 

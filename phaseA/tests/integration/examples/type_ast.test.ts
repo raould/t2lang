@@ -18,8 +18,8 @@ test("extended type nodes and type-alias", async () => {
         (type-assert "hi" (type-literal "hi"))))
   `, );
 
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /type Foo = \{ x: number; y: string \}/);
   assert.match(result.tsSource, /type Fn = \(number, string\) => boolean/);
   assert.match(result.tsSource, /\(v as Foo\)/);

@@ -59,7 +59,7 @@ function rewriteMethodCall(head: SymbolNode, args: SExprNode[], loc: SymbolNode[
   const propCall = createList([
     createSymbol("prop", loc),
     objectExpr,
-    createStringLiteral(methodName, loc),
+    createSymbol(methodName, loc),
   ], loc);
   return createList([
     createSymbol("call", loc),
@@ -141,7 +141,7 @@ function buildPropertyChain(parts: string[], loc: SymbolNode["loc"]): SExprNode 
     current = createList([
       createSymbol("prop", loc),
       current,
-      createStringLiteral(property, loc),
+      createSymbol(property, loc),
     ], loc);
   }
   return current;
@@ -149,10 +149,6 @@ function buildPropertyChain(parts: string[], loc: SymbolNode["loc"]): SExprNode 
 
 function createSymbol(name: string, loc: SymbolNode["loc"]): SymbolNode {
   return { kind: "symbol", name, loc };
-}
-
-function createStringLiteral(value: string, loc: SymbolNode["loc"]): SExprNode {
-  return { kind: "literal", value, loc };
 }
 
 function createList(elements: SExprNode[], loc: SymbolNode["loc"], delimiter: ListDelimiter = "("): ListNode {

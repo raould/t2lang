@@ -10,8 +10,8 @@ test("type alias with type params emits generic syntax", async () => {
     (type-alias Pair (typeparams (K) (V))
       (type-object ("first" (type-ref K)) ("second" (type-ref V)))))`;
   const result = await compile(src, { dumpAst: false, emitTypes: true });
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.equal(result.errors.length, 0, `errors: ${JSON.stringify(result.errors)}`);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.equal(result.diagnostics.length, 0, `errors: ${JSON.stringify(result.diagnostics)}`);
   assert.match(result.tsSource, /type Pair<\s*K\s*,\s*V\s*>/, "expected generic type params for Pair");
 });
 
@@ -20,8 +20,8 @@ test("type alias with type-app uses type constructors", async () => {
     (type-alias Box (typeparams (T)) (type-object ("value" (type-ref T))))
     (type-alias StringBox (type-app (type-ref Box) (type-string))))`;
   const result = await compile(src, { dumpAst: false, emitTypes: true });
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.equal(result.errors.length, 0, `errors: ${JSON.stringify(result.errors)}`);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.equal(result.diagnostics.length, 0, `errors: ${JSON.stringify(result.diagnostics)}`);
   assert.match(result.tsSource, /type StringBox = Box<string>/, "expected type-app to render as Box<string>");
 });
 
@@ -29,8 +29,8 @@ test("type-function emits parameter and return types", async () => {
   const src = `(program
     (type-alias Fn (type-function (type-number) (type-string) (type-boolean))))`;
   const result = await compile(src, { dumpAst: false, emitTypes: true });
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.equal(result.errors.length, 0, `errors: ${JSON.stringify(result.errors)}`);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.equal(result.diagnostics.length, 0, `errors: ${JSON.stringify(result.diagnostics)}`);
   assert.match(result.tsSource, /type Fn = \(number, string\) => boolean/, "expected function type emission");
 });
 
@@ -40,8 +40,8 @@ test("type-interface emits fields", async () => {
       (interface-body
         ("get" (type-function (type-string) (type-string))))))`;
   const result = await compile(src, { dumpAst: false, emitTypes: true });
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.equal(result.errors.length, 0, `errors: ${JSON.stringify(result.errors)}`);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.equal(result.diagnostics.length, 0, `errors: ${JSON.stringify(result.diagnostics)}`);
   assert.match(result.tsSource, /interface IContainer/, "expected interface emission");
   assert.match(result.tsSource, /get:\s*\(string\) => string/, "expected interface field with function type");
 });

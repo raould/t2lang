@@ -52,7 +52,7 @@ Tokens:
 <param> ::= "(" <param-modifier>* <identifier> <type>? ("default" <expression>)? ")"
           | "(" "this" <type> ")"
 <param-modifier> ::= "public" | "protected" | "private" | "readonly"
-<fn-signature> ::= "(" <param>* ")" <type>?
+<fn-signature> ::= "(" <param> (","? <param>)* ")" <type>?
 
 <init> ::= <expression>
 <condition> ::= <expression>
@@ -141,10 +141,11 @@ Tokens:
                | <type-ref>
                | <array>
                | <object>
+               | <spread>
                | <ternary>
 
-<call> ::= "(" "call" <expression> <expression>* ")"
-<call-with-this> ::= "(" "call-with-this" <expression> <expression> <expression>* ")"
+<call> ::= "(" "call" <expression> <expression>* ")"  ; commas allowed between args
+<call-with-this> ::= "(" "call-with-this" <expression> <expression> <expression>* ")"  ; commas allowed between args
 <prop> ::= "(" "prop" <expression> <string> ")"  ; literal property names only; computed cases use <index>
 <index> ::= "(" "index" <expression> <expression> ")"
 <new> ::= "(" "new" <expression> <expression>* ")"
@@ -152,9 +153,12 @@ Tokens:
 <try> ::= "(" "try" <statement> <catch>? <finally>? ")"
 <catch> ::= "(" "catch" <binding>? <statement>* ")"
 <finally> ::= "(" "finally" <statement>* ")"
-<array> ::= "(" "array" <expression>* ")"
-<object> ::= "(" "object" <object-field>* ")"
+<array> ::= "(" "array" <expression>* ")"  ; commas allowed between elements
+<object> ::= "(" "object" <object-field>* ")"  ; commas allowed between fields
 <object-field> ::= "(" <string> <expression> ")"
+               | "(" "spread" "object" <expression> ")"
+<spread> ::= "(" "spread" <spread-kind> <expression> ")"
+<spread-kind> ::= "array" | "object" | "rest"
 <ternary> ::= "(" "ternary" <expression> <expression> <expression> ")"
 <template> ::= "(" "template" <expression>* ")"
 <non-null> ::= "(" "non-null" <expression> ")"
@@ -206,5 +210,7 @@ Tokens:
 - Scope metadata (TDZ, const/let distinctions, hoisting flags) attaches to the nodes above but is not reflected in the EBNF; the resolver uses the metadata to enforce TypeScript semantics.
 - `<prop>` only covers literal property names; computed-property access should go through `<index>` so Phase B can rewrite dynamic keys without introducing new grammar forms.
 - `<ternary>` is the canonical expression that produces a value from a conditional without requiring a statement context ie TypeScript's `?:`.
+- Commas are treated as optional separators inside array literals, object literals, call argument lists, and function signature parameter lists. Commas are rejected in other list contexts.
+- Phase B adds sugar for `key: value` object fields and optional keys like `role?` inside `{ ... }`, but those desugar to canonical Phase A `object`/`spread` forms.
 - TODO: support ECMAScript specificaiton for <identifier>.
 ```

@@ -19,7 +19,7 @@ export function isEventSeverity(value: string): value is EventSeverity {
 
 export interface CompilerEvent {
   phase: CompilerStage;
-  kind: "snapshot" | "trace" | "codegen";
+  kind: "snapshot" | "trace" | "codegen" | "astDump" | "resolveDump";
   timestamp: number;
   seed: string;
   stamp: string;

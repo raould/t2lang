@@ -15,12 +15,10 @@ test("block with nested let and call", async () => {
   `;
 
   const result = await compile(source, {
-    prettyOption: true,
-    logLevel: "none",
-    enableTsc: false
+    prettyOption: 'pretty',
   });
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
 
   const ts = result.tsSource.trim();
   assert.match(ts, /foo\(y\)/);

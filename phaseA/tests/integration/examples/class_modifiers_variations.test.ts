@@ -22,8 +22,8 @@ test('various class field modifier combinations are emitted', async () => {
     )
   `;
   const result = await compile(src, );
-  if (result.errors.length > 0) { console.error(result.errors); }
-  assert.strictEqual(result.errors.length, 0);
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.strictEqual(result.diagnostics.length, 0);
 
   // Check emitted modifiers
   assert.match(result.tsSource, /a = 1/);

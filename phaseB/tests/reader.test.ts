@@ -48,8 +48,8 @@ test("parsePhaseB rewrites dotted property access into prop node", () => {
   assert.strictEqual((head as SymbolNode).name, "prop");
   assert.strictEqual(target.kind, "symbol");
   assert.strictEqual((target as SymbolNode).name, "obj");
-  assert.strictEqual(property.kind, "literal");
-  assert.strictEqual((property as { value: unknown }).value, "prop");
+  assert.strictEqual(property.kind, "symbol");
+  assert.strictEqual((property as SymbolNode).name, "prop");
 });
 
 test("parsePhaseB rewrites dotted method calls into call/prop structures", () => {
@@ -64,8 +64,8 @@ test("parsePhaseB rewrites dotted method calls into call/prop structures", () =>
   assert.strictEqual((propHead as SymbolNode).name, "prop");
   assert.strictEqual(target.kind, "symbol");
   assert.strictEqual((target as SymbolNode).name, "obj");
-  assert.strictEqual(methodName.kind, "literal");
-  assert.strictEqual((methodName as { value: unknown }).value, "method");
+  assert.strictEqual(methodName.kind, "symbol");
+  assert.strictEqual((methodName as SymbolNode).name, "method");
   assert.strictEqual(arg1.kind, "literal");
   assert.strictEqual(arg2.kind, "literal");
 });
@@ -96,6 +96,22 @@ test("unquote reader macro wraps a symbol", () => {
   const [node] = parseSexpr("~foo", "unquote.t2");
   assert.strictEqual((node as ListNode).elements[0].kind, "symbol");
   assert.strictEqual(((node as ListNode).elements[0] as SymbolNode).name, "unquote");
+});
+
+test("comments: ;; is a comment, ; is an atom", () => {
+  const nodes = parseSexpr("foo ;; this is a comment\n; bar", "comments.t2");
+  assert.strictEqual(nodes.length, 3);
+  assert.strictEqual((nodes[0] as SymbolNode).name, "foo");
+  assert.strictEqual((nodes[1] as SymbolNode).name, ";");
+  assert.strictEqual((nodes[2] as SymbolNode).name, "bar");
+});
+
+test("comma tokenizes as a symbol", () => {
+  const nodes = parseSexpr(",", "comma.t2");
+  assert.strictEqual(nodes.length, 1);
+  const node = nodes[0] as SymbolNode;
+  assert.strictEqual(node.kind, "symbol");
+  assert.strictEqual(node.name, ",");
 });
 
 test("unquote-splicing reader macro wraps a symbol", () => {

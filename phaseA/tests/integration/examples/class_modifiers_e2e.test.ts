@@ -31,13 +31,13 @@ test('class modifiers end-to-end: compile to JS and run', async () => {
 
   // We don't require running the TypeScript compiler here; transpile and
   // run the emitted JS with node to exercise end-to-end behavior.
-  const result = await compile(src, { enableTsc: false, emitTypes: false });
-  const nonTsc = result.errors.filter(e => e.phase !== 'tsc');
+  const result = await compile(src, { emitTypes: false });
+  const nonTsc = result.diagnostics.filter(e => e.phase !== 'tsc');
   if (nonTsc.length > 0) { console.error(nonTsc); }
   assert.strictEqual(nonTsc.length, 0, 'non-tsc compile errors');
 
   // tsc errors (phase === 'tsc') should be empty as well
-  const tscErrors = result.errors.filter(e => e.phase === 'tsc');
+  const tscErrors = result.diagnostics.filter(e => e.phase === 'tsc');
   if (tscErrors.length > 0) { console.error(tscErrors); }
   assert.strictEqual(tscErrors.length, 0, 'TypeScript reported errors');
 

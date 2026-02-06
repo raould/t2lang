@@ -1,6 +1,6 @@
 import type { ExpansionFrame, SourceLoc } from "./location.js";
 export type { ExpansionFrame, SourceLoc } from "./location.js";
-import type { Program } from "../../phaseA/dist/phaseA0.js";
+import type { Program } from "../../phaseA/dist/phaseA1.js";
 import { applySugar } from "./sugar.js";
 import { rewriteAssignments } from "./rewriter.js";
 import { lowerPhaseB } from "./lower.js";
@@ -20,7 +20,7 @@ export type LiteralNode = BaseNode & {
   value: string | number | boolean | null;
 };
 
-export type ListDelimiter = "(" | "[";
+export type ListDelimiter = "(" | "[" | "{";
 
 export type ListNode = BaseNode & {
   kind: "list";
@@ -101,6 +101,9 @@ function wrapPhaseBNode(node: SExprNode): PhaseBNode {
 }
 
 function wrapSymbol(node: SymbolNode): PhaseBNode {
+  if (node.name.startsWith("...")) {
+    return { ...node, phaseKind: "symbol" };
+  }
   if (node.name.includes(".")) {
     let parts = node.name.split(".");
     const lastIndex = parts.length - 1;
@@ -192,6 +195,12 @@ function readNode(state: ParserState): SExprNode {
     readChar(state);
     return readReaderMacro(state, "quote", startLine, startColumn, 1);
   }
+  if (char === ":" && peekNext(state) === "(") {
+    const startLine = state.line;
+    const startColumn = state.column;
+    readChar(state);
+    return readReaderMacro(state, "infix", startLine, startColumn, 1);
+  }
   if (char === "`") {
     const startLine = state.line;
     const startColumn = state.column;
@@ -214,11 +223,17 @@ function readNode(state: ParserState): SExprNode {
   if (char === "[") {
     return readBracketList(state);
   }
+  if (char === "{") {
+    return readBraceList(state);
+  }
   if (char === ")") {
     throw createError(state, "unexpected ')' encountered", "E002");
   }
   if (char === "]") {
     throw createError(state, "unexpected ']' encountered", "E002");
+  }
+  if (char === "}") {
+    throw createError(state, "unexpected '}' encountered", "E002");
   }
   if (char === '"') {
     return readString(state);
@@ -292,6 +307,26 @@ function readBracketList(state: ParserState): ListNode {
   }
 }
 
+function readBraceList(state: ParserState): ListNode {
+  const startLine = state.line;
+  const startColumn = state.column;
+  readChar(state); // consume '{'
+  const elements: SExprNode[] = [];
+  while (true) {
+    skipWhitespace(state);
+    const char = peek(state);
+    if (!char) {
+      throw createError(state, "unclosed '{' delimiter", "E001", startLine, startColumn);
+    }
+    if (char === "}") {
+      readChar(state);
+      const loc = makeLoc(state.file, startLine, startColumn, state.line, state.column);
+      return { kind: "list", elements, loc, delimiter: "{" };
+    }
+    elements.push(readNode(state));
+  }
+}
+
 function readString(state: ParserState): LiteralNode {
   const startLine = state.line;
   const startColumn = state.column;
@@ -326,13 +361,22 @@ function readAtom(state: ParserState): SExprNode {
   let token = "";
   while (true) {
     const ch = peek(state);
-    if (!ch || isWhitespace(ch) || ch === "(" || ch === ")" || ch === "[" || ch === "]" || ch === '"') {
+    if (!ch || isWhitespace(ch) || ch === "," || ch === "(" || ch === ")" || ch === "[" || ch === "]" || ch === "{" || ch === "}" || ch === '"' || ch === ";") {
       break;
     }
     token += readChar(state);
   }
   if (token.length === 0) {
-    throw createError(state, "invalid token", "E003", startLine, startColumn);
+    if (peek(state) === ",") {
+      readChar(state);
+      const loc = makeLoc(state.file, startLine, startColumn, state.line, state.column);
+      return { kind: "symbol", name: ",", loc };
+    }
+    if (peek(state) === ";") {
+      token = readChar(state);
+    } else {
+      throw createError(state, "invalid token", "E003", startLine, startColumn);
+    }
   }
   if (isMalformedNumericToken(token)) {
     throw createError(state, "malformed numeric literal", "E007", startLine, startColumn);
@@ -404,9 +448,13 @@ function skipWhitespace(state: ParserState): void {
       continue;
     }
     if (ch === ";") {
-      readChar(state);
-      skipLineComment(state);
-      continue;
+      const next = peekNext(state);
+      if (next === ";") {
+        readChar(state); // first ;
+        readChar(state); // second ;
+        skipLineComment(state);
+        continue;
+      }
     }
     break;
   }
@@ -434,6 +482,10 @@ function createError(
 
 function peek(state: ParserState): string {
   return state.source[state.index];
+}
+
+function peekNext(state: ParserState): string {
+  return state.source[state.index + 1];
 }
 
 function readChar(state: ParserState): string {

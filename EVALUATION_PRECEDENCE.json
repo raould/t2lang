@@ -131,7 +131,7 @@
     },
     {
       "name": "equality",
-      "symbols": ["==", "!=", "===", "!=="],
+      "symbols": ["==", "!=", "===", "!==", "?=", "?!="],
       "precedence": 11,
       "associativity": "left",
       "category": "equality",

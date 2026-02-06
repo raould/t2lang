@@ -4,6 +4,26 @@
 
 Phase B implements a powerful macro system influenced by Clojure. Macros allow users to extend the language syntax by defining functions that transform code (S-expressions) into other code before compilation proceeds to Phase A.
 
+## Reader Macros
+
+Phase B mirrors Clojure’s reader macro philosophy: the reader rewrites terse surface forms into explicit lists before any macro expansion runs. These helper forms keep the user-facing syntax familiar while the rest of the pipeline works with canonical S-expressions.
+
+| Surface | Expansion |
+| ------- | --------- |
+| `'x` | `(quote x)` |
+| `` `x `` | `(quasiquote x)` |
+| `~x` | `(unquote x)` (only valid inside a quasiquote) |
+| `~@x` | `(unquote-splicing x)` (only valid inside a quasiquote)
+
+The reader enforces the same structure as Clojure’s implementation:
+
+1. **Quote `'`** becomes the literal form `(quote ...)`.
+2. **Quasiquote `` ` ``** wraps the target expression, allowing unquoted sections inside.
+3. **Unquote `~`** only appears within a quasiquote; outside of a quasiquote it is treated as a plain symbol (for forward compatibility).
+4. **Unquote-splice `~@`** expands to `(unquote-splicing ...)` inside a quasiquote, merging a list’s elements with the surrounding list structure.
+
+Phase B’s reader keeps the new symbols (`quote`, `quasiquote`, `unquote`, `unquote-splicing`) available for macros, so macro authors can mimic Clojure’s quasiquote helpers. `MacroRegistry` and the expander itself do not treat reader macro results specially—they simply operate on the rewritten lists like any other form.
+
 ## Guiding Principles
 
 1.  **Expansion Before Phase A**: All macro expansion happens strictly within Phase B. The output of Phase B is a canonical Phase A AST. Phase A itself has no knowledge of macros.
@@ -114,7 +134,41 @@ Macros must ultimately produce valid Phase A AST nodes (or other macros that str
 
 When macros fail, Phase B reports diagnostics with full expansion context. See [phaseB/ERRORS.md](phaseB/ERRORS.md) for the complete specification.
 
-### Best Practices for Macro Authors
+## Macro Sandboxing
+
+To ensure compiler stability, security, and reproducibility, macro execution is restricted.
+
+### Execution Environment
+
+Macros execute within a restricted environment during the expansion phase. They have access only to a curated set of globals and utilities.
+
+#### Available Globals
+
+*   **List Manipulation**: `list`, `cons`, `first`, `rest`, `nth`, `append`, `concat`, `empty?`, `list?`.
+*   **Symbols & Literals**: `symbol`, `symbol?`, `number?`, `string?`, `boolean?`.
+*   **Hygienic Symbols**: `gensym` (deterministic symbol generation seeded by the compiler).
+*   **String Utilities**: `str`, `lower-case`, `upper-case`.
+*   **Diagnostic Tools**: `println` (outputs to compiler trace).
+
+#### Restricted Access
+
+Macros are **strictly prohibited** from accessing:
+*   **The File System**: No reading or writing files.
+*   **The Network**: No socket or HTTP connections.
+*   **System/Process State**: No access to `process`, `env`, or other runtime globals.
+*   **Compiler State**: Macros cannot mutate the `MacroRegistry` or access internal compiler data structures directly.
+
+### Side Effects
+
+Macros must be side-effect free. They should not mutate state or perform I/O. The only "output" of a macro is the replacement S-expression.
+
+### Resource Constraints
+
+*   **Recursion Depth**: Expansion is limited to a maximum depth (default: 100) to prevent infinite loops.
+*   **Execution Timeout**: Macro execution is subject to a wall-clock timeout to prevent CPU exhaustion.
+*   **Determinism**: Macros must be deterministic. Non-deterministic functions (e.g., `Date.now` or unseeded `Math.random`) are disallowed. Expansion must be reproducible given the same source and compiler seed.
+
+## Best Practices for Macro Authors
 
 1. **Validate inputs early**: Check argument count and forms at the start of your macro body.
 2. **Use descriptive gensym prefixes**: `(gensym "loop-temp")` is easier to trace than `(gensym "x")`.

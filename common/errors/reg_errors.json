@@ -1,0 +1,1124 @@
+{
+  "errors": {
+    "T2:0001": {
+      "message": "The form 'let' is not supported in Phase A, use 'let*' for sequential bindings.",
+      "category": "parse",
+      "severity": "error",
+      "docs": "https://example.com/docs/errors/0001"
+    },
+    "T2:0002": {
+      "message": "Invalid assignment target",
+      "category": "parse",
+      "severity": "error",
+      "docs": "https://example.com/docs/errors/0002"
+    },
+    "T2:0003": {
+      "message": "Unknown statement type",
+      "category": "parse",
+      "severity": "error",
+      "docs": "https://example.com/docs/errors/0003"
+    },
+    "T2:0004": {
+      "message": "Unknown expression type",
+      "category": "parse",
+      "severity": "error",
+      "docs": "https://example.com/docs/errors/0004"
+    },
+    "T2:0005": {
+      "message": "Unknown type node",
+      "category": "typecheck",
+      "severity": "error",
+      "docs": "https://example.com/docs/errors/0005"
+    },
+    "T2:0101": {
+      "message": "macro substitution produced non-SExpr node inside list",
+      "category": "macro",
+      "severity": "error"
+    },
+    "T2:0102": {
+      "message": "unquote-splicing is not supported yet",
+      "category": "macro",
+      "severity": "error"
+    },
+    "T2:0103": {
+      "message": "macro expansion exceeded recursion depth ({depth})",
+      "category": "macro",
+      "severity": "error"
+    },
+    "T2:0104": {
+      "message": "macro expansion timed out after {duration}ms",
+      "category": "macro",
+      "severity": "error"
+    },
+    "T2:0110": {
+      "message": "unexpected token '{token}' in type expression",
+      "category": "type",
+      "severity": "error"
+    },
+    "T2:0111": {
+      "message": "expected type identifier",
+      "category": "type",
+      "severity": "error"
+    },
+    "T2:0112": {
+      "message": "expected '{value}' but found '{found}' in type expression",
+      "category": "type",
+      "severity": "error"
+    },
+    "T2:0113": {
+      "message": "{context} cannot contain consecutive commas",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0114": {
+      "message": "{context} cannot end with a comma",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0115": {
+      "message": "{context} cannot start with a comma",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0116": {
+      "message": "{kind} requires a signature list",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0117": {
+      "message": "{kind} requires a string name",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0118": {
+      "message": "{label} must be an identifier",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0119": {
+      "message": "{label} must resolve to an identifier",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0120": {
+      "message": "{label} requires a boolean literal",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0121": {
+      "message": "{label} requires a string literal",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0122": {
+      "message": "abstract callables cannot have a body",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0123": {
+      "message": "abstract clause takes no arguments",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0124": {
+      "message": "abstract is only valid for methods/getters/setters",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0125": {
+      "message": "accessors cannot declare a this parameter",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0126": {
+      "message": "assign requires target and value",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0127": {
+      "message": "await requires an argument",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0128": {
+      "message": "Binding can only have a target and optional initializer",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0129": {
+      "message": "call requires a callee",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0130": {
+      "message": "call-with-this requires a function, thisArg, and optional args",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0131": {
+      "message": "case requires an expression",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0132": {
+      "message": "class-body contains unsupported member statement",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0133": {
+      "message": "class-body must start with (class-body ...)",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0134": {
+      "message": "class cannot declare abstract more than once",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0135": {
+      "message": "class cannot declare typeparams more than once",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0136": {
+      "message": "class cannot have multiple decorators clauses",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0137": {
+      "message": "class cannot have multiple extends clauses",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0138": {
+      "message": "class cannot have multiple implements clauses",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0139": {
+      "message": "class may only contain a single class-body",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0140": {
+      "message": "class requires a name and class-body",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0141": {
+      "message": "constructor cannot be abstract",
+      "category": "codegen",
+      "severity": "error"
+    },
+    "T2:0142": {
+      "message": "constructor cannot be async or generator",
+      "category": "codegen",
+      "severity": "error"
+    },
+    "T2:0143": {
+      "message": "decorators clause requires at least one expression",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0144": {
+      "message": "default clause requires a type",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0145": {
+      "message": "default pattern cannot wrap rest",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0146": {
+      "message": "default pattern requires a target and value",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0147": {
+      "message": "default requires a value expression",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0148": {
+      "message": "enum-body must start with (enum-body ...)",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0149": {
+      "message": "enum member must be (\"Name\" value?)",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0150": {
+      "message": "enum member name must be a string literal",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0151": {
+      "message": "enum requires a name and enum-body",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0152": {
+      "message": "Expected literal",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0153": {
+      "message": "export-default requires an expression",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0154": {
+      "message": "export named entries must be identifiers or two-element lists",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0155": {
+      "message": "export named entries must contain identifier atoms",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0156": {
+      "message": "export requires a name",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0157": {
+      "message": "export requires at least one spec",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0158": {
+      "message": "export-spec default requires an expression",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0159": {
+      "message": "export-spec entries must be literals, identifiers, or named/default/namespace lists",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0160": {
+      "message": "export-spec must start with (export-spec ...)",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0161": {
+      "message": "export-spec namespace requires a name",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0162": {
+      "message": "Export statement must start with an atom",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0163": {
+      "message": "extends clause requires a type",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0164": {
+      "message": "extends clause requires exactly one expression",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0165": {
+      "message": "Field modifier {modifier} lacks a value",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0166": {
+      "message": "Field modifiers must be atoms",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0167": {
+      "message": "fn param must be a list with a name",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0168": {
+      "message": "fn param must contain a name, optional type, and optional default value",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0169": {
+      "message": "fn param must include a name",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0170": {
+      "message": "fn signature parameters must be lists like ((x string) (y))",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0171": {
+      "message": "for-await clause requires a binding target and iterable",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0172": {
+      "message": "for-await requires a binding clause",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0173": {
+      "message": "for-await requires a body",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0174": {
+      "message": "for classic accepts at most init, condition, and update",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0175": {
+      "message": "for classic requires a body",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0176": {
+      "message": "for loop requires a kind",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0177": {
+      "message": "for-of clause requires a binding target and iterable",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0178": {
+      "message": "for-of requires a binding clause",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0179": {
+      "message": "for-of requires a body",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0180": {
+      "message": "getter must declare zero parameters",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0181": {
+      "message": "if requires a test and consequent statement",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0182": {
+      "message": "implements clause requires at least one expression",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0183": {
+      "message": "import-all requires an alias and module specifier",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0184": {
+      "message": "import-default requires a name and module specifier",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0185": {
+      "message": "import-named alias entries must contain identifier atoms",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0186": {
+      "message": "import-named entries must be identifiers or two-element lists",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0187": {
+      "message": "import-named requires a list of names and module specifier",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0188": {
+      "message": "import requires an import-spec list",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0189": {
+      "message": "import-spec default requires a name",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0190": {
+      "message": "import-spec entries must be literals, identifiers, or named/default/namespace lists",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0191": {
+      "message": "import-spec must start with (import-spec ...)",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0192": {
+      "message": "import-spec namespace requires a name",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0193": {
+      "message": "import-spec requires a module specifier literal",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0194": {
+      "message": "Import statement must start with an atom",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0195": {
+      "message": "index requires object and index expressions",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0196": {
+      "message": "index-signature only supports optional readonly modifier",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0197": {
+      "message": "index-signature parameter must include name and type",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0198": {
+      "message": "index-signature requires a (name type) pair and a value type",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0199": {
+      "message": "interface-body must start with (interface-body ...)",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0200": {
+      "message": "Invalid binding",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0201": {
+      "message": "Invalid binding target",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0202": {
+      "message": "Invalid template literal type part",
+      "category": "serialization",
+      "severity": "error"
+    },
+    "T2:0203": {
+      "message": "keyword arguments are not supported; use an object literal instead",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0204": {
+      "message": "lambda cannot be abstract",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0205": {
+      "message": "lambda cannot be overload",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0206": {
+      "message": "lambda cannot declare a this parameter",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0207": {
+      "message": "method requires a name",
+      "category": "codegen",
+      "severity": "error"
+    },
+    "T2:0208": {
+      "message": "Module specifier must be a literal",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0209": {
+      "message": "namespace-body must start with (namespace-body ...)",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0210": {
+      "message": "namespace requires a name and namespace-body",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0211": {
+      "message": "new requires a callee",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0212": {
+      "message": "non-null requires an expression",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0213": {
+      "message": "object field key must be a string literal",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0214": {
+      "message": "object fields must be (key value) or (spread object expr)",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0215": {
+      "message": "object literal key requires a value after ':'",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0216": {
+      "message": "object literal key requires a value; commas cannot appear between key and value",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0217": {
+      "message": "object-pattern field key must be a string literal",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0218": {
+      "message": "object-pattern fields must be (key target)",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0219": {
+      "message": "object spread must use kind 'object'",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0220": {
+      "message": "object spread requires (spread object expr)",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0221": {
+      "message": "optional key cannot be followed by a comma and another entry",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0222": {
+      "message": "optional literal field requires a value",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0223": {
+      "message": "overload cannot be abstract",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0224": {
+      "message": "overload is only valid for functions and methods",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0225": {
+      "message": "overload requires a named function",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0226": {
+      "message": "overload signatures cannot be emitted as expressions",
+      "category": "codegen",
+      "severity": "error"
+    },
+    "T2:0227": {
+      "message": "overload signatures cannot have a body",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0228": {
+      "message": "parameter properties are not allowed in constructor overloads",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0229": {
+      "message": "parameter properties are only allowed in constructors",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0230": {
+      "message": "parameter property cannot repeat readonly",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0231": {
+      "message": "parameter property cannot specify multiple access modifiers",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0232": {
+      "message": "parameter type annotation requires a type after ':'",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0233": {
+      "message": "Program must be wrapped in (program ...)",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0234": {
+      "message": "Program must start with (program ...)",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0235": {
+      "message": "prop requires an object and a string literal property name",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0236": {
+      "message": "rest target requires a binding target",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0237": {
+      "message": "return type annotation requires a type after ':'",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0238": {
+      "message": "setter cannot declare a return type",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0239": {
+      "message": "setter must declare exactly one parameter",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0240": {
+      "message": "spread kind must be array, object, or rest",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0241": {
+      "message": "spread requires a kind and an expression",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0242": {
+      "message": "static-block must start with (static-block ...)",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0243": {
+      "message": "switch case head must be an atom",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0244": {
+      "message": "switch cases must be non-empty lists",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0245": {
+      "message": "switch requires a discriminant",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0246": {
+      "message": "t:array requires an element type",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0247": {
+      "message": "t:conditional requires check, extends, true, and false branches",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0248": {
+      "message": "ternary requires test, consequent, and alternate expressions",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0249": {
+      "message": "t:fn requires at least a return type",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0250": {
+      "message": "this parameter cannot be repeated",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0251": {
+      "message": "this parameter must be declared without modifiers",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0252": {
+      "message": "this parameter must be first",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0253": {
+      "message": "this parameter requires a type annotation",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0254": {
+      "message": "throw requires an argument",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0255": {
+      "message": "t:indexed requires an object and an index type",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0256": {
+      "message": "t:infer requires a name",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0257": {
+      "message": "t:keyof requires a target type",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0258": {
+      "message": "t:nullable requires an inner type",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0259": {
+      "message": "t:primitive requires a name",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0260": {
+      "message": "try child must be catch or finally",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0261": {
+      "message": "try child must start with an atom",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0262": {
+      "message": "try requires a body statement",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0263": {
+      "message": "try supports at most one catch",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0264": {
+      "message": "try supports at most one finally",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0265": {
+      "message": "t:typeof requires an expression",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0266": {
+      "message": "t:var requires a name",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0267": {
+      "message": "type-alias expects a single type expression",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0268": {
+      "message": "type-alias requires a name",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0269": {
+      "message": "type-app requires an expression",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0270": {
+      "message": "type-app requires type arguments",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0271": {
+      "message": "type-assert requires an expression and a type",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0272": {
+      "message": "Type constructor must be an atom",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0273": {
+      "message": "Type expressions must be lists",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0274": {
+      "message": "type-function parameters must be type expressions or parameter descriptors",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0275": {
+      "message": "type-function parameters must either all specify types or none of them do",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0276": {
+      "message": "type-function requires at least a return type",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0277": {
+      "message": "type-interface requires a name and interface-body",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0278": {
+      "message": "type-intersection requires at least one member",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0279": {
+      "message": "type-mapped requires a type param and a value type",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0280": {
+      "message": "type-mapped supports at most name remap, modifiers, and via",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0281": {
+      "message": "type-object field key must be an atom",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0282": {
+      "message": "type-object fields must be (key type)",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0283": {
+      "message": "type-param cannot declare multiple variances",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0284": {
+      "message": "type-param contains too many entries",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0285": {
+      "message": "type-param must be a list with a name",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0286": {
+      "message": "type-params list must be a list of identifiers",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0287": {
+      "message": "typeparams list must start with typeparams",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0288": {
+      "message": ":type-params requires a list of identifiers",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0289": {
+      "message": "type-ref requires an identifier",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0290": {
+      "message": "type-this does not take arguments",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0291": {
+      "message": "type-union requires at least one member",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0292": {
+      "message": "Unexpected end of input",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0293": {
+      "message": "Unexpected token {token}",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0294": {
+      "message": "Unknown binding target kind",
+      "category": "serialization",
+      "severity": "error"
+    },
+    "T2:0295": {
+      "message": "Unknown field modifier {modifier}",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0296": {
+      "message": "Unknown import kind {kind}",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0297": {
+      "message": "Unknown primitive type {name}",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0298": {
+      "message": "Unknown switch clause {clause}",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0299": {
+      "message": "Unknown try child {child}",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0300": {
+      "message": "Unknown type constructor {constructor}",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0301": {
+      "message": "Unsupported binding target {kind}",
+      "category": "serialization",
+      "severity": "error"
+    },
+    "T2:0302": {
+      "message": "Unsupported binding target in codegen",
+      "category": "codegen",
+      "severity": "error"
+    },
+    "T2:0303": {
+      "message": "Unsupported expression kind {kind}",
+      "category": "serialization",
+      "severity": "error"
+    },
+    "T2:0304": {
+      "message": "Unsupported for loop kind {kind}",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0305": {
+      "message": "Unsupported PhaseB node for cloning: {kind}",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0306": {
+      "message": "Unsupported serialized type node {kind}",
+      "category": "serialization",
+      "severity": "error"
+    },
+    "T2:0307": {
+      "message": "Unsupported statement kind {kind}",
+      "category": "serialization",
+      "severity": "error"
+    },
+    "T2:0308": {
+      "message": "Unsupported token type {tokenType}",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0309": {
+      "message": "Unsupported type node",
+      "category": "codegen",
+      "severity": "error"
+    },
+    "T2:0310": {
+      "message": "Unterminated list",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0311": {
+      "message": "while requires a condition and body",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0312": {
+      "message": "Codegen Error: TypeApp in expression context has an invalid target: {target}. Expected an expression.",
+      "category": "codegen",
+      "severity": "error"
+    },
+    "T2:0313": {
+      "message": "template-with requires a string literal template",
+      "category": "macro",
+      "severity": "error"
+    },
+    "T2:0314": {
+      "message": "template-with expects (key value) pairs",
+      "category": "macro",
+      "severity": "error"
+    },
+    "T2:0315": {
+      "message": "template-with values must be literals",
+      "category": "macro",
+      "severity": "error"
+    },
+    "T2:0316": {
+      "message": "template-with missing value for placeholder '{key}'",
+      "category": "macro",
+      "severity": "error"
+    },
+    "T2:0317": {
+      "message": "template-with placeholder '{placeholder}' must be an identifier",
+      "category": "macro",
+      "severity": "error"
+    },
+    "T2:0318": {
+      "message": "template-with has unterminated placeholder",
+      "category": "macro",
+      "severity": "error"
+    },
+    "T2:0319": {
+      "message": "template-with has duplicate key '{key}'",
+      "category": "macro",
+      "severity": "error"
+    },
+    "T2:0320": {
+      "message": "infix expects a single list expression",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0321": {
+      "message": "infix expression must alternate operands and operators",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0322": {
+      "message": "not expects exactly one argument",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0323": {
+      "message": "{operator} expects at least one argument",
+      "category": "parse",
+      "severity": "error"
+    }
+  }
+}

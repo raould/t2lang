@@ -7,7 +7,7 @@ import { compile } from "../../../src/api";
  
 test("simple while loop", async () => {
   const result = await compile(`(program (fn foo () null) (while true (foo)))`, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /while \(true\)/);
   assert.match(result.tsSource, /foo\(\)/);
 });
@@ -20,7 +20,7 @@ test("while with variable condition", async () => {
         (while running
           (process))))
   `, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /while \(running\)/);
 });
 
@@ -35,7 +35,7 @@ test("while with multiple body statements", async () => {
         (b)
         (c)))
   `, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /a\(\)/);
   assert.match(result.tsSource, /b\(\)/);
   assert.match(result.tsSource, /c\(\)/);
@@ -43,6 +43,6 @@ test("while with multiple body statements", async () => {
 
 test("while with call condition", async () => {
   const result = await compile(`(program (fn hasMore () true) (fn process () null) (while (hasMore) (process)))`, );
-  assert.strictEqual(result.errors.length, 0);
+  assert.strictEqual(result.diagnostics.length, 0);
   assert.match(result.tsSource, /while \(hasMore\(\)\)/);
 });

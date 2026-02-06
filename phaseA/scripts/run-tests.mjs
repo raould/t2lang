@@ -1,4 +1,4 @@
-import { readdirSync, statSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -22,7 +22,6 @@ const collectTests = (dir) => {
     if (!entry.name.endsWith(".test.ts")) {
       continue;
     }
-    const relPath = fullPath.replace(`${rootDir}/`, "");
     testFiles.push(fullPath);
   }
 };

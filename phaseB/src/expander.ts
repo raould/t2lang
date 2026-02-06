@@ -1,18 +1,28 @@
 import type { ListNode, SExprNode, SymbolNode } from "./reader.js";
 import type { ExpansionFrame, SourceLoc } from "./location.js";
 import { MacroRegistry } from "./macroRegistry.js";
-import { reportError } from "./errorRegistry.js";
+import { reportError } from "../../common/dist/errorRegistry.js";
 import type { PhaseBSurfaceNode } from "./ast.js";
 
-export function expand(nodes: PhaseBSurfaceNode[], registry: MacroRegistry): PhaseBSurfaceNode[] {
+const MAX_MACRO_EXPANSION_DEPTH = 100;
+const MAX_MACRO_EXPANSION_MS = 500;
+
+interface ExpandContext {
+  depth: number;
+  start: number;
+}
+
+export function expand(nodes: PhaseBSurfaceNode[], registry: MacroRegistry, context?: ExpandContext): PhaseBSurfaceNode[] {
+  const ctx: ExpandContext = context ?? { depth: 0, start: Date.now() };
   const result: PhaseBSurfaceNode[] = [];
   for (const node of nodes) {
-    result.push(...expandNode(node, registry));
+    result.push(...expandNode(node, registry, ctx));
   }
   return result;
 }
 
-function expandNode(node: PhaseBSurfaceNode, registry: MacroRegistry): PhaseBSurfaceNode[] {
+function expandNode(node: PhaseBSurfaceNode, registry: MacroRegistry, context: ExpandContext): PhaseBSurfaceNode[] {
+  ensureLimits(context);
   if (isListNode(node)) {
     if (tryRegisterDefmacro(node, registry)) {
       return [];
@@ -29,7 +39,7 @@ function expandNode(node: PhaseBSurfaceNode, registry: MacroRegistry): PhaseBSur
       if (macro) {
         const argNodes = node.elements.slice(1);
         const args = argNodes.map((arg) => {
-          const expanded = expandArg(arg, registry);
+          const expanded = expandArg(arg, registry, context);
           return expanded[0] ?? cloneNode(arg);
         });
         const body = macro.body.map((entry) => substitute(entry, macro.params, args));
@@ -38,14 +48,14 @@ function expandNode(node: PhaseBSurfaceNode, registry: MacroRegistry): PhaseBSur
           callSite: node.loc,
           macroDefSite: macro.loc,
         };
-        const expanded = expand(body, registry);
+        const expanded = expand(body, registry, incrementDepth(context));
         return expanded.map((resultNode) => attachExpansionFrame(resultNode, frame));
       }
     }
 
     const expandedElements: SExprNode[] = [];
     for (const child of node.elements) {
-      for (const expanded of expandNode(child, registry)) {
+      for (const expanded of expandNode(child, registry, incrementDepth(context))) {
         if (isSExprNode(expanded)) {
           expandedElements.push(expanded);
         }
@@ -53,11 +63,27 @@ function expandNode(node: PhaseBSurfaceNode, registry: MacroRegistry): PhaseBSur
     }
     return [cloneListWithElements(node, expandedElements)];
   }
+  ensureLimits(context);
   return [cloneNode(node)];
 }
 
-function expandArg(arg: PhaseBSurfaceNode, registry: MacroRegistry): PhaseBSurfaceNode[] {
-  return expandNode(arg, registry);
+function expandArg(arg: PhaseBSurfaceNode, registry: MacroRegistry, context: ExpandContext): PhaseBSurfaceNode[] {
+  return expandNode(arg, registry, incrementDepth(context));
+}
+
+function incrementDepth(context: ExpandContext): ExpandContext {
+  const nextDepth = context.depth + 1;
+  ensureLimits({ ...context, depth: nextDepth });
+  return { ...context, depth: nextDepth };
+}
+
+function ensureLimits(context: ExpandContext): void {
+  if (context.depth > MAX_MACRO_EXPANSION_DEPTH) {
+    throw reportError("T2:0103", { depth: context.depth });
+  }
+  if (Date.now() - context.start > MAX_MACRO_EXPANSION_MS) {
+    throw reportError("T2:0104", { duration: Date.now() - context.start });
+  }
 }
 
 function tryRegisterDefmacro(node: ListNode, registry: MacroRegistry): boolean {
@@ -95,7 +121,7 @@ function substitute(node: PhaseBSurfaceNode, params: string[], args: PhaseBSurfa
       node.elements.map((child) => {
         const substituted = substitute(child, params, args);
         if (!isSExprNode(substituted)) {
-          throw reportError("E101");
+          throw reportError("T2:0101");
         }
         return substituted;
       })
@@ -150,7 +176,7 @@ function convertQuasiquote(node: SExprNode): SExprNode {
         return node.elements[1];
       }
       if (head.name === "unquote-splicing") {
-        throw reportError("E102");
+        throw reportError("T2:0102");
       }
     }
     const listSymbol = createSymbol("list", node.loc);
@@ -164,7 +190,7 @@ function convertQuasiquoteElement(node: SExprNode): SExprNode {
   if (isListNode(node)) {
     const head = node.elements[0];
     if (isSymbolNode(head) && head.name === "unquote-splicing") {
-      throw reportError("E102");
+      throw reportError("T2:0102");
     }
     return convertQuasiquote(node);
   }
