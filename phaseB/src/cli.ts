@@ -50,6 +50,8 @@ interface CliOptions {
   errorFormat?: string;
   color?: boolean;
   noColor?: boolean;
+  warnNoReturnAny?: boolean;
+  warnReturnExpected?: boolean;
 }
 
 export async function main(argv: string[]): Promise<void> {
@@ -123,6 +125,8 @@ export async function main(argv: string[]): Promise<void> {
       prettyOption,
       logLevel,
       compilerContext,
+      warnNoReturnAny: options.warnNoReturnAny,
+      warnReturnExpected: options.warnReturnExpected,
     });
   } catch (error) {
     handleParserFailure(error, format, {
@@ -138,11 +142,17 @@ export async function main(argv: string[]): Promise<void> {
   }
 
   const normalizedDiagnostics = normalizePhaseADiagnostics(result.diagnostics);
-  if (normalizedDiagnostics.length > 0) {
+  const warnings = normalizedDiagnostics.filter((diag) => diag.level === "warning");
+  const errors = normalizedDiagnostics.filter((diag) => diag.level !== "warning");
+  if (errors.length > 0) {
     console.error("Compilation produced diagnostics:");
-    console.error(formatDiagnostics(normalizedDiagnostics, format, diagContext));
+    console.error(formatDiagnostics(errors, format, diagContext));
     process.exitCode = 1;
     return;
+  }
+  if (warnings.length > 0) {
+    console.error("Compilation produced warnings:");
+    console.error(formatDiagnostics(warnings, format, diagContext));
   }
 
   const target = options.output ?? (isStdin ? "stdout.ts" : getDefaultOutput(inputPath));
@@ -193,6 +203,8 @@ function buildCommand(): Command {
     .option("--error-format <format>", "Choose diagnostic output (tty, short, json)", DEFAULT_ERROR_FORMAT)
     .option("--color", "Force colored diagnostic output")
     .option("--no-color", "Disable diagnostic coloring")
+    .option("--warn-no-return-any", "Warn on callables without explicit returns", false)
+    .option("--warn-return-expected", "Warn when non-void return types omit an explicit return", false)
     .allowUnknownOption(false);
   return cmd;
 }
@@ -253,7 +265,7 @@ function getDefaultOutput(input: string): string {
 function normalizePhaseADiagnostics(diags: PhaseADiagnostic[]): Diagnostic[] {
   return diags.map((diag) => ({
     code: (diag.code as ReaderErrorCode) ?? "E001",
-    level: "error",
+    level: diag.level === "warning" ? "warning" : "error",
     message: diag.message,
     loc: spanToSourceLoc(diag.span),
   }));

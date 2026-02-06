@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert";
 import { runE2E_NodeJS } from "./e2e_helpers.js";
+import { parsePhaseBRaw } from "../src/reader.js";
+import type { PhaseBListNode, SymbolNode } from "../src/reader.js";
 
 // note: w/out infix this is moot in sexprs. We are just checking transpilation at the moment.
 
@@ -39,6 +41,23 @@ test("operator translations", async () => {
         assert.deepStrictEqual(lines, entry.node, entry.description);
     }
 });
+
+  test("infix operator precedence is inductive", async () => {
+    for (const entry of infixPrecedenceTable) {
+      const source = `(infix (a ${entry.low} b ${entry.high} c))`;
+      const nodes = parsePhaseBRaw(source, "infix-inductive.t2");
+      const root = nodes[0] as PhaseBListNode;
+      const [, rootOperator, left, right] = root.elements;
+      assert.strictEqual((rootOperator as SymbolNode).name, entry.low, entry.description);
+      assert.strictEqual((left as SymbolNode).name, "a", entry.description);
+      assert.strictEqual(right.phaseKind, "list", entry.description);
+      const nested = right as PhaseBListNode;
+      const [, nestedOperator, nestedLeft, nestedRight] = nested.elements;
+      assert.strictEqual((nestedOperator as SymbolNode).name, entry.high, entry.description);
+      assert.strictEqual((nestedLeft as SymbolNode).name, "b", entry.description);
+      assert.strictEqual((nestedRight as SymbolNode).name, "c", entry.description);
+    }
+  });
 
 const table: OperatorTestEntry[] = [
   {
@@ -112,3 +131,25 @@ const table: OperatorTestEntry[] = [
     "node": ["a2", "b3", "3"]
   }
 ];
+
+type InfixPrecedenceEntry = {
+    description: string;
+    high: string;
+    low: string;
+};
+
+const infixPrecedenceTable: InfixPrecedenceEntry[] = [
+    { description: "** binds tighter than *", high: "**", low: "*" },
+    { description: "* binds tighter than +", high: "*", low: "+" },
+    { description: "+ binds tighter than <<", high: "+", low: "<<" },
+    { description: "<< binds tighter than <", high: "<<", low: "<" },
+    { description: "< binds tighter than ===", high: "<", low: "===" },
+    { description: "=== binds tighter than &", high: "===", low: "&" },
+    { description: "& binds tighter than ^", high: "&", low: "^" },
+    { description: "^ binds tighter than |", high: "^", low: "|" },
+    { description: "| binds tighter than &&", high: "|", low: "&&" },
+    { description: "&& binds tighter than ||", high: "&&", low: "||" },
+    { description: "|| binds tighter than ??", high: "||", low: "??" },
+    { description: "?? binds tighter than ,", high: "??", low: "," },
+];
+

@@ -495,7 +495,9 @@ async function emitExpression(expr: Expression): Promise<string> {
         return `${targetExpr} = ${valueExpr}`;
       }
     }
-    const callee = await emitExpression(expr.callee);
+    const calleeText = await emitExpression(expr.callee);
+    const needsParens = expr.callee instanceof FunctionExpr || expr.callee instanceof ClassExpr;
+    const callee = needsParens ? `(${calleeText})` : calleeText;
     const args = await Promise.all(expr.args.map(emitExpression));
     return `${callee}(${args.join(", ")})`;
   }
@@ -648,13 +650,6 @@ async function emitFunctionSignature(expr: FunctionExpr): Promise<{ typeParams: 
 
 async function renderFunctionBody(expr: FunctionExpr): Promise<string> {
   const bodyStatements = expr.body.slice();
-  if ((expr.callableKind === "method" || expr.callableKind === "getter") && bodyStatements.length > 0) {
-    const lastIndex = bodyStatements.length - 1;
-    const lastStmt = bodyStatements[lastIndex];
-    if (lastStmt instanceof ExprStmt) {
-      bodyStatements[lastIndex] = new ReturnExpr({ span: lastStmt.span, value: lastStmt.expr });
-    }
-  }
   const bodyBlock = new BlockStmt({ statements: bodyStatements, span: expr.span });
   const body = await emitStatementBody(bodyBlock);
   const lines = ["{"];

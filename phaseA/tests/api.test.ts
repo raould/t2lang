@@ -140,6 +140,26 @@ test("compile emits generator function keyword", async () => {
   assert.ok(result.tsSource.includes("function* sample"));
 });
 
+test("warn-no-return-any reports missing explicit returns", async () => {
+  const source = `(program
+    (fn foo ((x))
+      (call log x))
+  )`;
+  const result = await compile(source, { warnNoReturnAny: true });
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.ok(result.diagnostics.some((diag) => diag.code === "T2:0401" && diag.level === "warning"));
+});
+
+test("warn-return-expected reports non-void return type without return", async () => {
+  const source = `(program
+    (fn foo ((x) (type-number))
+      (call log x))
+  )`;
+  const result = await compile(source, { warnReturnExpected: true });
+  if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
+  assert.ok(result.diagnostics.some((diag) => diag.code === "T2:0402" && diag.level === "warning"));
+});
+
 test("generateCode emits lambda expressions", async () => {
   const paramId = mkIdentifier("value");
   const fn = new FunctionExpr({

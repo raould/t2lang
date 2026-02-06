@@ -8,6 +8,10 @@ export function rewriteAssignments(nodes: SExprNode[]): SExprNode[] {
 function rewriteNode(node: SExprNode): SExprNode {
   if (isListNode(node)) {
     const [originalHead, ...rest] = node.elements;
+    const infixAssign = rewriteInfixAssign(originalHead, rest, node.loc);
+    if (infixAssign) {
+      return infixAssign;
+    }
     const rewrittenRest = rest.map(rewriteNode);
     if (isSymbolNode(originalHead)) {
       const methodCall = rewriteMethodCall(originalHead, rewrittenRest, node.loc);
@@ -38,6 +42,24 @@ function rewriteNode(node: SExprNode): SExprNode {
     }
   }
   return node;
+}
+
+function rewriteInfixAssign(
+  targetNode: SExprNode | undefined,
+  rest: SExprNode[],
+  loc: SymbolNode["loc"]
+): SExprNode | null {
+  if (!targetNode || rest.length !== 2) {
+    return null;
+  }
+  const operator = rest[0];
+  if (!isSymbolNode(operator) || operator.name !== ":=") {
+    return null;
+  }
+  const value = rest[1];
+  const rewrittenTarget = rewriteNode(targetNode);
+  const rewrittenValue = rewriteNode(value);
+  return createList([createSymbol("assign", loc), rewrittenTarget, rewrittenValue], loc);
 }
 
 function isListNode(node: SExprNode): node is ListNode {

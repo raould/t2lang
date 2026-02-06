@@ -19,6 +19,31 @@ test("rewrites assignment sugar into assign", () => {
   assert.strictEqual(source.kind, "symbol");
 });
 
+test("rewrites infix := assignment into assign", () => {
+  const nodes = parseSexpr("(x := 10)", "rewriter.t2");
+  const rewritten = rewriteAssignments(nodes);
+  assert.strictEqual(rewritten.length, 1);
+  const list = rewritten[0] as ListNode;
+  const [head, target, source] = list.elements;
+  assert.strictEqual((head as SymbolNode).name, "assign");
+  assert.strictEqual((target as SymbolNode).name, "x");
+  assert.strictEqual((source as { kind: string }).kind, "literal");
+});
+
+test("rewrites dotted infix := assignment into assign", () => {
+  const nodes = parseSexpr("(obj.prop := 20)", "rewriter.t2");
+  const rewritten = rewriteAssignments(nodes);
+  assert.strictEqual(rewritten.length, 1);
+  const list = rewritten[0] as ListNode;
+  const [head, target] = list.elements;
+  assert.strictEqual((head as SymbolNode).name, "assign");
+  assert.strictEqual(target.kind, "list");
+  const [propHead, objectSym, propSym] = (target as ListNode).elements;
+  assert.strictEqual((propHead as SymbolNode).name, "prop");
+  assert.strictEqual((objectSym as SymbolNode).name, "obj");
+  assert.strictEqual((propSym as SymbolNode).name, "prop");
+});
+
 test("rewrites set! sugar into assign", () => {
   const nodes = parseSexpr("(set! foo bar)", "rewriter.t2");
   const rewritten = rewriteAssignments(nodes);

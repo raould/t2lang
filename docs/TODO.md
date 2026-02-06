@@ -17,6 +17,7 @@
 * infix.
 * properly hygenic gensym.
 * collate the good things from phase0/1 and phaseA/B and try again.
+    * bootstrap it from this compiler.
     * prevent context pollution by starting in a new repo.
     * stick to staging-guardrails.md.
     * specs at each level.
@@ -50,6 +51,5 @@
     * hoping to make it clear if some code is somehow running wrong code (e.g. dist/ is out of date).
 * bootstrap the language so that we can use its features for the compiler.
     * the error registry string interpolation via macro using js string template interpolation.
-
-
-
+* could t2tc accept fragments without `(program ...)`?
+* somebody do a clean-room, non gen-AI version of t2lang.
