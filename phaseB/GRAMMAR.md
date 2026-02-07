@@ -174,6 +174,7 @@ All code in a compilation unit (e.g. a single file) must be enclosed in a top-le
 <object> ::= "(" "object" <object-field>* ")"
 <object-field> ::= "(" <string> <expression> ")"
 							 | "(" "spread" "object" <expression> ")"
+					 | "(" "computed" <expression> <expression> ")"
 <spread> ::= "(" "spread" <spread-kind> <expression> ")"
 <spread-kind> ::= "array" | "object" | "rest"
 <await> ::= "(" "await" <expression> ")"

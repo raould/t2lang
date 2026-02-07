@@ -64,6 +64,7 @@ const NON_CALL_FORMS = new Set([
   "unquote",
   "unquote-splicing",
   "infix",
+  "computed",
 ]);
 
 export function applySugar(nodes: PhaseBNode[]): PhaseBNode[] {
@@ -722,6 +723,19 @@ function rewriteObjectFields(elements: PhaseBNode[], allowSymbolValues: boolean)
   while (idx < elements.length) {
     const entry = elements[idx];
     const nextEntry = elements[idx + 1];
+    if (entry.phaseKind === "list" && (entry as PhaseBListNode).delimiter === "[") {
+      if (!nextEntry || isCommaNode(nextEntry)) {
+        throw reportError("T2:0215");
+      }
+      const keyList = entry as PhaseBListNode;
+      if (keyList.elements.length !== 1) {
+        throw reportError("T2:0214");
+      }
+      const keyExpr = keyList.elements[0];
+      rewritten.push(createComputedFieldNode(keyExpr, nextEntry, mergeLocs(entry.loc, nextEntry.loc)));
+      idx += 2;
+      continue;
+    }
     if (entry.phaseKind === "symbol") {
       const split = splitTrailingColonSymbol(entry as PhaseBSymbolNode);
       if (split) {
@@ -824,6 +838,11 @@ function buildOptionalFieldNode(key: string, value: PhaseBNode, loc: SourceLoc):
   const optionalSymbol = createPhaseBSymbol("optional-field", loc);
   const keyLiteral = createLiteralNode(key, loc);
   return createPhaseBList([optionalSymbol, keyLiteral, value], loc);
+}
+
+function createComputedFieldNode(key: PhaseBNode, value: PhaseBNode, loc: SourceLoc): PhaseBListNode {
+  const computedSymbol = createPhaseBSymbol("computed", loc);
+  return createPhaseBList([computedSymbol, key, value], loc);
 }
 function rewriteOptionalObject(node: PhaseBListNode): PhaseBNode | null {
   const head = node.elements[0];

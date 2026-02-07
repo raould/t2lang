@@ -53,3 +53,4 @@
     * the error registry string interpolation via macro using js string template interpolation.
 * could t2tc accept fragments without `(program ...)`?
 * somebody do a clean-room, non gen-AI version of t2lang.
+* can we use Symbol for gensym?

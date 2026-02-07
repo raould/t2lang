@@ -1159,6 +1159,17 @@ function lowerObject(node: PhaseBListNode): ObjectExpr {
           return { kind: "spread", expr: lowerExpression(exprNode) } as const;
         }
       }
+      if (keyNode && keyNode.phaseKind === "symbol" && (keyNode as SymbolNode).name === "computed") {
+        const exprNode = list.elements[1];
+        const valueNode = list.elements[2];
+        if (exprNode && valueNode) {
+          return {
+            kind: "computed",
+            key: lowerExpression(exprNode),
+            value: lowerExpression(valueNode),
+          } as const;
+        }
+      }
       if (list.elements.length >= 2) {
         const valueNode = list.elements[1];
         return { kind: "field", key: extractPropertyName(list.elements[0]), value: lowerExpression(valueNode) } as const;

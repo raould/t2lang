@@ -95,3 +95,13 @@ test("type annotations emit t:literal for literal values", () => {
   const head = rewritten.elements[0] as SymbolNode;
   assert.strictEqual(head.name, "t:literal");
 });
+
+test("type annotations accept Iterable generics", () => {
+  const annotation = getFirstAnnotation("(fn (x : Iterable<number>) 0)");
+  const rewritten = annotation.annotation as PhaseBListNode;
+  const head = rewritten.elements[0] as SymbolNode;
+  assert.strictEqual(head.name, "t:apply");
+  const base = rewritten.elements[1] as PhaseBListNode;
+  const baseHead = base.elements[0] as SymbolNode;
+  assert.strictEqual(baseHead.name, "t:ref");
+});

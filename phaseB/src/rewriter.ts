@@ -13,7 +13,7 @@ function rewriteNode(node: SExprNode): SExprNode {
       return infixAssign;
     }
     const rewrittenRest = rest.map(rewriteNode);
-    if (isSymbolNode(originalHead)) {
+    if (isSymbolNode(originalHead) && node.delimiter === "(") {
       const methodCall = rewriteMethodCall(originalHead, rewrittenRest, node.loc);
       if (methodCall) {
         return methodCall;

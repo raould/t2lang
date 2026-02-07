@@ -62,3 +62,16 @@ test("object literal supports key: value syntax", () => {
   assert.strictEqual(key.value, "name");
   assert.strictEqual(value.value, "Alice");
 });
+
+test("object literal supports computed keys", () => {
+  const nodes = parsePhaseBRaw("{[Symbol.iterator] 0}", "object-computed.t2");
+  const objNode = nodes[0] as PhaseBListNode;
+  const field = objNode.elements[1] as PhaseBListNode;
+  const head = field.elements[0] as SymbolNode;
+  assert.strictEqual(head.name, "computed");
+  const keyExpr = field.elements[1] as PhaseBListNode;
+  const keyHead = keyExpr.elements[0] as SymbolNode;
+  assert.strictEqual(keyHead.name, "prop");
+  const value = field.elements[2] as LiteralNode;
+  assert.strictEqual(value.value, 0);
+});

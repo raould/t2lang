@@ -297,6 +297,7 @@ export class ArrayExpr {
 
 export type ObjectField =
   | { kind: "field"; key: string; value: Expression }
+  | { kind: "computed"; key: Expression; value: Expression }
   | { kind: "spread"; expr: Expression };
 
 export class ObjectExpr {

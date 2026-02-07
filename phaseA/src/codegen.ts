@@ -581,6 +581,11 @@ async function emitExpression(expr: Expression): Promise<string> {
           const valueText = await emitExpression(field.expr);
           return `...${valueText}`;
         }
+        if (field.kind === "computed") {
+          const keyText = await emitExpression(field.key);
+          const valueText = await emitExpression(field.value);
+          return `[${keyText}]: ${valueText}`;
+        }
         const valueText = await emitExpression(field.value);
         const keyText = formatObjectKey(field.key);
         return `${keyText}: ${valueText}`;
@@ -1351,6 +1356,9 @@ function containsAsyncExpression(expr: Expression): boolean {
     return expr.fields.some((field) => {
       if (field.kind === "spread") {
         return containsAsyncExpression(field.expr);
+      }
+      if (field.kind === "computed") {
+        return containsAsyncExpression(field.key) || containsAsyncExpression(field.value);
       }
       return containsAsyncExpression(field.value);
     });

@@ -37,7 +37,7 @@ Note: this has likely gotten out of date, GRAMMER.md is the lesser wrong.
 | CatchClause | `catch` | `binding?: Binding`, `body: Stmt[]` | A1 | Optional binding to capture exception value. |
 | FinallyClause | `finally` | `body: Stmt[]` | A1 | Executes irrespective of throw. |
 | ArrayExpr | `array` | `elements: Expr[]` | A1 | Elements may include `SpreadExpr` entries; commas can appear as separators in source lists. |
-| ObjectExpr | `object` | `fields: ObjectField[]` | A1 | `ObjectField` is either `{ kind: "field"; key: string; value: Expr }` or `{ kind: "spread"; expr: Expr }`. Commas can appear as separators in source lists. |
+| ObjectExpr | `object` | `fields: ObjectField[]` | A1 | `ObjectField` is `{ kind: "field"; key: string; value: Expr }`, `{ kind: "computed"; key: Expr; value: Expr }`, or `{ kind: "spread"; expr: Expr }`. Commas can appear as separators in source lists. |
 | TemplateExpr | `template` | `parts: Expr[]` | A1 | Interpolated template literals; string literals become raw segments and other expressions become `${...}` slots. |
 | NonNullAssertExpr | `non-null` | `expr: Expr` | A1 | Non-null assertion; emits postfix `!` in TypeScript. |
 | AwaitExpr | `await` | `argument: Expr` | A1 | Rewritten only inside `async` contexts by Phase B. |

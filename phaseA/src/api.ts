@@ -165,6 +165,9 @@ function collectReturnWarnings(program: Program, config: CompilePhaseAConfig): D
       for (const field of expr.fields) {
         if (field.kind === "field") {
           visitExpression(field.value);
+        } else if (field.kind === "computed") {
+          visitExpression(field.key);
+          visitExpression(field.value);
         } else {
           visitExpression(field.expr);
         }

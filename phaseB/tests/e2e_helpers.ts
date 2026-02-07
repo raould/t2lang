@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
+import assert from "node:assert";
 import { compile } from "../src/api.ts";
 import type { CompilePhaseBResult } from "../src/api.ts";
 
@@ -19,6 +20,13 @@ const VIRTUAL_LIB_SOURCE = [
   "interface Object {}",
   "interface RegExp {}",
   "interface String {}",
+  "interface SymbolConstructor { readonly iterator: symbol; }",
+  "declare const Symbol: SymbolConstructor;",
+  "interface IteratorResult<T, TReturn = any> { value: T | TReturn; done: boolean; }",
+  "interface Iterator<T, TReturn = any, TNext = undefined> { next(value?: TNext): IteratorResult<T, TReturn>; }",
+  "interface Iterable<T, TReturn = any, TNext = undefined> { [Symbol.iterator](): Iterator<T, TReturn, TNext>; }",
+  "interface IterableIterator<T, TReturn = any, TNext = undefined> extends Iterator<T, TReturn, TNext>, Iterable<T, TReturn, TNext> {}",
+  "interface Generator<T = any, TReturn = any, TNext = unknown> extends Iterator<T, TReturn, TNext> {}",
   "declare const console: { log: (...args: any[]) => void; };",
 ].join("\n");
 
@@ -34,7 +42,7 @@ function makeCompilerHost(tsSource: string): ts.CompilerHost {
       return undefined;
     },
     getDefaultLibFileName: () => VIRTUAL_LIB,
-    writeFile: () => {},
+    writeFile: () => { },
     getCurrentDirectory: () => "",
     getCanonicalFileName: (fileName) => fileName,
     useCaseSensitiveFileNames: () => true,
@@ -123,4 +131,43 @@ export async function runE2E_NodeJS(
   const { errors, ...compileResult } = result;
   void errors;
   return [compileResult as CompilePhaseBResult, tscErrors, { stdout, stderr }];
+}
+
+async function helperNode(source: string, echoSource = false) {
+  const [compileResult, tscErrors, { stdout, stderr }] = await runE2E_NodeJS(source);
+  if (echoSource) { console.log(compileResult.tsSource); }
+  assert.strictEqual(tscErrors.length, 0, `Expected no TypeScript errors, got: ${tscErrors.join(" | ")}`);
+  assert.ok(compileResult.tsSource.length > 0, "Expected emitted TypeScript output");
+  assert.ok(stdout.length > 0);
+  assert.strictEqual(stderr.length, 0);
+  return [compileResult, tscErrors, { stdout, stderr }] as const;
+}
+
+export async function helperStrictNode(source: string, expectedOutput: string, echoSource = false) {
+  const results = await helperNode(source, echoSource);
+  const cleanStdout = results[2].stdout.replace(/\x1B\[[0-9;]*m/g, "").trim();
+  assert.strictEqual(cleanStdout, expectedOutput);
+}
+
+export async function helperMatchNode(source: string, regex: string, echoSource = false) {
+  const results = await helperNode(source, echoSource);
+  const cleanStdout = results[2].stdout.replace(/\x1B\[[0-9;]*m/g, "").trim();
+  assert.match(
+    cleanStdout,
+    regex
+  );
+}
+
+export async function helperMatchTS(source: string, regex: string, echoSource = false) {
+  const [result, tscErrors, { stdout, stderr }] = await runE2E_NodeJS(source);
+  if (echoSource) { console.log(result.tsSource); }
+  assert.strictEqual(tscErrors.length, 0, `Expected no TypeScript errors, got: ${tscErrors.join(" | ")}`);
+  assert.ok(result.tsSource.length > 0, "Expected emitted TypeScript output");
+  assert.ok(stdout.length > 0);
+  assert.strictEqual(stderr.length, 0);
+  assert.match(
+    result.tsSource,
+    regex
+  );
+  return [result, tscErrors, { stdout, stderr }];
 }
