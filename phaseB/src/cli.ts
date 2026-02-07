@@ -18,6 +18,7 @@ import {
   Diagnostic,
   DiagnosticContext,
   ErrorFormat,
+  diagnosticFromCompilationError,
   diagnosticFromParseError,
   formatDiagnostics,
   parseErrorFormat,
@@ -30,6 +31,7 @@ import {
   EventSeverity,
   isEventSeverity,
 } from "../../phaseA/dist/events.js";
+import { T2CompilationError } from "./errorRegistry.js";
 
 const VALID_LOG_PHASES: CompilerStage[] = ["parse", "resolve", "typecheck", "codegen"];
 const VALID_PRETTY_OPTIONS = ["pretty", "ugly"] as const;
@@ -250,6 +252,12 @@ async function readStdin(): Promise<string> {
 function handleParserFailure(error: unknown, format: ErrorFormat, context: DiagnosticContext): void {
   if (error instanceof ParseError) {
     const diag = diagnosticFromParseError(error);
+    console.error(formatDiagnostics([diag], format, context));
+    process.exitCode = 1;
+    return;
+  }
+  if (error instanceof T2CompilationError) {
+    const diag = diagnosticFromCompilationError(error);
     console.error(formatDiagnostics([diag], format, context));
     process.exitCode = 1;
     return;

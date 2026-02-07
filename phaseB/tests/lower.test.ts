@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert";
 import { parsePhaseBRaw } from "../src/reader.js";
 import { lowerPhaseB } from "../src/lower.js";
-import { PhaseBError } from "../../common/dist/errorRegistry.js";
+import { T2CompilationError } from "../../common/dist/errorRegistry.js";
 import {
   AssignExpr,
   ExprStmt,
@@ -117,7 +117,7 @@ test("lowerPhaseB rejects string method names", () => {
   const [node] = parsePhaseBRaw("(method \"bad\" (x) (assign x 1))", "lower-method-string.test.t2");
   assert.throws(
     () => lowerPhaseB([node]),
-    (error) => error instanceof PhaseBError && error.code === "T2:0118"
+    (error) => error instanceof T2CompilationError && error.code === "T2:0118"
   );
 });
 
@@ -125,7 +125,7 @@ test("lowerPhaseB rejects string getter names", () => {
   const [node] = parsePhaseBRaw("(getter \"bad\" (x) (assign x 1))", "lower-getter-string.test.t2");
   assert.throws(
     () => lowerPhaseB([node]),
-    (error) => error instanceof PhaseBError && error.code === "T2:0118"
+    (error) => error instanceof T2CompilationError && error.code === "T2:0118"
   );
 });
 
@@ -133,7 +133,7 @@ test("lowerPhaseB rejects string setter names", () => {
   const [node] = parsePhaseBRaw("(setter \"bad\" (x) (assign x 1))", "lower-setter-string.test.t2");
   assert.throws(
     () => lowerPhaseB([node]),
-    (error) => error instanceof PhaseBError && error.code === "T2:0118"
+    (error) => error instanceof T2CompilationError && error.code === "T2:0118"
   );
 });
 
@@ -281,7 +281,7 @@ test("lowerPhaseB rejects await outside async callables", () => {
   const [node] = parsePhaseBRaw("(await (call foo))", "lower-await-outside.t2");
   assert.throws(
     () => lowerPhaseB([node]),
-    (error) => error instanceof PhaseBError && error.code === "T2:0324"
+    (error) => error instanceof T2CompilationError && error.code === "T2:0324"
   );
 });
 

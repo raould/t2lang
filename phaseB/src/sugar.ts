@@ -1689,17 +1689,17 @@ function rewriteInfixForm(node: PhaseBListNode): PhaseBNode | null {
     return null;
   }
   if (node.elements.length !== 2) {
-    throw reportError("T2:0320");
+    throw reportError("T2:0320", node.loc);
   }
   const inner = node.elements[1];
   if (!inner || inner.phaseKind !== "list") {
-    throw reportError("T2:0320");
+    throw reportError("T2:0320", node.loc);
   }
   const innerList = inner as PhaseBListNode;
   const rewrittenInner: PhaseBListNode = { ...innerList, elements: innerList.elements.map(rewriteNode) };
   const tokenized = extractInfixTokens(rewrittenInner);
   if (!tokenized) {
-    throw reportError("T2:0321");
+    throw reportError("T2:0321", node.loc);
   }
   const expression = buildInfixExpression(tokenized.operands, tokenized.operators);
   if (expression.phaseKind === "list") {
