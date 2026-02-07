@@ -18,6 +18,8 @@
 * properly hygenic gensym.
 * collate the good things from phase0/1 and phaseA/B and try again.
     * know that it will get squirrely quickly and do random incorrect things you didn't notice.
+    * i really wish it supported visual programming so i could more easily observe the pipeline.
+        * find a program-vizualization tool for typescript and use it iteratively to make sure things are not going off track.
     * a main problem is that when you add sugar, things explode combinatorially, so it is hard to have enough tests, and hard to know what combinations of syntax sugar really are successfully supported.
         * i really do not know if the phaseB macros & sugar are individually correctly lowering such that they can all be used together.
         * All sugar must desugar before macro expansion, and must desugar into the same canonical AST form that macros expect.

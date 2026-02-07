@@ -2,6 +2,8 @@ import type { ExpansionFrame, SourceLoc } from "./location.js";
 export type { ExpansionFrame, SourceLoc } from "./location.js";
 import type { Program } from "../../phaseA/dist/phaseA1.js";
 import { applySugar } from "./sugar.js";
+import { expand } from "./expander.js";
+import { MacroRegistry } from "./macroRegistry.js";
 import { rewriteAssignments } from "./rewriter.js";
 import { lowerPhaseB } from "./lower.js";
 
@@ -91,7 +93,9 @@ export function parsePhaseBRaw(source: string, file = "<input>"): PhaseBNode[] {
   const stripped = readerMacros.hasMacros ? stripReaderMacroDefs(macroParsed) : macroParsed;
   const rewritten = rewriteAssignments(stripped);
   const nodes = rewritten.map(wrapPhaseBNode);
-  return applySugar(nodes);
+  const sugared = applySugar(nodes);
+  const registry = new MacroRegistry();
+  return expand(sugared, registry) as PhaseBNode[];
 }
 
 function wrapPhaseBNode(node: SExprNode): PhaseBNode {

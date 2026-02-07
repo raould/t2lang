@@ -1,27 +1,29 @@
-import type { ListNode, SExprNode, SymbolNode } from "./reader.js";
+import type { ListNode, PhaseBListNode, PhaseBNode, PhaseBTypeAnnotation, SExprNode, SymbolNode } from "./reader.js";
 import type { ExpansionFrame, SourceLoc } from "./location.js";
 import { MacroRegistry } from "./macroRegistry.js";
 import { reportError } from "../../common/dist/errorRegistry.js";
-import type { PhaseBSurfaceNode } from "./ast.js";
 
 const MAX_MACRO_EXPANSION_DEPTH = 100;
 const MAX_MACRO_EXPANSION_MS = 500;
+
+type MacroNode = PhaseBNode | SExprNode;
+type MacroListNode = PhaseBListNode | ListNode;
 
 interface ExpandContext {
   depth: number;
   start: number;
 }
 
-export function expand(nodes: PhaseBSurfaceNode[], registry: MacroRegistry, context?: ExpandContext): PhaseBSurfaceNode[] {
+export function expand(nodes: MacroNode[], registry: MacroRegistry, context?: ExpandContext): MacroNode[] {
   const ctx: ExpandContext = context ?? { depth: 0, start: Date.now() };
-  const result: PhaseBSurfaceNode[] = [];
+  const result: MacroNode[] = [];
   for (const node of nodes) {
     result.push(...expandNode(node, registry, ctx));
   }
   return result;
 }
 
-function expandNode(node: PhaseBSurfaceNode, registry: MacroRegistry, context: ExpandContext): PhaseBSurfaceNode[] {
+function expandNode(node: MacroNode, registry: MacroRegistry, context: ExpandContext): MacroNode[] {
   ensureLimits(context);
   if (isListNode(node)) {
     if (tryRegisterDefmacro(node, registry)) {
@@ -53,7 +55,7 @@ function expandNode(node: PhaseBSurfaceNode, registry: MacroRegistry, context: E
       }
     }
 
-    const expandedElements: SExprNode[] = [];
+    const expandedElements: MacroNode[] = [];
     for (const child of node.elements) {
       for (const expanded of expandNode(child, registry, incrementDepth(context))) {
         if (isSExprNode(expanded)) {
@@ -67,7 +69,7 @@ function expandNode(node: PhaseBSurfaceNode, registry: MacroRegistry, context: E
   return [cloneNode(node)];
 }
 
-function expandArg(arg: PhaseBSurfaceNode, registry: MacroRegistry, context: ExpandContext): PhaseBSurfaceNode[] {
+function expandArg(arg: MacroNode, registry: MacroRegistry, context: ExpandContext): MacroNode[] {
   return expandNode(arg, registry, incrementDepth(context));
 }
 
@@ -86,7 +88,7 @@ function ensureLimits(context: ExpandContext): void {
   }
 }
 
-function tryRegisterDefmacro(node: ListNode, registry: MacroRegistry): boolean {
+function tryRegisterDefmacro(node: MacroListNode, registry: MacroRegistry): boolean {
   const [head, nameNode, paramsNode, ...body] = node.elements;
   if (!isSymbolNode(head) || head.name !== "defmacro") {
     return false;
@@ -94,7 +96,7 @@ function tryRegisterDefmacro(node: ListNode, registry: MacroRegistry): boolean {
   if (!nameNode || !isSymbolNode(nameNode)) {
     return false;
   }
-  if (!paramsNode || paramsNode.kind !== "list") {
+  if (!paramsNode || !isListNode(paramsNode)) {
     return false;
   }
   const params = paramsNode.elements.filter(isSymbolNode).map((sym) => sym.name);
@@ -107,7 +109,7 @@ function tryRegisterDefmacro(node: ListNode, registry: MacroRegistry): boolean {
   return true;
 }
 
-function substitute(node: PhaseBSurfaceNode, params: string[], args: PhaseBSurfaceNode[]): PhaseBSurfaceNode {
+function substitute(node: MacroNode, params: string[], args: MacroNode[]): MacroNode {
   if (isSymbolNode(node)) {
     const paramIndex = params.indexOf(node.name);
     if (paramIndex >= 0 && args[paramIndex]) {
@@ -130,11 +132,11 @@ function substitute(node: PhaseBSurfaceNode, params: string[], args: PhaseBSurfa
   return cloneNode(node);
 }
 
-function cloneListWithElements(node: ListNode, elements: SExprNode[]): ListNode {
-  return { ...node, elements };
+function cloneListWithElements(node: MacroListNode, elements: MacroNode[]): MacroListNode {
+  return { ...node, elements } as MacroListNode;
 }
 
-function cloneNode<T extends PhaseBSurfaceNode>(node: T): T {
+function cloneNode<T extends MacroNode>(node: T): T {
   return deepClone(node);
 }
 
@@ -152,23 +154,40 @@ function deepClone<T>(value: T): T {
   return copy as T;
 }
 
-function isListNode(node: PhaseBSurfaceNode): node is ListNode {
+function isListNode(node: MacroNode): node is MacroListNode {
+  if ("phaseKind" in node) {
+    return node.phaseKind === "list";
+  }
   return node.kind === "list";
 }
 
-function isSymbolNode(node: PhaseBSurfaceNode | undefined): node is SymbolNode {
-  return Boolean(node && node.kind === "symbol");
+function isSymbolNode(node: MacroNode | undefined): node is SymbolNode & { phaseKind?: "symbol" } {
+  if (!node) {
+    return false;
+  }
+  if ("phaseKind" in node) {
+    return node.phaseKind === "symbol";
+  }
+  return node.kind === "symbol";
 }
 
-function isSExprNode(node: PhaseBSurfaceNode): node is SExprNode {
+function isSExprNode(node: MacroNode): node is SExprNode | PhaseBNode | PhaseBTypeAnnotation {
+  if ("phaseKind" in node) {
+    return (
+      node.phaseKind === "symbol" ||
+      node.phaseKind === "literal" ||
+      node.phaseKind === "list" ||
+      node.phaseKind === "type-annotation"
+    );
+  }
   return node.kind === "symbol" || node.kind === "literal" || node.kind === "list";
 }
 
-function isQuasiquote(node: ListNode): boolean {
+function isQuasiquote(node: MacroListNode): boolean {
   return node.elements.length >= 2 && isSymbolNode(node.elements[0]) && node.elements[0].name === "quasiquote";
 }
 
-function convertQuasiquote(node: SExprNode): SExprNode {
+function convertQuasiquote(node: MacroNode): MacroNode {
   if (isListNode(node)) {
     const head = node.elements[0];
     if (isSymbolNode(head)) {
@@ -181,12 +200,18 @@ function convertQuasiquote(node: SExprNode): SExprNode {
     }
     const listSymbol = createSymbol("list", node.loc);
     const elements = node.elements.map((child) => convertQuasiquoteElement(child));
-    return { kind: "list", elements: [listSymbol, ...elements], loc: node.loc, delimiter: "(" };
+    return {
+      kind: "list",
+      elements: [listSymbol, ...elements],
+      loc: node.loc,
+      delimiter: "(",
+      phaseKind: "list",
+    } as PhaseBListNode;
   }
   return createQuoteNode(node);
 }
 
-function convertQuasiquoteElement(node: SExprNode): SExprNode {
+function convertQuasiquoteElement(node: MacroNode): MacroNode {
   if (isListNode(node)) {
     const head = node.elements[0];
     if (isSymbolNode(head) && head.name === "unquote-splicing") {
@@ -197,22 +222,29 @@ function convertQuasiquoteElement(node: SExprNode): SExprNode {
   return createQuoteNode(node);
 }
 
-function createSymbol(name: string, loc: SourceLoc): SymbolNode {
-  return { kind: "symbol", name, loc };
+function createSymbol(name: string, loc: SourceLoc): SymbolNode & PhaseBNode {
+  return { kind: "symbol", name, loc, phaseKind: "symbol" } as SymbolNode & PhaseBNode;
 }
 
-function createQuoteNode(node: SExprNode): ListNode {
+function createQuoteNode(node: MacroNode): PhaseBListNode {
   const quoteSym = createSymbol("quote", node.loc);
-  return { kind: "list", elements: [quoteSym, cloneNode(node) as SExprNode], loc: node.loc, delimiter: "(" };
+  return {
+    kind: "list",
+    elements: [quoteSym, cloneNode(node) as PhaseBNode],
+    loc: node.loc,
+    delimiter: "(",
+    phaseKind: "list",
+  };
 }
 
-function attachExpansionFrame(node: PhaseBSurfaceNode, frame: ExpansionFrame): PhaseBSurfaceNode {
+function attachExpansionFrame(node: MacroNode, frame: ExpansionFrame): MacroNode {
   const expandedStack = [...(node.expansionStack ?? []), frame];
   if (isListNode(node)) {
-    const elements = node.elements.map((child) =>
-      attachExpansionFrame(child, frame) as SExprNode
-    );
-    return { ...node, elements, expansionStack: expandedStack };
+    const elements = node.elements.map((child) => attachExpansionFrame(child, frame));
+    if ("phaseKind" in node) {
+      return { ...node, elements: elements as PhaseBNode[], expansionStack: expandedStack };
+    }
+    return { ...node, elements: elements as SExprNode[], expansionStack: expandedStack };
   }
   return { ...node, expansionStack: expandedStack };
 }
