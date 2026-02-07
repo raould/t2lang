@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { INFIX_OPERATOR_TABLE } from "../src/sugar.ts";
 
 const precedenceDoc = JSON.parse(
-  readFileSync(new URL("../../EVALUATION_PRECEDENCE.json", import.meta.url), "utf-8"),
+  readFileSync(new URL("../EVALUATION_PRECEDENCE.json", import.meta.url), "utf-8"),
 ) as {
   operators: Array<{
     symbols: string[];

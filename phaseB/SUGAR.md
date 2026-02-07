@@ -209,6 +209,24 @@ Phase A strictly requires `let*` and `const*` with specific nesting. Phase B all
 (assign (prop obj prop) 20)
 ```
 
+## 5.5 For-of / For-in / For-await [x]
+
+Phase B accepts explicit loop kinds and lowers them to Phase A loop nodes.
+
+**Sugar:**
+```lisp
+(for of ((item) items) body...)
+(for await ((item) items) body...)
+(for in ((key) obj) body...)
+```
+
+**Rewrite:**
+```lisp
+(for of ((item) items) body...)
+(for await ((item) items) body...)
+(for of ((key) (call (prop Object "keys") obj)) body...)
+```
+
 ## 6. Function Definitions [x]
 
 Support for TypeScript-style parameter lists with colons.

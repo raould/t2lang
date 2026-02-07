@@ -11,6 +11,8 @@ import {
   LetStarExpr,
   Literal,
   ForClassic,
+  ForOf,
+  ForAwait,
   FunctionExpr,
   PropExpr,
   ReturnExpr,
@@ -20,6 +22,7 @@ import {
   ArrayPattern,
   RestPattern,
   AwaitExpr,
+  YieldExpr,
   TypeVar,
   TypePrimitive,
   TypeUnion,
@@ -65,6 +68,40 @@ test("lowerPhaseB emits ForClassic for for forms", () => {
   assert.ok(stmt.init.expr instanceof Literal);
   assert.strictEqual((stmt.init.expr as Literal).value, null);
   assert.strictEqual(stmt.update, undefined);
+});
+
+test("lowerPhaseB emits ForOf for for-of forms", () => {
+  const [node] = parsePhaseBRaw("(for of ((item) items) (assign x item))", "lower-for-of.test.t2");
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof ForOf);
+  assert.ok(stmt instanceof ForOf);
+  assert.ok(stmt.binding.target instanceof Identifier);
+  assert.strictEqual(stmt.binding.target.name, "item");
+  assert.ok(stmt.iterable instanceof Identifier);
+  assert.strictEqual((stmt.iterable as Identifier).name, "items");
+});
+
+test("lowerPhaseB emits ForAwait for for-await forms", () => {
+  const [node] = parsePhaseBRaw("(for await ((value) values) (assign x value))", "lower-for-await.test.t2");
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof ForAwait);
+  assert.ok(stmt instanceof ForAwait);
+  assert.ok(stmt.binding.target instanceof Identifier);
+  assert.strictEqual(stmt.binding.target.name, "value");
+});
+
+test("lowerPhaseB rewrites for-in to Object.keys", () => {
+  const [node] = parsePhaseBRaw("(for in ((key) obj) (assign x key))", "lower-for-in.test.t2");
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof ForOf) as ForOf | undefined;
+  assert.ok(stmt instanceof ForOf);
+  assert.ok(stmt.iterable instanceof CallExpr);
+  const callExpr = stmt.iterable as CallExpr;
+  assert.ok(callExpr.callee instanceof PropExpr);
+  const prop = callExpr.callee as PropExpr;
+  assert.strictEqual(prop.name, "keys");
+  assert.ok(prop.object instanceof Identifier);
+  assert.strictEqual(prop.object.name, "Object");
 });
 
 test("lowerPhaseB emits FunctionExpr for method with identifier name", () => {
@@ -208,6 +245,36 @@ test("lowerPhaseB preserves async/generator flags", () => {
   assert.ok(generatorStmt instanceof FunctionExpr);
   assert.strictEqual(generatorStmt.generator, true);
   assert.strictEqual(generatorStmt.name?.name, "generatorCallable");
+
+  const [asyncGeneratorNode] = parsePhaseBRaw(
+    "(fn async generator asyncGen ((value)) (return value))",
+    "lower-async-generator.test.t2"
+  );
+  const asyncGeneratorProgram = lowerPhaseB([asyncGeneratorNode]);
+  const asyncGeneratorStmt = asyncGeneratorProgram.body.find((entry) => entry instanceof FunctionExpr);
+  assert.ok(asyncGeneratorStmt instanceof FunctionExpr);
+  assert.strictEqual(asyncGeneratorStmt.async, true);
+  assert.strictEqual(asyncGeneratorStmt.generator, true);
+});
+
+test("lowerPhaseB lowers yield and yield*", () => {
+  const [node] = parsePhaseBRaw("(fn generator g ((value)) (return (yield value)))", "lower-yield.test.t2");
+  const program = lowerPhaseB([node]);
+  const fn = program.body.find((entry) => entry instanceof FunctionExpr) as FunctionExpr | undefined;
+  assert.ok(fn);
+  const returnStmt = fn!.body.find((entry) => entry instanceof ReturnExpr) as ReturnExpr | undefined;
+  assert.ok(returnStmt);
+  assert.ok(returnStmt!.value instanceof YieldExpr);
+  assert.strictEqual((returnStmt!.value as YieldExpr).delegate, false);
+
+  const [delegatedNode] = parsePhaseBRaw("(fn generator g ((value)) (return (yield* value)))", "lower-yield-star.test.t2");
+  const delegatedProgram = lowerPhaseB([delegatedNode]);
+  const delegatedFn = delegatedProgram.body.find((entry) => entry instanceof FunctionExpr) as FunctionExpr | undefined;
+  assert.ok(delegatedFn);
+  const delegatedReturn = delegatedFn!.body.find((entry) => entry instanceof ReturnExpr) as ReturnExpr | undefined;
+  assert.ok(delegatedReturn);
+  assert.ok(delegatedReturn!.value instanceof YieldExpr);
+  assert.strictEqual((delegatedReturn!.value as YieldExpr).delegate, true);
 });
 
 test("lowerPhaseB rejects await outside async callables", () => {

@@ -49,6 +49,7 @@ import {
   TypeAssertExpr,
   NonNullAssertExpr,
   AwaitExpr,
+  YieldExpr,
   TypeVar,
   TypeParam,
   TypePrimitive,
@@ -299,8 +300,28 @@ function lowerReturn(node: PhaseBListNode): ReturnExpr {
   return new ReturnExpr({ span: spanFromLoc(node.loc), value });
 }
 
-function lowerFor(node: PhaseBListNode): ForClassic {
-  const [, clausesNode, ...bodyNodes] = node.elements;
+function lowerFor(node: PhaseBListNode): Statement {
+  const modeNode = node.elements[1];
+  if (modeNode && modeNode.phaseKind === "symbol") {
+    const mode = (modeNode as SymbolNode).name;
+    if (mode === "classic") {
+      return lowerForClassicCanonical(node);
+    }
+    if (mode === "of") {
+      return lowerForOf(node);
+    }
+    if (mode === "await") {
+      return lowerForAwait(node);
+    }
+    if (mode === "in") {
+      return lowerForIn(node);
+    }
+  }
+  return lowerForClassic(node);
+}
+
+function lowerForClassic(node: PhaseBListNode): ForClassic {
+  const [, clausesNode] = node.elements;
   let init: Statement | undefined;
   let condition: Expression | undefined;
   let update: Expression | undefined;
@@ -331,10 +352,7 @@ function lowerFor(node: PhaseBListNode): ForClassic {
     }
   }
 
-  const body = new BlockStmt({
-    statements: bodyNodes.map(lowerStatement),
-    span: spanFromLoc(node.loc),
-  });
+  const body = lowerLoopBody(node.elements.slice(2), spanFromLoc(node.loc));
 
   return new ForClassic({
     init,
@@ -343,6 +361,91 @@ function lowerFor(node: PhaseBListNode): ForClassic {
     body,
     span: spanFromLoc(node.loc),
   });
+}
+
+function lowerForClassicCanonical(node: PhaseBListNode): ForClassic {
+  const span = spanFromLoc(node.loc);
+  const args = node.elements.slice(2);
+  const bodyNode = args[args.length - 1];
+  const clauseNodes = args.slice(0, -1);
+  let init: Statement | undefined;
+  let condition: Expression | undefined;
+  let update: Expression | undefined;
+  if (clauseNodes.length > 0) {
+    const [initClause, conditionClause, updateClause] = clauseNodes;
+    if (initClause && !isPlaceholder(initClause)) {
+      init = lowerStatement(initClause);
+    }
+    if (conditionClause && !isPlaceholder(conditionClause)) {
+      condition = lowerExpression(conditionClause);
+    }
+    if (updateClause && !isPlaceholder(updateClause)) {
+      update = lowerExpression(updateClause);
+    }
+  }
+  const body = bodyNode ? lowerLoopBody([bodyNode], span) : new BlockStmt({ statements: [], span });
+  return new ForClassic({ init, condition, update, body, span });
+}
+
+function lowerForOf(node: PhaseBListNode): ForOf {
+  const span = spanFromLoc(node.loc);
+  const clauseNode = node.elements[2];
+  const bodyNodes = node.elements.slice(3);
+  if (!clauseNode || clauseNode.phaseKind !== "list") {
+    throw reportError("T2:0178");
+  }
+  const [bindingNode, iterableNode] = (clauseNode as PhaseBListNode).elements;
+  if (!bindingNode || !iterableNode) {
+    throw reportError("T2:0177");
+  }
+  const binding = bindingNode.phaseKind === "list" ? lowerBindingEntry(bindingNode as PhaseBListNode) : { target: lowerBindingTarget(bindingNode) };
+  const iterable = lowerExpression(iterableNode);
+  const body = lowerLoopBody(bodyNodes, span);
+  return new ForOf({ binding, iterable, body, span });
+}
+
+function lowerForAwait(node: PhaseBListNode): ForAwait {
+  const span = spanFromLoc(node.loc);
+  const clauseNode = node.elements[2];
+  const bodyNodes = node.elements.slice(3);
+  if (!clauseNode || clauseNode.phaseKind !== "list") {
+    throw reportError("T2:0172");
+  }
+  const [bindingNode, iterableNode] = (clauseNode as PhaseBListNode).elements;
+  if (!bindingNode || !iterableNode) {
+    throw reportError("T2:0171");
+  }
+  const binding = bindingNode.phaseKind === "list" ? lowerBindingEntry(bindingNode as PhaseBListNode) : { target: lowerBindingTarget(bindingNode) };
+  const iterable = lowerExpression(iterableNode);
+  const body = lowerLoopBody(bodyNodes, span);
+  return new ForAwait({ binding, iterable, body, span });
+}
+
+function lowerForIn(node: PhaseBListNode): ForOf {
+  const span = spanFromLoc(node.loc);
+  const clauseNode = node.elements[2];
+  const bodyNodes = node.elements.slice(3);
+  if (!clauseNode || clauseNode.phaseKind !== "list") {
+    throw reportError("T2:0178");
+  }
+  const [bindingNode, iterableNode] = (clauseNode as PhaseBListNode).elements;
+  if (!bindingNode || !iterableNode) {
+    throw reportError("T2:0177");
+  }
+  const binding = bindingNode.phaseKind === "list" ? lowerBindingEntry(bindingNode as PhaseBListNode) : { target: lowerBindingTarget(bindingNode) };
+  const iterable = lowerExpression(iterableNode);
+  const objectIdent = new Identifier({ name: "Object", span });
+  const keysProp = new PropExpr({ object: objectIdent, name: "keys", maybeNull: false, span });
+  const keysCall = new CallExpr({ callee: keysProp, args: [iterable], span });
+  const body = lowerLoopBody(bodyNodes, span);
+  return new ForOf({ binding, iterable: keysCall, body, span });
+}
+
+function lowerLoopBody(nodes: PhaseBNode[], span: Span): Statement {
+  if (nodes.length === 1) {
+    return lowerStatement(nodes[0]);
+  }
+  return new BlockStmt({ statements: nodes.map(lowerStatement), span });
 }
 
 function lowerFunction(node: PhaseBListNode, kind: CallableKind): FunctionExpr {
@@ -1006,6 +1109,22 @@ function lowerList(node: PhaseBListNode): Expression {
         }
         const argument = lowerExpression(filteredRest[0]);
         return new AwaitExpr({ argument, span });
+      }
+      case "yield": {
+        validateCommaSeparated(rest, "yield arguments");
+        if (filteredRest.length > 1) {
+          throw reportError("T2:0127");
+        }
+        const argument = filteredRest[0] ? lowerExpression(filteredRest[0]) : undefined;
+        return new YieldExpr({ delegate: false, argument, span });
+      }
+      case "yield*": {
+        validateCommaSeparated(rest, "yield arguments");
+        if (filteredRest.length !== 1) {
+          throw reportError("T2:0127");
+        }
+        const argument = lowerExpression(filteredRest[0]);
+        return new YieldExpr({ delegate: true, argument, span });
       }
       default:
         break;
