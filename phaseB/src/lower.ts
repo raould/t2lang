@@ -656,6 +656,9 @@ function lowerTypeList(node: PhaseBListNode): TypeNode | undefined {
       return buildInferType(args, span);
     case "t:literal":
       return buildLiteralType(args, span);
+    case "type-function":
+    case "t:fn":
+      return buildFunctionType(args, span);
     case "t:var": {
       const identifier = identifierFromNode(args[0]);
       if (!identifier) {
@@ -666,6 +669,48 @@ function lowerTypeList(node: PhaseBListNode): TypeNode | undefined {
     default:
       return undefined;
   }
+}
+
+function buildFunctionType(nodes: PhaseBNode[], span: Span): TypeFunction | undefined {
+  if (nodes.length === 0) {
+    return undefined;
+  }
+
+  let entries = nodes;
+  let typeParams: TypeParam[] | undefined;
+
+  const typeParamMarkerIndex = entries.findIndex(
+    (entry) => entry.phaseKind === "symbol" && (entry as SymbolNode).name === ":type-params"
+  );
+  if (typeParamMarkerIndex >= 0) {
+    const paramList = entries[typeParamMarkerIndex + 1];
+    typeParams = lowerTypeParams(paramList);
+    entries = [...entries.slice(0, typeParamMarkerIndex), ...entries.slice(typeParamMarkerIndex + 2)];
+  } else if (entries[0]?.phaseKind === "list") {
+    const list = entries[0] as PhaseBListNode;
+    const head = list.elements[0];
+    if (head && head.phaseKind === "symbol" && (head as SymbolNode).name === "typeparams") {
+      typeParams = lowerTypeParams(list);
+      entries = entries.slice(1);
+    }
+  }
+
+  if (entries.length === 0) {
+    return undefined;
+  }
+
+  const returns = lowerTypeNode(entries[entries.length - 1]);
+  if (!returns) {
+    return undefined;
+  }
+  const params = entries
+    .slice(0, -1)
+    .map((entry) => lowerTypeNode(entry))
+    .filter((entry): entry is TypeNode => Boolean(entry));
+  if (params.length !== entries.length - 1) {
+    return undefined;
+  }
+  return new TypeFunction({ params, returns, span, typeParams });
 }
 
 function lowerTypeParams(node: PhaseBNode | undefined): TypeParam[] {

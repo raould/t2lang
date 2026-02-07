@@ -18,6 +18,27 @@
 * properly hygenic gensym.
 * collate the good things from phase0/1 and phaseA/B and try again.
     * know that it will get squirrely quickly and do random incorrect things you didn't notice.
+    * a main problem is that when you add sugar, things explode combinatorially, so it is hard to have enough tests, and hard to know what combinations of syntax sugar really are successfully supported.
+        * i really do not know if the phaseB macros & sugar are individually correctly lowering such that they can all be used together.
+        * All sugar must desugar before macro expansion, and must desugar into the same canonical AST form that macros expect.
+        * A healthy S-expression language with sugar follows this order:
+            * Reader / Parser
+                * Handles all syntax sugar
+                * Handles precedence
+                * Handles infix, pipelines, object sugar, etc.
+                * Produces a clean, canonical AST
+            * Macro Expander
+                * Operates only on canonical AST
+                * Never sees sugar
+                * Never deals with precedence
+                * Never depends on surrounding syntactic context
+            * Compiler / Codegen
+                * Emits JS/TS/bytecode/etc.
+        * Sugar breaks things only if you violate the invariant:
+            * If macros run before sugar is fully desugared
+            * If sugar expands into more sugar  
+            * If sugar depends on macro expansion to resolve meaning
+            * If sugar produces ambiguous AST that depends on context
     * bootstrap it from this compiler.
     * prevent context pollution by starting in a new repo.
     * stick to staging-guardrails.md.
