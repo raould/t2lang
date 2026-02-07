@@ -58,15 +58,13 @@ test("lowerPhaseB emits AssignExpr for assign forms", () => {
 });
 
 test("lowerPhaseB emits ForClassic for for forms", () => {
-  const [node] = parsePhaseBRaw("(for (; true null) (assign x 1))", "lower-for.test.t2");
+  const [node] = parsePhaseBRaw("(for (_ true null) (assign x 1))", "lower-for.test.t2");
   const program = lowerPhaseB([node]);
   const stmt = program.body.find((entry) => entry instanceof ForClassic);
   assert.ok(stmt instanceof ForClassic);
   assert.ok(stmt.condition instanceof Literal);
   assert.strictEqual(stmt.condition.value, true);
-  assert.ok(stmt.init instanceof ExprStmt);
-  assert.ok(stmt.init.expr instanceof Literal);
-  assert.strictEqual((stmt.init.expr as Literal).value, null);
+  assert.strictEqual(stmt.init, undefined);
   assert.strictEqual(stmt.update, undefined);
 });
 

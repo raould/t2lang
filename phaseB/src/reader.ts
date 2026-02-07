@@ -632,13 +632,9 @@ function skipWhitespace(state: ParserState): void {
       continue;
     }
     if (ch === ";") {
-      const next = peekNext(state);
-      if (next === ";") {
-        readChar(state); // first ;
-        readChar(state); // second ;
-        skipLineComment(state);
-        continue;
-      }
+      readChar(state);
+      skipLineComment(state);
+      continue;
     }
     break;
   }

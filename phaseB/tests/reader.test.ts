@@ -98,12 +98,10 @@ test("unquote reader macro wraps a symbol", () => {
   assert.strictEqual(((node as ListNode).elements[0] as SymbolNode).name, "unquote");
 });
 
-test("comments: ;; is a comment, ; is an atom", () => {
+test("comments: ; and ;; are line comments", () => {
   const nodes = parseSexpr("foo ;; this is a comment\n; bar", "comments.t2");
-  assert.strictEqual(nodes.length, 3);
+  assert.strictEqual(nodes.length, 1);
   assert.strictEqual((nodes[0] as SymbolNode).name, "foo");
-  assert.strictEqual((nodes[1] as SymbolNode).name, ";");
-  assert.strictEqual((nodes[2] as SymbolNode).name, "bar");
 });
 
 test("comma tokenizes as a symbol", () => {

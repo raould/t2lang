@@ -343,26 +343,14 @@ function lowerForClassic(node: PhaseBListNode): ForClassic {
   if (clausesNode && clausesNode.phaseKind === "list") {
     const clauses = clausesNode as PhaseBListNode;
     const [initClause, conditionClause, updateClause] = clauses.elements;
-    if (initClause) {
-      if (isSemicolonPlaceholder(initClause)) {
-        init = createNullInitStatement(initClause.loc);
-      } else if (!isPlaceholder(initClause)) {
-        init = lowerStatement(initClause);
-      }
+    if (initClause && !isPlaceholder(initClause)) {
+      init = lowerStatement(initClause);
     }
-    if (conditionClause) {
-      if (isSemicolonPlaceholder(conditionClause)) {
-        condition = createNullLiteral(conditionClause.loc);
-      } else if (!isPlaceholder(conditionClause)) {
-        condition = lowerExpression(conditionClause);
-      }
+    if (conditionClause && !isPlaceholder(conditionClause)) {
+      condition = lowerExpression(conditionClause);
     }
-    if (updateClause) {
-      if (isSemicolonPlaceholder(updateClause)) {
-        update = createNullLiteral(updateClause.loc);
-      } else if (!isPlaceholder(updateClause)) {
-        update = lowerExpression(updateClause);
-      }
+    if (updateClause && !isPlaceholder(updateClause)) {
+      update = lowerExpression(updateClause);
     }
   }
 
@@ -1010,17 +998,10 @@ function isPlaceholder(node: PhaseBNode): boolean {
   if (node.phaseKind === "symbol" && (node as SymbolNode).name === "_") {
     return true;
   }
-  if (node.phaseKind === "symbol" && (node as SymbolNode).name === ";") {
-    return true;
-  }
   if (node.phaseKind === "list" && (node as PhaseBListNode).elements.length === 0) {
     return true;
   }
   return false;
-}
-
-function isSemicolonPlaceholder(node: PhaseBNode): boolean {
-  return node.phaseKind === "symbol" && (node as SymbolNode).name === ";";
 }
 
 function createNullLiteral(loc: SourceLoc): Literal {

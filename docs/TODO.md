@@ -17,6 +17,7 @@
 * infix.
 * properly hygenic gensym.
 * collate the good things from phase0/1 and phaseA/B and try again.
+    * know that it will get squirrely quickly and do random incorrect things you didn't notice.
     * bootstrap it from this compiler.
     * prevent context pollution by starting in a new repo.
     * stick to staging-guardrails.md.
