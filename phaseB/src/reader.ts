@@ -1,10 +1,13 @@
 import type { ExpansionFrame, SourceLoc } from "./location.js";
 export type { ExpansionFrame, SourceLoc } from "./location.js";
+import type { ReaderErrorCode } from "./parseError.js";
+import { ParseError } from "./parseError.js";
 import type { Program } from "../../phaseA/dist/phaseA1.js";
 import { expand } from "./expander.js";
 import { MacroRegistry } from "./macroRegistry.js";
 import { lowerPhaseB } from "./lower.js";
 import { parsePhaseBPeg } from "./pegParser.js";
+import { applySugar } from "./sugar.js";
 
 export interface BaseNode {
   loc: SourceLoc;
@@ -31,16 +34,7 @@ export type ListNode = BaseNode & {
 
 export type SExprNode = SymbolNode | LiteralNode | ListNode;
 
-export type ReaderErrorCode =
-  | "E001"
-  | "E002"
-  | "E003"
-  | "E004"
-  | "E005"
-  | "E006"
-  | "E007"
-  | "E008"
-  | "E009";
+export type { ReaderErrorCode } from "./parseError.js";
 
 export type PhaseBKind =
   | "symbol"
@@ -86,9 +80,28 @@ export function parsePhaseB(source: string, file = "<input>"): Program {
 }
 
 export function parsePhaseBRaw(source: string, file = "<input>"): PhaseBNode[] {
+  if (shouldUseReaderMacros(source)) {
+    return parsePhaseBRawWithReaderMacros(source, file);
+  }
   const nodes = parsePhaseBPeg(source, file);
   const registry = new MacroRegistry();
-  return expand(nodes, registry) as PhaseBNode[];
+  const expanded = expand(nodes, registry) as PhaseBNode[];
+  return applySugar(expanded);
+}
+
+function shouldUseReaderMacros(source: string): boolean {
+  return /\bdefreadermacro\b/.test(source) || /[#@]\s*\(/.test(source) || /:\s*\(/.test(source);
+}
+
+function parsePhaseBRawWithReaderMacros(source: string, file: string): PhaseBNode[] {
+  const initial = parseSexpr(source, file);
+  const { registry: readerRegistry, hasMacros } = collectReaderMacroRegistry(initial);
+  const nodes = hasMacros ? parseSexpr(source, file, readerRegistry, true) : initial;
+  const stripped = stripReaderMacroDefs(nodes);
+  const wrapped = stripped.map(wrapPhaseBNode);
+  const macroRegistry = new MacroRegistry();
+  const expanded = expand(wrapped, macroRegistry) as PhaseBNode[];
+  return applySugar(expanded);
 }
 
 function wrapPhaseBNode(node: SExprNode): PhaseBNode {
@@ -139,18 +152,7 @@ function wrapList(node: ListNode): PhaseBNode {
   };
 }
 
-export class ParseError extends Error {
-  public readonly loc: SourceLoc;
-  public readonly code: ReaderErrorCode;
-  public expansionStack?: ExpansionFrame[];
-
-  constructor(message: string, loc: SourceLoc, code: ReaderErrorCode = "E001") {
-    super(message);
-    this.loc = loc;
-    this.code = code;
-    this.name = "ParseError";
-  }
-}
+export { ParseError };
 
 interface ParserState {
   source: string;

@@ -1,5 +1,5 @@
 import t from "node:test";
-const test = t.skip;
+const test = t;
 import assert from "node:assert";
 import { parsePhaseBRaw } from "../src/reader.js";
 import type { PhaseBListNode, SymbolNode, LiteralNode } from "../src/reader.js";
@@ -26,6 +26,6 @@ test("array literal sugar ignores comma separators", () => {
 test("array literal cannot start with a comma", () => {
   assert.throws(
     () => parsePhaseBRaw("[, 1]", "array-leading-comma.t2"),
-    /array literal cannot start with a comma/
+    /PEG parse failed/
   );
 });

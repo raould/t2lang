@@ -177,6 +177,7 @@ function isSExprNode(node: MacroNode): node is SExprNode | PhaseBNode | PhaseBTy
       node.phaseKind === "symbol" ||
       node.phaseKind === "literal" ||
       node.phaseKind === "list" ||
+      node.phaseKind === "dotted" ||
       node.phaseKind === "type-annotation"
     );
   }

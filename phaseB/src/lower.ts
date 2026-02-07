@@ -1336,15 +1336,19 @@ function lowerList(node: PhaseBListNode): Expression {
         return new ArrayExpr({ elements, span });
       }
       case "call": {
-        validateCommaSeparated(rest, "call arguments");
-        const callee = filteredRest[0] ? lowerExpression(filteredRest[0]) : new Identifier({ name: "<missing>", span });
-        const args = filteredRest.slice(1).map(lowerExpression);
+        const calleeNode = rest[0];
+        const argsNodes = stripCommaNodes(rest.slice(1));
+        validateCommaSeparated(rest.slice(1), "call arguments");
+        const callee = calleeNode ? lowerExpression(calleeNode) : new Identifier({ name: "<missing>", span });
+        const args = argsNodes.map(lowerExpression);
         return new CallExpr({ callee, args, span });
       }
       case "new": {
-        validateCommaSeparated(rest, "new arguments");
-        const callee = filteredRest[0] ? lowerExpression(filteredRest[0]) : new Identifier({ name: "<missing>", span });
-        const args = filteredRest.slice(1).map(lowerExpression);
+        const calleeNode = rest[0];
+        const argsNodes = stripCommaNodes(rest.slice(1));
+        validateCommaSeparated(rest.slice(1), "new arguments");
+        const callee = calleeNode ? lowerExpression(calleeNode) : new Identifier({ name: "<missing>", span });
+        const args = argsNodes.map(lowerExpression);
         return new NewExpr({ callee, args, span });
       }
       case "prop": {
