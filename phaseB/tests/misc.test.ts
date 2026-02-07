@@ -1,26 +1,27 @@
 import test from "node:test";
-import assert from "node:assert";
-import { runE2E_NodeJS } from "./e2e_helpers.js";
+import { helperStrictNode, helperMatchNode } from "./e2e_helpers.js";
 
-async function helper(source: string, expectedOutput: string, echoSource = false) {
-    const [compileResult, tscErrors, { stdout, stderr }] = await runE2E_NodeJS(source);
-    if (echoSource) { console.log(compileResult.tsSource); }
-    assert.strictEqual(tscErrors.length, 0, `Expected no TypeScript errors, got: ${tscErrors.join(" | ")}`);
-    assert.ok(compileResult.tsSource.length > 0, "Expected emitted TypeScript output");
-    assert.ok(stdout.length > 0);
-    assert.strictEqual(stderr.length, 0);
-    const cleanStdout = stdout.replace(/\x1B\[[0-9;]*m/g, "").trim();
-    assert.strictEqual(cleanStdout, expectedOutput);
-}
+// things that have failed somewhere before...
 
-test("was empirically failing #1", async () => {
-    const source = `(program (console.log (+ ((lambda (x:number) (return x)) 2) 3)))`;
-    helper(source, "5");
+test("was empirically failing #3", async () => {
+    const source = `
+    (program
+        (let ((x 42))
+            (if (> x 41) (console.log "yes1"))
+            (if (infix (x > 41)) (console.log "yes2"))
+            (if :(x > 41) (console.log "yes3"))))
+    `;
+    await helperMatchNode(source, /yes1[\s\S]*yes2[\s\S]*yes3/);
 });
 
 test("was empirically failing #2", async () => {
     const source = `(program
         (let* ((f (lambda (x:number) (return x))))
               (call (prop console "log") (call + (call f 2) 3))))`;
-    helper(source, "5");
+    await helperStrictNode(source, "5");
+});
+
+test("was empirically failing #1", async () => {
+    const source = `(program (console.log (+ ((lambda (x:number) (return x)) 2) 3)))`;
+    await helperStrictNode(source, "5");
 });

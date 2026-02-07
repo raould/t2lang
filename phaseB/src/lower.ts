@@ -173,6 +173,9 @@ function lowerStatement(node: PhaseBNode): Statement {
       if (LET_FORMS.has(symbolHead.name)) {
         return lowerLet(listNode, symbolHead.name);
       }
+      if (symbolHead.name === "if") {
+        return lowerIf(listNode);
+      }
       if (symbolHead.name === "assign") {
         return lowerAssign(listNode);
       }
@@ -198,6 +201,17 @@ function lowerStatement(node: PhaseBNode): Statement {
     return new ExprStmt({ expr: lowerExpression(listNode), span: spanFromLoc(listNode.loc) });
   }
   return new ExprStmt({ expr: lowerExpression(node), span: spanFromLoc(node.loc) });
+}
+
+function lowerIf(node: PhaseBListNode): IfStmt {
+  const span = spanFromLoc(node.loc);
+  const testNode = node.elements[1];
+  const consequentNode = node.elements[2];
+  const alternateNode = node.elements[3];
+  const test = testNode ? lowerExpression(testNode) : new Literal({ value: null, span });
+  const consequent = consequentNode ? lowerStatement(consequentNode) : createNullInitStatement(node.loc);
+  const alternate = alternateNode ? lowerStatement(alternateNode) : undefined;
+  return new IfStmt({ test, consequent, alternate, span });
 }
 
 function unwrapProgramNode(node: PhaseBNode): PhaseBNode[] {

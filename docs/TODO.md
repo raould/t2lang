@@ -54,3 +54,4 @@
 * could t2tc accept fragments without `(program ...)`?
 * somebody do a clean-room, non gen-AI version of t2lang.
 * can we use Symbol for gensym?
+* clean up tests, abstract out more helpers to DRY.
