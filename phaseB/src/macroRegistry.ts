@@ -1,10 +1,12 @@
 import type { SourceLoc } from "./location.js";
-import type { PhaseBSurfaceNode } from "./ast.js";
+import type { PhaseBNode, SExprNode } from "./reader.js";
+
+type MacroNode = PhaseBNode | SExprNode;
 
 export interface MacroDefinition {
   name: string;
   params: string[];
-  body: PhaseBSurfaceNode[];
+  body: MacroNode[];
   loc: SourceLoc;
 }
 

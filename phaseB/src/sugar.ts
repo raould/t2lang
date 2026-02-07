@@ -64,7 +64,10 @@ const NON_CALL_FORMS = new Set([
   "unquote",
   "unquote-splicing",
   "infix",
+  "computed",
 ]);
+
+const CALLABLE_FLAGS = new Set(["async", "generator", "abstract", "overload"]);
 
 export function applySugar(nodes: PhaseBNode[]): PhaseBNode[] {
   return nodes.map(rewriteNode);
@@ -100,6 +103,11 @@ function rewriteList(node: PhaseBListNode): PhaseBNode {
   const typeDeclarationRewrite = rewriteTypeDeclaration(node);
   if (typeDeclarationRewrite) {
     return rewriteNode(typeDeclarationRewrite);
+  }
+
+  const exportDeclarationRewrite = rewriteExportDeclaration(node);
+  if (exportDeclarationRewrite) {
+    return rewriteNode(exportDeclarationRewrite);
   }
 
   validateNoKeywordArgs(node);
@@ -168,6 +176,109 @@ function rewriteList(node: PhaseBListNode): PhaseBNode {
   return optionalPropRewritten ?? listNode;
 }
 
+function rewriteExportDeclaration(node: PhaseBListNode): PhaseBNode | null {
+  const head = node.elements[0];
+  if (!head || !isSymbol(head, "export")) {
+    return null;
+  }
+  if (node.elements.length !== 2) {
+    return null;
+  }
+  const target = node.elements[1];
+  if (!target || target.phaseKind !== "list") {
+    return null;
+  }
+  const targetList = target as PhaseBListNode;
+  const targetHead = targetList.elements[0];
+  if (targetHead && isSymbol(targetHead, "export-spec")) {
+    return null;
+  }
+  const names = collectExportNames(targetList);
+  if (names.length === 0) {
+    return null;
+  }
+  const exportSpec = createPhaseBList(
+    [createPhaseBSymbol("export-spec", node.loc), ...names.map((name) => createPhaseBSymbol(name, node.loc))],
+    node.loc
+  );
+  const exportList = createPhaseBList([createPhaseBSymbol("export", node.loc), exportSpec], node.loc);
+  return createPhaseBList([createPhaseBSymbol("program", node.loc), targetList, exportList], node.loc);
+}
+
+function collectExportNames(target: PhaseBListNode): string[] {
+  const head = target.elements[0];
+  if (!head || head.phaseKind !== "symbol") {
+    return [];
+  }
+  const headName = (head as SymbolNode).name;
+  if (["fn", "lambda", "method", "getter", "setter"].includes(headName)) {
+    const nameNode = extractCallableName(target.elements.slice(1));
+    return nameNode ? [nameNode] : [];
+  }
+  if (["class", "enum", "namespace", "type-alias", "type-interface", "interface"].includes(headName)) {
+    const nameNode = target.elements[1];
+    const name = nameNode ? stringFromExportName(nameNode) : null;
+    return name ? [name] : [];
+  }
+  if (["const", "const*", "let", "let*"].includes(headName)) {
+    return collectBindingNames(target.elements.slice(1));
+  }
+  return [];
+}
+
+function extractCallableName(nodes: PhaseBNode[]): string | null {
+  for (const node of nodes) {
+    if (node.phaseKind === "symbol") {
+      const name = (node as SymbolNode).name;
+      if (CALLABLE_FLAGS.has(name)) {
+        continue;
+      }
+      return name;
+    }
+    return null;
+  }
+  return null;
+}
+
+function collectBindingNames(nodes: PhaseBNode[]): string[] {
+  if (nodes.length === 0) {
+    return [];
+  }
+  if (nodes.length >= 2 && nodes[0].phaseKind !== "list") {
+    const name = stringFromExportName(nodes[0]);
+    return name ? [name] : [];
+  }
+  const bindingList = nodes[0];
+  if (!bindingList || bindingList.phaseKind !== "list") {
+    return [];
+  }
+  const names: string[] = [];
+  for (const entry of (bindingList as PhaseBListNode).elements) {
+    if (entry.phaseKind !== "list") {
+      continue;
+    }
+    const target = (entry as PhaseBListNode).elements[0];
+    const name = target ? stringFromExportName(target) : null;
+    if (name) {
+      names.push(name);
+    }
+  }
+  return names;
+}
+
+function stringFromExportName(node: PhaseBNode): string | null {
+  if (node.phaseKind === "symbol") {
+    return (node as SymbolNode).name;
+  }
+  if (node.phaseKind === "literal" && typeof (node as LiteralNode).value === "string") {
+    const value = (node as LiteralNode).value;
+    if (typeof value === "string") {
+      return value;
+    }
+  }
+  return null;
+}
+
 const TEMPLATE_PLACEHOLDER = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 
 function rewriteTemplateWith(node: PhaseBListNode): PhaseBNode | null {
@@ -177,7 +288,7 @@ function rewriteTemplateWith(node: PhaseBListNode): PhaseBNode | null {
   }
   const templateNode = node.elements[1];
   if (!templateNode || !isStringLiteral(templateNode)) {
-    throw reportError("T2:0313");
+    throw reportError("T2:0313", templateNode?.loc ?? node.loc);
   }
   const templateText = (templateNode as PhaseBLiteralNode).value;
   const keySymbols = new Map<string, PhaseBSymbolNode>();
@@ -186,22 +297,22 @@ function rewriteTemplateWith(node: PhaseBListNode): PhaseBNode | null {
 
   for (const pair of node.elements.slice(2)) {
     if (pair.phaseKind !== "list") {
-      throw reportError("T2:0314");
+      throw reportError("T2:0314", pair.loc ?? node.loc);
     }
     const pairList = pair as PhaseBListNode;
     if (pairList.elements.length !== 2) {
-      throw reportError("T2:0314");
+      throw reportError("T2:0314", pairList.loc);
     }
     const keyName = extractTemplateKey(pairList.elements[0]);
     if (!keyName) {
-      throw reportError("T2:0314");
+      throw reportError("T2:0314", pairList.loc);
     }
     if (keySymbols.has(keyName)) {
-      throw reportError("T2:0319", { key: keyName });
+      throw reportError("T2:0319", { key: keyName }, pairList.loc);
     }
     const valueNode = pairList.elements[1];
     if (!isLiteralNode(valueNode)) {
-      throw reportError("T2:0315");
+      throw reportError("T2:0315", valueNode.loc);
     }
     const paramSymbol = createPhaseBSymbol(gensym("tmpl_"), pairList.loc);
     keySymbols.set(keyName, paramSymbol);
@@ -253,15 +364,15 @@ function buildTemplateParts(
     }
     const end = template.indexOf("}", start + 2);
     if (end < 0) {
-      throw reportError("T2:0318");
+      throw reportError("T2:0318", loc);
     }
     const placeholder = template.slice(start + 2, end).trim();
     if (!TEMPLATE_PLACEHOLDER.test(placeholder)) {
-      throw reportError("T2:0317", { placeholder });
+      throw reportError("T2:0317", { placeholder }, loc);
     }
     const symbol = keySymbols.get(placeholder);
     if (!symbol) {
-      throw reportError("T2:0316", { key: placeholder });
+      throw reportError("T2:0316", { key: placeholder }, loc);
     }
     parts.push(clonePhaseBNode(symbol));
     cursor = end + 1;
@@ -291,7 +402,7 @@ function validateNoKeywordArgs(node: PhaseBListNode): void {
     if (entry?.phaseKind === "symbol") {
       const symbolName = (entry as SymbolNode).name;
         if (symbolName !== ":" && symbolName.endsWith(":")) {
-          throw reportError("T2:0203");
+          throw reportError("T2:0203", entry.loc);
       }
     }
   }
@@ -309,13 +420,13 @@ function rewriteBooleanAliases(node: PhaseBListNode): PhaseBNode | null {
   const args = node.elements.slice(1).map(rewriteNode);
   if (name === "not") {
     if (args.length !== 1) {
-      throw reportError("T2:0322");
+      throw reportError("T2:0322", node.loc);
     }
     const op = createPhaseBSymbol("!", node.loc);
     return createPhaseBList([createPhaseBSymbol("call", node.loc), op, args[0]], node.loc);
   }
   if (args.length === 0) {
-    throw reportError("T2:0323", { operator: name });
+    throw reportError("T2:0323", { operator: name }, node.loc);
   }
   const op = createPhaseBSymbol(name === "and" ? "&&" : "||", node.loc);
   return createPhaseBList([createPhaseBSymbol("call", node.loc), op, ...args], node.loc);
@@ -387,7 +498,7 @@ function rewriteFunctionParams(node: PhaseBListNode): PhaseBListNode {
         const annotationStart = idx + 1;
         const { annotationNode, consumed } = collectParamAnnotationSegment(paramNodes, annotationStart);
         if (!annotationNode || consumed === 0) {
-            throw reportError("T2:0232");
+          throw reportError("T2:0232", split.loc);
         }
         elements.push(wrapFunctionParam(createTypeAnnotationNode(split, createPhaseBSymbol(":", split.loc), annotationNode)));
         idx = annotationStart + consumed;
@@ -441,7 +552,7 @@ function rewriteTypeDeclaration(node: PhaseBListNode): PhaseBNode | null {
   const nameNode = node.elements[1];
   const nameLiteral = toTypeAliasNameLiteral(nameNode);
   if (!nameLiteral) {
-    throw reportError("T2:0268");
+    throw reportError("T2:0268", nameNode.loc);
   }
 
   const parsed = parseAngleTypeParams(node.elements, 2, node.elements.length);
@@ -548,7 +659,7 @@ function parseAngleTypeParams(
   for (let i = startIndex; i < end; i += 1) {
     const entry = elements[i];
     if (entry.phaseKind !== "symbol") {
-      throw reportError("T2:0288");
+      throw reportError("T2:0288", entry.loc);
     }
     const name = (entry as SymbolNode).name;
     tokens.push(name);
@@ -558,24 +669,24 @@ function parseAngleTypeParams(
     }
   }
   if (endIndex < 0) {
-    throw reportError("T2:0288");
+    throw reportError("T2:0288", elements[startIndex]?.loc);
   }
   const joined = tokens.join(" ");
   const lt = joined.indexOf("<");
   const gt = joined.lastIndexOf(">");
   if (lt < 0 || gt <= lt) {
-    throw reportError("T2:0288");
+    throw reportError("T2:0288", elements[startIndex]?.loc);
   }
   const content = joined.slice(lt + 1, gt).trim();
   if (!content) {
-    throw reportError("T2:0288");
+    throw reportError("T2:0288", elements[startIndex]?.loc);
   }
   const names = content
     .split(",")
     .map((name) => name.trim())
     .filter((name) => name.length > 0);
   if (names.length === 0 || names.some((name) => !TYPE_PARAM_NAME.test(name))) {
-    throw reportError("T2:0288");
+    throw reportError("T2:0288", elements[startIndex]?.loc);
   }
   return { names, startIndex, endIndex };
 }
@@ -722,11 +833,24 @@ function rewriteObjectFields(elements: PhaseBNode[], allowSymbolValues: boolean)
   while (idx < elements.length) {
     const entry = elements[idx];
     const nextEntry = elements[idx + 1];
+    if (entry.phaseKind === "list" && (entry as PhaseBListNode).delimiter === "[") {
+      if (!nextEntry || isCommaNode(nextEntry)) {
+        throw reportError("T2:0215", entry.loc);
+      }
+      const keyList = entry as PhaseBListNode;
+      if (keyList.elements.length !== 1) {
+        throw reportError("T2:0214", keyList.loc);
+      }
+      const keyExpr = keyList.elements[0];
+      rewritten.push(createComputedFieldNode(keyExpr, nextEntry, mergeLocs(entry.loc, nextEntry.loc)));
+      idx += 2;
+      continue;
+    }
     if (entry.phaseKind === "symbol") {
       const split = splitTrailingColonSymbol(entry as PhaseBSymbolNode);
       if (split) {
         if (!nextEntry) {
-            throw reportError("T2:0215");
+          throw reportError("T2:0215", entry.loc);
         }
         rewritten.push(createStringKeyField(createLiteralNode(split.name, split.loc) as PhaseBLiteralNode, nextEntry));
         idx += 2;
@@ -736,7 +860,7 @@ function rewriteObjectFields(elements: PhaseBNode[], allowSymbolValues: boolean)
     if (isStringLiteral(entry) && nextEntry && isColon(nextEntry)) {
       const valueNode = elements[idx + 2];
       if (!valueNode) {
-          throw reportError("T2:0215");
+        throw reportError("T2:0215", entry.loc);
       }
       rewritten.push(createStringKeyField(entry as PhaseBLiteralNode, valueNode));
       idx += 3;
@@ -807,7 +931,7 @@ function createOptionalFieldNode(node: PhaseBLiteralNode | PhaseBSymbolNode, val
   if (node.phaseKind === "literal") {
     const { name } = stripOptionalLiteral(node);
     if (!value) {
-        throw reportError("T2:0222");
+      throw reportError("T2:0222", node.loc);
     }
     return buildOptionalFieldNode(name, value, mergeLocs(node.loc, value.loc));
   }
@@ -824,6 +948,11 @@ function buildOptionalFieldNode(key: string, value: PhaseBNode, loc: SourceLoc):
   const optionalSymbol = createPhaseBSymbol("optional-field", loc);
   const keyLiteral = createLiteralNode(key, loc);
   return createPhaseBList([optionalSymbol, keyLiteral, value], loc);
+}
+
+function createComputedFieldNode(key: PhaseBNode, value: PhaseBNode, loc: SourceLoc): PhaseBListNode {
+  const computedSymbol = createPhaseBSymbol("computed", loc);
+  return createPhaseBList([computedSymbol, key, value], loc);
 }
 function rewriteOptionalObject(node: PhaseBListNode): PhaseBNode | null {
   const head = node.elements[0];
@@ -1462,14 +1591,14 @@ function validateCommaSeparated(nodes: PhaseBNode[], context: string): void {
     return;
   }
   if (isCommaNode(nodes[0])) {
-    throw reportError("T2:0115", { context });
+    throw reportError("T2:0115", { context }, nodes[0].loc);
   }
   if (isCommaNode(nodes[nodes.length - 1])) {
-    throw reportError("T2:0114", { context });
+    throw reportError("T2:0114", { context }, nodes[nodes.length - 1].loc);
   }
   for (let i = 1; i < nodes.length; i += 1) {
     if (isCommaNode(nodes[i]) && isCommaNode(nodes[i - 1])) {
-      throw reportError("T2:0113", { context });
+      throw reportError("T2:0113", { context }, nodes[i].loc);
     }
   }
 }
@@ -1514,7 +1643,7 @@ function validateObjectCommaUsage(elements: PhaseBNode[]): void {
     if (isStringLiteral(entry) || isOptionalLiteralField(entry)) {
       const valueNode = elements[idx + 1];
       if (!valueNode || isCommaNode(valueNode)) {
-        throw reportError("T2:0216");
+        throw reportError("T2:0216", entry.loc);
       }
       idx += 2;
       continue;
@@ -1526,7 +1655,7 @@ function validateObjectCommaUsage(elements: PhaseBNode[]): void {
         if (nextNode && isCommaNode(nextNode)) {
           const nextNonComma = elements.slice(idx + 2).find((node) => !isCommaNode(node));
           if (nextNonComma) {
-            throw reportError("T2:0221");
+            throw reportError("T2:0221", nextNonComma.loc);
           }
         }
         idx += 1;
@@ -1598,9 +1727,11 @@ function clonePhaseBNode(node: PhaseBNode): PhaseBNode {
       };
     }
     default:
-      throw reportError("T2:0305", {
-        kind: (node as PhaseBNodeBase).phaseKind,
-      });
+      throw reportError(
+        "T2:0305",
+        { kind: (node as PhaseBNodeBase).phaseKind },
+        (node as PhaseBNodeBase).loc
+      );
   }
 }
 
@@ -1670,17 +1801,17 @@ function rewriteInfixForm(node: PhaseBListNode): PhaseBNode | null {
     return null;
   }
   if (node.elements.length !== 2) {
-    throw reportError("T2:0320");
+    throw reportError("T2:0320", node.loc);
   }
   const inner = node.elements[1];
   if (!inner || inner.phaseKind !== "list") {
-    throw reportError("T2:0320");
+    throw reportError("T2:0320", node.loc);
   }
   const innerList = inner as PhaseBListNode;
   const rewrittenInner: PhaseBListNode = { ...innerList, elements: innerList.elements.map(rewriteNode) };
   const tokenized = extractInfixTokens(rewrittenInner);
   if (!tokenized) {
-    throw reportError("T2:0321");
+    throw reportError("T2:0321", node.loc);
   }
   const expression = buildInfixExpression(tokenized.operands, tokenized.operators);
   if (expression.phaseKind === "list") {

@@ -17,6 +17,38 @@
 * infix.
 * properly hygenic gensym.
 * collate the good things from phase0/1 and phaseA/B and try again.
+    * know that it will get squirrely quickly and do random incorrect things you didn't notice.
+    * i really wish it supported visual programming so i could more easily observe the pipeline.
+        * find a program-vizualization tool for typescript and use it iteratively to make sure things are not going off track.
+    * a main problem is that when you add sugar, things explode combinatorially, so it is hard to have enough tests, and hard to know what combinations of syntax sugar really are successfully supported.
+        * i really do not know if the phaseB macros & sugar are individually correctly lowering such that they can all be used together.
+        * All sugar must desugar before macro expansion, and must desugar into the same canonical AST form that macros expect.
+        * All syntax sugar is recognized and lowered by a single unified parser.
+            * Sugar never expands into more sugar.
+            * Sugar is fully eliminated before macro expansion.
+            * Macros operate only on canonical AST.
+        * Sugar is implemented as grammar fragments that compose cleanly.
+        * Sugar is parsed with PEG / parser combinators.
+             * Infix is not supported at first.
+             * Add Pratt parser for infix sugar later.
+        * A healthy S-expression language with sugar follows this order:
+            * Reader / Parser
+                * Handles all syntax sugar
+                * Handles precedence
+                * Handles infix, pipelines, object sugar, etc.
+                * Produces a clean, canonical AST
+            * Macro Expander
+                * Operates only on canonical AST
+                * Never sees sugar
+                * Never deals with precedence
+                * Never depends on surrounding syntactic context
+            * Compiler / Codegen
+                * Emits JS/TS/bytecode/etc.
+        * Sugar breaks things only if you violate the invariant:
+            * If macros run before sugar is fully desugared
+            * If sugar expands into more sugar  
+            * If sugar depends on macro expansion to resolve meaning
+            * If sugar produces ambiguous AST that depends on context
     * bootstrap it from this compiler.
     * prevent context pollution by starting in a new repo.
     * stick to staging-guardrails.md.
@@ -28,6 +60,11 @@
     * acceptance tests should be as end-to-end as possible.
         * support for testing e2e with t2 -> tsc / -> node.
     * do not allow tests to become skipped and forgotten.
+    * much more e2e validation through tsc and node.
+        * e.g. `(program ...)` is pretty broken.
+            * have to pick a module standard.
+            * don't wrap everything in async iife?!
+        * multi-source-file support.
     * support all the useful sugars.
     * figure out how and when best to reuse code moving up the phase stack.
     * use & update the error registry when generating (throwing) errors.
@@ -39,6 +76,7 @@
         * e.g. the hell of "npx t2tc" never working right from inside the project.
     * beware the need for t2lang-runtime, it is to sigh.
     * maybe try to split out t2lang-sdk-ergonomics for real.
+* state has to be passed through so errors really can show line #s.
 * have to keep responsibility clear and coherent.
     * don't put something in phase B if phase A grammar supports it.
     * don't put something in phase A if it is more than phase A's spec.
@@ -53,3 +91,6 @@
     * the error registry string interpolation via macro using js string template interpolation.
 * could t2tc accept fragments without `(program ...)`?
 * somebody do a clean-room, non gen-AI version of t2lang.
+* can we use Symbol for gensym?
+* clean up tests, abstract out more helpers to DRY.
+* infix is a real pain. precedence has to be full and complete and correct e.g. dotted access.

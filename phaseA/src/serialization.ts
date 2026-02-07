@@ -78,6 +78,8 @@ import {
   TemplateExpr,
   NonNullAssertExpr,
   TernaryExpr,
+  AwaitExpr,
+  YieldExpr,
   IndexSignature,
   StaticBlockStmt,
   DefaultPattern,
@@ -89,6 +91,7 @@ export type SerializedIdentifier = { kind: "identifier"; name: string; span: Ser
 export type SerializedLiteral = { kind: "literal"; value: Literal["value"]; span: SerializedSpan };
 export type SerializedObjectField =
   | { kind: "field"; key: string; value: SerializedExpression }
+  | { kind: "computed"; key: SerializedExpression; value: SerializedExpression }
   | { kind: "spread"; expr: SerializedExpression };
 
 export type SerializedNamedImport = { imported: string; local: SerializedIdentifier };
@@ -143,6 +146,8 @@ export type SerializedExpression =
   | ({ kind: "object" } & { fields: SerializedObjectField[]; span: SerializedSpan })
   | ({ kind: "template" } & { parts: SerializedExpression[]; span: SerializedSpan })
   | ({ kind: "non-null" } & { expr: SerializedExpression; span: SerializedSpan })
+  | { kind: "await"; argument: SerializedExpression; span: SerializedSpan }
+  | { kind: "yield"; argument?: SerializedExpression | null; delegate: boolean; span: SerializedSpan }
   | { kind: "ternary"; test: SerializedExpression; consequent: SerializedExpression; alternate: SerializedExpression; span: SerializedSpan }
   | { kind: "throw"; argument: SerializedExpression; span: SerializedSpan }
   | {
@@ -319,6 +324,13 @@ export async function serializeExpression(expr: Expression): Promise<SerializedE
         if (field.kind === "spread") {
           return { kind: "spread", expr: await serializeExpression(field.expr) } as const;
         }
+        if (field.kind === "computed") {
+          return {
+            kind: "computed",
+            key: await serializeExpression(field.key),
+            value: await serializeExpression(field.value),
+          } as const;
+        }
         return { kind: "field", key: field.key, value: await serializeExpression(field.value) } as const;
       })
     );
@@ -330,6 +342,17 @@ export async function serializeExpression(expr: Expression): Promise<SerializedE
   }
   if (expr instanceof NonNullAssertExpr) {
     return { kind: "non-null", expr: await serializeExpression(expr.expr), span: await serializeSpan(expr.span) };
+  }
+  if (expr instanceof AwaitExpr) {
+    return { kind: "await", argument: await serializeExpression(expr.argument), span: await serializeSpan(expr.span) };
+  }
+  if (expr instanceof YieldExpr) {
+    return {
+      kind: "yield",
+      argument: expr.argument ? await serializeExpression(expr.argument) : undefined,
+      delegate: expr.delegate,
+      span: await serializeSpan(expr.span),
+    };
   }
   if (expr instanceof TernaryExpr) {
     return {
@@ -1021,6 +1044,13 @@ export async function deserializeExpression(serialized: SerializedExpression): P
             if (field.kind === "spread") {
               return { kind: "spread", expr: await deserializeExpression(field.expr) } as const;
             }
+            if (field.kind === "computed") {
+              return {
+                kind: "computed",
+                key: await deserializeExpression(field.key),
+                value: await deserializeExpression(field.value),
+              } as const;
+            }
             return { kind: "field", key: field.key, value: await deserializeExpression(field.value) } as const;
           })
         ),
@@ -1034,6 +1064,17 @@ export async function deserializeExpression(serialized: SerializedExpression): P
     case "non-null":
       return new NonNullAssertExpr({
         expr: await deserializeExpression(serialized.expr),
+        span: await deserializeSpan(serialized.span),
+      });
+    case "await":
+      return new AwaitExpr({
+        argument: await deserializeExpression(serialized.argument),
+        span: await deserializeSpan(serialized.span),
+      });
+    case "yield":
+      return new YieldExpr({
+        delegate: serialized.delegate,
+        argument: serialized.argument ? await deserializeExpression(serialized.argument) : undefined,
         span: await deserializeSpan(serialized.span),
       });
     case "ternary":

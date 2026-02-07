@@ -103,6 +103,22 @@ test("compile emits prop/index/object/new output", async () => {
   assert.ok(result.tsSource.includes("new Widget(obj)"));
 });
 
+test("compile emits computed object keys", async () => {
+  const source = `(program
+    (let* (iter
+      (object
+        (computed (prop Symbol "iterator")
+          (fn generator ((x))
+            (yield x)))))
+    iter)
+  )`;
+  const result = await compile(source);
+  if (result.diagnostics.length > 0) {
+    console.error(result.diagnostics);
+  }
+  assert.ok(result.tsSource.includes("[Symbol.iterator]: function*"));
+});
+
 test("compile emits import/export statements", async () => {
   const source = `(program
     (import (import-spec "./default" (default Default)))

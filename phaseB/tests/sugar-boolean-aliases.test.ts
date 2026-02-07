@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert";
 import { parsePhaseBRaw } from "../src/reader.js";
-import { PhaseBError } from "../../common/dist/errorRegistry.js";
+import { T2CompilationError } from "../../common/dist/errorRegistry.js";
 import { expectExpression } from "./sugar_helpers.js";
 
 test("and alias rewrites to && call", () => {
@@ -19,17 +19,17 @@ test("not alias rewrites to ! call", () => {
 test("not alias requires exactly one argument", () => {
   assert.throws(
     () => parsePhaseBRaw("(not true false)", "not-arity.t2"),
-    (error) => error instanceof PhaseBError && error.code === "T2:0322"
+    (error) => error instanceof T2CompilationError && error.code === "T2:0322"
   );
 });
 
 test("and/or aliases require at least one argument", () => {
   assert.throws(
     () => parsePhaseBRaw("(and)", "and-arity.t2"),
-    (error) => error instanceof PhaseBError && error.code === "T2:0323"
+    (error) => error instanceof T2CompilationError && error.code === "T2:0323"
   );
   assert.throws(
     () => parsePhaseBRaw("(or)", "or-arity.t2"),
-    (error) => error instanceof PhaseBError && error.code === "T2:0323"
+    (error) => error instanceof T2CompilationError && error.code === "T2:0323"
   );
 });

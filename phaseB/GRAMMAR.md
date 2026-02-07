@@ -158,6 +158,7 @@ All code in a compilation unit (e.g. a single file) must be enclosed in a top-le
 							 | <object>
 							 | <spread>
 							 | <await>
+							 | <yield>
 							 | <ternary>
 
 <call> ::= "(" "call" <expression> <expression>* ")"
@@ -173,9 +174,12 @@ All code in a compilation unit (e.g. a single file) must be enclosed in a top-le
 <object> ::= "(" "object" <object-field>* ")"
 <object-field> ::= "(" <string> <expression> ")"
 							 | "(" "spread" "object" <expression> ")"
+					 | "(" "computed" <expression> <expression> ")"
 <spread> ::= "(" "spread" <spread-kind> <expression> ")"
 <spread-kind> ::= "array" | "object" | "rest"
 <await> ::= "(" "await" <expression> ")"
+<yield> ::= "(" "yield" <expression>? ")"
+		 | "(" "yield*" <expression> ")"
 <ternary> ::= "(" "ternary" <expression> <expression> <expression> ")"
 <template> ::= "(" "template" <expression>* ")"
 <non-null> ::= "(" "non-null" <expression> ")"
@@ -373,6 +377,16 @@ obj?.[key]
 ```
 
 Rewrites to guarded `let*` + `if` expressions and `call-with-this` when needed.
+
+### For-of / For-in / For-await
+
+```
+(for of ((item) items) body...)
+(for await ((item) items) body...)
+(for in ((key) obj) body...)
+```
+
+`for in` lowers to `for of` over `(Object.keys obj)`.
 
 ### Object and array literals
 

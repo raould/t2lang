@@ -128,6 +128,22 @@ Phase B supports `?` suffixes on object literal keys to conditionally include a 
 - Uses `!= null` to match both `null` and `undefined`.
 - Falsy values like `0`, `""`, and `false` are included.
 - Multiple optional keys compile to multiple spreads in order of appearance.
+
+### Computed Keys
+
+**Sugar**:
+```lisp
+{[Symbol.iterator] (fn generator (x) (yield x))}
+```
+
+**Rewrite**:
+```lisp
+(object (computed Symbol.iterator (fn generator (x) (yield x))))
+```
+
+**Notes**:
+- Computed keys allow symbol-based properties like `Symbol.iterator`.
+- The key expression is preserved and lowered into Phase A as a computed object field.
 ```
 
 ### Array Literals
@@ -207,6 +223,24 @@ Phase A strictly requires `let*` and `const*` with specific nesting. Phase B all
 (assign x 10)
 (assign (prop obj prop) 20)
 (assign (prop obj prop) 20)
+```
+
+## 5.5 For-of / For-in / For-await [x]
+
+Phase B accepts explicit loop kinds and lowers them to Phase A loop nodes.
+
+**Sugar:**
+```lisp
+(for of ((item) items) body...)
+(for await ((item) items) body...)
+(for in ((key) obj) body...)
+```
+
+**Rewrite:**
+```lisp
+(for of ((item) items) body...)
+(for await ((item) items) body...)
+(for of ((key) (call (prop Object "keys") obj)) body...)
 ```
 
 ## 6. Function Definitions [x]

@@ -1,5 +1,6 @@
 import { ParseError } from "./reader.js";
 import type { ReaderErrorCode } from "./reader.js";
+import type { T2CompilationError } from "./errorRegistry.js";
 import type { ExpansionFrame, SourceLoc } from "./location.js";
 
 export type DiagnosticLevel = "error" | "warning" | "note" | "help";
@@ -61,6 +62,30 @@ export function diagnosticFromParseError(error: ParseError): Diagnostic {
     message: error.message,
     loc: error.loc,
     expansionStack: error.expansionStack,
+  };
+}
+
+export function diagnosticFromCompilationError(error: T2CompilationError): Diagnostic {
+  const loc = error.info?.loc ?? {
+    file: "<unknown>",
+    line: 1,
+    column: 1,
+    endLine: 1,
+    endColumn: 1,
+  };
+  const notes: DiagnosticNote[] = [];
+  if (error.info?.phase) {
+    notes.push({ message: `phase: ${error.info.phase}` });
+  }
+  if (error.info?.hint) {
+    notes.push({ message: error.info.hint });
+  }
+  return {
+    code: error.code as ReaderErrorCode,
+    level: "error",
+    message: error.message,
+    loc,
+    notes: notes.length > 0 ? notes : undefined,
   };
 }
 

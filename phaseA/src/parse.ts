@@ -995,6 +995,18 @@ class Parser {
         }
         return { kind: "spread", expr: this.nodeToExpression(exprNode) } as const;
       }
+      if (keyNode.type === "atom" && keyNode.value === "computed") {
+        const exprNode = fieldNode.elements[1];
+        const valueNode = fieldNode.elements[2];
+        if (!exprNode || !valueNode) {
+          throw reportError("T2:0214");
+        }
+        return {
+          kind: "computed",
+          key: this.nodeToExpression(exprNode),
+          value: this.nodeToExpression(valueNode),
+        } as const;
+      }
       if (keyNode.type !== "atom" || keyNode.tokenType !== "string") {
         throw reportError("T2:0213");
       }

@@ -11,6 +11,11 @@ test("lisp-style semicolon comment", async () => {
     (program
       (fn foo ((x)) x)
       ; this is a comment
+      ; (this is a comment)
+      ;(this is a comment)
+      ;this is a comment
+      ;;this is a comment
+      ;; this is a comment
       (foo 1))
   `, );
   if (result.diagnostics.length > 0) { console.error(result.diagnostics); }

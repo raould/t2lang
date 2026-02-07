@@ -157,6 +157,7 @@ Tokens:
 <object> ::= "(" "object" <object-field>* ")"  ; commas allowed between fields
 <object-field> ::= "(" <string> <expression> ")"
                | "(" "spread" "object" <expression> ")"
+               | "(" "computed" <expression> <expression> ")"
 <spread> ::= "(" "spread" <spread-kind> <expression> ")"
 <spread-kind> ::= "array" | "object" | "rest"
 <ternary> ::= "(" "ternary" <expression> <expression> <expression> ")"
