@@ -1,11 +1,10 @@
 import type { ExpansionFrame, SourceLoc } from "./location.js";
 export type { ExpansionFrame, SourceLoc } from "./location.js";
 import type { Program } from "../../phaseA/dist/phaseA1.js";
-import { applySugar } from "./sugar.js";
 import { expand } from "./expander.js";
 import { MacroRegistry } from "./macroRegistry.js";
-import { rewriteAssignments } from "./rewriter.js";
 import { lowerPhaseB } from "./lower.js";
+import { parsePhaseBPeg } from "./pegParser.js";
 
 export interface BaseNode {
   loc: SourceLoc;
@@ -87,15 +86,9 @@ export function parsePhaseB(source: string, file = "<input>"): Program {
 }
 
 export function parsePhaseBRaw(source: string, file = "<input>"): PhaseBNode[] {
-  const parsed = parseSexpr(source, file);
-  const readerMacros = collectReaderMacroRegistry(parsed);
-  const macroParsed = readerMacros.hasMacros ? parseSexpr(source, file, readerMacros.registry, true) : parsed;
-  const stripped = readerMacros.hasMacros ? stripReaderMacroDefs(macroParsed) : macroParsed;
-  const rewritten = rewriteAssignments(stripped);
-  const nodes = rewritten.map(wrapPhaseBNode);
-  const sugared = applySugar(nodes);
+  const nodes = parsePhaseBPeg(source, file);
   const registry = new MacroRegistry();
-  return expand(sugared, registry) as PhaseBNode[];
+  return expand(nodes, registry) as PhaseBNode[];
 }
 
 function wrapPhaseBNode(node: SExprNode): PhaseBNode {
@@ -245,6 +238,9 @@ function collectReaderMacroRegistry(nodes: SExprNode[]): { registry: ReaderMacro
 function stripReaderMacroDefs(nodes: SExprNode[]): SExprNode[] {
   return nodes.filter((node) => !parseReaderMacroDefinition(node));
 }
+
+void collectReaderMacroRegistry;
+void stripReaderMacroDefs;
 
 function parseReaderMacroDefinition(node: SExprNode): ReaderMacroDefinition | null {
   if (!isListNode(node)) {
