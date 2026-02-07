@@ -23,6 +23,14 @@
     * a main problem is that when you add sugar, things explode combinatorially, so it is hard to have enough tests, and hard to know what combinations of syntax sugar really are successfully supported.
         * i really do not know if the phaseB macros & sugar are individually correctly lowering such that they can all be used together.
         * All sugar must desugar before macro expansion, and must desugar into the same canonical AST form that macros expect.
+        * All syntax sugar is recognized and lowered by a single unified parser.
+            * Sugar never expands into more sugar.
+            * Sugar is fully eliminated before macro expansion.
+            * Macros operate only on canonical AST.
+        * Sugar is implemented as grammar fragments that compose cleanly.
+        * Sugar is parsed with PEG / parser combinators.
+             * Infix is not supported at first.
+             * Add Pratt parser for infix sugar later.
         * A healthy S-expression language with sugar follows this order:
             * Reader / Parser
                 * Handles all syntax sugar
