@@ -3,6 +3,8 @@ import type { PhaseBNode, PhaseBListNode, PhaseBTypeAnnotation, SourceLoc } from
 import { ParseError } from "./parseError.js";
 import type { TypeAst } from "./typeExpr.js";
 import { parseTypeExpression } from "./typeExpr.js";
+import { gensym } from "./gensym.js";
+import { reportError } from "../../common/dist/errorRegistry.js";
 
 type OhmNode = ohm.Node;
 type OhmIteration = ohm.IterationNode;
@@ -131,12 +133,15 @@ T2PhaseB {
     ObjectTokens = ObjectToken ObjectTokenTail*
     ObjectTokenTail = Spacing "," Spacing ObjectToken -- comma
         | Spacing ObjectToken -- spaced
-    ObjectToken = KeyValueEntry -- colon
+    ObjectToken = OptionalEntry -- optional
+      | KeyValueEntry -- colon
       | KeyValueShorthand -- spaced
       | Expr
 
     KeyValueEntry = Key Spacing ":" Spacing Expr
     KeyValueShorthand = Key Spacing Expr
+    OptionalEntry = Key Spacing "?" OptionalValue?
+    OptionalValue = Spacing Expr
 
   Key = ident | String
 
@@ -486,6 +491,62 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
     }
     return node;
   };
+  const TEMPLATE_PLACEHOLDER = /^[A-Za-z_][A-Za-z0-9_-]*$/;
+  const buildTemplateParts = (template: string, loc: SourceLoc, keySymbols: Map<string, PhaseBNode>): PhaseBNode[] => {
+    const parts: PhaseBNode[] = [];
+    let cursor = 0;
+    while (cursor < template.length) {
+      const start = template.indexOf("${", cursor);
+      if (start < 0) {
+        const tail = template.slice(cursor);
+        if (tail.length > 0) {
+          parts.push(strFromLoc(tail, loc));
+        }
+        break;
+      }
+      const prefix = template.slice(cursor, start);
+      if (prefix.length > 0) {
+        parts.push(strFromLoc(prefix, loc));
+      }
+      const end = template.indexOf("}", start + 2);
+      if (end < 0) {
+        throw reportError("T2:0318", loc);
+      }
+      const placeholder = template.slice(start + 2, end).trim();
+      if (!TEMPLATE_PLACEHOLDER.test(placeholder)) {
+        throw reportError("T2:0317", { placeholder }, loc);
+      }
+      const symbol = keySymbols.get(placeholder);
+      if (!symbol) {
+        throw reportError("T2:0316", { key: placeholder }, loc);
+      }
+      parts.push(symbol);
+      cursor = end + 1;
+    }
+    return parts;
+  };
+  const normalizeOptionalValue = (keyNode: PhaseBNode, valueNode?: PhaseBNode): PhaseBNode => {
+    if (valueNode) {
+      return valueNode;
+    }
+    if (keyNode.phaseKind === "symbol") {
+      return keyNode;
+    }
+    throw reportError("T2:0222", keyNode.loc);
+  };
+  const createOptionalObjectEntry = (keyNode: PhaseBNode, valueNode: PhaseBNode, loc: SourceLoc): PhaseBListNode => {
+    const condition = listFromLoc(
+      loc,
+      symFromLoc("!=", loc),
+      valueNode,
+      { kind: "literal", value: null, loc, phaseKind: "literal" },
+    );
+    const field = listFromLoc(loc, normalizeObjectKey(keyNode), valueNode);
+    const objectNode = listFromLoc(loc, symFromLoc("object", loc), field);
+    const emptyObject = listFromLoc(loc, symFromLoc("object", loc));
+    const conditional = listFromLoc(loc, symFromLoc("if", loc), condition, objectNode, emptyObject);
+    return listFromLoc(loc, symFromLoc("spread", loc), symFromLoc("object", loc), conditional);
+  };
   const normalizeCallableArgs = (headName: string, args: PhaseBNode[]): PhaseBNode[] => {
     let index = 0;
     while (index < args.length && args[index].phaseKind === "symbol" && CALLABLE_MODIFIERS.has((args[index] as { name: string }).name)) {
@@ -618,6 +679,22 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
     Call_implicitCall(exprs: OhmIteration) {
       const items = exprs.asIteration().children.map((child: ohm.Node) => unwrapNode(child.ast()));
       const [head, ...args] = items;
+      if (head && head.phaseKind === "symbol") {
+        const headName = (head as { name: string }).name;
+        if (headName === "not") {
+          if (args.length !== 1) {
+            throw reportError("T2:0322", (head as PhaseBNode).loc);
+          }
+          return list(this as ohm.Node, sym("call", this as ohm.Node), sym("!", this as ohm.Node), args[0]);
+        }
+        if (headName === "and" || headName === "or") {
+          if (args.length === 0) {
+            throw reportError("T2:0323", { operator: headName }, (head as PhaseBNode).loc);
+          }
+          const op = headName === "and" ? "&&" : "||";
+          return list(this as ohm.Node, sym("call", this as ohm.Node), sym(op, this as ohm.Node), ...args);
+        }
+      }
       if (head && head.phaseKind === "symbol" && NON_CALL_HEADS.has((head as { name: string }).name)) {
         const headName = (head as { name: string }).name;
         let normalizedArgs = args;
@@ -795,6 +872,16 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
       const keyNode = normalizeObjectKey(key.ast() as PhaseBNode);
       return list(this as ohm.Node, keyNode, unwrapNode(value.ast()));
     },
+    OptionalEntry(key: OhmNode, _sp: OhmNode, _q: OhmNode, value: OhmNode) {
+      void [_sp, _q];
+      const keyNode = unwrapNode(key.ast());
+      const valueNode = value.children.length ? unwrapNode(value.ast()) : normalizeOptionalValue(keyNode);
+      return createOptionalObjectEntry(keyNode, valueNode, locLookup(this as ohm.Node));
+    },
+    OptionalValue(_sp: OhmNode, expr: OhmNode) {
+      void _sp;
+      return unwrapNode(expr.ast());
+    },
     Key(key: OhmNode) {
       return unwrapNode(key.ast());
     },
@@ -892,8 +979,51 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
       );
     },
     TemplateWith(_kw: OhmNode, _sp1: OhmNode, template: OhmNode, _sp2: OhmNode, pairs: OhmIteration) {
-      const items = pairs.asIteration().children.map((child: ohm.Node) => unwrapNode(child.ast()));
-      return list(this as ohm.Node, sym("template-with", this as ohm.Node), unwrapNode(template.ast()), ...items);
+      const loc = locLookup(this as ohm.Node);
+      const templateNode = unwrapNode(template.ast());
+      if (!(templateNode.phaseKind === "literal" && typeof (templateNode as { value: unknown }).value === "string")) {
+        throw reportError("T2:0313", templateNode.loc ?? loc);
+      }
+      const templateText = (templateNode as { value: string }).value;
+      const keySymbols = new Map<string, PhaseBNode>();
+      const params: PhaseBNode[] = [];
+      const args: PhaseBNode[] = [];
+      for (const pair of pairs.asIteration().children.map((child: ohm.Node) => unwrapNode(child.ast()))) {
+        if (pair.phaseKind !== "list") {
+          throw reportError("T2:0314", pair.loc ?? locLookup(this as ohm.Node));
+        }
+        const pairList = pair as PhaseBListNode;
+        if (pairList.elements.length !== 2) {
+          throw reportError("T2:0314", pairList.loc);
+        }
+        const keyNode = pairList.elements[0];
+        let keyName: string | null = null;
+        if (keyNode.phaseKind === "symbol") {
+          keyName = (keyNode as { name: string }).name;
+        } else if (keyNode.phaseKind === "literal" && typeof (keyNode as { value: unknown }).value === "string") {
+          keyName = (keyNode as { value: string }).value;
+        }
+        if (!keyName) {
+          throw reportError("T2:0314", pairList.loc);
+        }
+        if (keySymbols.has(keyName)) {
+          throw reportError("T2:0319", { key: keyName }, pairList.loc);
+        }
+        const valueNode = pairList.elements[1];
+        if (!(valueNode.phaseKind === "literal")) {
+          throw reportError("T2:0315", valueNode.loc);
+        }
+        const paramSymbol = symFromLoc(gensym("tmpl_"), pairList.loc);
+        keySymbols.set(keyName, paramSymbol);
+        params.push(listFromLoc(pairList.loc, paramSymbol));
+        args.push(valueNode);
+      }
+      const parts = buildTemplateParts(templateText, templateNode.loc, keySymbols);
+      const templateList = listFromLoc(loc, symFromLoc("template", loc), ...parts);
+      const returnList = listFromLoc(loc, symFromLoc("return", loc), templateList);
+      const signatureList = listFromLoc(loc, ...params);
+      const lambdaList = listFromLoc(loc, symFromLoc("lambda", loc), signatureList, returnList);
+      return listFromLoc(loc, symFromLoc("call", loc), lambdaList, ...args);
     },
     Pair(_open: OhmNode, _sp1: OhmNode, key: OhmNode, _sp2: OhmNode, value: OhmNode, _sp3: OhmNode, _close: OhmNode) {
       void [_open, _sp1, _sp2, _sp3, _close];
