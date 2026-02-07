@@ -3,6 +3,16 @@ import { helperStrictNode, helperMatchNode } from "./e2e_helpers.js";
 
 // things that have failed somewhere before...
 
+test("was empirically failing #4", async () => {
+    const source = `(program
+        (let ((myobj {x: 42}))
+            (if (> myobj.x 41) (console.log "yes1"))
+            (if (infix (myobj.x > 41)) (console.log "yes2"))
+            (if :(myobj.x > 41) (console.log "yes3"))))
+    `;
+    await helperMatchNode(source, /yes1[\s\S]*yes2[\s\S]*yes3/);
+});
+
 test("was empirically failing #3", async () => {
     const source = `
     (program

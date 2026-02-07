@@ -121,7 +121,7 @@ function substitute(node: PhaseBSurfaceNode, params: string[], args: PhaseBSurfa
       node.elements.map((child) => {
         const substituted = substitute(child, params, args);
         if (!isSExprNode(substituted)) {
-          throw reportError("T2:0101");
+          throw reportError("T2:0101", child.loc);
         }
         return substituted;
       })
@@ -176,7 +176,7 @@ function convertQuasiquote(node: SExprNode): SExprNode {
         return node.elements[1];
       }
       if (head.name === "unquote-splicing") {
-        throw reportError("T2:0102");
+        throw reportError("T2:0102", node.loc);
       }
     }
     const listSymbol = createSymbol("list", node.loc);
@@ -190,7 +190,7 @@ function convertQuasiquoteElement(node: SExprNode): SExprNode {
   if (isListNode(node)) {
     const head = node.elements[0];
     if (isSymbolNode(head) && head.name === "unquote-splicing") {
-      throw reportError("T2:0102");
+      throw reportError("T2:0102", node.loc);
     }
     return convertQuasiquote(node);
   }

@@ -2,18 +2,22 @@ import type { ListNode, SExprNode, SymbolNode, ListDelimiter } from "./reader.js
 import { gensym } from "./gensym.js";
 
 export function rewriteAssignments(nodes: SExprNode[]): SExprNode[] {
-  return nodes.map(rewriteNode);
+  return nodes.map((node) => rewriteNode(node));
 }
 
-function rewriteNode(node: SExprNode): SExprNode {
+function rewriteNode(node: SExprNode, options: { allowMethodCall?: boolean } = {}): SExprNode {
+  const allowMethodCall = options.allowMethodCall !== false;
   if (isListNode(node)) {
     const [originalHead, ...rest] = node.elements;
     const infixAssign = rewriteInfixAssign(originalHead, rest, node.loc);
     if (infixAssign) {
       return infixAssign;
     }
-    const rewrittenRest = rest.map(rewriteNode);
-    if (isSymbolNode(originalHead) && node.delimiter === "(") {
+    const isInfixForm = isSymbolNode(originalHead) && originalHead.name === "infix";
+    const rewrittenRest = rest.map((child, index) =>
+      rewriteNode(child, isInfixForm && index === 0 ? { allowMethodCall: false } : undefined)
+    );
+    if (allowMethodCall && isSymbolNode(originalHead) && node.delimiter === "(") {
       const methodCall = rewriteMethodCall(originalHead, rewrittenRest, node.loc);
       if (methodCall) {
         return methodCall;

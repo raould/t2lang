@@ -112,7 +112,7 @@ export function lowerPhaseB(nodes: PhaseBNode[]): Program {
   const body = bodyNodes.map(lowerStatement);
   const span = nodes.length > 0 ? spanFromLoc(nodes[0].loc) : emptySpan();
   if (containsAwaitOutsideFunctions(body)) {
-    throw reportError("T2:0324");
+    throw reportError("T2:0324", nodes[0]?.loc);
   }
   const runtimeImports = collectRuntimeImports(bodyNodes);
   if (runtimeImports.length > 0) {
@@ -263,7 +263,7 @@ function lowerAssign(node: PhaseBListNode): AssignExpr {
 function lowerTypeAlias(node: PhaseBListNode): TypeAliasStmt {
   const [, nameNode, ...rest] = node.elements;
   if (!nameNode) {
-    throw reportError("T2:0268");
+    throw reportError("T2:0268", node.loc);
   }
   const name = lowerTypeAliasName(nameNode);
 
@@ -277,16 +277,16 @@ function lowerTypeAlias(node: PhaseBListNode): TypeAliasStmt {
       continue;
     }
     if (typeValueNode) {
-      throw reportError("T2:0267");
+      throw reportError("T2:0267", entry.loc);
     }
     typeValueNode = entry;
   }
   if (!typeValueNode) {
-    throw reportError("T2:0267");
+    throw reportError("T2:0267", node.loc);
   }
   let typeValue = lowerTypeNode(typeValueNode);
   if (!typeValue) {
-    throw reportError("T2:0267");
+    throw reportError("T2:0267", typeValueNode.loc);
   }
   if (typeParams && typeParams.length > 0) {
     const typeParamNames = new Set(typeParams.map((param) => param.name.name));
@@ -305,7 +305,7 @@ function lowerTypeAliasName(node: PhaseBNode): Identifier {
       return new Identifier({ name: literal.value, span: spanFromLoc(node.loc) });
     }
   }
-  throw reportError("T2:0268");
+  throw reportError("T2:0268", node.loc);
 }
 
 function lowerReturn(node: PhaseBListNode): ReturnExpr {
@@ -406,11 +406,11 @@ function lowerForOf(node: PhaseBListNode): ForOf {
   const clauseNode = node.elements[2];
   const bodyNodes = node.elements.slice(3);
   if (!clauseNode || clauseNode.phaseKind !== "list") {
-    throw reportError("T2:0178");
+    throw reportError("T2:0178", clauseNode?.loc ?? node.loc);
   }
   const [bindingNode, iterableNode] = (clauseNode as PhaseBListNode).elements;
   if (!bindingNode || !iterableNode) {
-    throw reportError("T2:0177");
+    throw reportError("T2:0177", clauseNode?.loc ?? node.loc);
   }
   const binding = bindingNode.phaseKind === "list" ? lowerBindingEntry(bindingNode as PhaseBListNode) : { target: lowerBindingTarget(bindingNode) };
   const iterable = lowerExpression(iterableNode);
@@ -423,11 +423,11 @@ function lowerForAwait(node: PhaseBListNode): ForAwait {
   const clauseNode = node.elements[2];
   const bodyNodes = node.elements.slice(3);
   if (!clauseNode || clauseNode.phaseKind !== "list") {
-    throw reportError("T2:0172");
+    throw reportError("T2:0172", clauseNode?.loc ?? node.loc);
   }
   const [bindingNode, iterableNode] = (clauseNode as PhaseBListNode).elements;
   if (!bindingNode || !iterableNode) {
-    throw reportError("T2:0171");
+    throw reportError("T2:0171", clauseNode?.loc ?? node.loc);
   }
   const binding = bindingNode.phaseKind === "list" ? lowerBindingEntry(bindingNode as PhaseBListNode) : { target: lowerBindingTarget(bindingNode) };
   const iterable = lowerExpression(iterableNode);
@@ -440,11 +440,11 @@ function lowerForIn(node: PhaseBListNode): ForOf {
   const clauseNode = node.elements[2];
   const bodyNodes = node.elements.slice(3);
   if (!clauseNode || clauseNode.phaseKind !== "list") {
-    throw reportError("T2:0178");
+    throw reportError("T2:0178", clauseNode?.loc ?? node.loc);
   }
   const [bindingNode, iterableNode] = (clauseNode as PhaseBListNode).elements;
   if (!bindingNode || !iterableNode) {
-    throw reportError("T2:0177");
+    throw reportError("T2:0177", clauseNode?.loc ?? node.loc);
   }
   const binding = bindingNode.phaseKind === "list" ? lowerBindingEntry(bindingNode as PhaseBListNode) : { target: lowerBindingTarget(bindingNode) };
   const iterable = lowerExpression(iterableNode);
@@ -492,7 +492,7 @@ function lowerFunction(node: PhaseBListNode, kind: CallableKind): FunctionExpr {
   } else if (kind === "method" || kind === "getter" || kind === "setter") {
     if (entries[0]) {
       if (entries[0].phaseKind !== "symbol") {
-        throw reportError("T2:0118", { label: `${kind} name` });
+        throw reportError("T2:0118", { label: `${kind} name` }, entries[0].loc);
       }
       methodName = extractPropertyName(entries[0]);
       entries = entries.slice(1);
@@ -516,7 +516,7 @@ function lowerFunction(node: PhaseBListNode, kind: CallableKind): FunctionExpr {
     if (marker === ":") {
       const returnNode = entries[1];
       if (!returnNode) {
-        throw reportError("T2:0237");
+        throw reportError("T2:0237", entries[0]?.loc ?? node.loc);
       }
       returnType = lowerTypeNode(returnNode);
       entries = entries.slice(2);
@@ -542,7 +542,7 @@ function lowerFunction(node: PhaseBListNode, kind: CallableKind): FunctionExpr {
 
   const body = entries.map(lowerStatement);
   if (!async && containsAwaitOutsideFunctions(body)) {
-    throw reportError("T2:0324");
+    throw reportError("T2:0324", node.loc);
   }
 
   return new FunctionExpr({
@@ -682,7 +682,7 @@ function lowerTypeList(node: PhaseBListNode): TypeNode | undefined {
 
 function lowerTypeParams(node: PhaseBNode | undefined): TypeParam[] {
   if (!node || node.phaseKind !== "list") {
-    throw reportError("T2:0288");
+    throw reportError("T2:0288", node?.loc);
   }
   const list = node as PhaseBListNode;
   let entries = list.elements;
@@ -694,7 +694,7 @@ function lowerTypeParams(node: PhaseBNode | undefined): TypeParam[] {
   for (const entry of entries) {
     const name = stringFromNode(entry);
     if (!name) {
-      throw reportError("T2:0288");
+      throw reportError("T2:0288", entry.loc);
     }
     const identifier = new Identifier({ name, span: spanFromLoc(entry.loc) });
     params.push(new TypeParam({ name: identifier, span: spanFromLoc(entry.loc) }));
@@ -1119,7 +1119,7 @@ function lowerList(node: PhaseBListNode): Expression {
       case "await": {
         validateCommaSeparated(rest, "await arguments");
         if (filteredRest.length !== 1) {
-          throw reportError("T2:0127");
+          throw reportError("T2:0127", node.loc);
         }
         const argument = lowerExpression(filteredRest[0]);
         return new AwaitExpr({ argument, span });
@@ -1127,7 +1127,7 @@ function lowerList(node: PhaseBListNode): Expression {
       case "yield": {
         validateCommaSeparated(rest, "yield arguments");
         if (filteredRest.length > 1) {
-          throw reportError("T2:0127");
+          throw reportError("T2:0127", node.loc);
         }
         const argument = filteredRest[0] ? lowerExpression(filteredRest[0]) : undefined;
         return new YieldExpr({ delegate: false, argument, span });
@@ -1135,7 +1135,7 @@ function lowerList(node: PhaseBListNode): Expression {
       case "yield*": {
         validateCommaSeparated(rest, "yield arguments");
         if (filteredRest.length !== 1) {
-          throw reportError("T2:0127");
+          throw reportError("T2:0127", node.loc);
         }
         const argument = lowerExpression(filteredRest[0]);
         return new YieldExpr({ delegate: true, argument, span });
@@ -1557,11 +1557,11 @@ function validateCommaSeparated(nodes: PhaseBNode[], context: string): void {
     return;
   }
   if (nodes[0].phaseKind === "symbol" && (nodes[0] as SymbolNode).name === ",") {
-    throw reportError("T2:0115", { context });
+    throw reportError("T2:0115", { context }, nodes[0]?.loc);
   }
   const last = nodes[nodes.length - 1];
   if (last.phaseKind === "symbol" && (last as SymbolNode).name === ",") {
-    throw reportError("T2:0114", { context });
+    throw reportError("T2:0114", { context }, last.loc);
   }
   for (let i = 1; i < nodes.length; i += 1) {
     const current = nodes[i];
@@ -1572,7 +1572,7 @@ function validateCommaSeparated(nodes: PhaseBNode[], context: string): void {
       prev.phaseKind === "symbol" &&
       (prev as SymbolNode).name === ","
     ) {
-      throw reportError("T2:0113", { context });
+      throw reportError("T2:0113", { context }, current.loc);
     }
   }
 }

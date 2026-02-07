@@ -39,6 +39,7 @@
         * e.g. the hell of "npx t2tc" never working right from inside the project.
     * beware the need for t2lang-runtime, it is to sigh.
     * maybe try to split out t2lang-sdk-ergonomics for real.
+* state has to be passed through so errors really can show line #s.
 * have to keep responsibility clear and coherent.
     * don't put something in phase B if phase A grammar supports it.
     * don't put something in phase A if it is more than phase A's spec.
@@ -55,3 +56,4 @@
 * somebody do a clean-room, non gen-AI version of t2lang.
 * can we use Symbol for gensym?
 * clean up tests, abstract out more helpers to DRY.
+* infix is a real pain. precedence has to be full and complete and correct e.g. dotted access.
