@@ -27,6 +27,7 @@ const NON_CALL_FORMS = new Set([
   "let*",
   "const",
   "const*",
+  "type",
   "if",
   "when",
   "for",
@@ -96,7 +97,17 @@ function rewriteList(node: PhaseBListNode): PhaseBNode {
     return rewriteNode(templateRewrite);
   }
 
+  const typeDeclarationRewrite = rewriteTypeDeclaration(node);
+  if (typeDeclarationRewrite) {
+    return rewriteNode(typeDeclarationRewrite);
+  }
+
   validateNoKeywordArgs(node);
+
+  const functionTypeParamsRewrite = rewriteFunctionTypeParams(node);
+  if (functionTypeParamsRewrite) {
+    return rewriteNode(functionTypeParamsRewrite);
+  }
 
   const booleanAliasRewrite = rewriteBooleanAliases(node);
   if (booleanAliasRewrite) {
@@ -120,9 +131,13 @@ function rewriteList(node: PhaseBListNode): PhaseBNode {
 
   let elements = node.elements;
   const head = elements[0];
-  if (head && isSymbol(head, "fn") && elements[1]?.phaseKind === "list") {
-    elements = [...elements];
-    elements[1] = rewriteFunctionParams(elements[1] as PhaseBListNode);
+  if (head && isCallableHead(head)) {
+    const signatureIndex = findSignatureListIndex(elements, 1);
+    if (signatureIndex >= 0) {
+      elements = [...elements];
+      elements[signatureIndex] = rewriteFunctionParams(elements[signatureIndex] as PhaseBListNode);
+      elements = rewriteFunctionReturnType(elements, signatureIndex);
+    }
   }
   if (head && isLetForm(head) && elements[1]?.phaseKind === "list") {
     elements = [...elements];
@@ -393,6 +408,197 @@ function rewriteFunctionParams(node: PhaseBListNode): PhaseBListNode {
     idx += 1;
   }
   return { ...node, elements };
+}
+
+function rewriteFunctionReturnType(elements: PhaseBNode[], signatureIndex: number): PhaseBNode[] {
+  for (let i = signatureIndex + 1; i < elements.length - 1; i += 1) {
+    const entry = elements[i];
+    if (entry.phaseKind === "symbol" && (entry as SymbolNode).name === ":") {
+      const annotation = elements[i + 1];
+      if (!annotation) {
+        return elements;
+      }
+      const converted = convertTypeAnnotation(annotation);
+      if (converted === annotation) {
+        return elements;
+      }
+      const nextElements = [...elements];
+      nextElements[i + 1] = converted;
+      return nextElements;
+    }
+  }
+  return elements;
+}
+
+function rewriteTypeDeclaration(node: PhaseBListNode): PhaseBNode | null {
+  const head = node.elements[0];
+  if (!head || !isSymbol(head, "type")) {
+    return null;
+  }
+  if (node.elements.length < 3) {
+    return node;
+  }
+  const nameNode = node.elements[1];
+  const nameLiteral = toTypeAliasNameLiteral(nameNode);
+  if (!nameLiteral) {
+    throw reportError("T2:0268");
+  }
+
+  const parsed = parseAngleTypeParams(node.elements, 2, node.elements.length);
+  const filtered: PhaseBNode[] = [];
+  for (let i = 0; i < node.elements.length; i += 1) {
+    if (parsed && i >= parsed.startIndex && i <= parsed.endIndex) {
+      continue;
+    }
+    filtered.push(node.elements[i]);
+  }
+  if (filtered.length < 3) {
+    return node;
+  }
+  filtered[0] = createPhaseBSymbol("type-alias", node.loc);
+  filtered[1] = nameLiteral;
+
+  const typeValueIndex = 2;
+  const typeValue = filtered[typeValueIndex];
+  if (typeValue) {
+    filtered[typeValueIndex] = convertTypeAnnotation(typeValue);
+  }
+
+  if (parsed) {
+    const startLoc = node.elements[parsed.startIndex].loc;
+    const endLoc = node.elements[parsed.endIndex].loc;
+    const listLoc = mergeLocs(startLoc, endLoc);
+    const typeParamSymbols = parsed.names.map((name) => createPhaseBSymbol(name, listLoc));
+    const typeParamList = createPhaseBList(typeParamSymbols, listLoc);
+    const typeParamMarker = createPhaseBSymbol(":type-params", listLoc);
+    filtered.splice(typeValueIndex + 1, 0, typeParamMarker, typeParamList);
+  }
+
+  return { ...node, elements: filtered };
+}
+
+function toTypeAliasNameLiteral(node: PhaseBNode): PhaseBNode | null {
+  if (node.phaseKind === "symbol") {
+    return createStringLiteral((node as SymbolNode).name, node.loc);
+  }
+  if (isStringLiteral(node)) {
+    return node;
+  }
+  return null;
+}
+
+const TYPE_PARAM_NAME = /^[A-Za-z_][A-Za-z0-9_-]*$/;
+
+function rewriteFunctionTypeParams(node: PhaseBListNode): PhaseBListNode | null {
+  const head = node.elements[0];
+  if (!head || !isCallableHead(head)) {
+    return null;
+  }
+  if (node.elements.some((entry) => entry.phaseKind === "symbol" && (entry as SymbolNode).name === ":type-params")) {
+    return null;
+  }
+  const signatureIndex = findSignatureListIndex(node.elements, 1);
+  if (signatureIndex < 0) {
+    return null;
+  }
+  const parsed = parseAngleTypeParams(node.elements, 1, signatureIndex);
+  if (!parsed) {
+    return null;
+  }
+
+  const { names, startIndex, endIndex } = parsed;
+  const startLoc = node.elements[startIndex].loc;
+  const endLoc = node.elements[endIndex].loc;
+  const listLoc = mergeLocs(startLoc, endLoc);
+  const typeParamSymbols = names.map((name) => createPhaseBSymbol(name, listLoc));
+  const typeParamList = createPhaseBList(typeParamSymbols, listLoc);
+  const typeParamMarker = createPhaseBSymbol(":type-params", listLoc);
+
+  const filtered: PhaseBNode[] = [];
+  for (let i = 0; i < node.elements.length; i += 1) {
+    if (i < startIndex || i > endIndex) {
+      filtered.push(node.elements[i]);
+    }
+  }
+  const removedBeforeSignature = startIndex <= signatureIndex ? Math.min(signatureIndex, endIndex) - startIndex + 1 : 0;
+  const signatureIndexAfter = signatureIndex - removedBeforeSignature;
+  const insertAt = signatureIndexAfter + 1;
+  filtered.splice(insertAt, 0, typeParamMarker, typeParamList);
+  return { ...node, elements: filtered };
+}
+
+function parseAngleTypeParams(
+  elements: PhaseBNode[],
+  start: number,
+  end: number
+): { names: string[]; startIndex: number; endIndex: number } | null {
+  let startIndex = -1;
+  for (let i = start; i < end; i += 1) {
+    const entry = elements[i];
+    if (entry.phaseKind === "symbol" && containsAngleStart((entry as SymbolNode).name)) {
+      startIndex = i;
+      break;
+    }
+  }
+  if (startIndex < 0) {
+    return null;
+  }
+  const tokens: string[] = [];
+  let endIndex = -1;
+  for (let i = startIndex; i < end; i += 1) {
+    const entry = elements[i];
+    if (entry.phaseKind !== "symbol") {
+      throw reportError("T2:0288");
+    }
+    const name = (entry as SymbolNode).name;
+    tokens.push(name);
+    if (name.includes(">") || name === ">") {
+      endIndex = i;
+      break;
+    }
+  }
+  if (endIndex < 0) {
+    throw reportError("T2:0288");
+  }
+  const joined = tokens.join(" ");
+  const lt = joined.indexOf("<");
+  const gt = joined.lastIndexOf(">");
+  if (lt < 0 || gt <= lt) {
+    throw reportError("T2:0288");
+  }
+  const content = joined.slice(lt + 1, gt).trim();
+  if (!content) {
+    throw reportError("T2:0288");
+  }
+  const names = content
+    .split(",")
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0);
+  if (names.length === 0 || names.some((name) => !TYPE_PARAM_NAME.test(name))) {
+    throw reportError("T2:0288");
+  }
+  return { names, startIndex, endIndex };
+}
+
+function containsAngleStart(token: string): boolean {
+  return token.includes("<") || token.startsWith("<");
+}
+
+function findSignatureListIndex(elements: PhaseBNode[], start: number): number {
+  for (let i = start; i < elements.length; i += 1) {
+    const entry = elements[i];
+    if (entry.phaseKind === "list") {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function isCallableHead(node: PhaseBNode): node is SymbolNode & { phaseKind: "symbol" } {
+  return (
+    node.phaseKind === "symbol" &&
+    ["fn", "lambda", "method", "getter", "setter"].includes((node as SymbolNode).name)
+  );
 }
 
 function createTypeAnnotationNode(target: PhaseBNode, colon: PhaseBNode, annotation: PhaseBNode): PhaseBTypeAnnotation {

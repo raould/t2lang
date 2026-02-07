@@ -32,6 +32,7 @@ export interface Diagnostic {
   span: Span;
   stage?: CompilerStage;
   code?: string;
+  level?: "error" | "warning";
 }
 
 export const DIAGNOSTIC_NAMESPACE = "T2A";
@@ -47,6 +48,7 @@ export function createDiagnostic(stage: CompilerStage, registryId: string, span:
     span,
     stage,
     code: registryId,
+    level: entry.severity === "warn" ? "warning" : "error",
   };
 }
 

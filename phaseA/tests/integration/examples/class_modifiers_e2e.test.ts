@@ -21,7 +21,7 @@ test('class modifiers end-to-end: compile to JS and run', async () => {
         (class-body
           (field public static readonly "X" 42)
           (field private "_y" 7)
-          (method "getY" () (prop this "_y"))))
+          (method "getY" () (return (prop this "_y")))))
 
       (let* ((c (new C)))
         (call (prop console "log") (prop C "X"))

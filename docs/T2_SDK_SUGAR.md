@@ -243,7 +243,7 @@ greet({ name: "Bob", formal: true })
 
 | Operator | Meaning | JS Equivalent |
 |----------|---------|----------------|
-| `=` | Assignment | `=` |
+| `:=` | Assignment | `=` |
 | `==` | Loose equality (coercive) | `==` |
 | `!=` | Loose inequality (coercive) | `!=` |
 | `===` | Strict equality | `===` |
@@ -337,6 +337,8 @@ export function setIn<T>(obj: T, path: string[], value: any): T {
 ---
 
 ## Syntactic Sugar (Phase B Macros)
+
+A la Clojure.
 
 ### Pipeline Operator `->`
 

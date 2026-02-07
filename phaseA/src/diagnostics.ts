@@ -1,6 +1,6 @@
 import type { Diagnostic } from "./phaseA0.js";
 
-export type DiagnosticLevel = "error";
+export type DiagnosticLevel = "error" | "warning";
 export type ErrorFormat = "tty" | "short" | "json";
 export const DEFAULT_ERROR_FORMAT: ErrorFormat = "tty";
 const ERROR_FORMATS: ErrorFormat[] = ["tty", "short", "json"];
@@ -46,6 +46,9 @@ function diagToJson(diag: Diagnostic): Record<string, unknown> {
     message: diag.message,
     file: diag.span.source,
   };
+  if (diag.level) {
+    json.level = diag.level;
+  }
   if (diag.code) {
     json.code = diag.code;
   }
@@ -74,7 +77,8 @@ function formatShort(diagnostics: Diagnostic[]): string {
     const line = span.startLine ?? 0;
     const column = span.startColumn ?? 0;
     const stagePrefix = diag.stage ? `${diag.stage} ` : "";
-    return `${span.source}:${line}:${column}: ${stagePrefix}error[${code}]: ${diag.message}`;
+    const level = diag.level ?? "error";
+    return `${span.source}:${line}:${column}: ${stagePrefix}${level}[${code}]: ${diag.message}`;
   });
   return `${lines.join("\n")}\n`;
 }
@@ -86,7 +90,10 @@ function formatTty(diagnostics: Diagnostic[], context: DiagnosticContext): strin
 
 function formatTtyDiagnostic(diag: Diagnostic, context: DiagnosticContext): string {
   const useColor = context.useColor ?? true;
-  const levelLabel = useColor ? `${RED}error${RESET}` : "error";
+  const level = diag.level ?? "error";
+  const levelLabel = useColor
+    ? `${level === "warning" ? YELLOW : RED}${level}${RESET}`
+    : level;
   const code = diag.code ?? "unknown";
   const span = diag.span;
   const line = span.startLine ?? 0;
@@ -109,6 +116,7 @@ function formatTtyDiagnostic(diag: Diagnostic, context: DiagnosticContext): stri
 }
 
 const RED = "\x1b[31m";
+const YELLOW = "\x1b[33m";
 const RESET = "\x1b[0m";
 
 function renderSourceSnippet(diag: Diagnostic, context: DiagnosticContext): string | null {

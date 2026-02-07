@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert";
 import { parsePhaseBRaw } from "../src/reader.js";
 import { lowerPhaseB } from "../src/lower.js";
+import { PhaseBError } from "../../common/dist/errorRegistry.js";
 import {
   AssignExpr,
   ExprStmt,
@@ -18,9 +19,13 @@ import {
   SpreadExpr,
   ArrayPattern,
   RestPattern,
+  AwaitExpr,
+  TypeVar,
   TypePrimitive,
   TypeUnion,
   TypeApp,
+  TypeTuple,
+  TypeAliasStmt,
 } from "../../phaseA/dist/phaseA1.js";
 
 test("lowerPhaseB produces LetStarExpr for let bindings", () => {
@@ -69,6 +74,30 @@ test("lowerPhaseB emits FunctionExpr for method with identifier name", () => {
   assert.ok(stmt instanceof FunctionExpr);
   assert.strictEqual(stmt.callableKind, "method");
   assert.strictEqual(stmt.methodName, "myMethod");
+});
+
+test("lowerPhaseB rejects string method names", () => {
+  const [node] = parsePhaseBRaw("(method \"bad\" (x) (assign x 1))", "lower-method-string.test.t2");
+  assert.throws(
+    () => lowerPhaseB([node]),
+    (error) => error instanceof PhaseBError && error.code === "T2:0118"
+  );
+});
+
+test("lowerPhaseB rejects string getter names", () => {
+  const [node] = parsePhaseBRaw("(getter \"bad\" (x) (assign x 1))", "lower-getter-string.test.t2");
+  assert.throws(
+    () => lowerPhaseB([node]),
+    (error) => error instanceof PhaseBError && error.code === "T2:0118"
+  );
+});
+
+test("lowerPhaseB rejects string setter names", () => {
+  const [node] = parsePhaseBRaw("(setter \"bad\" (x) (assign x 1))", "lower-setter-string.test.t2");
+  assert.throws(
+    () => lowerPhaseB([node]),
+    (error) => error instanceof PhaseBError && error.code === "T2:0118"
+  );
 });
 
 test("lowerPhaseB lowers prop expressions using identifier names to strings", () => {
@@ -181,6 +210,25 @@ test("lowerPhaseB preserves async/generator flags", () => {
   assert.strictEqual(generatorStmt.name?.name, "generatorCallable");
 });
 
+test("lowerPhaseB rejects await outside async callables", () => {
+  const [node] = parsePhaseBRaw("(await (call foo))", "lower-await-outside.t2");
+  assert.throws(
+    () => lowerPhaseB([node]),
+    (error) => error instanceof PhaseBError && error.code === "T2:0324"
+  );
+});
+
+test("lowerPhaseB allows await inside async callables", () => {
+  const [node] = parsePhaseBRaw("(fn async (x) (return (await x)))", "lower-await-async.t2");
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof FunctionExpr) as FunctionExpr | undefined;
+  assert.ok(stmt);
+  assert.strictEqual(stmt.async, true);
+  const returnStmt = stmt.body.find((entry) => entry instanceof ReturnExpr) as ReturnExpr | undefined;
+  assert.ok(returnStmt);
+  assert.ok(returnStmt.value instanceof AwaitExpr);
+});
+
 test("lowerPhaseB unwraps program wrappers", () => {
   const [node] = parsePhaseBRaw("(program (assign foo 42))", "lower-program.test.t2");
   const program = lowerPhaseB([node]);
@@ -224,4 +272,45 @@ test("lowerPhaseB captures return type annotations", () => {
   assert.ok(stmt);
   assert.ok(stmt.signature.returnType instanceof TypePrimitive);
   assert.strictEqual(stmt.signature.returnType.kind, "type-number");
+});
+
+test("lowerPhaseB lowers generic params and uses TypeVar", () => {
+  const [node] = parsePhaseBRaw(
+    "(fn <T, U>(x: T, y: U): [T, U] (return x))",
+    "lower-generic-params.t2"
+  );
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof FunctionExpr) as FunctionExpr | undefined;
+  assert.ok(stmt);
+  assert.strictEqual(stmt.typeParams?.length, 2);
+  assert.strictEqual(stmt.typeParams?.[0].name.name, "T");
+  assert.strictEqual(stmt.typeParams?.[1].name.name, "U");
+  const [paramX, paramY] = stmt.signature.parameters;
+  assert.ok(paramX.typeAnnotation instanceof TypeVar);
+  assert.strictEqual((paramX.typeAnnotation as TypeVar).name.name, "T");
+  assert.ok(paramY.typeAnnotation instanceof TypeVar);
+  assert.strictEqual((paramY.typeAnnotation as TypeVar).name.name, "U");
+  const returnType = stmt.signature.returnType;
+  assert.ok(returnType instanceof TypeTuple);
+  const tuple = returnType as TypeTuple;
+  assert.strictEqual(tuple.types.length, 2);
+  assert.ok(tuple.types[0] instanceof TypeVar);
+  assert.ok(tuple.types[1] instanceof TypeVar);
+});
+
+test("lowerPhaseB lowers type alias declarations with type params", () => {
+  const [node] = parsePhaseBRaw(
+    "(type Generic <T> (Array<T>))",
+    "lower-type-alias.t2"
+  );
+  const program = lowerPhaseB([node]);
+  const stmt = program.body.find((entry) => entry instanceof TypeAliasStmt) as TypeAliasStmt | undefined;
+  assert.ok(stmt);
+  assert.strictEqual(stmt.name.name, "Generic");
+  assert.strictEqual(stmt.typeParams?.length, 1);
+  assert.strictEqual(stmt.typeParams?.[0].name.name, "T");
+  const value = stmt.typeValue;
+  assert.ok(value instanceof TypeApp);
+  const app = value as TypeApp;
+  assert.ok(app.typeArgs[0] instanceof TypeVar);
 });

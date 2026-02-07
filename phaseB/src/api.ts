@@ -13,6 +13,8 @@ export interface CompilePhaseBConfig {
   prettyOption?: "pretty" | "ugly";
   logLevel?: EventSeverity;
   compilerContext?: PhaseACompilerContext;
+  warnNoReturnAny?: boolean;
+  warnReturnExpected?: boolean;
 }
 
 export interface CompilePhaseBResult extends CompilePhaseAResult {
@@ -32,6 +34,8 @@ export async function compile(source: string, config: CompilePhaseBConfig = {}):
     logLevel: config.logLevel,
     compilerContext: config.compilerContext,
     program: phaseAProgram,
+    warnNoReturnAny: config.warnNoReturnAny,
+    warnReturnExpected: config.warnReturnExpected,
   };
 
   const result = await compilePhaseA(source, phaseAConfig);

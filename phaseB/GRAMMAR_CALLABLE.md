@@ -53,16 +53,10 @@ This grammar describes a more ergonomic syntax for callables that **lowers** to 
 
 ```
 <b-fn> ::= "(" "fn" <callable-flag>* <identifier>? <b-param-list> <statement>* ")"
-
 <b-lambda> ::= "(" "lambda" <callable-flag>* <b-param-list> <statement>* ")"
-
-<b-method-name> ::= <identifier> | <string>
-
-<b-method> ::= "(" "method" <callable-flag>* <b-method-name> <b-param-list> <statement>* ")"
-
-<b-getter> ::= "(" "getter" <callable-flag>* <b-method-name> <b-param-list> <statement>* ")"
-
-<b-setter> ::= "(" "setter" <callable-flag>* <b-method-name> <b-param-list> <statement>* ")"
+<b-method> ::= "(" "method" <callable-flag>* <identifier> <b-param-list> <statement>* ")"
+<b-getter> ::= "(" "getter" <callable-flag>* <identifier> <b-param-list> <statement>* ")"
+<b-setter> ::= "(" "setter" <callable-flag>* <identifier> <b-param-list> <statement>* ")"
 ```
 
 ---
@@ -90,7 +84,6 @@ This grammar describes a more ergonomic syntax for callables that **lowers** to 
 | `(fn name (x) x)` | `(fn name ((x)) x)` |
 | `(lambda (x) x)` | `(lambda ((x)) x)` |
 | `(method name (x) x)` | `(method "name" ((x)) x)` |
-| `(method "name" (x) x)` | `(method "name" ((x)) x)` |
 
 ### Return Type Lowering
 
@@ -146,7 +139,7 @@ This grammar describes a more ergonomic syntax for callables that **lowers** to 
 
 ```lisp
 ; Phase B                          ; Phase A                           ; TypeScript
-(method "greet" (name: string)     (method "greet" ((name string))     greet(name: string) {
+(method greet (name: string)     (method "greet" ((name string))     greet(name: string) {
   (call console.log name))           (call console.log name))            console.log(name); }
 ```
 

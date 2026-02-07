@@ -41,6 +41,8 @@ interface CliOptions {
   errorFormat?: string;
   color?: boolean;
   noColor?: boolean;
+  warnNoReturnAny?: boolean;
+  warnReturnExpected?: boolean;
 }
 
 function buildCommand(): Command {
@@ -84,6 +86,8 @@ function buildCommand(): Command {
     .option("--error-format <format>", "Choose diagnostic output (tty, short, json)", DEFAULT_ERROR_FORMAT)
     .option("--color", "Force colored diagnostic output")
     .option("--no-color", "Disable colored diagnostic output")
+    .option("--warn-no-return-any", "Warn on callables without explicit returns", false)
+    .option("--warn-return-expected", "Warn when non-void return types omit an explicit return", false)
     .allowUnknownOption(false);
   return cmd;
 }
@@ -193,12 +197,20 @@ export async function main(argv: string[]): Promise<void> {
     stamp: compilerSerializerStamp,
     logLevel,
     compilerContext,
+    warnNoReturnAny: options.warnNoReturnAny,
+    warnReturnExpected: options.warnReturnExpected,
   });
 
-  if (result.diagnostics.length > 0) {
+  const warnings = result.diagnostics.filter((diag) => diag.level === "warning");
+  const errors = result.diagnostics.filter((diag) => diag.level !== "warning");
+  if (errors.length > 0) {
     console.error("Compilation produced diagnostics:");
-    console.error(formatDiagnostics(result.diagnostics, format, diagContext));
+    console.error(formatDiagnostics(errors, format, diagContext));
     process.exit(1);
+  }
+  if (warnings.length > 0) {
+    console.error("Compilation produced warnings:");
+    console.error(formatDiagnostics(warnings, format, diagContext));
   }
 
   for (const event of result.events) {

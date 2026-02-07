@@ -220,7 +220,7 @@ Support for TypeScript-style parameter lists with colons.
 
 **Rewrite**:
 ```lisp
-(fn ((x (type-number)) (y (type-string))) (type-boolean) ...)
+(fn ((x (t:primitive "number")) (y (t:primitive "string"))) (t:primitive "boolean") ...)
 ```
 
 Phase B is responsible for parsing the type syntax (`x: T`) and converting it into the `(x T)` tuple structure Phase A expects for named parameters.
@@ -294,20 +294,23 @@ When the receiver is non-optional (e.g., `obj.[key]`) the sugar simply emits `(i
 - Method calls must preserve `this` semantics; emitting `(tmp.call obj args...)` or equivalent Phase A call is acceptable.
 - The base expression (like `getObj()?.method`) is evaluated exactly once because it is bound before the guard.
 
-## 8. Async / Await [ ]
+## 8. Async / Await [x]
+
+Phase B uses callable flags to mark async callables and lowers `(await expr)` directly.
 
 **Sugar**:
 ```lisp
-(async (x) ...)
+(fn async (x) (return (await (call fetch x))))
 ```
 
 **Rewrite**:
 ```lisp
-(fn (x) (return (await ...))) ;; sets async flag on FunctionExpr
+(fn async (x) (return (await (call fetch x))))
 ```
 
-Explicit `async` keyword macros or rewrites produce the `FunctionExpr` with `async: true` metadata.
-Additional metadata on the generated `FunctionExpr` indicates it is async so downstream phases can treat `await` appropriately; the canonical form might look like `(fn (x) :async true (return (await ...)))` or similar depending on how Phase A records metadata, but the key point is that the node is decorated with `async: true` rather than requiring a separate sugar form.
+Notes:
+- `async` is a callable flag (for `fn`, `lambda`, `method`, `getter`, `setter`).
+- `(await expr)` is only valid inside async callables.
 
 ## 9. Type Expression Syntax [x]
 
@@ -347,6 +350,8 @@ Phase B parses TypeScript-style type annotations and rewrites them to the struct
 ```
 
 ### Inline Type Expressions
+
+TODO (not?): I really cannot envision how these would actually play out in day to day use, so I am punting on it because I think it will actually make things too complected. At least for now.
 
 | Sugar | Canonical |
 | --- | --- |

@@ -1,10 +1,11 @@
 * read staging-guardrails.md.
-* read all .md files in Phase A to get context on the goals and design.
-* currently we are working on Phase A only.
-* Phase 0 and Phase 1 are for reference only.
+* read all .md files in Phase A and Phase B to get context on the goals and design.
+* currently we are working on Phase A, Phase B, and Common only. We are not making any changes to OLD/**.
+* OLD/ Phase 0 and Phase 1 are for reference only.
 * when writing TypeScript code, keep it simple.
 * note that "npm test" already runs "npm build" first, so you do not have to run "npm build" separately.
 * if you make edits to files in phaseA, then "cd phaseA; npm run lint; npm test" and fix any errors.
+* if you make edits to files in phaseB, then "cd phaseB; npm run lint; npm test" and fix any errors.
 * if you make edits to files in phase0, then "cd OLD/phase0; npm run lint; npm test" and fix any errors.
 * if you make edits to files in phase1, then "cd OLD/phase1; npm run lint; npm test" and fix any errors.
 * if you make edits to files in common, then "cd OLD/common; npm run lint; npm test" and fix any errors.
@@ -15,16 +16,9 @@
 ```
 * The macro system should try to be like Clojure's design, not like Racket's.
 * do not offer to create PRs.
-* phase0 is meant to be a low-level sexpr syntax with as little sugar as possible. It doesn't support macros for example. It is meant to be more like a "core calculus" for ease of machine processing; to keep code simple and consistent.
-* phase1 is meant to add macros.
-* phase1 might also be where more human-friendly syntax and sugar is added, making use of macros.
-* When making changes, try to not change phase0 if it can be avoided.
-* Do try to add more small integration tests in the relevant phase0 or phase1 when making changes or adding new features.
-* When making changes, also make sure all phase1/examples build and run correctly.
-* read the "help" text in the CLI (common/src/cliHelper.ts, phase1/src/cli.ts, phase0/src/cli.ts) to understand the intended usage of the compiler.
 * phaseA cannot depend on anything from phase 0 or phase 1 or common. PhaseA cannot depend on anything in t2lang/OLD. if there are features which need to be carried over, they must be re-implemented in phaseA without any kind of dependency on phase0 or phase1.
 * phaseB cannot depend on anything from phase 0 or phase 1 or common. PhaseB cannot depend on anything in t2lang/OLD. if there are features which need to be carried over, they must be re-implemented in phaseB without any kind of dependency on phase0 or phase1.
 * functions internal to the compiler pipeline should always be written as "async" even if they don't do anything asynchronous yet. This is to make it easier to add async features later without breaking the API.
 * typescript output from the compiler should not create "async" unless the .t2 source input used "async".
 * phaseB can only rely on APIs from phaseA, it cannot rely on any file contents directly.
-* any file named **/*.test.ts must be run as part of the parent "npm test" command. check for any such files that are not being invoked. this is to ensure test coverage.
+* any file named **/*.test.ts must be run as part of the parent "npm test" command. check for any such files that are not being invoked, see run-tests.mjs. This is to ensure test coverage.

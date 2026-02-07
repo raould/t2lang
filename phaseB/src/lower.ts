@@ -14,23 +14,43 @@ import {
   BlockStmt,
   AssignExpr,
   CallExpr,
+  CallWithThisExpr,
+  IndexExpr,
+  NewExpr,
   PropExpr,
   Identifier,
   Literal,
   LetStarExpr,
   ImportStmt,
   ArrayExpr,
+  ForOf,
+  ForAwait,
   ForClassic,
   FunctionExpr,
   ReturnExpr,
   ObjectExpr,
   TemplateExpr,
+  ThrowExpr,
+  TryCatchExpr,
+  IfStmt,
+  WhileStmt,
+  SwitchStmt,
+  BreakStmt,
+  ContinueStmt,
+  EnumStmt,
+  NamespaceStmt,
+  TypeAliasStmt,
   ArrayPattern,
   ObjectPattern,
   RestPattern,
   DefaultPattern,
   SpreadExpr,
   TernaryExpr,
+  TypeAssertExpr,
+  NonNullAssertExpr,
+  AwaitExpr,
+  TypeVar,
+  TypeParam,
   TypePrimitive,
   TypeRef,
   TypeArray,
@@ -43,7 +63,13 @@ import {
   TypeIndexed,
   TypeConditional,
   TypeInfer,
+  TypeThis,
   TypeLiteral,
+  TypeFunction,
+  TypeObject,
+  TypeTemplateLiteral,
+  TypeMapped,
+  TypeField,
   TypeApp,
   type Statement,
   type Expression,
@@ -84,6 +110,9 @@ export function lowerPhaseB(nodes: PhaseBNode[]): Program {
   const bodyNodes = nodes.flatMap(unwrapProgramNode);
   const body = bodyNodes.map(lowerStatement);
   const span = nodes.length > 0 ? spanFromLoc(nodes[0].loc) : emptySpan();
+  if (containsAwaitOutsideFunctions(body)) {
+    throw reportError("T2:0324");
+  }
   const runtimeImports = collectRuntimeImports(bodyNodes);
   if (runtimeImports.length > 0) {
     const importSpan = bodyNodes.length > 0 ? spanFromLoc(bodyNodes[0].loc) : emptySpan();
@@ -152,8 +181,17 @@ function lowerStatement(node: PhaseBNode): Statement {
       if (symbolHead.name === "return") {
         return lowerReturn(listNode);
       }
-      if (symbolHead.name === "fn" || symbolHead.name === "method" || symbolHead.name === "lambda") {
-        return lowerFunction(listNode, symbolHead.name as "fn" | "method" | "lambda");
+      if (symbolHead.name === "type-alias") {
+        return lowerTypeAlias(listNode);
+      }
+      if (
+        symbolHead.name === "fn" ||
+        symbolHead.name === "method" ||
+        symbolHead.name === "lambda" ||
+        symbolHead.name === "getter" ||
+        symbolHead.name === "setter"
+      ) {
+        return lowerFunction(listNode, symbolHead.name as "fn" | "method" | "lambda" | "getter" | "setter");
       }
     }
     return new ExprStmt({ expr: lowerExpression(listNode), span: spanFromLoc(listNode.loc) });
@@ -205,6 +243,54 @@ function lowerAssign(node: PhaseBListNode): AssignExpr {
   const target = targetNode ? lowerExpression(targetNode) : new Identifier({ name: "<missing>", span: emptySpan() });
   const value = valueNode ? lowerExpression(valueNode) : new Literal({ value: null, span: emptySpan() });
   return new AssignExpr({ target, value, span: spanFromLoc(node.loc) });
+}
+
+function lowerTypeAlias(node: PhaseBListNode): TypeAliasStmt {
+  const [, nameNode, ...rest] = node.elements;
+  if (!nameNode) {
+    throw reportError("T2:0268");
+  }
+  const name = lowerTypeAliasName(nameNode);
+
+  let typeParams: TypeParam[] | undefined;
+  let typeValueNode: PhaseBNode | undefined;
+  for (let i = 0; i < rest.length; i += 1) {
+    const entry = rest[i];
+    if (entry.phaseKind === "symbol" && (entry as SymbolNode).name === ":type-params") {
+      typeParams = lowerTypeParams(rest[i + 1]);
+      i += 1;
+      continue;
+    }
+    if (typeValueNode) {
+      throw reportError("T2:0267");
+    }
+    typeValueNode = entry;
+  }
+  if (!typeValueNode) {
+    throw reportError("T2:0267");
+  }
+  let typeValue = lowerTypeNode(typeValueNode);
+  if (!typeValue) {
+    throw reportError("T2:0267");
+  }
+  if (typeParams && typeParams.length > 0) {
+    const typeParamNames = new Set(typeParams.map((param) => param.name.name));
+    typeValue = replaceTypeParamsInTypeNode(typeValue, typeParamNames) as TypeNode;
+  }
+  return new TypeAliasStmt({ name, typeValue, span: spanFromLoc(node.loc), typeParams });
+}
+
+function lowerTypeAliasName(node: PhaseBNode): Identifier {
+  if (node.phaseKind === "symbol") {
+    return new Identifier({ name: (node as SymbolNode).name, span: spanFromLoc(node.loc) });
+  }
+  if (node.phaseKind === "literal") {
+    const literal = node as LiteralNode;
+    if (typeof literal.value === "string") {
+      return new Identifier({ name: literal.value, span: spanFromLoc(node.loc) });
+    }
+  }
+  throw reportError("T2:0268");
 }
 
 function lowerReturn(node: PhaseBListNode): ReturnExpr {
@@ -288,14 +374,18 @@ function lowerFunction(node: PhaseBListNode, kind: CallableKind): FunctionExpr {
     entries = entries.slice(1);
   } else if (kind === "method" || kind === "getter" || kind === "setter") {
     if (entries[0]) {
+      if (entries[0].phaseKind !== "symbol") {
+        throw reportError("T2:0118", { label: `${kind} name` });
+      }
       methodName = extractPropertyName(entries[0]);
       entries = entries.slice(1);
     }
   }
 
   const signatureNode = entries[0];
-  const parameters: FnParam[] = [];
+  let parameters: FnParam[] = [];
   let returnType: TypeNode | undefined;
+  let typeParams: TypeParam[] | undefined;
   if (signatureNode && signatureNode.phaseKind === "list") {
     const list = signatureNode as PhaseBListNode;
     for (const param of stripCommaNodes(list.elements)) {
@@ -304,16 +394,39 @@ function lowerFunction(node: PhaseBListNode, kind: CallableKind): FunctionExpr {
     entries = entries.slice(1);
   }
 
-  if (entries[0] && entries[0].phaseKind === "symbol" && (entries[0] as SymbolNode).name === ":") {
-    const returnNode = entries[1];
-    if (!returnNode) {
-      throw reportError("T2:0237");
+  while (entries[0] && entries[0].phaseKind === "symbol") {
+    const marker = (entries[0] as SymbolNode).name;
+    if (marker === ":") {
+      const returnNode = entries[1];
+      if (!returnNode) {
+        throw reportError("T2:0237");
+      }
+      returnType = lowerTypeNode(returnNode);
+      entries = entries.slice(2);
+      continue;
     }
-    returnType = lowerTypeNode(returnNode);
-    entries = entries.slice(2);
+    if (marker === ":type-params") {
+      const listNode = entries[1];
+      typeParams = lowerTypeParams(listNode);
+      entries = entries.slice(2);
+      continue;
+    }
+    break;
+  }
+
+  if (typeParams && typeParams.length > 0) {
+    const typeParamNames = new Set(typeParams.map((param) => param.name.name));
+    parameters = parameters.map((param) => ({
+      ...param,
+      typeAnnotation: replaceTypeParamsInTypeNode(param.typeAnnotation, typeParamNames),
+    }));
+    returnType = replaceTypeParamsInTypeNode(returnType, typeParamNames);
   }
 
   const body = entries.map(lowerStatement);
+  if (!async && containsAwaitOutsideFunctions(body)) {
+    throw reportError("T2:0324");
+  }
 
   return new FunctionExpr({
     signature: { parameters, returnType },
@@ -322,6 +435,7 @@ function lowerFunction(node: PhaseBListNode, kind: CallableKind): FunctionExpr {
     callableKind: kind,
     name,
     methodName,
+    typeParams,
     async: async ? true : undefined,
     generator: generator ? true : undefined,
   });
@@ -437,9 +551,171 @@ function lowerTypeList(node: PhaseBListNode): TypeNode | undefined {
       return buildInferType(args, span);
     case "t:literal":
       return buildLiteralType(args, span);
+    case "t:var": {
+      const identifier = identifierFromNode(args[0]);
+      if (!identifier) {
+        return undefined;
+      }
+      return new TypeVar({ name: identifier, span });
+    }
     default:
       return undefined;
   }
+}
+
+function lowerTypeParams(node: PhaseBNode | undefined): TypeParam[] {
+  if (!node || node.phaseKind !== "list") {
+    throw reportError("T2:0288");
+  }
+  const list = node as PhaseBListNode;
+  let entries = list.elements;
+  const head = entries[0];
+  if (head && head.phaseKind === "symbol" && (head as SymbolNode).name === "typeparams") {
+    entries = entries.slice(1);
+  }
+  const params: TypeParam[] = [];
+  for (const entry of entries) {
+    const name = stringFromNode(entry);
+    if (!name) {
+      throw reportError("T2:0288");
+    }
+    const identifier = new Identifier({ name, span: spanFromLoc(entry.loc) });
+    params.push(new TypeParam({ name: identifier, span: spanFromLoc(entry.loc) }));
+  }
+  return params;
+}
+
+function replaceTypeParamsInTypeNode(typeNode: TypeNode | undefined, typeParamNames: Set<string>): TypeNode | undefined {
+  if (!typeNode) {
+    return undefined;
+  }
+  if (typeNode instanceof TypeVar) {
+    return typeNode;
+  }
+  if (typeNode instanceof TypeRef) {
+    if (typeParamNames.has(typeNode.identifier.name)) {
+      return new TypeVar({ name: typeNode.identifier, span: typeNode.span });
+    }
+    if (typeNode.typeArgs && typeNode.typeArgs.length > 0) {
+      const mappedArgs = typeNode.typeArgs.map((arg) => replaceTypeParamsInTypeNode(arg, typeParamNames) as TypeNode);
+      return new TypeRef({ identifier: typeNode.identifier, span: typeNode.span, typeArgs: mappedArgs });
+    }
+    return typeNode;
+  }
+  if (typeNode instanceof TypePrimitive || typeNode instanceof TypeLiteral || typeNode instanceof TypeThis || typeNode instanceof TypeInfer) {
+    return typeNode;
+  }
+  if (typeNode instanceof TypeArray) {
+    const element = replaceTypeParamsInTypeNode(typeNode.element, typeParamNames) as TypeNode;
+    return new TypeArray({ element, span: typeNode.span });
+  }
+  if (typeNode instanceof TypeNullable) {
+    const inner = replaceTypeParamsInTypeNode(typeNode.inner, typeParamNames) as TypeNode;
+    return new TypeNullable({ inner, span: typeNode.span });
+  }
+  if (typeNode instanceof TypeTuple) {
+    const types = typeNode.types.map((entry) => replaceTypeParamsInTypeNode(entry, typeParamNames) as TypeNode);
+    return new TypeTuple({ types, span: typeNode.span });
+  }
+  if (typeNode instanceof TypeUnion) {
+    const types = typeNode.types.map((entry) => replaceTypeParamsInTypeNode(entry, typeParamNames) as TypeNode);
+    return new TypeUnion({ types, span: typeNode.span });
+  }
+  if (typeNode instanceof TypeIntersection) {
+    const types = typeNode.types.map((entry) => replaceTypeParamsInTypeNode(entry, typeParamNames) as TypeNode);
+    return new TypeIntersection({ types, span: typeNode.span });
+  }
+  if (typeNode instanceof TypeKeyof) {
+    const target = replaceTypeParamsInTypeNode(typeNode.target, typeParamNames) as TypeNode;
+    return new TypeKeyof({ target, span: typeNode.span });
+  }
+  if (typeNode instanceof TypeTypeof) {
+    return typeNode;
+  }
+  if (typeNode instanceof TypeIndexed) {
+    const object = replaceTypeParamsInTypeNode(typeNode.object, typeParamNames) as TypeNode;
+    const index = replaceTypeParamsInTypeNode(typeNode.index, typeParamNames) as TypeNode;
+    return new TypeIndexed({ object, index, span: typeNode.span });
+  }
+  if (typeNode instanceof TypeConditional) {
+    const check = replaceTypeParamsInTypeNode(typeNode.check, typeParamNames) as TypeNode;
+    const extendsType = replaceTypeParamsInTypeNode(typeNode.extends, typeParamNames) as TypeNode;
+    const trueType = replaceTypeParamsInTypeNode(typeNode.trueType, typeParamNames) as TypeNode;
+    const falseType = replaceTypeParamsInTypeNode(typeNode.falseType, typeParamNames) as TypeNode;
+    return new TypeConditional({ check, extendsType, trueType, falseType, span: typeNode.span });
+  }
+  if (typeNode instanceof TypeFunction) {
+    const params = typeNode.params.map((entry) => replaceTypeParamsInTypeNode(entry, typeParamNames) as TypeNode);
+    const returns = replaceTypeParamsInTypeNode(typeNode.returns, typeParamNames) as TypeNode;
+    return new TypeFunction({ params, returns, span: typeNode.span, typeParams: typeNode.typeParams });
+  }
+  if (typeNode instanceof TypeObject) {
+    const fields = typeNode.fields.map((field) =>
+      new TypeField({
+        key: field.key,
+        fieldType: replaceTypeParamsInTypeNode(field.fieldType, typeParamNames) as TypeNode,
+        span: field.span,
+        optional: field.optional,
+        readonlyFlag: field.readonlyFlag,
+      })
+    );
+    return new TypeObject({ fields, span: typeNode.span });
+  }
+  if (typeNode instanceof TypeTemplateLiteral) {
+    const parts = typeNode.parts.map((part) =>
+      typeof part === "string" ? part : (replaceTypeParamsInTypeNode(part, typeParamNames) as TypeNode)
+    );
+    return new TypeTemplateLiteral({ parts, span: typeNode.span });
+  }
+  if (typeNode instanceof TypeMapped) {
+    const valueType = replaceTypeParamsInTypeNode(typeNode.valueType, typeParamNames) as TypeNode;
+    const nameRemap = typeNode.nameRemap
+      ? (replaceTypeParamsInTypeNode(typeNode.nameRemap, typeParamNames) as TypeNode)
+      : undefined;
+    const via = typeNode.via ? (replaceTypeParamsInTypeNode(typeNode.via, typeParamNames) as TypeNode) : undefined;
+    return new TypeMapped({
+      typeParam: typeNode.typeParam,
+      valueType,
+      span: typeNode.span,
+      nameRemap,
+      readonlyModifier: typeNode.readonlyModifier,
+      optionalModifier: typeNode.optionalModifier,
+      via,
+    });
+  }
+  if (typeNode instanceof TypeApp) {
+    const mappedExpr = isTypeNodeInstance(typeNode.expr)
+      ? (replaceTypeParamsInTypeNode(typeNode.expr, typeParamNames) as TypeNode)
+      : typeNode.expr;
+    const typeArgs = typeNode.typeArgs.map((entry) => replaceTypeParamsInTypeNode(entry, typeParamNames) as TypeNode);
+    return new TypeApp({ expr: mappedExpr, typeArgs, span: typeNode.span });
+  }
+  return typeNode;
+}
+
+function isTypeNodeInstance(value: Expression | TypeNode): value is TypeNode {
+  return (
+    value instanceof TypePrimitive ||
+    value instanceof TypeVar ||
+    value instanceof TypeTuple ||
+    value instanceof TypeArray ||
+    value instanceof TypeNullable ||
+    value instanceof TypeKeyof ||
+    value instanceof TypeTypeof ||
+    value instanceof TypeIndexed ||
+    value instanceof TypeConditional ||
+    value instanceof TypeInfer ||
+    value instanceof TypeThis ||
+    value instanceof TypeRef ||
+    value instanceof TypeFunction ||
+    value instanceof TypeObject ||
+    value instanceof TypeUnion ||
+    value instanceof TypeIntersection ||
+    value instanceof TypeLiteral ||
+    value instanceof TypeTemplateLiteral ||
+    value instanceof TypeMapped ||
+    value instanceof TypeApp
+  );
 }
 
 function buildPrimitiveType(nodes: PhaseBNode[], span: Span): TypePrimitive | undefined {
@@ -695,7 +971,9 @@ function lowerList(node: PhaseBListNode): Expression {
       case "fn":
       case "method":
       case "lambda":
-        return lowerFunction(node, symbolHead.name as "fn" | "method" | "lambda");
+      case "getter":
+      case "setter":
+        return lowerFunction(node, symbolHead.name as "fn" | "method" | "lambda" | "getter" | "setter");
       case "object":
         return lowerObject(node);
       case "template": {
@@ -720,6 +998,14 @@ function lowerList(node: PhaseBListNode): Expression {
         const consequent = consequentNode ? lowerExpression(consequentNode) : new Literal({ value: null, span });
         const alternate = alternateNode ? lowerExpression(alternateNode) : new Literal({ value: null, span });
         return new TernaryExpr({ test, consequent, alternate, span });
+      }
+      case "await": {
+        validateCommaSeparated(rest, "await arguments");
+        if (filteredRest.length !== 1) {
+          throw reportError("T2:0127");
+        }
+        const argument = lowerExpression(filteredRest[0]);
+        return new AwaitExpr({ argument, span });
       }
       default:
         break;
@@ -890,6 +1176,218 @@ function lowerDefaultPattern(node: PhaseBListNode): DefaultPattern {
   const target = targetNode ? lowerBindingTarget(targetNode) : new Identifier({ name: "<missing>", span });
   const defaultValue = defaultNode ? lowerExpression(defaultNode) : new Literal({ value: null, span });
   return new DefaultPattern({ target, defaultValue, span });
+}
+
+function containsAwaitOutsideFunctions(statements: Statement[]): boolean {
+  for (const statement of statements) {
+    if (containsAwaitInStatement(statement)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function containsAwaitInStatement(statement: Statement): boolean {
+  if (statement instanceof FunctionExpr) {
+    return false;
+  }
+  if (statement instanceof ExprStmt) {
+    return containsAwaitInExpression(statement.expr);
+  }
+  if (statement instanceof BlockStmt) {
+    return containsAwaitOutsideFunctions(statement.statements);
+  }
+  if (statement instanceof LetStarExpr) {
+    for (const binding of statement.bindings) {
+      if (binding.init && containsAwaitInExpression(binding.init)) {
+        return true;
+      }
+      if (containsAwaitInBindingTarget(binding.target)) {
+        return true;
+      }
+    }
+    return containsAwaitOutsideFunctions(statement.body);
+  }
+  if (statement instanceof AssignExpr) {
+    return containsAwaitInExpression(statement.target) || containsAwaitInExpression(statement.value);
+  }
+  if (statement instanceof ForClassic) {
+    if (statement.init && containsAwaitInStatement(statement.init)) {
+      return true;
+    }
+    if (statement.condition && containsAwaitInExpression(statement.condition)) {
+      return true;
+    }
+    if (statement.update && containsAwaitInExpression(statement.update)) {
+      return true;
+    }
+    return containsAwaitInStatement(statement.body);
+  }
+  if (statement instanceof ForOf || statement instanceof ForAwait) {
+    if (containsAwaitInBindingTarget(statement.binding.target)) {
+      return true;
+    }
+    if (statement.binding.init && containsAwaitInExpression(statement.binding.init)) {
+      return true;
+    }
+    if (containsAwaitInExpression(statement.iterable)) {
+      return true;
+    }
+    return containsAwaitInStatement(statement.body);
+  }
+  if (statement instanceof IfStmt) {
+    if (containsAwaitInExpression(statement.test)) {
+      return true;
+    }
+    if (containsAwaitInStatement(statement.consequent)) {
+      return true;
+    }
+    return statement.alternate ? containsAwaitInStatement(statement.alternate) : false;
+  }
+  if (statement instanceof WhileStmt) {
+    return containsAwaitInExpression(statement.condition) || containsAwaitInStatement(statement.body);
+  }
+  if (statement instanceof SwitchStmt) {
+    if (containsAwaitInExpression(statement.discriminant)) {
+      return true;
+    }
+    for (const clause of statement.cases) {
+      if (clause.test && containsAwaitInExpression(clause.test)) {
+        return true;
+      }
+      if (containsAwaitOutsideFunctions(clause.consequent)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  if (statement instanceof ReturnExpr) {
+    return statement.value ? containsAwaitInExpression(statement.value) : false;
+  }
+  if (statement instanceof NamespaceStmt) {
+    return containsAwaitOutsideFunctions(statement.body);
+  }
+  if (statement instanceof EnumStmt) {
+    for (const member of statement.members) {
+      if (member.value && containsAwaitInExpression(member.value)) {
+        return true;
+      }
+    }
+    return false;
+  }
+  if (statement instanceof BreakStmt || statement instanceof ContinueStmt) {
+    return false;
+  }
+  return false;
+}
+
+function containsAwaitInExpression(expression: Expression): boolean {
+  if (expression instanceof AwaitExpr) {
+    return true;
+  }
+  if (expression instanceof Identifier || expression instanceof Literal) {
+    return false;
+  }
+  if (expression instanceof CallExpr) {
+    if (containsAwaitInExpression(expression.callee)) {
+      return true;
+    }
+    return expression.args.some((arg) => containsAwaitInExpression(arg));
+  }
+  if (expression instanceof CallWithThisExpr) {
+    if (containsAwaitInExpression(expression.fn)) {
+      return true;
+    }
+    if (containsAwaitInExpression(expression.thisArg)) {
+      return true;
+    }
+    return expression.args.some((arg) => containsAwaitInExpression(arg));
+  }
+  if (expression instanceof NewExpr) {
+    if (containsAwaitInExpression(expression.callee)) {
+      return true;
+    }
+    return expression.args.some((arg) => containsAwaitInExpression(arg));
+  }
+  if (expression instanceof PropExpr) {
+    return containsAwaitInExpression(expression.object);
+  }
+  if (expression instanceof IndexExpr) {
+    return containsAwaitInExpression(expression.object) || containsAwaitInExpression(expression.index);
+  }
+  if (expression instanceof ArrayExpr) {
+    return expression.elements.some((entry) => containsAwaitInExpression(entry));
+  }
+  if (expression instanceof ObjectExpr) {
+    return expression.fields.some((field) => {
+      if (field.kind === "spread") {
+        return containsAwaitInExpression(field.expr);
+      }
+      return containsAwaitInExpression(field.value);
+    });
+  }
+  if (expression instanceof TemplateExpr) {
+    return expression.parts.some((part) => containsAwaitInExpression(part));
+  }
+  if (expression instanceof SpreadExpr) {
+    return containsAwaitInExpression(expression.expr);
+  }
+  if (expression instanceof TernaryExpr) {
+    return (
+      containsAwaitInExpression(expression.test) ||
+      containsAwaitInExpression(expression.consequent) ||
+      containsAwaitInExpression(expression.alternate)
+    );
+  }
+  if (expression instanceof ThrowExpr) {
+    return containsAwaitInExpression(expression.argument);
+  }
+  if (expression instanceof TryCatchExpr) {
+    if (containsAwaitInStatement(expression.body)) {
+      return true;
+    }
+    if (expression.catchClause && containsAwaitOutsideFunctions(expression.catchClause.body)) {
+      return true;
+    }
+    if (expression.finallyClause && containsAwaitOutsideFunctions(expression.finallyClause.body)) {
+      return true;
+    }
+    return false;
+  }
+  if (expression instanceof TypeAssertExpr) {
+    return containsAwaitInExpression(expression.expr);
+  }
+  if (expression instanceof NonNullAssertExpr) {
+    return containsAwaitInExpression(expression.expr);
+  }
+  if (expression instanceof FunctionExpr) {
+    return false;
+  }
+  return false;
+}
+
+function containsAwaitInBindingTarget(target: BindingTarget): boolean {
+  if (target instanceof DefaultPattern) {
+    return containsAwaitInBindingTarget(target.target) || containsAwaitInExpression(target.defaultValue);
+  }
+  if (target instanceof RestPattern) {
+    return containsAwaitInBindingTarget(target.target);
+  }
+  if (target instanceof ArrayPattern) {
+    if (target.elements.some((element) => containsAwaitInBindingTarget(element))) {
+      return true;
+    }
+    return target.rest ? containsAwaitInBindingTarget(target.rest) : false;
+  }
+  if (target instanceof ObjectPattern) {
+    for (const property of target.properties) {
+      if (containsAwaitInBindingTarget(property.target)) {
+        return true;
+      }
+    }
+    return target.rest ? containsAwaitInBindingTarget(target.rest) : false;
+  }
+  return false;
 }
 
 function stripSpreadPrefix(node: SymbolNode): PhaseBNode | null {

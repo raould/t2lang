@@ -1119,6 +1119,21 @@
       "message": "{operator} expects at least one argument",
       "category": "parse",
       "severity": "error"
+    },
+    "T2:0324": {
+      "message": "await is only allowed inside async callables",
+      "category": "parse",
+      "severity": "error"
+    },
+    "T2:0401": {
+      "message": "callable has no explicit return; this will return undefined",
+      "category": "typecheck",
+      "severity": "warn"
+    },
+    "T2:0402": {
+      "message": "callable declares a non-void return type but has no explicit return",
+      "category": "typecheck",
+      "severity": "warn"
     }
   }
 }
