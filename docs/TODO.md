@@ -31,6 +31,7 @@
         * Sugar is parsed with PEG / parser combinators.
              * Infix is not supported at first.
              * Add Pratt parser for infix sugar later.
+             * Read phaseB/TODO_PEG.md
         * A healthy S-expression language with sugar follows this order:
             * Reader / Parser
                 * Handles all syntax sugar
