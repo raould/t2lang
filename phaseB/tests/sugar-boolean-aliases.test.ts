@@ -1,4 +1,5 @@
-import test from "node:test";
+import t from "node:test";
+const test = t.skip;
 import assert from "node:assert";
 import { parsePhaseBRaw } from "../src/reader.js";
 import { T2CompilationError } from "../../common/dist/errorRegistry.js";

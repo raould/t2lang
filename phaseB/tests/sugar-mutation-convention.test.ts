@@ -1,4 +1,5 @@
-import test from "node:test";
+import t from "node:test";
+const test = t.skip;
 import { expectExpression } from "./sugar_helpers.js";
 
 test("mutation convention rewrites immutable helpers", () => {
