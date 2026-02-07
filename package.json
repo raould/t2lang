@@ -26,8 +26,5 @@
         "t2tc": "npm --prefix phaseB run phaseb --",
         "t2js": "npm --prefix phaseB run phaseb --",
         "t2run": "npm --prefix phaseB run phaseb --"
-    },
-    "dependencies": {
-        "ohm-js": "^17.3.0"
     }
 }
