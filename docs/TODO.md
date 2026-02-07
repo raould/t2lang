@@ -50,6 +50,11 @@
     * acceptance tests should be as end-to-end as possible.
         * support for testing e2e with t2 -> tsc / -> node.
     * do not allow tests to become skipped and forgotten.
+    * much more e2e validation through tsc and node.
+        * e.g. `(program ...)` is pretty broken.
+            * have to pick a module standard.
+            * don't wrap everything in async iife?!
+        * multi-source-file support.
     * support all the useful sugars.
     * figure out how and when best to reuse code moving up the phase stack.
     * use & update the error registry when generating (throwing) errors.

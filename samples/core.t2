@@ -70,7 +70,7 @@
                (call yield item)))))
   
   ;; Alias
-  (export (const from fromArray))
+  (export (const ((from fromArray))))
   
   ;; fromResponse - create source from fetch Response
   (export (fn async generator fromResponse ((res (t:ref Response)))
@@ -79,9 +79,10 @@
              (const* ((reader (call (prop (prop res "body") "getReader"))))
                (try
                  (while true
-                   (const* ((({done value} (await (call (prop reader "read"))))))
+                   (const* (((object-pattern ("done" done) ("value" value))
+                             (await (call (prop reader "read"))))))
                      (if done (break))
-                     (call yield value)))
+                     (call yield value))
                  (finally
                    (call (prop reader "releaseLock"))))))))
   
@@ -116,7 +117,7 @@
   (export (fn async generator never ()
                 : (t:ref Source (array (t:ref any)))
            (block
-             (await (new (t:ref Promise) (lambda () (block)))))))
+             (await (new Promise (lambda () (block)))))))
   
   ;; range - generate numeric range
   (export (fn async generator range ((start type-number)
@@ -259,7 +260,7 @@
                 : (t:ref Pipe (array (t:ref T) (t:ref T)))
            (return
              (fn async generator ((source (t:ref Source (array (t:ref T)))))
-               (const* ((seen (new (t:ref Set))))
+               (const* ((seen (new Set)))
                  (for await (item source)
                    (if (! (call (prop seen "has") item))
                      (block
@@ -364,3 +365,4 @@
                  (return true))))))
 
 )
+

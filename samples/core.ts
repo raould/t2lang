@@ -1,64 +1,127 @@
-void (async () => {
-  {
-  type Source<T> = AsyncIterable<T>;
-  type Pipe<A, B> = (Source) => Source;
-  type Sink<T, R> = (Source) => Promise;
-  export(function pipe2(source, op1) {
+type Source<T> = AsyncIterable<T>;
+type Pipe<A, B> = (Source) => Source;
+type Sink<T, R> = (Source) => Promise;
+function pipe2(source, op1) {
 return op1(source);
-});
-  export(function pipe3(source, op1, op2) {
+}
+export { pipe2 };
+function pipe3(source, op1, op2) {
 return op2(op1(source));
-});
-  export(function pipe4(source, op1, op2, op3) {
+}
+export { pipe3 };
+function pipe4(source, op1, op2, op3) {
 return op3(op2(op1(source)));
-});
-  export(function pipe5(source, op1, op2, op3, op4) {
+}
+export { pipe4 };
+function pipe5(source, op1, op2, op3, op4) {
 return op4(op3(op2(op1(source))));
-});
-  export(function pipe(source, rest) {
+}
+export { pipe5 };
+function pipe(source, rest) {
 let result = source;
-block(for(of, op(ops), result = op(result)), return(result));
-});
-  export(async function* fromArray(items): Source {
-block(for(of, item(items), yield(item)));
-});
-  export(const(from, fromArray));
-  export(async function* fromResponse(res): Source {
-block(const*(reader(res.body.getReader())(), try(while(true, const*({ done: value }(await reader.read())()(), if(done, break()), yield(value))), finally(reader.releaseLock()))));
-});
-  export(function fromLazyPromise(fn): Source {
+{
+  for (let op of ops) {
+    result = op(result);
+  }
+  return result;
+}
+}
+export { pipe };
+async function* fromArray(items): Source {
+{
+  for (let item of items) {
+    yield(item);
+  }
+}
+}
+export { fromArray };
+const const_tmp__1_7168736585 = fromArray;
+const from = const_tmp__1_7168736585;
+export { const_tmp__1_7168736585, from };
+async function* fromResponse(res): Source {
+{
+  const reader = res.body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      yield(value);
+    }
+  }
+  finally {
+    reader.releaseLock();
+  }
+}
+}
+export { fromResponse };
+function fromLazyPromise(fn): Source {
 return (async function*() {
 yield(await fn());
 })();
+}
+export { fromLazyPromise };
+async function* fromIterator(iter): Source {
+{
+  for (let item of iter) {
+    yield(item);
+  }
+}
+}
+export { fromIterator };
+async function* fromAsyncIterator(iter): Source {
+{
+  for await (let item of iter) {
+    yield(item);
+  }
+}
+}
+export { fromAsyncIterator };
+async function* empty(): Source {
+{
+  return;
+}
+}
+export { empty };
+async function* never(): Source {
+{
+  await new Promise(() => {
+{
+}
 });
-  export(async function* fromIterator(iter): Source {
-block(for(of, item(iter), yield(item)));
-});
-  export(async function* fromAsyncIterator(iter): Source {
-block(for(await, item(iter), yield(item)));
-});
-  export(async function* empty(): Source {
-block(return());
-});
-  export(async function* never(): Source {
-block(await new(t:ref(Promise), () => {
-block();
-}));
-});
-  export(async function* range(start, end, step): Source {
-block(let*(i(start)(), while((i < end), yield(i), i = (i + step))));
-});
-  export(async function* repeat(value, count): Source {
-block(let*(i(0)(), while((i < count), yield(value), i = (i + 1))));
-});
-  export(function map(fn): Pipe {
+}
+}
+export { never };
+async function* range(start, end, step): Source {
+{
+  let i = start;
+  while ((i < end)) {
+    yield(i);
+    i = (i + step);
+  }
+}
+}
+export { range };
+async function* repeat(value, count): Source {
+{
+  let i = 0;
+  while ((i < count)) {
+    yield(value);
+    i = (i + 1);
+  }
+}
+}
+export { repeat };
+function map(fn): Pipe {
 return async function*(source) {
 for await (let item of source) {
   yield(fn(item));
 }
 };
-});
-  export(function filter(fn): Pipe {
+}
+export { map };
+function filter(fn): Pipe {
 return async function*(source) {
 for await (let item of source) {
   if (fn(item)) {
@@ -66,20 +129,22 @@ for await (let item of source) {
   }
 }
 };
-});
-  export(function take(n): Pipe {
+}
+export { filter };
+function take(n): Pipe {
 return async function*(source) {
 let count = 0;
 for await (let item of source) {
   if ((count >= n)) {
-    break();
+    break;
   }
   yield(item);
   count = (count + 1);
 }
 };
-});
-  export(function drop(n): Pipe {
+}
+export { take };
+function drop(n): Pipe {
 return async function*(source) {
 let count = 0;
 for await (let item of source) {
@@ -91,36 +156,51 @@ for await (let item of source) {
   }
 }
 };
-});
-  export(function takeWhile(fn): Pipe {
+}
+export { drop };
+function takeWhile(fn): Pipe {
 return async function*(source) {
 for await (let item of source) {
   if (!fn(item)) {
-    break();
+    break;
   }
   yield(item);
 }
 };
-});
-  export(function dropWhile(fn): Pipe {
+}
+export { takeWhile };
+function dropWhile(fn): Pipe {
 return async function*(source) {
 let dropping = true;
 for await (let item of source) {
   if ((dropping && fn(item))) {
-    continue();
+    continue;
   }
   dropping = false;
   yield(item);
 }
 };
-});
-  export(function chunk(size): Pipe {
+}
+export { dropWhile };
+function chunk(size): Pipe {
 return async function*(source) {
 let batch = [];
-block(for(await, item(source), batch.push(item), if((batch.length >= size), block(yield(batch), batch = []))), if((batch.length > 0), yield(batch)));
+{
+  for await (let item of source) {
+    batch.push(item);
+    if ((batch.length >= size)) {
+      yield(batch);
+      batch = [];
+    }
+  }
+  if ((batch.length > 0)) {
+    yield(batch);
+  }
+}
 };
-});
-  export(function flatMap(fn, opts): Pipe {
+}
+export { chunk };
+function flatMap(fn, opts): Pipe {
 const concurrency = (opts.concurrency || 1);
 return async function*(source) {
 if ((concurrency === 1)) {
@@ -134,16 +214,18 @@ else {
   }
 }
 };
-});
-  export(function tap(fn): Pipe {
+}
+export { flatMap };
+function tap(fn): Pipe {
 return async function*(source) {
 for await (let item of source) {
   fn(item);
   yield(item);
 }
 };
-});
-  export(function scan(fn, init): Pipe {
+}
+export { tap };
+function scan(fn, init): Pipe {
 return async function*(source) {
 let acc = init;
 for await (let item of source) {
@@ -151,69 +233,117 @@ for await (let item of source) {
   yield(acc);
 }
 };
-});
-  export(function distinct(): Pipe {
+}
+export { scan };
+function distinct(): Pipe {
 return async function*(source) {
-const seen = new(t:ref(Set));
+const seen = new Set();
 for await (let item of source) {
   if (!seen.has(item)) {
-    block(seen.add(item), yield(item));
+    seen.add(item);
+    yield(item);
   }
 }
 };
-});
-  export(function collect(): Sink {
+}
+export { distinct };
+function collect(): Sink {
 return async function(source) {
 const items = [];
-block(for(await, item(source), items.push(item)), return(items));
+{
+  for await (let item of source) {
+    items.push(item);
+  }
+  return items;
+}
 };
-});
-  export(function first(): Sink {
+}
+export { collect };
+function first(): Sink {
 return async function(source) {
-block(for(await, item(source), return(item)), return(undefined));
+{
+  for await (let item of source) {
+    return item;
+  }
+  return undefined;
+}
 };
-});
-  export(function last(): Sink {
+}
+export { first };
+function last(): Sink {
 return async function(source) {
 let lastItem = undefined;
-block(for(await, item(source), lastItem = item), return(lastItem));
+{
+  for await (let item of source) {
+    lastItem = item;
+  }
+  return lastItem;
+}
 };
-});
-  export(function reduce(fn, init): Sink {
+}
+export { last };
+function reduce(fn, init): Sink {
 return async function(source) {
 let acc = init;
-block(for(await, item(source), acc = fn(acc, item)), return(acc));
+{
+  for await (let item of source) {
+    acc = fn(acc, item);
+  }
+  return acc;
+}
 };
-});
-  export(function forEach(fn): Sink {
+}
+export { reduce };
+function forEach(fn): Sink {
 return async function(source) {
 for await (let item of source) {
   fn(item);
 }
 };
-});
-  export(function drain(): Sink {
+}
+export { forEach };
+function drain(): Sink {
 return async function(source) {
 for await (let _ of source) {
-  block();
 }
 };
-});
-  export(function count(): Sink {
+}
+export { drain };
+function count(): Sink {
 return async function(source) {
 let n = 0;
-block(for(await, _(source), n = (n + 1)), return(n));
-};
-});
-  export(function some(fn): Sink {
-return async function(source) {
-block(for(await, item(source), if(fn(item), return(true))), return(false));
-};
-});
-  export(function every(fn): Sink {
-return async function(source) {
-block(for(await, item(source), if(!fn(item), return(false))), return(true));
-};
-});
+{
+  for await (let _ of source) {
+    n = (n + 1);
   }
-})();
+  return n;
+}
+};
+}
+export { count };
+function some(fn): Sink {
+return async function(source) {
+{
+  for await (let item of source) {
+    if (fn(item)) {
+      return true;
+    }
+  }
+  return false;
+}
+};
+}
+export { some };
+function every(fn): Sink {
+return async function(source) {
+{
+  for await (let item of source) {
+    if (!fn(item)) {
+      return false;
+    }
+  }
+  return true;
+}
+};
+}
+export { every };

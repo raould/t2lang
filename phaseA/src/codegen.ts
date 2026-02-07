@@ -128,9 +128,10 @@ export async function generateCode(program: Program, config: CompilerConfig = {}
     generatedLine += outputOffset;
   }
   const requiresAsync = programRequiresAsync(program);
+  const isModule = program.body.some((stmt) => stmt instanceof ImportStmt || stmt instanceof ExportStmt);
   let tsLines = lines;
   let lineShift = 0;
-  if (config.prettyOption === "pretty") {
+  if (config.prettyOption === "pretty" && !isModule) {
     tsLines = ["{", ...tsLines, "}"];
     lineShift += 1;
   }
@@ -1331,7 +1332,7 @@ function containsAsyncStatement(stmt: Statement): boolean {
     return false;
   }
   if (stmt instanceof FunctionExpr || stmt instanceof ClassExpr) {
-    return containsAsyncExpression(stmt as Expression);
+    return false;
   }
   return false;
 }
@@ -1399,19 +1400,7 @@ function containsAsyncExpression(expr: Expression): boolean {
     }
     return false;
   }
-  if (expr instanceof FunctionExpr) {
-    return expr.body.some((inner) => containsAsyncStatement(inner));
-  }
-  if (expr instanceof ClassExpr) {
-    if (expr.body.statements.some((inner) => containsAsyncStatement(inner))) {
-      return true;
-    }
-    if (expr.constructorStmt && containsAsyncStatement(expr.constructorStmt)) {
-      return true;
-    }
-    if (expr.staticBlocks && expr.staticBlocks.some((block) => containsAsyncStatement(block))) {
-      return true;
-    }
+  if (expr instanceof FunctionExpr || expr instanceof ClassExpr) {
     return false;
   }
   if (expr instanceof TryCatchExpr) {

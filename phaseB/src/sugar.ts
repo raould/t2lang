@@ -67,6 +67,8 @@ const NON_CALL_FORMS = new Set([
   "computed",
 ]);
 
+const CALLABLE_FLAGS = new Set(["async", "generator", "abstract", "overload"]);
+
 export function applySugar(nodes: PhaseBNode[]): PhaseBNode[] {
   return nodes.map(rewriteNode);
 }
@@ -101,6 +103,11 @@ function rewriteList(node: PhaseBListNode): PhaseBNode {
   const typeDeclarationRewrite = rewriteTypeDeclaration(node);
   if (typeDeclarationRewrite) {
     return rewriteNode(typeDeclarationRewrite);
+  }
+
+  const exportDeclarationRewrite = rewriteExportDeclaration(node);
+  if (exportDeclarationRewrite) {
+    return rewriteNode(exportDeclarationRewrite);
   }
 
   validateNoKeywordArgs(node);
@@ -167,6 +174,109 @@ function rewriteList(node: PhaseBListNode): PhaseBNode {
   const listNode = baseList as PhaseBListNode;
   const optionalPropRewritten = rewriteOptionalProperty(listNode);
   return optionalPropRewritten ?? listNode;
+}
+
+function rewriteExportDeclaration(node: PhaseBListNode): PhaseBNode | null {
+  const head = node.elements[0];
+  if (!head || !isSymbol(head, "export")) {
+    return null;
+  }
+  if (node.elements.length !== 2) {
+    return null;
+  }
+  const target = node.elements[1];
+  if (!target || target.phaseKind !== "list") {
+    return null;
+  }
+  const targetList = target as PhaseBListNode;
+  const targetHead = targetList.elements[0];
+  if (targetHead && isSymbol(targetHead, "export-spec")) {
+    return null;
+  }
+  const names = collectExportNames(targetList);
+  if (names.length === 0) {
+    return null;
+  }
+  const exportSpec = createPhaseBList(
+    [createPhaseBSymbol("export-spec", node.loc), ...names.map((name) => createPhaseBSymbol(name, node.loc))],
+    node.loc
+  );
+  const exportList = createPhaseBList([createPhaseBSymbol("export", node.loc), exportSpec], node.loc);
+  return createPhaseBList([createPhaseBSymbol("program", node.loc), targetList, exportList], node.loc);
+}
+
+function collectExportNames(target: PhaseBListNode): string[] {
+  const head = target.elements[0];
+  if (!head || head.phaseKind !== "symbol") {
+    return [];
+  }
+  const headName = (head as SymbolNode).name;
+  if (["fn", "lambda", "method", "getter", "setter"].includes(headName)) {
+    const nameNode = extractCallableName(target.elements.slice(1));
+    return nameNode ? [nameNode] : [];
+  }
+  if (["class", "enum", "namespace", "type-alias", "type-interface", "interface"].includes(headName)) {
+    const nameNode = target.elements[1];
+    const name = nameNode ? stringFromExportName(nameNode) : null;
+    return name ? [name] : [];
+  }
+  if (["const", "const*", "let", "let*"].includes(headName)) {
+    return collectBindingNames(target.elements.slice(1));
+  }
+  return [];
+}
+
+function extractCallableName(nodes: PhaseBNode[]): string | null {
+  for (const node of nodes) {
+    if (node.phaseKind === "symbol") {
+      const name = (node as SymbolNode).name;
+      if (CALLABLE_FLAGS.has(name)) {
+        continue;
+      }
+      return name;
+    }
+    return null;
+  }
+  return null;
+}
+
+function collectBindingNames(nodes: PhaseBNode[]): string[] {
+  if (nodes.length === 0) {
+    return [];
+  }
+  if (nodes.length >= 2 && nodes[0].phaseKind !== "list") {
+    const name = stringFromExportName(nodes[0]);
+    return name ? [name] : [];
+  }
+  const bindingList = nodes[0];
+  if (!bindingList || bindingList.phaseKind !== "list") {
+    return [];
+  }
+  const names: string[] = [];
+  for (const entry of (bindingList as PhaseBListNode).elements) {
+    if (entry.phaseKind !== "list") {
+      continue;
+    }
+    const target = (entry as PhaseBListNode).elements[0];
+    const name = target ? stringFromExportName(target) : null;
+    if (name) {
+      names.push(name);
+    }
+  }
+  return names;
+}
+
+function stringFromExportName(node: PhaseBNode): string | null {
+  if (node.phaseKind === "symbol") {
+    return (node as SymbolNode).name;
+  }
+  if (node.phaseKind === "literal" && typeof (node as LiteralNode).value === "string") {
+    const value = (node as LiteralNode).value;
+    if (typeof value === "string") {
+      return value;
+    }
+  }
+  return null;
 }
 
 const TEMPLATE_PLACEHOLDER = /^[A-Za-z_][A-Za-z0-9_-]*$/;
