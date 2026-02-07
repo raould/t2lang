@@ -230,6 +230,23 @@ All code in a compilation unit (e.g. a single file) must be enclosed in a top-le
 
 ## Phase B sugar and macro surface forms
 
+### Macro forms
+
+```
+(defmacro <identifier> (<param>* (& <identifier>)?) <expression>+)
+(gensym <string>?)
+(macroexpand <expression>)
+```
+
+List quoting forms (also produced by reader macros):
+
+```
+(quote <expression>)
+(quasiquote <expression>)
+(unquote <expression>)
+(unquote-splicing <expression>)
+```
+
 ### Equality operator sugar
 
 | Operator | Meaning | JS Equivalent |
@@ -257,6 +274,37 @@ Custom reader macros (per file):
 ```
 (defreadermacro "#" quote)
 #(foo bar)  ; => (quote (foo bar))
+```
+
+### Type generics (sugar)
+
+```
+(fn <T, U>(x: T, y: U): [T, U] ...)
+```
+
+Rewrites to:
+
+```
+(fn
+	((x (t:var "T"))
+	 (y (t:var "U")))
+	(t:tuple (t:var "T") (t:var "U"))
+	:type-params ("T" "U")
+	...)
+```
+
+### Type declaration sugar
+
+```
+(type Alias SomeType)
+(type Generic <T> (Array<T>))
+```
+
+Rewrites to:
+
+```
+(type-alias "Alias" SomeType')
+(type-alias "Generic" (t:apply (t:ref "Array") (t:var "T")) :type-params ("T"))
 ```
 
 ### Infix
