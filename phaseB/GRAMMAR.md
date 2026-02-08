@@ -390,7 +390,7 @@ obj?.[key]
 (obj?.method arg)
 ```
 
-Rewrites to guarded `let*` + `if` expressions and `call-with-this` when needed.
+Rewrites to canonical optional forms: `(?. obj prop)`, `(?.[] obj key)`, and `(call (?. obj method) arg)`.
 
 ### For-of / For-in / For-await
 

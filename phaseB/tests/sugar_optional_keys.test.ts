@@ -1,5 +1,4 @@
-import t from "node:test";
-const test = t.skip;
+import test from "node:test";
 import assert from "node:assert";
 import { expectExpression } from "./sugar_helpers.js";
 import { compile } from "../../phaseB/dist/api.js";

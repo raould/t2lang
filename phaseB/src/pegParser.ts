@@ -65,6 +65,9 @@ const NON_CALL_HEADS = new Set([
   "call",
   "prop",
   "index",
+  "?.",
+  "?.[]",
+  "?.call",
   "new",
   "assign",
   "ternary",
@@ -140,6 +143,7 @@ T2PhaseB {
   Postfix = Primary PostfixTail*
   PostfixTail = "." ident &"(" CallArgs -- call
              | "." ident -- prop
+             | "." "[" Expr "]" -- index
 
   OptionalChain = Primary OptionalSegment+
   OptionalSegment = OptionalProp
@@ -1057,6 +1061,11 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
       return (value: PhaseBNode): PhaseBNode =>
         list(this as ohm.Node, sym("prop", this as ohm.Node), value, sym(name.sourceString, name as ohm.Node));
     },
+    PostfixTail_index(_dot: OhmNode, _open: OhmNode, expr: OhmNode, _close: OhmNode) {
+      void [_dot, _open, _close];
+      return (value: PhaseBNode): PhaseBNode =>
+        list(this as ohm.Node, sym("index", this as ohm.Node), value, expr.ast());
+    },
     OptionalChain(primary: OhmNode, segs: OhmIteration) {
       let acc = unwrapNode(primary.ast());
       for (const seg of segs.asIteration().children) {
@@ -1071,7 +1080,7 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
     OptionalProp_call(_dot: OhmNode, name: OhmNode, _open: OhmNode, callArgs: OhmNode) {
       void [_dot, _open];
       return (value: PhaseBNode): PhaseBNode => {
-        const prop = list(this as ohm.Node, sym("prop", this as ohm.Node), value, sym(name.sourceString, name as ohm.Node));
+        const prop = list(this as ohm.Node, sym("?.", this as ohm.Node), value, sym(name.sourceString, name as ohm.Node));
         const args = callArgs.ast() as PhaseBNode[];
         return list(callArgs as ohm.Node, sym("call", callArgs as ohm.Node), prop, ...args);
       };
@@ -1079,18 +1088,18 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
     OptionalProp_prop(_dot: OhmNode, name: OhmNode) {
       void _dot;
       return (value: PhaseBNode): PhaseBNode =>
-        list(this as ohm.Node, sym("prop", this as ohm.Node), value, sym(name.sourceString, name as ohm.Node));
+        list(this as ohm.Node, sym("?.", this as ohm.Node), value, sym(name.sourceString, name as ohm.Node));
     },
     OptionalIndex_index(_dot: OhmNode, _open: OhmNode, expr: OhmNode, _close: OhmNode) {
       void [_dot, _open, _close];
       return (value: PhaseBNode): PhaseBNode =>
-        list(this as ohm.Node, sym("index", this as ohm.Node), value, expr.ast());
+        list(this as ohm.Node, sym("?.[]", this as ohm.Node), value, expr.ast());
     },
     OptionalCall_call(_dot: OhmNode, callArgs: OhmNode) {
       void _dot;
       return (value: PhaseBNode): PhaseBNode => {
         const args = callArgs.ast() as PhaseBNode[];
-        return list(callArgs as ohm.Node, sym("call", callArgs as ohm.Node), value, ...args);
+        return list(callArgs as ohm.Node, sym("?.call", callArgs as ohm.Node), value, ...args);
       };
     },
     CallArgs(_open: OhmNode, _sp1: OhmNode, args: OhmNode, _sp2: OhmNode, _close: OhmNode) {
@@ -1599,6 +1608,9 @@ function detectInvalidDotted(source: string, locFromIndex: (start: number, end?:
       }
       const prev = source[i - 1];
       const next = source[i + 1];
+      if (prev === "?") {
+        continue;
+      }
       const prevOk = prev && /[A-Za-z0-9_\-]/.test(prev);
       const nextOk = next && /[A-Za-z_]/.test(next);
       if (!prevOk && nextOk) {

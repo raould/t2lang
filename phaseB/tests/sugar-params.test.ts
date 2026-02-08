@@ -1,5 +1,4 @@
-import t from "node:test";
-const test = t.skip;
+import test from "node:test";
 import assert from "node:assert";
 import { parsePhaseBRaw } from "../src/reader.js";
 import type { PhaseBListNode, PhaseBTypeAnnotation, SymbolNode } from "../src/reader.js";

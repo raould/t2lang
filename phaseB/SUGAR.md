@@ -277,74 +277,48 @@ Support for TypeScript-style parameter lists with colons.
 
 Phase B is responsible for parsing the type syntax (`x: T`) and converting it into the `(x T)` tuple structure Phase A expects for named parameters.
 
-## 7. Optional Chaining (Expanded) [x]
+## 7. Optional Chaining (Canonical) [x]
 
-Optional chaining rewrites avoid thunks by nesting `let*` bindings with `if` checks so arguments are never evaluated when the chain short-circuits.
+Optional chaining is preserved as canonical Phase A optional forms so it emits directly to TypeScript `?.` without inserting null guards.
 See [phaseB/ERRORS.md](phaseB/ERRORS.md) for the diagnostics Surface B surfaces when optional chaining sugar is malformed.
 
-### Rewrite Rules
+### Canonical Forms
 
 **Property access** `obj?.prop`:
 ```lisp
-(let* ((tmp obj))
-  (if (== tmp null)
-      undefined
-      (prop tmp prop)))
+(?. obj prop)
 ```
 
 **Method call** `obj?.method(args...)`:
 ```lisp
-(let* ((tmp obj))
-  (if (== tmp null)
-      undefined
-      ((prop tmp method) args...)))
+(call (?. obj method) args...)
 ```
 
 **Callable check** `expr?.(args...)`:
 ```lisp
-(let* ((tmp expr))
-  (if (== tmp null)
-      undefined
-      (tmp args...)))
-```
-
-When the callable target is a method access (e.g., `obj.method?.(a, b)`), the rewrite must preserve the `this` binding explicitly. Phase A exposes a `call-with-this` primitive so Phase B can emit a general call form that compiles to `fn.call(thisVal, ...args)`.
-
-**Sugar:**
-```lisp
-(obj.method?. a b)
-```
-
-**Rewrite:**
-```lisp
-(let* ((tmp-obj obj)
-     (tmp-fn (prop tmp-obj method)))
-  (if (== tmp-fn null)
-    undefined
-      (call-with-this tmp-fn tmp-obj a b)))
+(?.call expr args...)
 ```
 
 ### Computed optional access
 
-Computed lookups like `obj?.[key]` share the same guard strategy, but they always rewrite to the `index` primitive so the downstream compiler can handle arbitrary expressions for the key. For example:
+Computed lookups like `obj?.[key]` lower to the dedicated optional index form:
 
 ```lisp
-(let* ((tmp obj))
-  (if (== tmp null)
-      undefined
-      (index tmp key)))
+(?.[] obj key)
 ```
 
-When the receiver is non-optional (e.g., `obj.[key]`) the sugar simply emits `(index obj key)` without introducing guards.
+When the receiver is non-optional (e.g., `obj.[key]`) the sugar emits `(index obj key)` without the `?.` marker.
 
-**Nested chains** `a?.b?.c(x)` introduce one `let*`/`if` per `?.`, short-circuiting to `undefined` at the first nullish value while reusing the previous temporary in the next check.
+**Nested chains** `a?.b?.c(x)` become nested optional forms:
+
+```lisp
+(call (?. (?. a b) c) x)
+```
 
 ### Notes
 
-- `==` handles both `null` and `undefined` for the guard.
-- Temporary bindings must use `gensym` to avoid capture.
-- Method calls must preserve `this` semantics; emitting `(tmp.call obj args...)` or equivalent Phase A call is acceptable.
-- The base expression (like `getObj()?.method`) is evaluated exactly once because it is bound before the guard.
+- `?.` list form accepts chained property segments like `(?. user :address :city)`, which lowers to nested optional property access nodes.
+- Optional calls use `?.call` for direct-call syntax (`fn?.(args)`), while `obj?.method(args)` remains a normal call with an optional callee.
 
 ## 8. Async / Await [x]
 

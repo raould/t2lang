@@ -18,9 +18,12 @@ import {
   AssignExpr,
   CallExpr,
   CallWithThisExpr,
+  OptionalCallExpr,
   IndexExpr,
+  OptionalIndexExpr,
   NewExpr,
   PropExpr,
+  OptionalPropExpr,
   Identifier,
   Literal,
   LetStarExpr,
@@ -1593,6 +1596,17 @@ function lowerList(node: PhaseBListNode): Expression {
         const args = argsNodes.map(lowerExpression);
         return new CallExpr({ callee, args, span });
       }
+      case "?.call": {
+        const calleeNode = rest[0];
+        const argsNodes = stripCommaNodes(rest.slice(1));
+        validateCommaSeparated(rest.slice(1), "optional call arguments");
+        if (!calleeNode) {
+          throw reportError("T2:0129", node.loc);
+        }
+        const callee = lowerExpression(calleeNode);
+        const args = argsNodes.map(lowerExpression);
+        return new OptionalCallExpr({ callee, args, span });
+      }
       case "new": {
         const calleeNode = rest[0];
         const argsNodes = stripCommaNodes(rest.slice(1));
@@ -1607,6 +1621,41 @@ function lowerList(node: PhaseBListNode): Expression {
         const object = objectNode ? lowerExpression(objectNode) : new Identifier({ name: "<missing>", span });
         const name = propertyNode ? extractPropertyName(propertyNode) : "<missing>";
         return new PropExpr({ object, name, maybeNull: false, span });
+      }
+      case "?.": {
+        if (filteredRest.length < 2) {
+          throw reportError("T2:0127", node.loc);
+        }
+        const [objectNode, ...tail] = filteredRest;
+        let acc = lowerExpression(objectNode);
+        let index = 0;
+        while (index < tail.length) {
+          const current = tail[index];
+          const next = tail[index + 1];
+          if (current.phaseKind === "symbol" && (current as SymbolNode).name === ":") {
+            if (!next) {
+              throw reportError("T2:0127", current.loc ?? node.loc);
+            }
+            const name = extractOptionalKeywordName(next);
+            acc = new OptionalPropExpr({ object: acc, name, span: spanFromLoc(next.loc ?? node.loc) });
+            index += 2;
+            continue;
+          }
+          const name = extractOptionalKeywordName(current);
+          acc = new OptionalPropExpr({ object: acc, name, span: spanFromLoc(current.loc ?? node.loc) });
+          index += 1;
+        }
+        return acc;
+      }
+      case "?.[]": {
+        const objectNode = rest[0];
+        const indexNode = rest[1];
+        if (!objectNode || !indexNode) {
+          throw reportError("T2:0195", node.loc);
+        }
+        const object = lowerExpression(objectNode);
+        const indexExpr = lowerExpression(indexNode);
+        return new OptionalIndexExpr({ object, index: indexExpr, span });
       }
       case "fn":
       case "method":
@@ -2126,6 +2175,21 @@ function extractPropertyName(node: PhaseBNode): string {
   if (node.phaseKind === "symbol") {
     const symbol = node as SymbolNode;
     return symbol.name;
+  }
+  return "<unknown>";
+}
+
+function extractOptionalKeywordName(node: PhaseBNode): string {
+  if (node.phaseKind === "symbol") {
+    const symbol = node as SymbolNode;
+    if (symbol.name.startsWith(":")) {
+      return symbol.name.slice(1);
+    }
+    return symbol.name;
+  }
+  if (node.phaseKind === "literal") {
+    const literal = node as LiteralNode;
+    return typeof literal.value === "string" ? literal.value : String(literal.value);
   }
   return "<unknown>";
 }

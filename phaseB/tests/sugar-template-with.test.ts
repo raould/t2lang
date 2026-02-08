@@ -1,5 +1,4 @@
-import t from "node:test";
-const test = t.skip;
+import test from "node:test";
 import assert from "node:assert";
 import { parsePhaseBRaw } from "../src/reader.js";
 import { resetGensym } from "../src/gensym.js";
