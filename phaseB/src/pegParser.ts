@@ -90,6 +90,26 @@ const CALLABLE_MODIFIERS = new Set(["async", "generator"]);
 const EXPORT_CALLABLE_HEADS = new Set(["fn", "lambda", "method", "getter", "setter"]);
 const EXPORT_DECL_HEADS = new Set(["class", "enum", "namespace", "type-alias", "type-interface", "interface"]);
 const EXPORT_BINDING_HEADS = new Set(["const", "const*", "let", "let*"]);
+const CALLABLE_LIST_HEADS = new Set(["call", "call-with-this", "prop", "index", "new", "?.", "?.[]", "?.call"]);
+const MUTATION_CONVENTION_ALIASES: Record<string, string> = {
+  "set-in": "__t2_setIn",
+  "set-in!": "__t2_setInMut",
+  "update-in": "__t2_updateIn",
+  "update-in!": "__t2_updateInMut",
+  "merge": "__t2_merge",
+  "merge!": "__t2_mergeMut",
+  "set": "__t2_set",
+  "push": "__t2_push",
+  "push!": "__t2_pushMut",
+  "pop": "__t2_pop",
+  "pop!": "__t2_popMut",
+  "sort-by": "__t2_sortBy",
+  "sort-by!": "__t2_sortByMut",
+  "reverse": "__t2_reverse",
+  "reverse!": "__t2_reverseMut",
+  "delete": "__t2_delete",
+  "delete!": "__t2_deleteMut",
+};
 
 const GRAMMAR_SOURCE = String.raw`
 T2PhaseB {
@@ -240,7 +260,7 @@ T2PhaseB {
 
   identNoAs = ~asKeyword ident
   ident = (letter | "_") identChar*
-  identChar = letter | digit | "_" | "-" | "*"
+  identChar = letter | digit | "_" | "-" | "*" | "!"
   asKeyword = "as" ~identChar
   String = "\"" (~"\"" any)* "\""
   Number = number
@@ -808,6 +828,7 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
     while (index < elements.length) {
       const entry = elements[index];
       if (entry.phaseKind === "symbol" && (entry as { name: string }).name === ",") {
+        normalized.push(entry);
         index += 1;
         continue;
       }
@@ -937,7 +958,16 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
         const listNode = rawSignature as PhaseBListNode;
         const elements = listNode.elements.map((entry) => unwrapSingleList(unwrapCallList(entry)));
         const normalized = normalizeParamListTypeAnnotations(elements);
-        return { ...listNode, elements: normalized } as PhaseBNode;
+        const wrapped = normalized.map((entry) => {
+          if (entry.phaseKind === "symbol" && (entry as { name: string }).name === ",") {
+            return entry;
+          }
+          if (entry.phaseKind === "list") {
+            return entry;
+          }
+          return listFromLoc(entry.loc, entry);
+        });
+        return { ...listNode, elements: wrapped } as PhaseBNode;
       })();
       args = [...args.slice(0, signatureIndex), signatureNode, ...args.slice(signatureIndex + 1)];
     }
@@ -1121,7 +1151,33 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
     Call_implicitCall(exprs: OhmIteration) {
       const items = exprs.asIteration().children.map((child: ohm.Node) => unwrapNode(child.ast()));
       const [head, ...args] = items;
+      if (head && head.phaseKind === "list" && args.length === 0) {
+        const listHead = (head as PhaseBListNode).elements[0];
+        if (
+          !(
+            listHead
+            && listHead.phaseKind === "symbol"
+            && (CALLABLE_HEADS.has((listHead as { name: string }).name) || CALLABLE_LIST_HEADS.has((listHead as { name: string }).name))
+          )
+        ) {
+          return list(this as ohm.Node, head);
+        }
+      }
       const hasKeywordArgs = (entries: PhaseBNode[]): boolean => {
+        const hasComma = entries.some(
+          (entry) => entry.phaseKind === "symbol" && (entry as { name: string }).name === ",",
+        );
+        if (hasComma) {
+          const paramLike = entries.every((entry) => {
+            if (entry.phaseKind === "symbol" && (entry as { name: string }).name === ",") {
+              return true;
+            }
+            return entry.phaseKind === "symbol" || entry.phaseKind === "type-annotation";
+          });
+          if (paramLike) {
+            return false;
+          }
+        }
         for (let i = 0; i < entries.length; i += 1) {
           const entry = entries[i];
           if (entry.phaseKind === "type-annotation") {
@@ -1154,6 +1210,21 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
           }
           const op = headName === "and" ? "&&" : "||";
           return list(this as ohm.Node, sym("call", this as ohm.Node), sym(op, this as ohm.Node), ...args);
+        }
+        if (headName === "call") {
+          const callee = args[0];
+          if (callee && callee.phaseKind === "symbol") {
+            const calleeName = (callee as { name: string }).name;
+            const mapped = MUTATION_CONVENTION_ALIASES[calleeName];
+            if (mapped) {
+              return list(this as ohm.Node, head, sym(mapped, this as ohm.Node), ...args.slice(1));
+            }
+          }
+        } else {
+          const mapped = MUTATION_CONVENTION_ALIASES[headName];
+          if (mapped) {
+            return list(this as ohm.Node, sym(mapped, this as ohm.Node), ...args);
+          }
         }
       }
       if (head && head.phaseKind === "symbol" && NON_CALL_HEADS.has((head as { name: string }).name)) {
@@ -1197,7 +1268,8 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
         return list(this as ohm.Node, head, ...args);
       }
       if (head && head.phaseKind === "type-annotation") {
-        return list(this as ohm.Node, head, ...args);
+        const wrappedHead = listFromLoc(head.loc, head);
+        return list(this as ohm.Node, wrappedHead, ...args);
       }
       return list(this as ohm.Node, sym("call", this as ohm.Node), head, ...args);
     },
