@@ -33,7 +33,7 @@ function cleanup(filePath: string) {
 }
 
 async function compileWithPhaseA(source: string): Promise<string> {
-  const result = await compile(source, { prettyOption: "pretty", logLevel: "none" });
+  const result = await compile(source, { prettyOption: "ugly", logLevel: "none" });
   return result.tsSource.trim();
 }
 
@@ -41,7 +41,7 @@ async function expectCliMatches(source: string): Promise<void> {
   const expected = await compileWithPhaseA(source);
   const inputPath = writeTempInput(source);
   try {
-    const result = spawnSync(process.execPath, [cliPath, "--stdout", inputPath], {
+    const result = spawnSync(process.execPath, [cliPath, "--stdout", "--pretty-option", "ugly", inputPath], {
       encoding: "utf8",
     });
 

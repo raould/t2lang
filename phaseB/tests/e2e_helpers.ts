@@ -63,7 +63,7 @@ function makeCompilerHost(tsSource: string): ts.CompilerHost {
 }
 
 export async function runE2E_TSC(t2: string): Promise<[CompilePhaseBResult, string[]]> {
-  const result = { ...(await compile(t2, { prettyOption: "pretty" })), errors: [] as unknown[] };
+  const result = { ...(await compile(t2, { prettyOption: "ugly" })), errors: [] as unknown[] };
   if (result.errors.length > 0) { console.error(result.errors); }
 
   const host = makeCompilerHost(result.tsSource);
@@ -93,7 +93,7 @@ export async function runE2E_TSC(t2: string): Promise<[CompilePhaseBResult, stri
 export async function runE2E_NodeJS(
   t2: string
 ): Promise<[CompilePhaseBResult, string[], { stdout: string; stderr: string }]> {
-  const result = { ...(await compile(t2, { prettyOption: "pretty" })), errors: [] as unknown[] };
+  const result = { ...(await compile(t2, { prettyOption: "ugly" })), errors: [] as unknown[] };
   if (result.errors.length > 0) { console.error(result.errors); }
 
   const host = makeCompilerHost(result.tsSource);

@@ -33,7 +33,7 @@ function cleanup(filePath: string) {
 }
 
 async function compileExpected(): Promise<string> {
-  const result = await compile(sampleSource, { prettyOption: "pretty", logLevel: "none" });
+  const result = await compile(sampleSource, { prettyOption: "ugly", logLevel: "none" });
   return result.tsSource.trim();
 }
 
@@ -43,7 +43,7 @@ test("phaseB CLI --dump-ast prints AST and still emits TypeScript", async () => 
   try {
     const result = spawnSync(
       process.execPath,
-      [cliPath, "--stdout", "--dump-ast", inputPath],
+      [cliPath, "--stdout", "--pretty-option", "ugly", "--dump-ast", inputPath],
       { encoding: "utf8" }
     );
 
@@ -65,7 +65,7 @@ test("phaseB CLI --trace dumps Phase A snapshot ASTs", async () => {
   try {
     const result = spawnSync(
       process.execPath,
-      [cliPath, "--trace", "--stdout", inputPath],
+      [cliPath, "--trace", "--stdout", "--pretty-option", "ugly", inputPath],
       { encoding: "utf8" }
     );
 
