@@ -8,6 +8,9 @@ import type {
 } from "./reader.js";
 import type { SourceLoc } from "./location.js";
 import { reportError } from "../../common/dist/errorRegistry.js";
+import type { TypeAst } from "./typeExpr.js";
+import { parseTypeExpression } from "./typeExpr.js";
+import { mergeLocs, serializePhaseBNode } from "./typeAnnotationUtils.js";
 import {
   Program,
   ExprStmt,
@@ -730,7 +733,8 @@ function lowerFunction(node: PhaseBListNode, kind: CallableKind): FunctionExpr {
   let typeParams: TypeParam[] | undefined;
   if (signatureNode && signatureNode.phaseKind === "list") {
     const list = signatureNode as PhaseBListNode;
-    for (const param of stripCommaNodes(list.elements)) {
+    const normalizedParams = normalizeFnParams(list.elements);
+    for (const param of normalizedParams) {
       parameters.push(lowerFnParam(param));
     }
     entries = entries.slice(1);
@@ -783,6 +787,37 @@ function lowerFunction(node: PhaseBListNode, kind: CallableKind): FunctionExpr {
   });
 }
 
+function normalizeFnParams(elements: PhaseBNode[]): PhaseBNode[] {
+  const normalized: PhaseBNode[] = [];
+  for (let i = 0; i < elements.length; i += 1) {
+    const current = elements[i];
+    if (current.phaseKind === "symbol" && (current as SymbolNode).name === ",") {
+      continue;
+    }
+    const next = elements[i + 1];
+    const annotation = elements[i + 2];
+    if (
+      next &&
+      next.phaseKind === "symbol" &&
+      (next as SymbolNode).name === ":" &&
+      annotation
+    ) {
+      const loc = mergeLocs(current.loc, annotation.loc ?? next.loc);
+      normalized.push({
+        kind: "list",
+        phaseKind: "list",
+        delimiter: "(",
+        loc,
+        elements: [current, next, annotation],
+      });
+      i += 2;
+      continue;
+    }
+    normalized.push(current);
+  }
+  return normalized;
+}
+
 function lowerFnParam(node: PhaseBNode): FnParam {
   let target: PhaseBNode | undefined;
   let annotationNode: PhaseBNode | undefined;
@@ -794,6 +829,18 @@ function lowerFnParam(node: PhaseBNode): FnParam {
       const annotation = first as PhaseBTypeAnnotation;
       target = annotation.target;
       annotationNode = annotation.annotation;
+    } else if (
+      list.elements.length >= 3 &&
+      list.elements[1]?.phaseKind === "symbol" &&
+      (list.elements[1] as SymbolNode).name === ":"
+    ) {
+      target = first ?? node;
+      const rawAnnotation = list.elements[2];
+      const serialized = rawAnnotation ? serializePhaseBNode(rawAnnotation) : undefined;
+      if (serialized) {
+        const ast = parseTypeExpression(serialized);
+        annotationNode = typeAstToPhaseB(ast, rawAnnotation.loc ?? list.loc);
+      }
     } else {
       target = first ?? node;
     }
@@ -807,6 +854,58 @@ function lowerFnParam(node: PhaseBNode): FnParam {
 
   const typeAnnotation = annotationNode ? lowerTypeNode(annotationNode) : undefined;
   return { name: lowerIdentifier(target), typeAnnotation };
+}
+
+function typeAstToPhaseB(ast: TypeAst, loc: SourceLoc): PhaseBNode {
+  const symbolNode = (name: string): PhaseBNode => ({ kind: "symbol", name, loc, phaseKind: "symbol" });
+  const literalNode = (value: string | number | boolean | null): PhaseBNode => ({
+    kind: "literal",
+    value,
+    loc,
+    phaseKind: "literal",
+  });
+  const listNode = (name: string, args: PhaseBNode[]): PhaseBListNode => ({
+    kind: "list",
+    phaseKind: "list",
+    delimiter: "(",
+    loc,
+    elements: [symbolNode(name), ...args],
+  });
+  switch (ast.kind) {
+    case "primitive":
+      return listNode("t:primitive", [literalNode(ast.name)]);
+    case "ref":
+      return listNode("t:ref", [literalNode(ast.name)]);
+    case "array":
+      return listNode("t:array", [typeAstToPhaseB(ast.element, loc)]);
+    case "nullable":
+      return listNode("t:nullable", [typeAstToPhaseB(ast.inner, loc)]);
+    case "tuple":
+      return listNode("t:tuple", ast.elements.map((el) => typeAstToPhaseB(el, loc)));
+    case "union":
+      return listNode("t:union", ast.options.map((opt) => typeAstToPhaseB(opt, loc)));
+    case "intersection":
+      return listNode("t:intersection", ast.options.map((opt) => typeAstToPhaseB(opt, loc)));
+    case "apply":
+      return listNode("t:apply", [typeAstToPhaseB(ast.base, loc), ...ast.args.map((arg) => typeAstToPhaseB(arg, loc))]);
+    case "keyof":
+      return listNode("t:keyof", [typeAstToPhaseB(ast.target, loc)]);
+    case "typeof":
+      return listNode("t:typeof", [symbolNode(ast.expr)]);
+    case "indexed":
+      return listNode("t:indexed", [typeAstToPhaseB(ast.object, loc), typeAstToPhaseB(ast.index, loc)]);
+    case "conditional":
+      return listNode("t:conditional", [
+        typeAstToPhaseB(ast.check, loc),
+        typeAstToPhaseB(ast.extends, loc),
+        typeAstToPhaseB(ast.trueType, loc),
+        typeAstToPhaseB(ast.falseType, loc),
+      ]);
+    case "infer":
+      return listNode("t:infer", [symbolNode(ast.name)]);
+    case "literal":
+      return listNode("t:literal", [literalNode(ast.value)]);
+  }
 }
 
 const PRIMITIVE_TYPE_MAP: Record<string, TypePrimitive["kind"]> = {

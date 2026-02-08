@@ -26,13 +26,13 @@ Goal: move Phase B sugar from rewrite passes into an Ohm PEG parser. Infix is ex
 - Emit `(prop obj "name")` for access and `(call (prop obj "name") args...)` for method calls.
 - Update tests or add a small focused test in phaseB/tests for dotted access via the PEG parser.
 
-### 4) Switch pipeline to PEG parser only
+### 4) Switch pipeline to PEG parser only [x]
 - In phaseB/src/reader.ts (or phaseB/src/api.ts), route `parsePhaseBRaw` to `parsePhaseBPeg` instead of the old reader + sugar rewrites.
 - Remove or bypass `applySugar` and `rewriteAssignments` in the main pipeline.
 - Keep the files containing the old reader + rewrites around temporarily, but unused, for back-compat until migrations are complete.
 - Expect most sugar tests to fail initially; update tests incrementally as each sugar is migrated.
 
-## Sugar → PEG Design
+## Sugar → PEG Design [x]
 
 Each item lists surface sugar, Ohm rule shape, and canonical output.
 

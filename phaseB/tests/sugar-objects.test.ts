@@ -40,14 +40,14 @@ test("object literal sugar ignores comma separators", () => {
   assert.strictEqual(ageKey.value, "age");
 });
 
-test.skip("object literal comma between optional key and entry is invalid", () => {
+test("object literal comma between optional key and entry is invalid", () => {
   assert.throws(
     () => parsePhaseBRaw("{name, role?, role}", "object-optional-comma.t2"),
     /optional key cannot be followed by a comma/
   );
 });
 
-test.skip("object literal comma between key and value is invalid", () => {
+test("object literal comma between key and value is invalid", () => {
   assert.throws(
     () => parsePhaseBRaw("{\"age\", 30}", "object-key-comma.t2"),
     /object literal key requires a value/

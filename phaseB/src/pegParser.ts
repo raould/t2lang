@@ -3,6 +3,7 @@ import type { PhaseBNode, PhaseBListNode, PhaseBTypeAnnotation, SourceLoc } from
 import { ParseError } from "./parseError.js";
 import type { TypeAst } from "./typeExpr.js";
 import { parseTypeExpression } from "./typeExpr.js";
+import { serializePhaseBNode } from "./typeAnnotationUtils.js";
 import { gensym } from "./gensym.js";
 import { reportError } from "../../common/dist/errorRegistry.js";
 
@@ -337,6 +338,34 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
         if (
           head &&
           head.phaseKind === "symbol" &&
+          (head as { name: string }).name === "optional-key" &&
+          listEntry.elements.length === 2
+        ) {
+          if (nextEntry) {
+            throw new Error("optional key cannot be followed by a comma");
+          }
+          const keyNode = listEntry.elements[1];
+          const valueNode = normalizeOptionalValue(keyNode);
+          rewritten.push(createOptionalObjectEntry(keyNode, valueNode, listEntry.loc));
+          idx += 1;
+          continue;
+        }
+        if (listEntry.elements.length === 2) {
+          const keyNode = listEntry.elements[0];
+          const valueNode = listEntry.elements[1];
+          if (valueNode.phaseKind === "symbol" && (valueNode as { name: string }).name === ",") {
+            if (keyNode.phaseKind === "symbol") {
+              const keyLiteral = strFromLoc((keyNode as { name: string }).name, keyNode.loc);
+              rewritten.push(listFromLoc(keyNode.loc, keyLiteral, keyNode));
+              idx += 1;
+              continue;
+            }
+            throw new Error("object literal key requires a value");
+          }
+        }
+        if (
+          head &&
+          head.phaseKind === "symbol" &&
           (head as { name: string }).name === "array" &&
           listEntry.elements.length === 2 &&
           nextEntry
@@ -491,6 +520,55 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
     }
     return node;
   };
+  const convertAnnotationNode = (node: PhaseBNode): PhaseBNode => {
+    if (node.phaseKind === "type-annotation") {
+      return convertAnnotationNode((node as PhaseBTypeAnnotation).annotation);
+    }
+    if (node.phaseKind === "list") {
+      const listNode = node as PhaseBListNode;
+      const head = listNode.elements[0];
+      if (head && head.phaseKind === "symbol" && (head as { name: string }).name.startsWith("t:")) {
+        return node;
+      }
+    }
+    const serialized = serializePhaseBNode(node);
+    const ast = parseTypeExpression(serialized);
+    return typeAstToPhaseB(ast, node.loc);
+  };
+  const normalizeParamListTypeAnnotations = (elements: PhaseBNode[]): PhaseBNode[] => {
+    const normalized: PhaseBNode[] = [];
+    let index = 0;
+    while (index < elements.length) {
+      const entry = elements[index];
+      if (entry.phaseKind === "symbol" && (entry as { name: string }).name === ",") {
+        index += 1;
+        continue;
+      }
+      const next = elements[index + 1];
+      if (next && next.phaseKind === "symbol" && (next as { name: string }).name === ":") {
+        const annotationNode = elements[index + 2];
+        if (!annotationNode) {
+          normalized.push(entry);
+          index += 2;
+          continue;
+        }
+        const annotation = convertAnnotationNode(annotationNode);
+        normalized.push({
+          phaseKind: "type-annotation",
+          kind: "list",
+          elements: [entry, annotation],
+          target: entry,
+          annotation,
+          loc: entry.loc,
+        } as PhaseBNode);
+        index += 3;
+        continue;
+      }
+      normalized.push(entry);
+      index += 1;
+    }
+    return normalized;
+  };
   const TEMPLATE_PLACEHOLDER = /^[A-Za-z_][A-Za-z0-9_-]*$/;
   const buildTemplateParts = (template: string, loc: SourceLoc, keySymbols: Map<string, PhaseBNode>): PhaseBNode[] => {
     const parts: PhaseBNode[] = [];
@@ -592,7 +670,8 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
         }
         const listNode = rawSignature as PhaseBListNode;
         const elements = listNode.elements.map((entry) => unwrapSingleList(unwrapCallList(entry)));
-        return { ...listNode, elements } as PhaseBNode;
+        const normalized = normalizeParamListTypeAnnotations(elements);
+        return { ...listNode, elements: normalized } as PhaseBNode;
       })();
       args = [...args.slice(0, signatureIndex), signatureNode, ...args.slice(signatureIndex + 1)];
     }
@@ -869,13 +948,19 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
     },
     KeyValueShorthand(key: OhmNode, _sp: OhmNode, value: OhmNode) {
       void _sp;
-      const keyNode = normalizeObjectKey(key.ast() as PhaseBNode);
+      const keyNode = unwrapNode(key.ast());
       return list(this as ohm.Node, keyNode, unwrapNode(value.ast()));
     },
     OptionalEntry(key: OhmNode, _sp: OhmNode, _q: OhmNode, value: OhmNode) {
       void [_sp, _q];
       const keyNode = unwrapNode(key.ast());
-      const valueNode = value.children.length ? unwrapNode(value.ast()) : normalizeOptionalValue(keyNode);
+      if (!value.children.length) {
+        return listFromLoc(locLookup(this as ohm.Node), symFromLoc("optional-key", locLookup(this as ohm.Node)), keyNode);
+      }
+      const valueNode = unwrapNode(value.ast());
+      if (valueNode.phaseKind === "symbol" && (valueNode as { name: string }).name === ",") {
+        throw new Error("optional key cannot be followed by a comma");
+      }
       return createOptionalObjectEntry(keyNode, valueNode, locLookup(this as ohm.Node));
     },
     OptionalValue(_sp: OhmNode, expr: OhmNode) {
