@@ -3,10 +3,97 @@
 
 (program
 
+  (import (import-spec "./core"
+       (named pipe
+         from
+         fromArray
+         fromLazyPromise
+         range
+         map
+         filter
+         take
+         drop
+         takeWhile
+         chunk
+         flatMap
+         tap
+         scan
+         collect
+         first
+         last
+         count
+         drain)))
+
+  (import (import-spec "./operators"
+       (named concat
+         debounce
+         throttle
+         buffer
+         catchError
+         retry
+         defaultIfEmpty
+         distinctUntilChanged
+         groupBy)))
+
+  (import (import-spec "./interop"
+       (named fromEvent)))
+
+  ;; External stubs for examples
+  (export (const ((db
+                   (object
+                     ("query" (lambda ((query params)) (array)))
+                     ("insertMany" (lambda ((table rows)) null)))))))
+
+  (export (const ((fallbackItem (object)))))
+
+  (export (fn async fetchItem ((id: string)) : any
+           (return (object))))
+
+  (export (fn async fetchUser ((id: string)) : any
+           (return (object))))
+
+  (export (fn async checkTaskStatus ((taskId: string)) : any
+           (return (object))))
+
+  (export (fn async searchAPI ((query: string)) : any
+           (return (array))))
+
+  (export (fn handleSubmit ((data: any)) : any
+           (return undefined)))
+
+  (export (fn displayResults ((results: any)) : any
+           (return undefined)))
+
+  (export (fn async processBatch ((batch: Array<any>)) : any
+           (return batch)))
+
+  (export (fn async processChunk ((batch: Array<any>)) : any
+           (return batch)))
+
+  (export (fn template ((s: string) (suffix: string)) : string
+           (return :(s + suffix))))
+
+  (export (fn encode () : any
+           (return (fn ((source)) (return source)))))
+
+  (export (fn toResponse ((opts: any)) : any
+           (return (fn async ((source)) (return (object))))))
+
+  (export (fn async readFile ((filename: string) (encoding: string)) : Promise<string>
+           (return "")))
+
+  ;; Runtime pipeline helper (macro-free)
+  (export (fn async run ((source: any) (rest ops Array<Function>)) : any
+           (let* ((result source))
+             (block
+               (for of (op ops)
+                 (assign result (call op result)))
+               (return (await result))))))
+
   ;; ============================================================================
   ;; BASIC EXAMPLES
   ;; ============================================================================
-  
+
   ;; Example 1: Basic transform pipeline
   (export (fn async basicTransform ()
            (const* ((result
@@ -22,10 +109,10 @@
   ;; Example 2: Using macros for cleaner syntax
   (export (fn async macroExample ()
            (const* ((result
-                      (-> (source 1 2 3 4 5)
-                          (filter (lambda ((x)) :(x > 2)))
-                          (map (lambda ((x)) :(x * 2)))
-                          (collect))))
+                      (run (fromArray (array 1 2 3 4 5))
+                           (filter (lambda ((x)) :(x > 2)))
+                           (map (lambda ((x)) :(x * 2)))
+                           (collect))))
              (block
                ;; result = [6, 8, 10]
                (call (prop console "log") "Macro example:" result)
@@ -34,9 +121,9 @@
   ;; Example 3: Single value extraction
   (export (fn async singleValue ()
            (const* ((user
-                      (run (fromLazyPromise (lambda ()
-                                              (call fetch "/api/user/123")
-                                              .then (lambda ((r)) (call (prop r "json")))))
+                         (run (fromLazyPromise (lambda ()
+                                 (call (prop (call fetch "/api/user/123") "then")
+                                   (lambda ((r)) (call (prop r "json"))))))
                            (first))))
              (block
                (call (prop console "log") "User:" user)
@@ -47,7 +134,7 @@
   ;; ============================================================================
   
   ;; Example 4: CSV import with batching
-  (export (fn async csvImport ((filename: type-string))
+  (export (fn async csvImport ((filename: string))
            (run (fromLines filename)
                 (drop 1)  ;; Skip header
                 (map parseCSVLine)
@@ -59,35 +146,39 @@
                 (drain))))
   
   ;; Helper function for CSV parsing
-  (fn parseCSVLine ((line: type-string))
+  (export (fn parseCSVLine ((line: string))
     (const* ((parts (call (prop line "split") ",")))
       (return
         (object
           ("name" (index parts 0))
           ("email" (index parts 1))
-          ("age" (call (t:ref Number) (index parts 2)))))))
+          ("age" (call Number (index parts 2))))))))
   
   ;; Helper function for validation
-  (fn isValidRow ((row: (t:ref any)))
+  (export (fn isValidRow ((row: any))
     (&& (prop row "email")
-        (call (prop (prop row "email") "includes") "@")))
+        (call (prop (prop row "email") "includes") "@"))))
   
   ;; Example 5: Log file processing
-  (export (fn async processLogs ((logFile: type-string))
+  (export (fn async processLogs ((logFile: string))
            (const* ((stats
                       (run (fromLines logFile)
                            (filter (lambda ((line))
                                      (call (prop line "includes") "ERROR")))
                            (map (lambda ((line))
-                                  (object
-                                    ("timestamp" (call extractTimestamp line))
-                                    ("message" line))))
+                                  (return
+                                    (object
+                                      ("timestamp" (call extractTimestamp line))
+                                      ("message" line)))))
                            (groupBy (lambda ((entry))
                                       (call extractHour (prop entry "timestamp"))))
-                           (map (lambda (((array hour entries)))
-                                  (object
-                                    ("hour" hour)
-                                    ("count" (prop entries "length")))))
+                           (map (lambda ((group))
+                                  (const* ((hour (call index group 0))
+                                           (entries (call index group 1)))
+                                    (return
+                                      (object
+                                        ("hour" hour)
+                                        ("count" (prop entries "length")))))))
                            (collect))))
              (block
                (call (prop console "log") "Error stats by hour:" stats)
@@ -98,24 +189,24 @@
   ;; ============================================================================
   
   ;; Example 6: Streaming HTTP response
-  (export (fn async streamingHandler ((req: (t:ref Request)))
-                : (t:ref Promise (array (t:ref Response)))
+  (export (fn async streamingHandler ((req: Request))
+                : Promise<Response>
            (return
              (run (fromQuery db "SELECT * FROM users")
-                  (map (t:ref JSON "stringify"))
+                  (map (prop JSON "stringify"))
                   (map (lambda ((s)) (template s "
 ")))
                   (encode)
                   (toResponse (object ("contentType" "application/x-ndjson")))))))
   
   ;; Example 7: Parallel API fetching with concurrency limit
-  (export (fn async parallelFetch ((urls: (t:ref Array (array type-string))))
+  (export (fn async parallelFetch ((urls: Array<string>))
            (const* ((results
                       (run (from urls)
                            (flatMap (lambda ((url))
-                                      (call fetch url)
-                                      .then (lambda ((r))
-                                              (call (prop r "json"))))
+                                      (call (prop (call fetch url) "then")
+                                            (lambda ((r))
+                                              (call (prop r "json")))))
                                     (object ("concurrency" 5)))
                            (collect))))
              (block
@@ -123,7 +214,7 @@
                (return results)))))
   
   ;; Example 8: Retry with exponential backoff
-  (export (fn async fetchWithRetry ((id: type-string))
+  (export (fn async fetchWithRetry ((id: string))
            (const* ((item
                       (run (fromLazyPromise (lambda ()
                                               (call fetchItem id)))
@@ -141,11 +232,11 @@
   ;; ============================================================================
   
   ;; Example 9: WebSocket message stream
-  (export (fn async websocketStream ((url: type-string))
-           (const* ((ws (new (t:ref WebSocket) url)))
+  (export (fn async websocketStream ((url: string))
+           (const* ((ws (new WebSocket url)))
              (run (fromEvent ws "message")
                   (map (lambda ((event))
-                         (call (t:ref JSON "parse") (prop event "data"))))
+                         (call (prop JSON "parse") (prop event "data"))))
                   (filter (lambda ((msg))
                             (=== (prop msg "type") "update")))
                   (debounce 300)
@@ -161,7 +252,7 @@
                   (throttle 1000)
                   (map (lambda ((event))
                          (call (prop event "preventDefault"))
-                         (return (object ("timestamp" (call (prop (t:ref Date) "now")))))))
+                         (return (object ("timestamp" (call (prop Date "now")))))))
                   (tap (lambda ((data))
                          (call handleSubmit data)))
                   (take 10)
@@ -176,23 +267,24 @@
            (const* ((products (await (run (fromQuery db "SELECT * FROM products")
                                           (collect))))
                     (productMap (call keyBy products (lambda ((p)) (prop p "id")))))
-             (const* ((dashboard
-                        (run (fromQuery db "SELECT * FROM users")
-                             (map (lambda ((user))
-                                    (const* ((orders (call (prop db "query")
-                                                          "SELECT * FROM orders WHERE user_id = ?"
-                                                          (array (prop user "id")))))
-                                      (return
-                                        (object
-                                          ("user" user)
-                                          ("orders" (call (prop orders "map")
-                                                         (lambda ((o))
+           (const* ((dashboard
+                      (run (fromQuery db "SELECT * FROM users")
+                           (map (lambda ((user))
+                                  (const* ((orders (call (prop db "query")
+                                                        "SELECT * FROM orders WHERE user_id = ?"
+                                                        (array (prop user "id")))))
+                                    (return
+                                      (object
+                                        ("user" user)
+                                        ("orders" (call (prop orders "map")
+                                                       (lambda ((o))
+                                                         (return
                                                            (object
-                                                             (spread object o)
+                                                             ("order" o)
                                                              ("product" (call (prop productMap "get")
-                                                                             (prop o "productId"))))))))))))
-                             (collect))))
-               (return dashboard)))))
+                                                                             (prop o "productId")))))))))))))
+                           (collect)))))
+           (return dashboard))))
   
   ;; Example 12: Combining multiple streams
   (export (fn async combineStreams ()
@@ -212,7 +304,7 @@
   ;; ============================================================================
   
   ;; Example 13: Debounced search
-  (export (fn async searchWithDebounce ((searchInput: (t:ref HTMLInputElement)))
+  (export (fn async searchWithDebounce ((searchInput: HTMLInputElement))
            (run (fromEvent searchInput "input")
                 (map (lambda ((event))
                        (prop (prop event "target") "value")))
@@ -228,7 +320,7 @@
                 (drain))))
   
   ;; Example 14: Polling with interval
-  (export (fn async pollStatus ((taskId: type-string))
+  (export (fn async pollStatus ((taskId: string))
            (const* ((finalStatus
                       (run (fromInterval 2000)
                            (flatMap (lambda ((_))
@@ -257,10 +349,10 @@
   (export (fn async errorRecoveryExample ()
            (const* ((results
                       (run (from (array "id1" "id2" "bad-id" "id3"))
-                           (flatMap (lambda ((id))
-                                      (try-run (fetchUser id)
-                                               (first)
-                                        (catch ((err))
+                           (flatMap (lambda async ((id))
+                                      (try
+                                        (return (await (pipe (fetchUser id) (first))))
+                                        (catch (err)
                                           (block
                                             (call (prop console "warn") "Failed to fetch" id ":" err)
                                             (return null))))))
@@ -283,25 +375,30 @@
   
   ;; Example 18: Benchmark pipeline
   (export (fn async benchmarkExample ()
-           (time-run "Process 10k items"
-                     (range 0 10000)
-                     (filter (lambda ((x)) :(x % 2 === 0)))
-                     (map (lambda ((x)) :(x * x)))
-                     (chunk 100)
-                     (flatMap (lambda ((batch))
-                                (call processChunk batch))
-                              (object ("concurrency" 4)))
-                     (count))))
+           (const* ((start (call (prop Date "now")))
+                    (result
+                      (run (range 0 10000)
+                           (filter (lambda ((x)) :(x % 2 === 0)))
+                           (map (lambda ((x)) :(x * x)))
+                           (chunk 100)
+                           (flatMap (lambda ((batch))
+                                      (call processChunk batch))
+                                    (object ("concurrency" 4)))
+                           (count))))
+             (block
+               (call (prop console "log") "Process 10k items:" :((call (prop Date "now")) - start) "ms")
+               (return result)))))
   
   ;; Example 19: Memory-efficient large file processing
-  (export (fn async largeFileProcessing ((filename: type-string))
+  (export (fn async largeFileProcessing ((filename: string))
            ;; Process 100GB file without loading into memory
            (const* ((stats
                       (run (fromLines filename)
                            (scan (lambda ((acc line))
-                                   (object
-                                     ("lines" :(acc.lines + 1))
-                                     ("chars" :(acc.chars + line.length))))
+                                   (return
+                                     (object
+                                       ("lines" :(acc.lines + 1))
+                                       ("chars" :(acc.chars + line.length)))))
                                  (object ("lines" 0) ("chars" 0)))
                            (last))))
              (return stats))))
@@ -314,16 +411,18 @@
   (export (fn async customOperatorExample ()
            ;; Define custom operator
            (const* ((removeNulls
-                      (compose
-                        (filter (lambda ((x)) (!== x null)))
-                        (filter (lambda ((x)) (!== x undefined))))))
+                      (fn async generator ((source))
+                        (for await (item (pipe source
+                                                (filter (lambda ((x)) (!== x null)))
+                                                (filter (lambda ((x)) (!== x undefined))))))
+                          (call yield item)))))
              (const* ((result
                         (run (from (array 1 null 2 undefined 3))
                              removeNulls
                              (collect))))
                (block
                  ;; result = [1, 2, 3]
-                 (return result))))))
+                 (return result)))))
   
   ;; Example 21: Recursive stream generation
   (export (fn async recursiveExample ()
@@ -351,7 +450,7 @@
                                (sum 0))
                           (return
                             (fn async generator ((source))
-                              (for await ((item source))
+                              (for await (item source)
                                 (assign count :(count + 1))
                                 (assign sum :(sum + item))
                                 (call yield :(sum / count)))))))))
@@ -366,62 +465,68 @@
   ;; ============================================================================
   ;; HELPER FUNCTIONS
   ;; ============================================================================
+
+  (export (fn index ((items: Array<any>) (i: number))
+           (return (prop items i))))
+
+  (export (fn extractTimestamp ((line: string))
+           ;; Extract timestamp from log line
+           (return (call (prop line "substring") 0 19))))
+
+  (export (fn extractHour ((timestamp: string))
+           ;; Extract hour from timestamp
+           (return (call (prop timestamp "substring") 11 13))))
   
-  (fn extractTimestamp ((line: type-string))
-    ;; Extract timestamp from log line
-    (return (call (prop line "substring") 0 19)))
-  
-  (fn extractHour ((timestamp: type-string))
-    ;; Extract hour from timestamp
-    (return (call (prop timestamp "substring") 11 13)))
-  
-  (fn fromLines ((filename: type-string))
+  (export (fn fromLines ((filename: string))
     ;; Simplified file line reader
     (return
       (call (fn async generator ()
               (const* ((content (await (call readFile filename "utf-8")))
                        (lines (call (prop content "split") "
 ")))
-                (for of ((line lines))
-                  (call yield line)))))))
+                (for of (line lines)
+                  (call yield line))))))))
   
-  (fn fromQuery ((db: (t:ref any)) (query: type-string))
+  (export (fn fromQuery ((db: any) (query: string))
     ;; Simplified database query
     (return
       (call (fn async generator ()
               (const* ((results (await (call (prop db "query") query))))
-                (for of ((row results))
-                  (call yield row)))))))
+                (for of (row results)
+                  (call yield row))))))))
   
-  (fn fromInterval ((ms: type-number))
+  (export (fn fromInterval ((ms: number))
     ;; Generate values at regular intervals
     (return
       (call (fn async generator ()
               (let* ((count 0))
                 (while true
-                  (await (new (t:ref Promise)
+                  (await (new Promise
                              (lambda ((resolve))
                                (call setTimeout resolve ms))))
                   (call yield count)
-                  (assign count :(count + 1))))))))
+                  (assign count :(count + 1)))))))))
   
-  (fn fromEventSource ((url: type-string))
+  (export (fn fromEventSource ((url: string))
     ;; Server-sent events source
     (return
       (call (fn async generator ()
-              (const* ((es (new (t:ref EventSource) url)))
+              (const* ((es (new EventSource url)))
                 (try
-                  (for await ((event (fromEvent es "message")))
-                    (call yield (call (t:ref JSON "parse") (prop event "data"))))
+                  (for await (event (fromEvent es "message"))
+                    (call yield (call (prop JSON "parse") (prop event "data"))))
                   (finally
-                    (call (prop es "close")))))))))
+                    (call (prop es "close"))))))))))
   
-  (fn keyBy ((items: (t:ref Array (array (t:ref any))))
-             (keyFn: (t:function (t:ref any) (t:ref any))))
-    (const* ((map (new (t:ref Map))))
+  (export (fn keyBy ((items: Array<any>)
+             (keyFn: Function))
+    (const* ((map (new Map)))
       (block
-        (for of ((item items))
+        (for of (item items)
           (call (prop map "set") (call keyFn item) item))
-        (return map))))
+        (return map)))))
+
+
+)
 
 )
