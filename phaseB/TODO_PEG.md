@@ -1,6 +1,6 @@
 # Phase B Ohm PEG Migration Plan
 
-Goal: move Phase B sugar from rewrite passes into an Ohm PEG parser. Infix is explicitly **not** supported.
+Goal: move Phase B sugar from rewrite passes into an Ohm PEG parser. Infix is added later via Pratt/precedence parser.
 
 ## Pipeline
 
@@ -124,9 +124,6 @@ Each item lists surface sugar, Ohm rule shape, and canonical output.
 - **Sugar**: `(template-with "Hello ${name}" (name "Ada"))`
 - **Rule**: `TemplateWith = "(" "template-with" StringLit Pair* ")"`
 - **Output**: `(call (lambda (gensym...) (return (template ...))) ...)`
-
-### Explicitly Unsupported
-- Any value-level infix (including `:(...)`).
 
 ---
 
@@ -306,3 +303,24 @@ const semantics = grammar.createSemantics().addOperation("ast", {
 ```
 
 > Helper constructors used above (`list`, `sym`, `str`, `num`, `optionalObjectEntry`, `lowerFor`, `lowerParallelLet`, `lowerTypeDecl`, `lowerTemplateWith`, `lowerTypeExpr`) will live alongside the Ohm parser implementation.
+
+## Infix
+
+- PEG must hand off to Pratt/parsec for infix.
+- parsec returns full AST back to PEG.
+- use typescript-parsec for Pratt.
+- use our precedence tables for parsec.
+    - phaseB/EVALUATION_PRECEDENCE.json
+- Ohm grammar is simple - just recognizes expression boundaries with expressionToken+
+    - ohm grammar must be extended for infix recognition.
+    - ohm praser must invoke parsec for the infix section.
+    - parser must return AST.
+    - ohm must merge AST.
+- Ohm semantics delegates - collects tokens and passes to parsec parser
+- parsec does the heavy lifting - handles all operator precedence
+- Clean separation - Ohm handles structure, parsec handles expressions
+- Key Steps for Infix Integration with Ohm & TypeScript Define the Grammar:
+    - Create a .ohm file defining rules for precedence (e.g., AddExp for `(+/-)`, MulExp for `(*//)`) to handle infix operators properly.
+    - Handle Left Recursion: Ohm supports left-recursive rules, allowing expressions like Expr = Expr "+" Term | Term directly.
+    - Generate Types: Use the @ohm-js/cli to generate TypeScript definition files (.d.ts) from the grammar to ensure type safety in semantic actions.
+    - Implement Semantics: Create an Ohm operation (semantics.addOperation) in TypeScript to walk the parse tree and build an AST or evaluate the expression.
