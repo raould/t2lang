@@ -80,9 +80,19 @@ export async function main(argv: string[]): Promise<void> {
   }
 
   const useColor = options.noColor ? false : options.color ?? true;
-  const inputPath = cmd.args[0];
-  if (!inputPath) {
+  const inputPaths = cmd.args;
+  if (!inputPaths.length) {
     console.error("Error: No input file specified (use '-' for stdin)");
+    process.exitCode = 1;
+    return;
+  }
+  if (inputPaths.length > 1 && inputPaths.includes("-")) {
+    console.error("Error: Cannot combine '-' (stdin) with other input files");
+    process.exitCode = 1;
+    return;
+  }
+  if (inputPaths.length > 1 && options.output && options.output !== "-") {
+    console.error("Error: --output cannot be used with multiple input files");
     process.exitCode = 1;
     return;
   }
@@ -97,80 +107,87 @@ export async function main(argv: string[]): Promise<void> {
     tracePhases.add("all");
   }
 
-  const { source, actualPath } = await readSource(inputPath);
-  const isStdin = actualPath === "<stdin>";
-  let writeStdout = Boolean(options.stdout) || isStdin;
-  if (options.output === "-") {
-    writeStdout = true;
-  }
-
-  const sourcePath = actualPath;
+  let hadErrors = false;
   const prettyOption = options.prettyOption ?? "pretty";
   const compilerStamp = await loadCompilerStamp();
   const seed = options.seed ?? "default";
-  const compilerContext = {
-    events: new ArrayEventSink(),
-    seed,
-    stamp: compilerStamp,
-    logLevel,
-  };
+  for (const inputPath of inputPaths) {
+    const { source, actualPath } = await readSource(inputPath);
+    const isStdin = actualPath === "<stdin>";
+    let writeStdout = Boolean(options.stdout) || isStdin;
+    if (options.output === "-") {
+      writeStdout = true;
+    }
 
-  const diagContext: DiagnosticContext = {
-    sourceMap: { [sourcePath]: source },
-    useColor,
-  };
-
-  let result: Awaited<ReturnType<typeof compile>>;
-  try {
-    result = await compile(source, {
-      sourcePath,
+    const sourcePath = actualPath;
+    const compilerContext = {
+      events: new ArrayEventSink(),
       seed,
-      prettyOption,
+      stamp: compilerStamp,
       logLevel,
-      compilerContext,
-      warnNoReturnAny: options.warnNoReturnAny,
-      warnReturnExpected: options.warnReturnExpected,
-    });
-  } catch (error) {
-    handleParserFailure(error, format, {
-      sourceMap: { [actualPath]: source },
+    };
+
+    const diagContext: DiagnosticContext = {
+      sourceMap: { [sourcePath]: source },
       useColor,
-    });
-    return;
-  }
+    };
 
-  if (options.dumpAst) {
-    console.error("Normalized Phase A AST:");
-    console.error(JSON.stringify(result.phaseAProgram, stringifyFilter, 2));
-  }
+    let result: Awaited<ReturnType<typeof compile>>;
+    try {
+      result = await compile(source, {
+        sourcePath,
+        seed,
+        prettyOption,
+        logLevel,
+        compilerContext,
+        warnNoReturnAny: options.warnNoReturnAny,
+        warnReturnExpected: options.warnReturnExpected,
+      });
+    } catch (error) {
+      handleParserFailure(error, format, {
+        sourceMap: { [actualPath]: source },
+        useColor,
+      });
+      hadErrors = true;
+      continue;
+    }
 
-  const normalizedDiagnostics = normalizePhaseADiagnostics(result.diagnostics);
-  const warnings = normalizedDiagnostics.filter((diag) => diag.level === "warning");
-  const errors = normalizedDiagnostics.filter((diag) => diag.level !== "warning");
-  if (errors.length > 0) {
-    console.error("Compilation produced diagnostics:");
-    console.error(formatDiagnostics(errors, format, diagContext));
+    if (options.dumpAst) {
+      console.error("Normalized Phase A AST:");
+      console.error(JSON.stringify(result.phaseAProgram, stringifyFilter, 2));
+    }
+
+    const normalizedDiagnostics = normalizePhaseADiagnostics(result.diagnostics);
+    const warnings = normalizedDiagnostics.filter((diag) => diag.level === "warning");
+    const errors = normalizedDiagnostics.filter((diag) => diag.level !== "warning");
+    if (errors.length > 0) {
+      console.error("Compilation produced diagnostics:");
+      console.error(formatDiagnostics(errors, format, diagContext));
+      hadErrors = true;
+      continue;
+    }
+    if (warnings.length > 0) {
+      console.error("Compilation produced warnings:");
+      console.error(formatDiagnostics(warnings, format, diagContext));
+    }
+
+    const target = options.output ?? (isStdin ? "stdout.ts" : getDefaultOutput(inputPath));
+    const formattedSource = prettyOption === "pretty" ? await formatWithPrettier(result.tsSource) : result.tsSource;
+    if (writeStdout) {
+      console.log(formattedSource);
+    } else {
+      await fs.mkdir(path.dirname(target), { recursive: true });
+      await fs.writeFile(target, formattedSource, "utf8");
+      console.error(`Compiled ${inputPath} -> ${target}`);
+    }
+
+    for (const event of result.events) {
+      logEvent(event, logPhases, logLevel);
+      await logTraceEvent(event, tracePhases, logLevel);
+    }
+  }
+  if (hadErrors) {
     process.exitCode = 1;
-    return;
-  }
-  if (warnings.length > 0) {
-    console.error("Compilation produced warnings:");
-    console.error(formatDiagnostics(warnings, format, diagContext));
-  }
-
-  const target = options.output ?? (isStdin ? "stdout.ts" : getDefaultOutput(inputPath));
-  const formattedSource = prettyOption === "pretty" ? await formatWithPrettier(result.tsSource) : result.tsSource;
-  if (writeStdout) {
-    console.log(formattedSource);
-  } else {
-    await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.writeFile(target, formattedSource, "utf8");
-    console.error(`Compiled ${inputPath} -> ${target}`);
-  }
-
-  for (const event of result.events) {
-    logEvent(event, logPhases, logLevel);
-    await logTraceEvent(event, tracePhases, logLevel);
   }
 }
 
@@ -179,7 +196,7 @@ function buildCommand(): Command {
   cmd
     .name("t2b")
     .description("Phase B t2 compiler")
-    .argument("<input>", "Input .t2 file path (use '-' for stdin)")
+    .argument("<input...>", "Input .t2 file path(s) (use '-' for stdin)")
     .option("-o, --output <path>", "Output file path")
     .option("--stdout", "Write output to stdout")
     .option("--seed <seed>", "Deterministic seed value", "default")
