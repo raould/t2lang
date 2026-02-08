@@ -1,6 +1,11 @@
 ;; t2conduit/macros.t2
 ;; Macros for ergonomic pipeline composition and validation
 
+;; Reader macro setup (top-level only)
+;; Usage: #> source (map inc) (filter even?) (collect)
+
+(defreadermacro "#>" run)
+
 (program
 
   ;; ============================================================================
@@ -12,7 +17,7 @@
   ;; Expands to: (await (pipe source op1 op2 ... sink))
   
   (defmacro run (source rest ops)
-    `(await (pipe ,source ,@ops)))
+    `(await (pipe ~source ~@ops)))
   
   ;; ============================================================================
   ;; CONDUIT THREADING MACRO
@@ -27,7 +32,7 @@
       expr
       (let* ((first-form (index forms 0))
              (rest-forms (call (prop forms "slice") 1)))
-        `(-> (pipe ,expr ,first-form) ,@rest-forms))))
+        `(-> (pipe ~expr ~first-form) ~@rest-forms))))
   
   ;; ============================================================================
   ;; SOURCE CREATION SUGAR
@@ -38,7 +43,7 @@
   ;; Expands to: (fromArray (array 1 2 3 4 5))
   
   (defmacro source (rest items)
-    `(fromArray (array ,@items)))
+    `(fromArray (array ~@items)))
   
   ;; ============================================================================
   ;; OPERATOR COMPOSITION SUGAR
@@ -52,7 +57,7 @@
     (if (== (length ops) 1)
       (index ops 0)
       `(fn async generator ((source))
-         (for await ((item (pipe source ,@ops)))
+        (for await ((item (pipe source ~@ops)))
            (call yield item)))))
   
   ;; ============================================================================
@@ -63,8 +68,8 @@
   ;; Usage: (when-pipe condition (map inc))
   
   (defmacro when-pipe (condition op)
-    `(if ,condition
-       ,op
+    `(if ~condition
+       ~op
        (fn async generator ((source))
          (for await ((item source))
            (call yield item)))))
@@ -82,10 +87,10 @@
            (catch-clause (find (lambda (x) (=== (index x 0) 'catch)) body)))
       (if catch-clause
         `(try
-           (return (await (pipe ,source ,@ops)))
-           ,catch-clause)
+          (return (await (pipe ~source ~@ops)))
+          ~catch-clause)
         `(try
-           (return (await (pipe ,source ,@ops)))))))
+          (return (await (pipe ~source ~@ops)))))))
   
   ;; ============================================================================
   ;; PERFORMANCE MACROS
@@ -98,12 +103,12 @@
     (let* ((start-time (gensym "start"))
            (result (gensym "result"))
            (end-time (gensym "end")))
-      `(let* ((,start-time (call (prop (t:ref Date) "now"))))
-         (const* ((,result (await (pipe ,source ,@ops)))
-                  (,end-time (call (prop (t:ref Date) "now"))))
-           (call (prop console "log")
-                 (template ,label " took " :(,end-time - ,start-time) "ms"))
-           ,result))))
+    `(let* ((~start-time (call (prop (t:ref Date) "now"))))
+       (const* ((~result (await (pipe ~source ~@ops)))
+        (~end-time (call (prop (t:ref Date) "now"))))
+         (call (prop console "log")
+           (template ~label " took " :(~end-time - ~start-time) "ms"))
+         ~result))))
   
   ;; ============================================================================
   ;; DEBUGGING MACROS
@@ -114,7 +119,7 @@
   
   (defmacro debug (label)
     `(tap (lambda ((x))
-            (call (prop console "log") ,label x))))
+            (call (prop console "log") ~label x))))
   
   ;; Log entire pipeline flow
   ;; Usage: (trace-run "User pipeline" source (map inc) (collect))
@@ -126,9 +131,9 @@
                      `(block
                         (tap (lambda ((x))
                                (call (prop console "log")
-                                     (template ,label " [" ,i "] ") x)))
-                        ,op)))))
-      `(await (pipe ,source ,@traced-ops))))
+                           (template ~label " [" ~i "] ") x)))
+                      ~op)))))
+                `(await (pipe ~source ~@traced-ops))))
   
   ;; ============================================================================
   ;; TYPE-SAFE PIPELINE BUILDERS
@@ -140,7 +145,7 @@
   (defmacro single (source rest ops)
     (let* ((last-op (index ops :(ops.length - 1))))
       ;; In real implementation, validate last-op is a singleton sink
-      `(await (pipe ,source ,@ops))))
+      `(await (pipe ~source ~@ops))))
   
   ;; Enforce collection at compile time
   ;; Usage: (many source (map inc) (collect)) - must end with collection sink
@@ -148,7 +153,7 @@
   (defmacro many (source rest ops)
     (let* ((last-op (index ops :(ops.length - 1))))
       ;; In real implementation, validate last-op is a collection sink
-      `(await (pipe ,source ,@ops))))
+      `(await (pipe ~source ~@ops))))
   
   ;; ============================================================================
   ;; RESOURCE MANAGEMENT MACROS
@@ -159,9 +164,9 @@
   ;;          (run s (splitLines) (collect)))
   
   (defmacro with-source (source-expr (binding) rest body)
-    `(let* ((,binding ,source-expr))
+    `(let* ((~binding ~source-expr))
        (try
-         (block ,@body)
+         (block ~@body)
          (finally
            ;; Cleanup logic if needed
            (block)))))
@@ -174,25 +179,25 @@
   ;; Usage: (map-collect (array 1 2 3) inc)
   
   (defmacro map-collect (source fn)
-    `(run (fromArray ,source)
-          (map ,fn)
+      `(run (fromArray ~source)
+        (map ~fn)
           (collect)))
   
   ;; Filter and collect pattern
   ;; Usage: (filter-collect (array 1 2 3 4) even?)
   
   (defmacro filter-collect (source pred)
-    `(run (fromArray ,source)
-          (filter ,pred)
+      `(run (fromArray ~source)
+        (filter ~pred)
           (collect)))
   
   ;; Batch process pattern
   ;; Usage: (batch-process items 100 process-batch)
   
   (defmacro batch-process (source batch-size fn)
-    `(run (fromArray ,source)
-          (chunk ,batch-size)
-          (flatMap ,fn)
+      `(run (fromArray ~source)
+        (chunk ~batch-size)
+        (flatMap ~fn)
           (drain)))
   
   ;; ============================================================================
@@ -203,8 +208,8 @@
   ;; Usage: (pmap 5 fetch-user (array "id1" "id2" "id3"))
   
   (defmacro pmap (concurrency fn source)
-    `(run ,source
-          (flatMap ,fn (object ("concurrency" ,concurrency)))
+      `(run ~source
+        (flatMap ~fn (object ("concurrency" ~concurrency)))
           (collect)))
   
   ;; ============================================================================
@@ -215,13 +220,13 @@
   ;; Usage: (from-promise (fetch "url"))
   
   (defmacro from-promise (promise-expr)
-    `(fromLazyPromise (lambda () ,promise-expr)))
+    `(fromLazyPromise (lambda () ~promise-expr)))
   
   ;; Convert source to promise of first value
   ;; Usage: (to-promise source)
   
   (defmacro to-promise (source)
-    `(pipe ,source (first)))
+    `(pipe ~source (first)))
   
   ;; ============================================================================
   ;; VALIDATION HELPERS
@@ -232,27 +237,10 @@
   
   (defmacro assert-count (expected source)
     (let* ((actual (gensym "actual")))
-      `(let* ((,actual (run ,source (count))))
-         (if (!== ,actual ,expected)
+      `(let* ((~actual (run ~source (count))))
+         (if (!== ~actual ~expected)
            (throw (new (t:ref Error)
-                       (template "Expected " ,expected " values, got " ,actual)))
-           ,actual))))
+                       (template "Expected " ~expected " values, got " ~actual)))
+           ~actual))))
   
-  ;; ============================================================================
-  ;; READER MACROS
-  ;; ============================================================================
-  
-  ;; Pipe operator as reader macro
-  ;; Usage: #> source (map inc) (filter even?) (collect)
-  ;; Note: This would need to be registered with defreadermacro
-  
-  (defreadermacro "#>" run)
-  
-  ;; Source constructor as reader macro  
-  ;; Usage: #[1 2 3 4 5]
-  
-  (defreadermacro "#[" 
-    (lambda (items)
-      `(fromArray (array ,@items))))
-
 )

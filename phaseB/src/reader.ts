@@ -414,6 +414,9 @@ function isPossibleMacroPrefixChar(char: string): boolean {
   if (isWhitespace(char)) {
     return false;
   }
+  if (/[(){}\[\]]/.test(char)) {
+    return false;
+  }
   return !/[A-Za-z0-9]/.test(char);
 }
 

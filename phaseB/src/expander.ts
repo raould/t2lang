@@ -200,7 +200,29 @@ function convertQuasiquote(node: MacroNode): MacroNode {
       }
     }
     const listSymbol = createSymbol("list", node.loc);
-    const elements = node.elements.map((child) => convertQuasiquoteElement(child));
+    const elements: MacroNode[] = [];
+    for (const child of node.elements) {
+      if (isListNode(child)) {
+        const childHead = child.elements[0];
+        if (isSymbolNode(childHead) && childHead.name === "unquote") {
+          const unquoted = child.elements[1];
+          if (!unquoted) {
+            throw reportError("T2:0102", child.loc);
+          }
+          elements.push(unquoted);
+          continue;
+        }
+        if (isSymbolNode(childHead) && childHead.name === "unquote-splicing") {
+          const unquoted = child.elements[1];
+          if (!unquoted || !isListNode(unquoted)) {
+            throw reportError("T2:0102", child.loc);
+          }
+          elements.push(...unquoted.elements.map((entry) => cloneNode(entry)));
+          continue;
+        }
+      }
+      elements.push(convertQuasiquoteElement(child));
+    }
     return {
       kind: "list",
       elements: [listSymbol, ...elements],
@@ -214,10 +236,6 @@ function convertQuasiquote(node: MacroNode): MacroNode {
 
 function convertQuasiquoteElement(node: MacroNode): MacroNode {
   if (isListNode(node)) {
-    const head = node.elements[0];
-    if (isSymbolNode(head) && head.name === "unquote-splicing") {
-      throw reportError("T2:0102", node.loc);
-    }
     return convertQuasiquote(node);
   }
   return createQuoteNode(node);
