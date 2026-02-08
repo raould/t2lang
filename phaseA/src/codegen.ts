@@ -8,8 +8,11 @@ import {
   Identifier,
   CallExpr,
   CallWithThisExpr,
+  OptionalCallExpr,
   PropExpr,
   IndexExpr,
+  OptionalPropExpr,
+  OptionalIndexExpr,
   ObjectExpr,
   NewExpr,
   LetStarExpr,
@@ -513,6 +516,13 @@ async function emitExpression(expr: Expression): Promise<string> {
     const callArgs = [thisArg, ...args].join(", ");
     return `${fn}.call(${callArgs})`;
   }
+  if (expr instanceof OptionalCallExpr) {
+    const calleeText = await emitExpression(expr.callee);
+    const needsParens = expr.callee instanceof FunctionExpr || expr.callee instanceof ClassExpr;
+    const callee = needsParens ? `(${calleeText})` : calleeText;
+    const args = await Promise.all(expr.args.map(emitExpression));
+    return `${callee}?.(${args.join(", ")})`;
+  }
   if (expr instanceof ArrayExpr) {
     const entries = await Promise.all(expr.elements.map(emitExpression));
     return `[${entries.join(", ")}]`;
@@ -571,10 +581,22 @@ async function emitExpression(expr: Expression): Promise<string> {
     }
     return `${objectExpr}[${JSON.stringify(expr.name)}]`;
   }
+  if (expr instanceof OptionalPropExpr) {
+    const objectExpr = await emitExpression(expr.object);
+    if (isIdentifierName(expr.name)) {
+      return `${objectExpr}?.${expr.name}`;
+    }
+    return `${objectExpr}?.[${JSON.stringify(expr.name)}]`;
+  }
   if (expr instanceof IndexExpr) {
     const objectExpr = await emitExpression(expr.object);
     const indexExpr = await emitExpression(expr.index);
     return `${objectExpr}[${indexExpr}]`;
+  }
+  if (expr instanceof OptionalIndexExpr) {
+    const objectExpr = await emitExpression(expr.object);
+    const indexExpr = await emitExpression(expr.index);
+    return `${objectExpr}?.[${indexExpr}]`;
   }
   if (expr instanceof ObjectExpr) {
     if (expr.fields.length === 0) {

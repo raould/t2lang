@@ -206,6 +206,11 @@ Phase B rewrites `for await..of` into this node, capturing the async iterator se
 - Fields: `fn: Expr`, `thisArg: Expr`, `args: Expr[]`
 - Notes: Captures calls that require an explicit `this` binding (method references, borrowed helpers, optional chaining callable checks). Phase B emits this primitive so the generated code can compile to `fn.call(thisArg, ...args)` when preserving the receiver is required.
 
+### `optional-call`
+- Node: `OptionalCallExpr`
+- Fields: `callee: Expr`, `args: Expr[]`
+- Notes: Canonical optional call form that emits `callee?.(args...)` in TypeScript without inserting explicit null guards.
+
 ### `ternary`
 - Node: `TernaryExpr`
 - Fields: `test: Expr`, `consequent: Expr`, `alternate: Expr`
@@ -224,8 +229,11 @@ Phase B rewrites `for await..of` into this node, capturing the async iterator se
 ### `prop` / `index`
 - Nodes: `PropExpr`, `IndexExpr`
 - Use: property and index access with explicit operand structures.
-- Optional chaining (Phase B sugar) translates to explicit `if` guards or runtime helpers before Phase A sees `PropExpr`/`IndexExpr`; these nodes do not implicitly allow `null`/`undefined` bypasses unless Phase B rewrote them into dedicated helper calls. Each node carries a `maybeNull: boolean` flag so Phase B can signal when the base expression may still be `null`/`undefined`; `maybeNull: false` means the guard proved the receiver is defined.
-- Nullability inference: Phase A1 runs a pass over the canonical AST that consumes the `maybeNull` flags, propagates non-null information through following expressions/statements (e.g., subsequent `prop`/`index`, `if` conditions, binding initializers), and updates downstream metadata before resolver/typechecker code runs so the normalized nodes expose accurate nullability state.
+- Optional chaining emits dedicated optional nodes (see below) instead of rewriting into guards.
+
+### `optional-prop` / `optional-index`
+- Nodes: `OptionalPropExpr`, `OptionalIndexExpr`
+- Use: canonical optional property/index access that emits `obj?.prop` and `obj?.[key]` in TypeScript.
 
 ### `new`
 - Node: `NewExpr`

@@ -25,8 +25,11 @@ import {
   ExprStmt,
   CallExpr,
   CallWithThisExpr,
+  OptionalCallExpr,
   PropExpr,
   IndexExpr,
+  OptionalPropExpr,
+  OptionalIndexExpr,
   NewExpr,
   ArrayExpr,
   ObjectExpr,
@@ -140,8 +143,11 @@ export type SerializedExpression =
   | SerializedIdentifier
   | { kind: "call"; callee: SerializedExpression; args: SerializedExpression[]; span: SerializedSpan }
   | { kind: "call-with-this"; fn: SerializedExpression; thisArg: SerializedExpression; args: SerializedExpression[]; span: SerializedSpan }
+  | { kind: "optional-call"; callee: SerializedExpression; args: SerializedExpression[]; span: SerializedSpan }
   | { kind: "prop"; object: SerializedExpression; name: string; maybeNull: boolean; span: SerializedSpan }
   | { kind: "index"; object: SerializedExpression; index: SerializedExpression; maybeNull: boolean; span: SerializedSpan }
+  | { kind: "optional-prop"; object: SerializedExpression; name: string; span: SerializedSpan }
+  | { kind: "optional-index"; object: SerializedExpression; index: SerializedExpression; span: SerializedSpan }
   | { kind: "new"; callee: SerializedExpression; args: SerializedExpression[]; span: SerializedSpan }
   | ({ kind: "array" } & { elements: SerializedExpression[]; span: SerializedSpan })
   | ({ kind: "object" } & { fields: SerializedObjectField[]; span: SerializedSpan })
@@ -304,6 +310,11 @@ export async function serializeExpression(expr: Expression): Promise<SerializedE
     const args = await Promise.all(expr.args.map(serializeExpression));
     return { kind: "call-with-this", fn, thisArg, args, span: await serializeSpan(expr.span) };
   }
+  if (expr instanceof OptionalCallExpr) {
+    const callee = await serializeExpression(expr.callee);
+    const args = await Promise.all(expr.args.map(serializeExpression));
+    return { kind: "optional-call", callee, args, span: await serializeSpan(expr.span) };
+  }
   if (expr instanceof PropExpr) {
     const object = await serializeExpression(expr.object);
     return { kind: "prop", object, name: expr.name, maybeNull: expr.maybeNull, span: await serializeSpan(expr.span) };
@@ -312,6 +323,15 @@ export async function serializeExpression(expr: Expression): Promise<SerializedE
     const object = await serializeExpression(expr.object);
     const index = await serializeExpression(expr.index);
     return { kind: "index", object, index, maybeNull: expr.maybeNull, span: await serializeSpan(expr.span) };
+  }
+  if (expr instanceof OptionalPropExpr) {
+    const object = await serializeExpression(expr.object);
+    return { kind: "optional-prop", object, name: expr.name, span: await serializeSpan(expr.span) };
+  }
+  if (expr instanceof OptionalIndexExpr) {
+    const object = await serializeExpression(expr.object);
+    const index = await serializeExpression(expr.index);
+    return { kind: "optional-index", object, index, span: await serializeSpan(expr.span) };
   }
   if (expr instanceof NewExpr) {
     const callee = await serializeExpression(expr.callee);
@@ -1020,6 +1040,12 @@ export async function deserializeExpression(serialized: SerializedExpression): P
         args: await Promise.all(serialized.args.map(deserializeExpression)),
         span: await deserializeSpan(serialized.span),
       });
+    case "optional-call":
+      return new OptionalCallExpr({
+        callee: await deserializeExpression(serialized.callee),
+        args: await Promise.all(serialized.args.map(deserializeExpression)),
+        span: await deserializeSpan(serialized.span),
+      });
     case "prop":
       return new PropExpr({
         object: await deserializeExpression(serialized.object),
@@ -1032,6 +1058,18 @@ export async function deserializeExpression(serialized: SerializedExpression): P
         object: await deserializeExpression(serialized.object),
         index: await deserializeExpression(serialized.index),
         maybeNull: serialized.maybeNull,
+        span: await deserializeSpan(serialized.span),
+      });
+    case "optional-prop":
+      return new OptionalPropExpr({
+        object: await deserializeExpression(serialized.object),
+        name: serialized.name,
+        span: await deserializeSpan(serialized.span),
+      });
+    case "optional-index":
+      return new OptionalIndexExpr({
+        object: await deserializeExpression(serialized.object),
+        index: await deserializeExpression(serialized.index),
         span: await deserializeSpan(serialized.span),
       });
     case "new":

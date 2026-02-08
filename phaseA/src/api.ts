@@ -24,8 +24,11 @@ import {
   TryCatchExpr,
   CallExpr,
   CallWithThisExpr,
+  OptionalCallExpr,
   PropExpr,
   IndexExpr,
+  OptionalPropExpr,
+  OptionalIndexExpr,
   NewExpr,
   ArrayExpr,
   ObjectExpr,
@@ -100,8 +103,11 @@ function isExpressionNode(value: Expression | TypeNode): value is Expression {
     || value instanceof ClassExpr
     || value instanceof CallExpr
     || value instanceof CallWithThisExpr
+    || value instanceof OptionalCallExpr
     || value instanceof PropExpr
     || value instanceof IndexExpr
+    || value instanceof OptionalPropExpr
+    || value instanceof OptionalIndexExpr
     || value instanceof NewExpr
     || value instanceof ArrayExpr
     || value instanceof ObjectExpr
@@ -143,11 +149,25 @@ function collectReturnWarnings(program: Program, config: CompilePhaseAConfig): D
       for (const arg of expr.args) visitExpression(arg);
       return;
     }
+    if (expr instanceof OptionalCallExpr) {
+      visitExpression(expr.callee);
+      for (const arg of expr.args) visitExpression(arg);
+      return;
+    }
     if (expr instanceof PropExpr) {
       visitExpression(expr.object);
       return;
     }
     if (expr instanceof IndexExpr) {
+      visitExpression(expr.object);
+      visitExpression(expr.index);
+      return;
+    }
+    if (expr instanceof OptionalPropExpr) {
+      visitExpression(expr.object);
+      return;
+    }
+    if (expr instanceof OptionalIndexExpr) {
       visitExpression(expr.object);
       visitExpression(expr.index);
       return;

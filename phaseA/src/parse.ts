@@ -41,6 +41,7 @@ import {
   Span,
   CallExpr,
   CallWithThisExpr,
+  OptionalCallExpr,
   ArrayExpr,
   FunctionExpr,
   FnParam,
@@ -82,6 +83,8 @@ import {
   NonNullAssertExpr,
   TemplateExpr,
   IndexSignature,
+  OptionalPropExpr,
+  OptionalIndexExpr,
 } from "./phaseA1.js";
 import { reportError } from "../../common/dist/errorRegistry.js";
 
@@ -873,6 +876,15 @@ class Parser {
       if (head.value === "index") {
         return this.buildIndex(node);
       }
+      if (head.value === "?.") {
+        return this.buildOptionalProp(node);
+      }
+      if (head.value === "?.[]") {
+        return this.buildOptionalIndex(node);
+      }
+      if (head.value === "?.call") {
+        return this.buildOptionalCall(node);
+      }
       if (head.value === "new") {
         return this.buildNew(node);
       }
@@ -948,6 +960,19 @@ class Parser {
     return new CallWithThisExpr({ fn, thisArg, args, span });
   }
 
+  private buildOptionalCall(node: ListNode): OptionalCallExpr {
+    const span = node.span;
+    const [, calleeNode, ...argNodes] = node.elements;
+    if (!calleeNode) {
+      throw reportError("T2:0129");
+    }
+    const callee = this.nodeToExpression(calleeNode);
+    const args = argNodes
+      .filter((child) => !(child.type === "atom" && child.value === ","))
+      .map((child) => this.nodeToExpression(child));
+    return new OptionalCallExpr({ callee, args, span });
+  }
+
   private buildProp(node: ListNode): PropExpr {
     const span = node.span;
     const [, objectNode, nameNode] = node.elements;
@@ -962,6 +987,19 @@ class Parser {
     });
   }
 
+  private buildOptionalProp(node: ListNode): OptionalPropExpr {
+    const span = node.span;
+    const [, objectNode, nameNode] = node.elements;
+    if (!objectNode || !nameNode || nameNode.type !== "atom" || nameNode.tokenType !== "string") {
+      throw reportError("T2:0235");
+    }
+    return new OptionalPropExpr({
+      object: this.nodeToExpression(objectNode),
+      name: nameNode.value,
+      span,
+    });
+  }
+
   private buildIndex(node: ListNode): IndexExpr {
     const span = node.span;
     const [, objectNode, indexNode] = node.elements;
@@ -972,6 +1010,19 @@ class Parser {
       object: this.nodeToExpression(objectNode),
       index: this.nodeToExpression(indexNode),
       maybeNull: false,
+      span,
+    });
+  }
+
+  private buildOptionalIndex(node: ListNode): OptionalIndexExpr {
+    const span = node.span;
+    const [, objectNode, indexNode] = node.elements;
+    if (!objectNode || !indexNode) {
+      throw reportError("T2:0195");
+    }
+    return new OptionalIndexExpr({
+      object: this.nodeToExpression(objectNode),
+      index: this.nodeToExpression(indexNode),
       span,
     });
   }

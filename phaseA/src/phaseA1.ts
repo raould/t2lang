@@ -258,6 +258,18 @@ export class CallWithThisExpr {
   }
 }
 
+export class OptionalCallExpr {
+  private readonly __brand!: "optional-call";
+  readonly callee: Expression;
+  readonly args: Expression[];
+  readonly span: Span;
+  constructor(data: { callee: Expression; args: Expression[]; span: Span }) {
+    this.callee = data.callee;
+    this.args = data.args;
+    this.span = data.span;
+  }
+}
+
 export class PropExpr {
   private readonly __brand!: "prop";
   readonly object: Expression;
@@ -277,6 +289,30 @@ export class IndexExpr {
   readonly span: Span;
   constructor(data: { object: Expression; index: Expression; maybeNull: boolean; span: Span }) {
     this.object = data.object; this.index = data.index; this.maybeNull = data.maybeNull; this.span = data.span;
+  }
+}
+
+export class OptionalPropExpr {
+  private readonly __brand!: "optional-prop";
+  readonly object: Expression;
+  readonly name: string;
+  readonly span: Span;
+  constructor(data: { object: Expression; name: string; span: Span }) {
+    this.object = data.object;
+    this.name = data.name;
+    this.span = data.span;
+  }
+}
+
+export class OptionalIndexExpr {
+  private readonly __brand!: "optional-index";
+  readonly object: Expression;
+  readonly index: Expression;
+  readonly span: Span;
+  constructor(data: { object: Expression; index: Expression; span: Span }) {
+    this.object = data.object;
+    this.index = data.index;
+    this.span = data.span;
   }
 }
 
@@ -780,7 +816,7 @@ export class InterfaceStmt {
 // --- Union Types ---
 
 export type Statement = ClassMember | EnumStmt | NamespaceStmt | ImportStmt | ExportStmt | TypeAliasStmt | InterfaceStmt;
-export type Expression = Literal | Identifier | CallExpr | CallWithThisExpr | PropExpr | IndexExpr | NewExpr | ArrayExpr | ObjectExpr | TemplateExpr | ThrowExpr | TryCatchExpr | FunctionExpr | ClassExpr | SpreadExpr | TernaryExpr | AwaitExpr | YieldExpr | TypeAssertExpr | NonNullAssertExpr | TypeApp;
+export type Expression = Literal | Identifier | CallExpr | CallWithThisExpr | OptionalCallExpr | PropExpr | IndexExpr | OptionalPropExpr | OptionalIndexExpr | NewExpr | ArrayExpr | ObjectExpr | TemplateExpr | ThrowExpr | TryCatchExpr | FunctionExpr | ClassExpr | SpreadExpr | TernaryExpr | AwaitExpr | YieldExpr | TypeAssertExpr | NonNullAssertExpr | TypeApp;
 
 export class Program {
   private readonly __brand!: "program";
@@ -1023,6 +1059,13 @@ export async function createProcessor(ctx: Context) {
           }
           return expr;
         }
+        if (expr instanceof OptionalCallExpr) {
+          await evaluateExpression(expr.callee);
+          for (const a of expr.args) {
+            await evaluateExpression(a);
+          }
+          return expr;
+        }
       if (expr instanceof PropExpr) {
         await evaluateExpression(expr.object);
         return expr;
@@ -1032,6 +1075,15 @@ export async function createProcessor(ctx: Context) {
         await evaluateExpression(expr.index);
         return expr;
       }
+        if (expr instanceof OptionalPropExpr) {
+          await evaluateExpression(expr.object);
+          return expr;
+        }
+        if (expr instanceof OptionalIndexExpr) {
+          await evaluateExpression(expr.object);
+          await evaluateExpression(expr.index);
+          return expr;
+        }
       if (expr instanceof NewExpr) {
         await evaluateExpression(expr.callee);
         for (const a of expr.args) {

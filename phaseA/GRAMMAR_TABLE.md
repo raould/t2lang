@@ -28,8 +28,11 @@ Note: this has likely gotten out of date, GRAMMER.md is the lesser wrong.
 | ExprStmt | `exprStmt` | `expr: Expr`, `typeId?: number` | A1 | Statement wrapper Phase B emits around every expression statement (calls, updates, template tags, macro helpers). |
 | CallExpr | `call` | `callee: Expr`, `args: Expr[]` | A1 | Only canonical call form; Phase B rewrites dots/infix to this. |
 | CallWithThisExpr | `call-with-this` | `fn: Expr`, `thisArg: Expr`, `args: Expr[]` | A1 | Emits `fn.call(thisArg, ...args)` to preserve `this` binding. |
+| OptionalCallExpr | `?.call` | `callee: Expr`, `args: Expr[]` | A1 | Optional call that emits `callee?.(args...)`. |
 | PropExpr | `prop` | `object: Expr`, `name: string`, `maybeNull: boolean` | A1 | Fixed-name property access; `maybeNull` signals optional chaining guards. |
 | IndexExpr | `index` | `object: Expr`, `index: Expr`, `maybeNull: boolean` | A1 | Computed access; `maybeNull` stays `true` when guards kept. |
+| OptionalPropExpr | `?.` | `object: Expr`, `name: string` | A1 | Optional property access that emits `obj?.prop`. |
+| OptionalIndexExpr | `?.[]` | `object: Expr`, `index: Expr` | A1 | Optional index access that emits `obj?.[key]`. |
 | IndexSignature | `index-signature` | `key: Identifier`, `keyType: TypeNode`, `valueType: TypeNode`, `readonlyFlag?: boolean` | A1 | Class/interface index signature that emits `[key: KeyType]: ValueType`. |
 | NewExpr | `new` | `callee: Expr`, `args: Expr[]` | A1 | Constructor call with normalized argument list. |
 | ThrowExpr | `throw` | `argument: Expr` | A0 | Expression-form throw used both as statement and nested expression. |

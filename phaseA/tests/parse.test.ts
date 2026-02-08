@@ -33,6 +33,9 @@ import {
   Literal,
   PropExpr,
   IndexExpr,
+  OptionalPropExpr,
+  OptionalIndexExpr,
+  OptionalCallExpr,
   ObjectExpr,
   NewExpr,
   FunctionExpr,
@@ -172,6 +175,30 @@ test("parseSource handles prop/index/object/new expressions", () => {
   assert.ok(newExpr.callee instanceof Identifier);
   assert.strictEqual(newExpr.callee.name, "Widget");
   assert.strictEqual(newExpr.args.length, 1);
+});
+
+test("parseSource handles optional chaining expressions", () => {
+  const source = `(program
+    (call log
+      (?. obj "foo")
+      (?.[] obj key)
+      (?.call fn 1 2)))`;
+
+  const program = parseSource(source);
+  const callStmt = program.body[0] as ExprStmt;
+  assert.ok(callStmt.expr instanceof CallExpr);
+  const [optProp, optIndex, optCall] = callStmt.expr.args;
+
+  assert.ok(optProp instanceof OptionalPropExpr);
+  assert.ok(optIndex instanceof OptionalIndexExpr);
+  assert.ok(optCall instanceof OptionalCallExpr);
+
+  assert.strictEqual(optProp.name, "foo");
+  assert.ok(optIndex.index instanceof Identifier);
+  assert.strictEqual((optIndex.index as Identifier).name, "key");
+  assert.ok(optCall.callee instanceof Identifier);
+  assert.strictEqual((optCall.callee as Identifier).name, "fn");
+  assert.strictEqual(optCall.args.length, 2);
 });
 
 test("parseSource ignores comma separators in lists", () => {
