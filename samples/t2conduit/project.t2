@@ -1,0 +1,339 @@
+;; t2conduit/project.t2
+;; Project configuration and build setup
+
+(program
+
+  ;; ============================================================================
+  ;; PROJECT METADATA
+  ;; ============================================================================
+  
+  (export (const projectConfig
+    (object
+      ("name" "t2conduit")
+      ("version" "1.0.0")
+      ("description" "Pull-based streaming library for TypeScript")
+      ("author" "T2 Team")
+      ("license" "MIT")
+      
+      ;; Entry points
+      ("main" "./dist/index.js")
+      ("types" "./dist/index.d.ts")
+      ("module" "./dist/index.mjs")
+      
+      ;; Build configuration
+      ("build" (object
+        ("source" (array
+          "core.t2"
+          "operators.t2"
+          "macros.t2"
+          "interop.t2"))
+        ("output" "dist")
+        ("target" "es2020")
+        ("module" "esnext")))
+      
+      ;; Dependencies
+      ("peerDependencies" (object
+        ("typescript" "^5.0.0")))
+      
+      ("devDependencies" (object
+        ("@types/node" "^20.0.0")
+        ("vitest" "^1.0.0")
+        ("tsup" "^8.0.0")))
+      
+      ;; Package exports
+      ("exports" (object
+        ("." (object
+          ("types" "./dist/index.d.ts")
+          ("import" "./dist/index.mjs")
+          ("require" "./dist/index.js")))
+        ("./core" (object
+          ("types" "./dist/core.d.ts")
+          ("import" "./dist/core.mjs")
+          ("require" "./dist/core.js")))
+        ("./operators" (object
+          ("types" "./dist/operators.d.ts")
+          ("import" "./dist/operators.mjs")
+          ("require" "./dist/operators.js")))
+        ("./interop" (object
+          ("types" "./dist/interop.d.ts")
+          ("import" "./dist/interop.mjs")
+          ("require" "./dist/interop.js")))
+        ("./macros" (object
+          ("types" "./dist/macros.d.ts")
+          ("import" "./dist/macros.mjs")
+          ("require" "./dist/macros.js")))))
+      
+      ;; Keywords
+      ("keywords" (array
+        "streaming"
+        "async"
+        "iterator"
+        "pipe"
+        "conduit"
+        "reactive"
+        "pull-based"
+        "backpressure"
+        "t2lang"
+        "lisp")))))
+
+  ;; ============================================================================
+  ;; BUILD SCRIPTS
+  ;; ============================================================================
+  
+  ;; Compile all .t2 files to TypeScript
+  (export (fn async buildAll ()
+    (const* ((files (array
+                      (object ("source" "core.t2") ("output" "dist/core.ts"))
+                      (object ("source" "operators.t2") ("output" "dist/operators.ts"))
+                      (object ("source" "macros.t2") ("output" "dist/macros.ts"))
+                      (object ("source" "interop.t2") ("output" "dist/interop.ts"))
+                      (object ("source" "examples.t2") ("output" "dist/examples.ts"))
+                      (object ("source" "tests.t2") ("output" "dist/tests.ts")))))
+      (block
+        (for of ((file files))
+          (const* ((source (prop file "source"))
+                   (output (prop file "output")))
+            (block
+              (call (prop console "log") (template "Compiling " source " -> " output))
+              (await (call compileT2File source output)))))
+        (call (prop console "log") "Build complete!")))))
+  
+  ;; Compile single .t2 file
+  (fn async compileT2File ((sourcePath: type-string)
+                           (outputPath: type-string))
+    (const* ((({compile} (call require "t2lang/compiler")))
+             (({readFile writeFile} (call require "fs/promises")))
+             (({dirname} (call require "path"))))
+      (block
+        ;; Read source
+        (const* ((source (await (call readFile sourcePath "utf-8"))))
+          (block
+            ;; Compile
+            (const* ((typescript (call compile source
+                                      (object
+                                        ("sourceFile" sourcePath)
+                                        ("target" "typescript")
+                                        ("expandMacros" true)))))
+              (block
+                ;; Ensure output directory exists
+                (const* ((outputDir (call dirname outputPath)))
+                  (await (call (call require "fs/promises") "mkdir"
+                              outputDir
+                              (object ("recursive" true)))))
+                ;; Write output
+                (await (call writeFile outputPath typescript "utf-8")))))))))
+  
+  ;; ============================================================================
+  ;; TSCONFIG GENERATION
+  ;; ============================================================================
+  
+  (export (const tsconfig
+    (object
+      ("compilerOptions" (object
+        ("target" "ES2020")
+        ("module" "ESNext")
+        ("lib" (array "ES2020"))
+        ("moduleResolution" "bundler")
+        ("declaration" true)
+        ("declarationMap" true)
+        ("sourceMap" true)
+        ("outDir" "dist")
+        ("rootDir" ".")
+        ("strict" true)
+        ("esModuleInterop" true)
+        ("skipLibCheck" true)
+        ("forceConsistentCasingInFileNames" true)
+        ("resolveJsonModule" true)
+        ("allowSyntheticDefaultImports" true)))
+      
+      ("include" (array "dist/**/*.ts"))
+      ("exclude" (array "node_modules" "dist/**/*.test.ts")))))
+  
+  ;; Write tsconfig.json
+  (export (fn async generateTsConfig ()
+    (const* ((({writeFile} (call require "fs/promises"))))
+      (await (call writeFile
+                  "tsconfig.json"
+                  (call (prop (t:ref JSON) "stringify") tsconfig null 2)
+                  "utf-8")))))
+
+  ;; ============================================================================
+  ;; TYPE DEFINITION LEVELS
+  ;; ============================================================================
+  
+  ;; Generate different strictness level type definitions
+  (export (const typeDefinitionLevels
+    (array
+      (object
+        ("name" "loose")
+        ("file" "types/loose.d.ts")
+        ("config" (object
+          ("cardinality" false)
+          ("ownership" false)
+          ("scoped" false)
+          ("distributivity" false))))
+      
+      (object
+        ("name" "strict")
+        ("file" "types/strict.d.ts")
+        ("config" (object
+          ("cardinality" true)
+          ("ownership" false)
+          ("scoped" false)
+          ("distributivity" false))))
+      
+      (object
+        ("name" "strict-2")
+        ("file" "types/strict-2.d.ts")
+        ("config" (object
+          ("cardinality" true)
+          ("ownership" true)
+          ("scoped" false)
+          ("distributivity" false))))
+      
+      (object
+        ("name" "strict-3")
+        ("file" "types/strict-3.d.ts")
+        ("config" (object
+          ("cardinality" true)
+          ("ownership" true)
+          ("scoped" true)
+          ("distributivity" false))))
+      
+      (object
+        ("name" "pedantic")
+        ("file" "types/pedantic.d.ts")
+        ("config" (object
+          ("cardinality" true)
+          ("ownership" true)
+          ("scoped" true)
+          ("distributivity" true)))))))
+
+  ;; ============================================================================
+  ;; TEST CONFIGURATION
+  ;; ============================================================================
+  
+  (export (const vitestConfig
+    (object
+      ("test" (object
+        ("globals" true)
+        ("environment" "node")
+        ("coverage" (object
+          ("provider" "v8")
+          ("reporter" (array "text" "json" "html"))
+          ("exclude" (array
+            "node_modules/**"
+            "dist/**"
+            "**/*.test.ts"
+            "**/*.spec.ts"))))
+        ("include" (array "dist/**/*.test.ts"))
+        ("threads" true)
+        ("isolate" true))))))
+
+  ;; ============================================================================
+  ;; DOCUMENTATION GENERATION
+  ;; ============================================================================
+  
+  (export (fn async generateDocs ()
+    (const* ((operators (array
+                          (object ("name" "map") ("category" "transformation"))
+                          (object ("name" "filter") ("category" "filtering"))
+                          (object ("name" "reduce") ("category" "aggregation"))
+                          ;; ... all operators
+                          )))
+      (block
+        (call (prop console "log") "Generating documentation...")
+        ;; Generate markdown docs from operator metadata
+        (for of ((op operators))
+          (const* ((name (prop op "name"))
+                   (category (prop op "category")))
+            (call (prop console "log") (template "  " name " (" category ")"))))
+        (call (prop console "log") "Documentation generated!")))))
+
+  ;; ============================================================================
+  ;; RELEASE WORKFLOW
+  ;; ============================================================================
+  
+  (export (fn async release ((version: type-string))
+    (block
+      (call (prop console "log") (template "Releasing version " version))
+      
+      ;; 1. Build
+      (call (prop console "log") "1. Building...")
+      (await (call buildAll))
+      
+      ;; 2. Test
+      (call (prop console "log") "2. Running tests...")
+      (await (call runTests))
+      
+      ;; 3. Generate docs
+      (call (prop console "log") "3. Generating docs...")
+      (await (call generateDocs))
+      
+      ;; 4. Update version
+      (call (prop console "log") "4. Updating version...")
+      (assign (prop projectConfig "version") version)
+      
+      ;; 5. Create git tag
+      (call (prop console "log") "5. Creating git tag...")
+      (const* ((({exec} (call require "child_process"))))
+        (call exec (template "git tag v" version)))
+      
+      (call (prop console "log") (template "Release " version " complete!")))))
+  
+  (fn async runTests ()
+    (const* ((({exec} (call require "child_process"))))
+      (return (new (t:ref Promise)
+                  (lambda ((resolve reject))
+                    (call exec "npm test"
+                          (lambda ((error stdout stderr))
+                            (if error
+                              (call reject error)
+                              (call resolve stdout)))))))))
+
+  ;; ============================================================================
+  ;; DEVELOPMENT HELPERS
+  ;; ============================================================================
+  
+  ;; Watch mode - rebuild on file changes
+  (export (fn async watch ()
+    (const* ((({watch} (call require "chokidar")))
+             (watcher (call watch "*.t2")))
+      (block
+        (call (prop console "log") "Watching for changes...")
+        (call (prop watcher "on") "change"
+              (fn async ((path))
+                (block
+                  (call (prop console "log") (template "
+" path " changed, rebuilding..."))
+                  (await (call buildAll)))))))))
+  
+  ;; Format all .t2 files
+  (export (fn async format ()
+    (call (prop console "log") "Formatting .t2 files...")
+    ;; T2lang formatter
+    (const* ((({format} (call require "t2lang/formatter")))
+             (({readdir readFile writeFile} (call require "fs/promises")))
+             (files (await (call readdir "." ))))
+      (block
+        (for of ((file files))
+          (if (call (prop file "endsWith") ".t2")
+            (const* ((source (await (call readFile file "utf-8")))
+                     (formatted (call format source)))
+              (await (call writeFile file formatted "utf-8")))))
+        (call (prop console "log") "Formatting complete!")))))
+  
+  ;; Lint all files
+  (export (fn async lint ()
+    (call (prop console "log") "Linting...")
+    (const* ((({lint} (call require "t2lang/linter"))))
+      (block
+        ;; Run linter
+        (const* ((results (call lint (array "*.t2"))))
+          (if :(results.errors > 0)
+            (block
+              (call (prop console "error") (template results.errors " errors found"))
+              (call (prop process "exit") 1))
+            (call (prop console "log") "No errors found")))))))
+
+)

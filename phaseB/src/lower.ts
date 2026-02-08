@@ -210,6 +210,9 @@ function lowerStatement(node: PhaseBNode): Statement {
       if (symbolHead.name === "continue") {
         return lowerContinue(listNode);
       }
+      if (symbolHead.name === "import") {
+        return lowerImport(listNode);
+      }
       if (symbolHead.name === "export") {
         return lowerExport(listNode);
       }
@@ -267,6 +270,122 @@ function lowerExport(node: PhaseBListNode): ExportStmt {
   }
   const spec = lowerExportSpec(specNode as PhaseBListNode);
   return new ExportStmt({ spec, span });
+}
+
+function lowerImport(node: PhaseBListNode): ImportStmt {
+  const span = spanFromLoc(node.loc);
+  const specNode = node.elements[1];
+  if (!specNode || specNode.phaseKind !== "list") {
+    throw reportError("T2:0191", specNode?.loc ?? node.loc);
+  }
+  const spec = lowerImportSpec(specNode as PhaseBListNode);
+  return new ImportStmt({ spec, span });
+}
+
+function lowerImportSpec(node: PhaseBListNode): {
+  source: Literal;
+  defaultBinding?: Identifier;
+  namespaceBinding?: Identifier;
+  named?: { imported: string; local: Identifier }[];
+} {
+  const head = node.elements[0];
+  if (!head || head.phaseKind !== "symbol" || (head as SymbolNode).name !== "import-spec") {
+    throw reportError("T2:0191", node.loc);
+  }
+  let source: Literal | undefined;
+  let defaultBinding: Identifier | undefined;
+  let namespaceBinding: Identifier | undefined;
+  let named: { imported: string; local: Identifier }[] | undefined;
+
+  for (const entry of node.elements.slice(1)) {
+    if (entry.phaseKind === "symbol") {
+      const name = (entry as SymbolNode).name;
+      defaultBinding = new Identifier({ name, span: spanFromLoc(entry.loc) });
+      continue;
+    }
+    if (entry.phaseKind === "literal") {
+      const literal = entry as LiteralNode;
+      if (typeof literal.value === "string") {
+        source = new Literal({ value: literal.value, span: spanFromLoc(entry.loc) });
+        continue;
+      }
+    }
+    if (entry.phaseKind === "list") {
+      const list = entry as PhaseBListNode;
+      const listHead = list.elements[0];
+      if (listHead?.phaseKind === "symbol") {
+        const listName = (listHead as SymbolNode).name;
+        if (listName === "default") {
+          const nameNode = list.elements[1];
+          if (!nameNode) {
+            throw reportError("T2:0189", list.loc);
+          }
+          const identifier = identifierFromNode(nameNode);
+          if (!identifier) {
+            throw reportError("T2:0189", list.loc);
+          }
+          defaultBinding = identifier;
+          continue;
+        }
+        if (listName === "namespace") {
+          const nameNode = list.elements[1];
+          if (!nameNode) {
+            throw reportError("T2:0192", list.loc);
+          }
+          const identifier = identifierFromNode(nameNode);
+          if (!identifier) {
+            throw reportError("T2:0192", list.loc);
+          }
+          namespaceBinding = identifier;
+          continue;
+        }
+        if (listName === "named") {
+          const entries = list.elements.slice(1).map(lowerNamedImport);
+          named = entries;
+          continue;
+        }
+      }
+      if (!named) {
+        named = list.elements.map(lowerNamedImport);
+        continue;
+      }
+    }
+    const expr = lowerExpression(entry);
+    if (expr instanceof Literal) {
+      if (typeof expr.value !== "string") {
+        throw reportError("T2:0208", entry.loc);
+      }
+      source = expr;
+      continue;
+    }
+    throw reportError("T2:0190", entry.loc);
+  }
+
+  if (!source) {
+    throw reportError("T2:0193", node.loc);
+  }
+  return { source, defaultBinding, namespaceBinding, named };
+}
+
+function lowerNamedImport(node: PhaseBNode): { imported: string; local: Identifier } {
+  if (node.phaseKind === "symbol") {
+    const name = (node as SymbolNode).name;
+    const local = new Identifier({ name, span: spanFromLoc(node.loc) });
+    return { imported: name, local };
+  }
+  if (node.phaseKind === "list") {
+    const list = node as PhaseBListNode;
+    if (list.elements.length === 2) {
+      const [importedNode, localNode] = list.elements;
+      const imported = stringFromNode(importedNode);
+      const local = identifierFromNode(localNode);
+      if (!imported || !local) {
+        throw reportError("T2:0185", list.loc);
+      }
+      return { imported, local };
+    }
+  }
+  throw reportError("T2:0186", node.loc);
 }
 
 function lowerExportSpec(node: PhaseBListNode): {
