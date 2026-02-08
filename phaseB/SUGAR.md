@@ -203,6 +203,24 @@ function expandParallelLet(bindings, body) {
     body,
   };
 }
+
+## 5. Namespace Imports (TypeScript-style)
+
+Phase B supports TypeScript namespace imports in list form and lowers them to canonical import specs.
+
+### Sugar
+```lisp
+(import * as Foo from "./mod")
+```
+
+### Canonical Rewrite (Phase A)
+```lisp
+(import (import-spec (namespace Foo) "./mod"))
+```
+
+### Notes
+- This is sugar only; Phase A consumes the canonical `import-spec` with a `namespace` clause.
+- Phase B keeps the canonical s-expression output so downstream phases stay unchanged.
 ```
 
 This strategy guarantees that every `let`/`const` binding becomes a deterministic `let*` sequence where the initial values are fixed before the final bindings occur.

@@ -89,6 +89,9 @@ Tokens:
 <class-abstract> ::= "(" "abstract" ")"
 <class-decorators> ::= "(" "decorators" <expression>+ ")"
 <import> ::= "(" "import" <import-spec> ")"
+          | "(" "import-default" <identifier> <module-spec> ")"
+          | "(" "import-named" "(" <named-import>* ")" <module-spec> ")"
+          | "(" "import-all" <identifier> <module-spec> ")"
 <export> ::= "(" "export" <export-spec> ")"
 <enum> ::= "(" "enum" <identifier> <enum-body> ")"
 <enum-body> ::= "(" "enum-body" <enum-member>* ")"
@@ -115,6 +118,17 @@ Tokens:
 <object-pattern-field> ::= "(" <string> <binding-target> ")"
 <rest-target> ::= "(" "rest" <binding-target> ")"  ; `...rest` in arrays/objects
 <default-target> ::= "(" "default" <binding-target> <expression> ")"  ; destructuring defaults
+
+<module-spec> ::= <string>
+<import-spec> ::= "(" "import-spec" <import-clause>* ")"
+<import-clause> ::= <module-spec>
+                  | <identifier>
+                  | "(" "default" <identifier> ")"
+                  | "(" "namespace" <identifier> ")"
+                  | "(" "named" <named-import>* ")"
+                  | "(" <named-import>* ")"
+<named-import> ::= <identifier>
+                 | "(" <identifier> <identifier> ")"
 ```
 
 ## Expressions

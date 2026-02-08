@@ -52,3 +52,26 @@ test("PEG parser emits type-assert for 'as' casting", () => {
   assert.strictEqual(typeHead.kind, "symbol");
   assert.strictEqual((typeHead as SymbolNode).name, "t:primitive");
 });
+
+test("PEG parser emits import-spec for namespace import list form", () => {
+  const [node] = parsePhaseBPeg("(import * as Foo from \"./mod\")", "peg-import-namespace.t2");
+  assert.ok(node);
+  assert.strictEqual(node.kind, "list");
+  const list = node as ListNode;
+  const [head, spec] = list.elements;
+  assert.strictEqual(head.kind, "symbol");
+  assert.strictEqual((head as SymbolNode).name, "import");
+  assert.ok(spec && spec.kind === "list");
+  const specList = spec as ListNode;
+  const [specHead, namespaceList, source] = specList.elements;
+  assert.strictEqual(specHead.kind, "symbol");
+  assert.strictEqual((specHead as SymbolNode).name, "import-spec");
+  assert.ok(namespaceList && namespaceList.kind === "list");
+  const [namespaceHead, alias] = (namespaceList as ListNode).elements;
+  assert.strictEqual(namespaceHead.kind, "symbol");
+  assert.strictEqual((namespaceHead as SymbolNode).name, "namespace");
+  assert.strictEqual(alias.kind, "symbol");
+  assert.strictEqual((alias as SymbolNode).name, "Foo");
+  assert.strictEqual(source.kind, "literal");
+  assert.strictEqual((source as { value: unknown }).value, "./mod");
+});

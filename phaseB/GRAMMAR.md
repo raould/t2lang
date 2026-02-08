@@ -104,6 +104,9 @@ All code in a compilation unit (e.g. a single file) must be enclosed in a top-le
 <class-abstract> ::= "(" "abstract" ")"
 <class-decorators> ::= "(" "decorators" <expression>+ ")"
 <import> ::= "(" "import" <import-spec> ")"
+		  | "(" "import-default" <identifier> <module-spec> ")"
+		  | "(" "import-named" "(" <named-import>* ")" <module-spec> ")"
+		  | "(" "import-all" <identifier> <module-spec> ")"
 <export> ::= "(" "export" <export-spec> ")"
 <enum> ::= "(" "enum" <identifier> <enum-body> ")"
 <enum-body> ::= "(" "enum-body" <enum-member>* ")"
@@ -130,6 +133,17 @@ All code in a compilation unit (e.g. a single file) must be enclosed in a top-le
 <object-pattern-field> ::= "(" <string> <binding-target> ")"
 <rest-target> ::= "(" "rest" <binding-target> ")"
 <default-target> ::= "(" "default" <binding-target> <expression> ")"
+
+<module-spec> ::= <string>
+<import-spec> ::= "(" "import-spec" <import-clause>* ")"
+<import-clause> ::= <module-spec>
+				  | <identifier>
+				  | "(" "default" <identifier> ")"
+				  | "(" "namespace" <identifier> ")"
+				  | "(" "named" <named-import>* ")"
+				  | "(" <named-import>* ")"
+<named-import> ::= <identifier>
+				 | "(" <identifier> <identifier> ")"
 ```
 
 ### Expressions

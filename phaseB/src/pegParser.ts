@@ -102,6 +102,7 @@ T2PhaseB {
      | Let
      | TypeDecl
      | TemplateWith
+      | ImportNamespace
      | Call
 
   Call = Expr+  -- implicitCall
@@ -197,6 +198,8 @@ T2PhaseB {
 
   TemplateWith = "template-with" Spacing String Spacing Pair*
   Pair = "(" Spacing Key Spacing Expr Spacing ")"
+
+  ImportNamespace = "import" Spacing "*" Spacing "as" Spacing ident Spacing "from" Spacing String
 
   TypeParams = "<" Spacing ident TypeParamTail* Spacing ">"
   TypeParamTail = Spacing "," Spacing ident
@@ -1313,6 +1316,26 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
       const signatureList = listFromLoc(loc, ...params);
       const lambdaList = listFromLoc(loc, symFromLoc("lambda", loc), signatureList, returnList);
       return listFromLoc(loc, symFromLoc("call", loc), lambdaList, ...args);
+    },
+    ImportNamespace(
+      _kw: OhmNode,
+      _sp1: OhmNode,
+      _star: OhmNode,
+      _sp2: OhmNode,
+      _as: OhmNode,
+      _sp3: OhmNode,
+      alias: OhmNode,
+      _sp4: OhmNode,
+      _from: OhmNode,
+      _sp5: OhmNode,
+      source: OhmNode,
+    ) {
+      void [_kw, _sp1, _star, _sp2, _as, _sp3, _sp4, _from, _sp5];
+      const aliasNode = sym(alias.sourceString, alias as ohm.Node);
+      const sourceNode = unwrapNode(source.ast());
+      const namespaceSpec = list(this as ohm.Node, sym("namespace", this as ohm.Node), aliasNode);
+      const importSpec = list(this as ohm.Node, sym("import-spec", this as ohm.Node), namespaceSpec, sourceNode);
+      return list(this as ohm.Node, sym("import", this as ohm.Node), importSpec);
     },
     Pair(_open: OhmNode, _sp1: OhmNode, key: OhmNode, _sp2: OhmNode, value: OhmNode, _sp3: OhmNode, _close: OhmNode) {
       void [_open, _sp1, _sp2, _sp3, _close];
