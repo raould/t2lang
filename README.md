@@ -27,6 +27,7 @@ cd OLD; npm i && npm run demo
   * more sexpry: let/let*, const/const* scope and set! inside that scope, rather than e.g. top-level procedural a la typescript.
   * more typescripty: actually most things are left alone to be like typescript, if only because the ecosystem already is too complected.
   * a mish-mash: you really want to use let* not let.
+  * 'because history': some of the syntax is just ugly by mistake.
 * This repo works best in a GNU/Linux environment.
 * It might work on MacOS, or it might have some issues.
 * It might work on Microsoft Windows, or it might have some issues.
