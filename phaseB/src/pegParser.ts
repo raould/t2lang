@@ -108,9 +108,16 @@ T2PhaseB {
 
   Expr = TypeAnnotated
 
-  TypeAnnotated = OptionalChain TypeAnnotationTail?
+  TypeAnnotated = AsCast TypeAnnotationTail?
+    | OptionalChain TypeAnnotationTail?
     | Postfix TypeAnnotationTail?
     | Primary TypeAnnotationTail?
+
+  AsCast = OptionalChain AsTail+
+    | Postfix AsTail+
+    | Primary AsTail+
+
+  AsTail = Spacing asKeyword Spacing TypeExpr
 
   TypeAnnotationTail = Spacing ":" Spacing TypeExpr
 
@@ -212,7 +219,7 @@ T2PhaseB {
     | "typeof" Spacing ident -- typeof
   TypeExprTail = Spacing "," Spacing TypeExpr
 
-  Atom = SpreadIdent | YieldStar | TIdent | operator | ident
+  Atom = SpreadIdent | YieldStar | TIdent | operator | identNoAs
   TIdent = "t:" ident
   SpreadIdent = "..." ident
   YieldStar = "yield*"
@@ -224,7 +231,10 @@ T2PhaseB {
   Colon = ":"
   TypeParamsExpr = "<" Spacing ident TypeParamTail* Spacing ">"
 
-  ident = (letter | "_") (letter | digit | "_" | "-" | "*" )*
+  identNoAs = ~asKeyword ident
+  ident = (letter | "_") identChar*
+  identChar = letter | digit | "_" | "-" | "*"
+  asKeyword = "as" ~identChar
   String = "\"" (~"\"" any)* "\""
   Number = number
   number = digit+ fraction?
@@ -991,6 +1001,18 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
     },
     TypeAnnotationTail(_sp1: OhmNode, _colon: OhmNode, _sp2: OhmNode, annotation: OhmNode) {
       void [_sp1, _colon, _sp2];
+      return annotation.ast();
+    },
+    AsCast(expr: OhmNode, tails: OhmIteration) {
+      let target = unwrapNode(expr.ast());
+      for (const tail of tails.asIteration().children) {
+        const typeNode = unwrapNode(tail.ast());
+        target = list(this as ohm.Node, sym("type-assert", this as ohm.Node), target, typeNode);
+      }
+      return target;
+    },
+    AsTail(_sp1: OhmNode, _as: OhmNode, _sp2: OhmNode, annotation: OhmNode) {
+      void [_sp1, _as, _sp2];
       return annotation.ast();
     },
     InfixMacro(_prefix: OhmNode, _sp1: OhmNode, body: OhmNode, _sp2: OhmNode, _close: OhmNode) {

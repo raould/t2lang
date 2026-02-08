@@ -36,3 +36,19 @@ test("PEG parser emits call/prop for dotted method calls", () => {
   assert.strictEqual(arg1.kind, "literal");
   assert.strictEqual(arg2.kind, "literal");
 });
+
+test("PEG parser emits type-assert for 'as' casting", () => {
+  const [node] = parsePhaseBPeg("value as any", "peg-as.t2");
+  assert.ok(node);
+  assert.strictEqual(node.kind, "list");
+  const list = node as ListNode;
+  const [head, target, assertedType] = list.elements;
+  assert.strictEqual(head.kind, "symbol");
+  assert.strictEqual((head as SymbolNode).name, "type-assert");
+  assert.strictEqual(target.kind, "symbol");
+  assert.strictEqual((target as SymbolNode).name, "value");
+  assert.strictEqual(assertedType.kind, "list");
+  const [typeHead] = (assertedType as ListNode).elements;
+  assert.strictEqual(typeHead.kind, "symbol");
+  assert.strictEqual((typeHead as SymbolNode).name, "t:primitive");
+});

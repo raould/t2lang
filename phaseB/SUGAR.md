@@ -398,6 +398,24 @@ TODO (not?): I really cannot envision how these would actually play out in day t
 | `A & B` | `(t:intersection A' B')` |
 | `[A, B]` | `(t:tuple A' B')` |
 | `T?` | `(t:nullable T')` |
+
+## 9.5 Type assertions (`as`) [x]
+
+Phase B supports TypeScript-style `as` casting and lowers it to the canonical `type-assert` form.
+
+**Sugar**:
+```lisp
+value as Foo
+```
+
+**Rewrite**:
+```lisp
+(type-assert value Foo')
+```
+
+Notes:
+- `Foo'` is the parsed `t:*` type node produced by the type parser.
+- Chained casts (e.g., `value as Foo as Bar`) lower to nested `type-assert` forms.
 | `{ a: T }` | `(t:object ("a" T'))` |
 | `(a: A) => R` | `(t:fn ((a A')) R')` |
 | `"literal"` | `(t:literal "literal")` |

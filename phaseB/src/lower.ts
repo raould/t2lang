@@ -1663,6 +1663,20 @@ function lowerList(node: PhaseBListNode): Expression {
         const argument = lowerExpression(filteredRest[0]);
         return new YieldExpr({ delegate: true, argument, span });
       }
+      case "type-assert": {
+        validateCommaSeparated(rest, "type assertion");
+        const exprNode = filteredRest[0];
+        const typeNode = filteredRest[1];
+        if (!exprNode || !typeNode) {
+          throw reportError("T2:0127", node.loc);
+        }
+        const expr = lowerExpression(exprNode);
+        const assertedType = lowerTypeNode(typeNode);
+        if (!assertedType) {
+          throw reportError("T2:0127", node.loc);
+        }
+        return new TypeAssertExpr({ expr, assertedType, span });
+      }
       default:
         break;
     }
