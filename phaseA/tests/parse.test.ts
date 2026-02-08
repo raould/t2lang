@@ -200,6 +200,33 @@ test("parseSource ignores comma separators in lists", () => {
   assert.strictEqual(fnStmt.signature.parameters.length, 2);
 });
 
+test("parseSource supports empty callable parameter lists", () => {
+  const source = `(program
+    (fn () (return 1))
+    (lambda () (return 2))
+    (class Box
+      (class-body
+        (method "m" () (return 3))
+        (getter "g" () (return 4)))))`;
+
+  const program = parseSource(source);
+  const [fnStmt, lambdaStmt, classStmt] = program.body;
+
+  assert.ok(fnStmt instanceof FunctionExpr);
+  assert.strictEqual(fnStmt.signature.parameters.length, 0);
+
+  assert.ok(lambdaStmt instanceof FunctionExpr);
+  assert.strictEqual(lambdaStmt.signature.parameters.length, 0);
+
+  assert.ok(classStmt instanceof ClassExpr);
+  const members = classStmt.body.statements;
+  assert.strictEqual(members.length, 2);
+  assert.ok(members[0] instanceof FunctionExpr);
+  assert.ok(members[1] instanceof FunctionExpr);
+  assert.strictEqual((members[0] as FunctionExpr).signature.parameters.length, 0);
+  assert.strictEqual((members[1] as FunctionExpr).signature.parameters.length, 0);
+});
+
 test("parseSource handles import/export statements", () => {
   const source = `(program
     (import (import-spec "./default" (default Default)))

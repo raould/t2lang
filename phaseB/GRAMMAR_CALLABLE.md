@@ -35,7 +35,7 @@ This grammar describes a more ergonomic syntax for callables that **lowers** to 
 
 <b-param-modifier> ::= "public" | "protected" | "private" | "readonly"
 
-<b-param-list> ::= "(" <b-param-list-body> ")" <type>?
+<b-param-list> ::= "(" <b-param-list-body>? ")" <type>?
 
 <b-param-list-body> ::= <b-param-no-comma>*          ; no commas anywhere
                       | <b-param-with-comma>+        ; commas between all params

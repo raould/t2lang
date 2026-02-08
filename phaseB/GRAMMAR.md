@@ -67,7 +67,7 @@ All code in a compilation unit (e.g. a single file) must be enclosed in a top-le
 <param> ::= "(" <param-modifier>* <identifier> <type>? ("default" <expression>)? ")"
 					| "(" "this" <type> ")"
 <param-modifier> ::= "public" | "protected" | "private" | "readonly"
-<fn-signature> ::= "(" <param> (","? <param>)* ")" <type>?
+<fn-signature> ::= "(" (<param> (","? <param>)*)? ")" <type>?
 
 <init> ::= <expression>
 <condition> ::= <expression>

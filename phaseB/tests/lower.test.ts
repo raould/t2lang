@@ -111,6 +111,32 @@ test("lowerPhaseB emits FunctionExpr for method with identifier name", () => {
   assert.strictEqual(stmt.methodName, "myMethod");
 });
 
+test("lowerPhaseB supports empty callable parameter lists", () => {
+  const [fnNode] = parsePhaseBRaw("(fn () (return 1))", "lower-empty-fn.t2");
+  const [lambdaNode] = parsePhaseBRaw("(lambda () (return 2))", "lower-empty-lambda.t2");
+  const [methodNode] = parsePhaseBRaw("(method m () (return 3))", "lower-empty-method.t2");
+  const [getterNode] = parsePhaseBRaw("(getter g () (return 4))", "lower-empty-getter.t2");
+
+  const fnProgram = lowerPhaseB([fnNode]);
+  const lambdaProgram = lowerPhaseB([lambdaNode]);
+  const methodProgram = lowerPhaseB([methodNode]);
+  const getterProgram = lowerPhaseB([getterNode]);
+
+  const fnStmt = fnProgram.body.find((entry) => entry instanceof FunctionExpr) as FunctionExpr | undefined;
+  const lambdaStmt = lambdaProgram.body.find((entry) => entry instanceof FunctionExpr) as FunctionExpr | undefined;
+  const methodStmt = methodProgram.body.find((entry) => entry instanceof FunctionExpr) as FunctionExpr | undefined;
+  const getterStmt = getterProgram.body.find((entry) => entry instanceof FunctionExpr) as FunctionExpr | undefined;
+
+  assert.ok(fnStmt);
+  assert.ok(lambdaStmt);
+  assert.ok(methodStmt);
+  assert.ok(getterStmt);
+  assert.strictEqual(fnStmt!.signature.parameters.length, 0);
+  assert.strictEqual(lambdaStmt!.signature.parameters.length, 0);
+  assert.strictEqual(methodStmt!.signature.parameters.length, 0);
+  assert.strictEqual(getterStmt!.signature.parameters.length, 0);
+});
+
 test("lowerPhaseB rejects string method names", () => {
   const [node] = parsePhaseBRaw("(method \"bad\" (x) (assign x 1))", "lower-method-string.test.t2");
   assert.throws(

@@ -52,7 +52,7 @@ Tokens:
 <param> ::= "(" <param-modifier>* <identifier> <type>? ("default" <expression>)? ")"
           | "(" "this" <type> ")"
 <param-modifier> ::= "public" | "protected" | "private" | "readonly"
-<fn-signature> ::= "(" <param> (","? <param>)* ")" <type>?
+<fn-signature> ::= "(" (<param> (","? <param>)*)? ")" <type>?
 
 <init> ::= <expression>
 <condition> ::= <expression>

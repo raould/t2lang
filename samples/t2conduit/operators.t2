@@ -8,8 +8,7 @@
   ;; ============================================================================
   
   ;; concat - concatenate multiple sources sequentially
-  (export (fn concat ((rest sources: (t:ref Array (array (t:ref Source (array (t:ref T)))))))
-                : (t:ref Source (array (t:ref T)))
+  (export (fn concat ((rest sources: (t:ref Array (array (t:ref Source (array (t:ref T))))))) : (t:ref Source (array (t:ref T)))
            (return
              (call (fn async generator ()
                      (for of ((source sources))
@@ -356,7 +355,7 @@
                      (if :(item < minVal)
                        (assign minVal item))
                      (assign hasValue true))
-                   (return (if hasValue minVal undefined))))))))
+                   (return (if hasValue minVal undefined)))))))
   
   ;; max - find maximum value
   (export (fn max ()
@@ -370,6 +369,5 @@
                      (if :(item > maxVal)
                        (assign maxVal item))
                      (assign hasValue true))
-                   (return (if hasValue maxVal undefined))))))))
-
-)
+                   (return (if hasValue maxVal undefined)))))))
+  )
