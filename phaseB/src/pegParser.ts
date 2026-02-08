@@ -174,9 +174,9 @@ T2PhaseB {
       | Expr
 
     KeyValueEntry = Key Spacing ":" Spacing Expr
-    KeyValueShorthand = Key Spacing Expr
+    KeyValueShorthand = Key Spacing Expr ~"?"
     OptionalEntry = Key Spacing "?" OptionalValue?
-    OptionalValue = Spacing Expr
+    OptionalValue = Spacing Expr ~"?"
 
   Key = ident | String
 
@@ -369,27 +369,171 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
     }
     return node;
   };
+  const getObjectKeyName = (node: PhaseBNode): string | null => {
+    if (node.phaseKind === "symbol") {
+      return (node as { name: string }).name;
+    }
+    if (node.phaseKind === "literal") {
+      const value = (node as { value: unknown }).value;
+      if (typeof value === "string") {
+        return value;
+      }
+    }
+    return null;
+  };
+  const isQuestionKey = (node: PhaseBNode): boolean =>
+    (node.phaseKind === "symbol" && (node as { name: string }).name === "?")
+    || (node.phaseKind === "literal" && (node as { value: unknown }).value === "?");
+  const getOptionalKeyInfo = (node: PhaseBNode): { keyNode: PhaseBNode } | null => {
+    if (node.phaseKind === "symbol") {
+      const name = (node as { name: string }).name;
+      if (name.endsWith("?") && name.length > 1) {
+        return { keyNode: symFromLoc(name.slice(0, -1), node.loc) };
+      }
+    }
+    if (node.phaseKind === "literal") {
+      const value = (node as { value: unknown }).value;
+      if (typeof value === "string" && value.endsWith("?") && value.length > 1) {
+        return { keyNode: strFromLoc(value.slice(0, -1), node.loc) };
+      }
+    }
+    return null;
+  };
+  const isObjectKeyNode = (node: PhaseBNode): boolean =>
+    (node.phaseKind === "symbol")
+    || (node.phaseKind === "literal" && typeof (node as { value: unknown }).value === "string");
+  const isSpreadEntry = (node: PhaseBNode): node is PhaseBListNode => {
+    if (node.phaseKind !== "list") {
+      return false;
+    }
+    const listNode = node as PhaseBListNode;
+    const head = listNode.elements[0];
+    return Boolean(head && head.phaseKind === "symbol" && (head as { name: string }).name === "spread");
+  };
   const normalizeObjectEntries = (entries: PhaseBNode[]): PhaseBNode[] => {
     const rewritten: PhaseBNode[] = [];
+    const whenEntries: PhaseBNode[] = [];
     let idx = 0;
     while (idx < entries.length) {
       const entry = entries[idx];
       const nextEntry = entries[idx + 1];
+      const optionalKeyInfo = getOptionalKeyInfo(entry);
       if (entry.phaseKind === "list") {
         const listEntry = entry as PhaseBListNode;
         const head = listEntry.elements[0];
+        if (listEntry.elements.length === 2 && nextEntry && nextEntry.phaseKind === "list") {
+          const keyNode = listEntry.elements[0];
+          const valueNode = listEntry.elements[1];
+          const nextList = nextEntry as PhaseBListNode;
+          const nextHead = nextList.elements[0];
+          const nextSecond = nextList.elements[1];
+          if (nextHead && isQuestionKey(nextHead) && nextSecond && isQuestionKey(nextSecond)) {
+            const keyName = getObjectKeyName(keyNode);
+            const valueName = getObjectKeyName(valueNode);
+            if (keyName && valueName && keyName === valueName) {
+              rewritten.push(createOptionalObjectEntry(keyNode, valueNode, listEntry.loc));
+              idx += 2;
+              continue;
+            }
+          }
+        }
+        if (listEntry.elements.length === 2) {
+          const keyNode = listEntry.elements[0];
+          const valueNode = listEntry.elements[1];
+          if (isObjectKeyNode(keyNode) && valueNode.phaseKind === "list") {
+            const valueList = valueNode as PhaseBListNode;
+            const valueHead = valueList.elements[0];
+            if (valueHead && valueHead.phaseKind === "symbol" && (valueHead as { name: string }).name === "optional-key") {
+              const optionalKey = valueList.elements[1];
+              if (optionalKey) {
+                const keyLiteral = normalizeObjectKey(keyNode);
+                rewritten.push(listFromLoc(listEntry.loc, keyLiteral, keyNode));
+                rewritten.push(createOptionalObjectEntry(optionalKey, normalizeOptionalValue(optionalKey), listEntry.loc));
+                idx += 1;
+                continue;
+              }
+            }
+          }
+          if (isObjectKeyNode(keyNode) && isSpreadEntry(valueNode)) {
+            const keyLiteral = normalizeObjectKey(keyNode);
+            rewritten.push(listFromLoc(listEntry.loc, keyLiteral, keyNode));
+            rewritten.push(valueNode);
+            idx += 1;
+            continue;
+          }
+        }
+        if (listEntry.elements.length === 2) {
+          const keyNode = listEntry.elements[0];
+          const valueNode = listEntry.elements[1];
+          const optionalFromKey = getOptionalKeyInfo(keyNode);
+          if (optionalFromKey) {
+            rewritten.push(createOptionalObjectEntry(optionalFromKey.keyNode, valueNode, listEntry.loc));
+            idx += 1;
+            continue;
+          }
+        }
+        if (head && isQuestionKey(head) && listEntry.elements.length === 2) {
+          const inner = listEntry.elements[1];
+          if (inner && inner.phaseKind === "list") {
+            const innerList = inner as PhaseBListNode;
+            const keyNode = innerList.elements[0];
+            const valueNode = innerList.elements[1];
+            if (keyNode && valueNode) {
+              rewritten.push(createOptionalObjectEntry(keyNode, valueNode, listEntry.loc));
+              idx += 1;
+              continue;
+            }
+          }
+        }
+        if (listEntry.elements.length === 2 && nextEntry && nextEntry.phaseKind === "list") {
+          const nextList = nextEntry as PhaseBListNode;
+          const nextHead = nextList.elements[0];
+          if (nextHead && isQuestionKey(nextHead)) {
+            const keyNode = listEntry.elements[0];
+            if (keyNode && (keyNode.phaseKind === "symbol" || keyNode.phaseKind === "literal")) {
+              const valueNode = listEntry.elements[1];
+              if (valueNode && (valueNode.phaseKind === "symbol" || valueNode.phaseKind === "literal") && nextList.elements.length === 2 && isQuestionKey(nextList.elements[1])) {
+                rewritten.push(createOptionalObjectEntry(keyNode, valueNode, listEntry.loc));
+                idx += 2;
+                continue;
+              }
+              const keyLiteral = normalizeObjectKey(keyNode);
+              rewritten.push(listFromLoc(listEntry.loc, keyLiteral, keyNode));
+              idx += 1;
+              continue;
+            }
+          }
+        }
         if (
           head &&
           head.phaseKind === "symbol" &&
           (head as { name: string }).name === "optional-key" &&
           listEntry.elements.length === 2
         ) {
-          if (nextEntry) {
-            throw new Error("optional key cannot be followed by a comma");
-          }
           const keyNode = listEntry.elements[1];
           const valueNode = normalizeOptionalValue(keyNode);
           rewritten.push(createOptionalObjectEntry(keyNode, valueNode, listEntry.loc));
+          idx += 1;
+          continue;
+        }
+        if (head && head.phaseKind === "symbol" && (head as { name: string }).name === "when") {
+          const conditionNode = listEntry.elements[1];
+          const objectNode = listEntry.elements[2];
+          if (conditionNode && objectNode) {
+            const condition = listFromLoc(
+              listEntry.loc,
+              symFromLoc("&&", listEntry.loc),
+              conditionNode,
+              objectNode,
+            );
+            whenEntries.push(listFromLoc(listEntry.loc, symFromLoc("spread", listEntry.loc), symFromLoc("object", listEntry.loc), condition));
+            idx += 1;
+            continue;
+          }
+        }
+        if (optionalKeyInfo && listEntry.elements.length === 2) {
+          const valueNode = listEntry.elements[1];
+          rewritten.push(createOptionalObjectEntry(optionalKeyInfo.keyNode, valueNode, listEntry.loc));
           idx += 1;
           continue;
         }
@@ -423,6 +567,41 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
         continue;
       }
       if (entry.phaseKind === "symbol") {
+        if (nextEntry && isQuestionKey(nextEntry)) {
+          rewritten.push(createOptionalObjectEntry(entry, entry, entry.loc));
+          idx += 2;
+          continue;
+        }
+        if (nextEntry && nextEntry.phaseKind === "list") {
+          const nextList = nextEntry as PhaseBListNode;
+          const nextHead = nextList.elements[0];
+          if (nextHead && nextHead.phaseKind === "symbol" && (nextHead as { name: string }).name === "optional-key") {
+            const keyLiteral = strFromLoc((entry as { name: string }).name, entry.loc);
+            rewritten.push(listFromLoc(entry.loc, keyLiteral, entry));
+            const optionalKey = nextList.elements[1];
+            if (optionalKey) {
+              rewritten.push(createOptionalObjectEntry(optionalKey, normalizeOptionalValue(optionalKey), nextEntry.loc));
+            }
+            idx += 2;
+            continue;
+          }
+        }
+        if (optionalKeyInfo) {
+          const valueNode = normalizeOptionalValue(optionalKeyInfo.keyNode, nextEntry);
+          rewritten.push(createOptionalObjectEntry(optionalKeyInfo.keyNode, valueNode, entry.loc));
+          idx += nextEntry ? 2 : 1;
+          continue;
+        }
+        if (nextEntry && nextEntry.phaseKind === "list") {
+          const nextList = nextEntry as PhaseBListNode;
+          const nextHead = nextList.elements[0];
+          if (nextHead && nextHead.phaseKind === "symbol" && ((nextHead as { name: string }).name === "spread" || (nextHead as { name: string }).name === "when")) {
+            const keyLiteral = strFromLoc((entry as { name: string }).name, entry.loc);
+            rewritten.push(listFromLoc(entry.loc, keyLiteral, entry));
+            idx += 1;
+            continue;
+          }
+        }
         if (nextEntry && nextEntry.phaseKind !== "symbol") {
           const nextIsString =
             nextEntry.phaseKind === "literal" && typeof (nextEntry as { value: unknown }).value === "string";
@@ -440,6 +619,22 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
         continue;
       }
       if (entry.phaseKind === "literal" && typeof (entry as { value: unknown }).value === "string") {
+        if (optionalKeyInfo) {
+          const valueNode = normalizeOptionalValue(optionalKeyInfo.keyNode, nextEntry);
+          rewritten.push(createOptionalObjectEntry(optionalKeyInfo.keyNode, valueNode, entry.loc));
+          idx += nextEntry ? 2 : 1;
+          continue;
+        }
+        if (nextEntry && nextEntry.phaseKind === "list") {
+          const nextList = nextEntry as PhaseBListNode;
+          const nextHead = nextList.elements[0];
+          if (nextHead && nextHead.phaseKind === "symbol" && ((nextHead as { name: string }).name === "spread" || (nextHead as { name: string }).name === "when")) {
+            const keyLiteral = normalizeObjectKey(entry);
+            rewritten.push(listFromLoc(entry.loc, keyLiteral, entry));
+            idx += 1;
+            continue;
+          }
+        }
         if (!nextEntry) {
           throw new Error("object literal key requires a value");
         }
@@ -451,7 +646,7 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
       rewritten.push(entry);
       idx += 1;
     }
-    return rewritten;
+    return [...rewritten, ...whenEntries];
   };
   const normalizeArgs = (value: unknown): PhaseBNode[] => {
     if (!Array.isArray(value)) {
@@ -693,8 +888,7 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
     );
     const field = listFromLoc(loc, normalizeObjectKey(keyNode), valueNode);
     const objectNode = listFromLoc(loc, symFromLoc("object", loc), field);
-    const emptyObject = listFromLoc(loc, symFromLoc("object", loc));
-    const conditional = listFromLoc(loc, symFromLoc("if", loc), condition, objectNode, emptyObject);
+    const conditional = listFromLoc(loc, symFromLoc("&&", loc), condition, objectNode);
     return listFromLoc(loc, symFromLoc("spread", loc), symFromLoc("object", loc), conditional);
   };
   const normalizeCallableArgs = (headName: string, args: PhaseBNode[]): PhaseBNode[] => {
@@ -927,6 +1121,25 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
     Call_implicitCall(exprs: OhmIteration) {
       const items = exprs.asIteration().children.map((child: ohm.Node) => unwrapNode(child.ast()));
       const [head, ...args] = items;
+      const hasKeywordArgs = (entries: PhaseBNode[]): boolean => {
+        for (let i = 0; i < entries.length; i += 1) {
+          const entry = entries[i];
+          if (entry.phaseKind === "type-annotation") {
+            return true;
+          }
+          if (entry.phaseKind === "symbol" && (entry as { name: string }).name === ":") {
+            return true;
+          }
+        }
+        return false;
+      };
+      if (head && head.phaseKind === "symbol") {
+        const headName = (head as { name: string }).name;
+        const shouldCheck = headName === "call" || !NON_CALL_HEADS.has(headName);
+        if (shouldCheck && hasKeywordArgs(args)) {
+          throw new Error("keyword arguments are not supported");
+        }
+      }
       if (head && head.phaseKind === "symbol") {
         const headName = (head as { name: string }).name;
         if (headName === "not") {
