@@ -8,366 +8,390 @@
   ;; ============================================================================
   
   ;; concat - concatenate multiple sources sequentially
-  (export (fn concat ((rest sources: (t:ref Array (array (t:ref Source (array (t:ref T))))))) : (t:ref Source (array (t:ref T)))
-           (return
-             (call (fn async generator ()
-                     (for of ((source sources))
-                       (for await ((item source))
-                         (call yield item))))))))
+  (fn concat ((rest sources (t:ref Array (array (t:ref Source (array (t:ref T))))))) : (t:ref Source (array (t:ref T)))
+    (return
+      (call (fn async generator ()
+              (for of ((source sources))
+                (for await ((item source))
+                  (call yield item)))))))
+  (export (export-spec (named concat)))
   
   ;; merge - merge multiple sources concurrently
-  (export (fn merge ((rest sources: (t:ref Array (array (t:ref Source (array (t:ref T)))))))
-                : (t:ref Source (array (t:ref T)))
-           (return
-             (call (fn async generator ()
-                     ;; Simplified - real version would handle concurrent iteration
-                     (for of ((source sources))
-                       (for await ((item source))
-                         (call yield item))))))))
+  (fn merge ((rest sources (t:ref Array (array (t:ref Source (array (t:ref T)))))))
+    : (t:ref Source (array (t:ref T)))
+    (return
+      (call (fn async generator ()
+              ;; Simplified - real version would handle concurrent iteration
+              (for of ((source sources))
+                (for await ((item source))
+                  (call yield item)))))))
+  (export (export-spec (named merge)))
   
   ;; zip - combine sources pairwise
-  (export (fn zip ((source1: (t:ref Source (array (t:ref A))))
-                   (source2: (t:ref Source (array (t:ref B)))))
-                : (t:ref Source (array (t:ref Array (array (t:union (t:ref A) (t:ref B))))))
-           (return
-             (call (fn async generator ()
-                     (const* ((iter1 (call (prop source1 (t:ref Symbol "asyncIterator"))))
-                              (iter2 (call (prop source2 (t:ref Symbol "asyncIterator")))))
-                       (while true
-                         (const* ((result1 (await (call (prop iter1 "next"))))
-                                  (result2 (await (call (prop iter2 "next")))))
-                           (if (|| (prop result1 "done") (prop result2 "done"))
-                             (break))
-                           (call yield (array (prop result1 "value")
-                                             (prop result2 "value")))))))))))
+  (fn zip ((source1: (t:ref Source (array (t:ref A))))
+           (source2: (t:ref Source (array (t:ref B)))))
+    : (t:ref Source (array (t:ref Array (array (t:union (t:ref A) (t:ref B))))))
+    (return
+      (call (fn async generator ()
+              (const* ((iter1 (call (index source1 (prop Symbol "asyncIterator"))))
+                       (iter2 (call (index source2 (prop Symbol "asyncIterator")))))
+                (while true
+                  (const* ((result1 (await (call (prop iter1 "next"))))
+                           (result2 (await (call (prop iter2 "next")))))
+                    (if (|| (prop result1 "done") (prop result2 "done"))
+                      (break))
+                    (call yield (array (prop result1 "value")
+                                      (prop result2 "value")))))))))
+  (export (export-spec (named zip)))
   
   ;; combineLatest - emit array of latest values from all sources
-  (export (fn combineLatest ((rest sources: (t:ref Array (array (t:ref Source (array (t:ref T)))))))
-                : (t:ref Source (array (t:ref Array (array (t:ref T)))))
-           (return
-             (call (fn async generator ()
-                     ;; Simplified implementation
-                     (const* ((latest (new (t:ref Array) (prop sources "length")))
-                              (hasValue (new (t:ref Array) (prop sources "length"))))
-                       ;; Real implementation would use concurrent iteration
-                       (for of ((source sources))
-                         (for await ((item source))
-                           (call yield (array item))))))))))
+  (fn combineLatest ((rest sources (t:ref Array (array (t:ref Source (array (t:ref T)))))))
+    : (t:ref Source (array (t:ref Array (array (t:ref T)))))
+    (return
+      (call (fn async generator ()
+              ;; Simplified implementation
+              (const* ((latest (new Array (prop sources "length")))
+                       (hasValue (new Array (prop sources "length"))))
+                ;; Real implementation would use concurrent iteration
+                (for of ((source sources))
+                  (for await ((item source))
+                    (call yield (array item)))))))))
+  (export (export-spec (named combineLatest)))
 
   ;; ============================================================================
   ;; TIME-BASED OPERATORS
   ;; ============================================================================
   
   ;; debounce - emit only after silence period
-  (export (fn debounce ((ms: type-number))
-                : (t:ref Pipe (array (t:ref T) (t:ref T)))
-           (return
-             (fn async generator ((source: (t:ref Source (array (t:ref T)))))
-               (let* ((timer null)
-                      (lastValue null)
-                      (hasValue false))
-                 (block
-                   (for await ((item source))
-                     (if timer (call clearTimeout timer))
-                     (assign lastValue item)
-                     (assign hasValue true)
-                     (assign timer
-                       (call setTimeout
-                         (lambda ()
-                           (if hasValue
-                             (block
-                               (call yield lastValue)
-                               (assign hasValue false))))
-                         ms)))
-                   (if hasValue (call yield lastValue))))))))
+  (fn debounce ((ms: type-number))
+    : (t:ref Pipe (array (t:ref T) (t:ref T)))
+    (return
+      (fn async generator ((source: (t:ref Source (array (t:ref T)))))
+        (let* ((timer null)
+               (lastValue null)
+               (hasValue false))
+          (block
+            (for await ((item source))
+              (if timer (call clearTimeout timer))
+              (assign lastValue item)
+              (assign hasValue true)
+              (assign timer
+                (call setTimeout
+                  (lambda ()
+                    (if hasValue
+                      (block
+                        (call yield lastValue)
+                        (assign hasValue false))))
+                  ms)))
+            (if hasValue (call yield lastValue)))))))
+  (export (export-spec (named debounce)))
   
   ;; throttle - emit at most once per time period
-  (export (fn throttle ((ms: type-number))
-                : (t:ref Pipe (array (t:ref T) (t:ref T)))
-           (return
-             (fn async generator ((source: (t:ref Source (array (t:ref T)))))
-               (let* ((lastEmit 0))
-                 (for await ((item source))
-                   (const* ((now (call (prop (t:ref Date) "now"))))
-                     (if :(now - lastEmit >= ms)
-                       (block
-                         (call yield item)
-                         (assign lastEmit now))))))))))
+  (fn throttle ((ms: type-number))
+    : (t:ref Pipe (array (t:ref T) (t:ref T)))
+    (return
+      (fn async generator ((source: (t:ref Source (array (t:ref T)))))
+        (let* ((lastEmit 0))
+          (for await ((item source))
+            (const* ((now (call (prop Date "now"))))
+              (if :(now - lastEmit >= ms)
+                (block
+                  (call yield item)
+                  (assign lastEmit now)))))))))
+  (export (export-spec (named throttle)))
   
   ;; delay - delay each emission
-  (export (fn delay ((ms: type-number))
-                : (t:ref Pipe (array (t:ref T) (t:ref T)))
-           (return
-             (fn async generator ((source: (t:ref Source (array (t:ref T)))))
-               (for await ((item source))
-                 (await (new (t:ref Promise)
-                            (lambda ((resolve))
-                              (call setTimeout resolve ms))))
-                 (call yield item))))))
+  (fn delay ((ms: type-number))
+    : (t:ref Pipe (array (t:ref T) (t:ref T)))
+    (return
+      (fn async generator ((source: (t:ref Source (array (t:ref T)))))
+        (for await ((item source))
+          (await (new Promise
+                     (lambda ((resolve))
+                       (call setTimeout resolve ms))))
+          (call yield item)))))
+  (export (export-spec (named delay)))
   
   ;; timeout - error if no emission within period
-  (export (fn timeout ((ms: type-number))
-                : (t:ref Pipe (array (t:ref T) (t:ref T)))
-           (return
-             (fn async generator ((source: (t:ref Source (array (t:ref T)))))
-               (for await ((item source))
-                 ;; Simplified - real version would use Promise.race
-                 (call yield item))))))
+  (fn timeout ((ms: type-number))
+    : (t:ref Pipe (array (t:ref T) (t:ref T)))
+    (return
+      (fn async generator ((source: (t:ref Source (array (t:ref T)))))
+        (for await ((item source))
+          ;; Simplified - real version would use Promise.race
+          (call yield item)))))
+  (export (export-spec (named timeout)))
   
   ;; buffer - collect values over time window
-  (export (fn buffer ((ms: type-number))
-                : (t:ref Pipe (array (t:ref T) (t:ref Array (array (t:ref T)))))
-           (return
-             (fn async generator ((source: (t:ref Source (array (t:ref T)))))
-               (let* ((batch (array))
-                      (timer null))
-                 (const* ((flush (lambda ()
-                                   (if :(batch.length > 0)
-                                     (block
-                                       (call yield batch)
-                                       (assign batch (array)))))))
-                   (for await ((item source))
-                     (if (! timer)
-                       (assign timer (call setTimeout flush ms)))
-                     (call (prop batch "push") item))
-                   (call flush)))))))
+  (fn buffer ((ms: type-number))
+    : (t:ref Pipe (array (t:ref T) (t:ref Array (array (t:ref T)))))
+    (return
+      (fn async generator ((source: (t:ref Source (array (t:ref T)))))
+        (let* ((batch (array))
+               (timer null))
+          (const* ((flush (lambda ()
+                            (if :(batch.length > 0)
+                              (block
+                                (call yield batch)
+                                (assign batch (array)))))))
+            (for await ((item source))
+              (if (! timer)
+                (assign timer (call setTimeout flush ms)))
+              (call (prop batch "push") item))
+            (call flush))))))
+  (export (export-spec (named buffer)))
 
   ;; ============================================================================
   ;; ERROR HANDLING OPERATORS
   ;; ============================================================================
   
   ;; catchError - handle errors and continue with fallback source
-  (export (fn catchError ((handler: (t:function (t:ref Error) (t:ref Source (array (t:ref T))))))
-                : (t:ref Pipe (array (t:ref T) (t:ref T)))
-           (return
-             (fn async generator ((source: (t:ref Source (array (t:ref T)))))
-               (try
-                 (for await ((item source))
-                   (call yield item))
-                 (catch ((err))
-                   (const* ((fallback (call handler err)))
-                     (for await ((item fallback))
-                       (call yield item)))))))))
+  (fn catchError ((handler: (t:fn (t:ref Error) (t:ref Source (array (t:ref T))))))
+    : (t:ref Pipe (array (t:ref T) (t:ref T)))
+    (return
+      (fn async generator ((source: (t:ref Source (array (t:ref T)))))
+        (try
+          (for await ((item source))
+            (call yield item))
+          (catch ((err))
+            (const* ((fallback (call handler err)))
+              (for await ((item fallback))
+                (call yield item))))))))
+  (export (export-spec (named catchError)))
   
   ;; retry - retry on error with optional backoff
-  (export (fn retry ((maxAttempts: type-number)
-                     (opts: (t:object (("delay" (t:function type-number type-number))))
-                            (default (object))))
-                : (t:ref Pipe (array (t:ref T) (t:ref T)))
-           (const* ((delayFn (|| (prop opts "delay") (lambda ((n)) 1000))))
-             (return
-               (fn async generator ((source: (t:ref Source (array (t:ref T)))))
-                 (let* ((attempt 0)
-                        (lastError null))
-                   (while :(attempt < maxAttempts)
-                     (try
-                       (for await ((item source))
-                         (call yield item))
-                       (return)
-                       (catch ((err))
-                         (assign lastError err)
-                         (assign attempt :(attempt + 1))
-                         (if :(attempt < maxAttempts)
-                           (await (new (t:ref Promise)
-                                      (lambda ((resolve))
-                                        (call setTimeout resolve
-                                              (call delayFn attempt)))))))))
-                   (throw lastError)))))))
+  (fn retry ((maxAttempts: type-number) (opts: (t:object ("delay" (t:fn type-number type-number)) default (object))))
+    : (t:ref Pipe (array (t:ref T) (t:ref T)))
+    (const* ((delayFn (|| (prop opts "delay") (lambda ((n)) 1000))))
+      (return
+        (fn async generator ((source: (t:ref Source (array (t:ref T)))))
+          (let* ((attempt 0)
+                 (lastError null))
+            (while :(attempt < maxAttempts)
+              (try
+                (for await ((item source))
+                  (call yield item))
+                (return)
+                (catch ((err))
+                  (assign lastError err)
+                  (assign attempt :(attempt + 1))
+                  (if :(attempt < maxAttempts)
+                    (await (new Promise
+                               (lambda ((resolve))
+                                 (call setTimeout resolve
+                                       (call delayFn attempt)))))))))
+            (throw lastError))))))
+  (export (export-spec (named retry)))
   
   ;; onErrorResume - switch to fallback on error
-  (export (fn onErrorResume ((fallback: (t:ref Source (array (t:ref T)))))
-                : (t:ref Pipe (array (t:ref T) (t:ref T)))
-           (return
-             (fn async generator ((source: (t:ref Source (array (t:ref T)))))
-               (try
-                 (for await ((item source))
-                   (call yield item))
-                 (catch ((_))
-                   (for await ((item fallback))
-                     (call yield item))))))))
+  (fn onErrorResume ((fallback: (t:ref Source (array (t:ref T)))))
+    : (t:ref Pipe (array (t:ref T) (t:ref T)))
+    (return
+      (fn async generator ((source: (t:ref Source (array (t:ref T)))))
+        (try
+          (for await ((item source))
+            (call yield item))
+          (catch ((_))
+            (for await ((item fallback))
+              (call yield item)))))))
+  (export (export-spec (named onErrorResume)))
   
   ;; defaultIfEmpty - emit default value if source is empty
-  (export (fn defaultIfEmpty ((defaultValue: (t:ref T)))
-                : (t:ref Pipe (array (t:ref T) (t:ref T)))
-           (return
-             (fn async generator ((source: (t:ref Source (array (t:ref T)))))
-               (let* ((isEmpty true))
-                 (block
-                   (for await ((item source))
-                     (assign isEmpty false)
-                     (call yield item))
-                   (if isEmpty
-                     (call yield defaultValue))))))))
+  (fn defaultIfEmpty ((defaultValue: (t:ref T)))
+    : (t:ref Pipe (array (t:ref T) (t:ref T)))
+    (return
+      (fn async generator ((source: (t:ref Source (array (t:ref T)))))
+        (let* ((isEmpty true))
+          (block
+            (for await ((item source))
+              (assign isEmpty false)
+              (call yield item))
+            (if isEmpty
+              (call yield defaultValue)))))))
+  (export (export-spec (named defaultIfEmpty)))
 
   ;; ============================================================================
   ;; FILTERING & TRANSFORMATION
   ;; ============================================================================
   
   ;; distinctUntilChanged - only emit when value changes
-  (export (fn distinctUntilChanged ((comparator: (t:function (t:ref T) (t:ref T) type-boolean)
-                                                  (default (lambda ((a b)) (=== a b)))))
-                : (t:ref Pipe (array (t:ref T) (t:ref T)))
-           (return
-             (fn async generator ((source: (t:ref Source (array (t:ref T)))))
-               (let* ((hasLast false)
-                      (last null))
-                 (for await ((item source))
-                   (if (|| (! hasLast) (! (call comparator last item)))
-                     (block
-                       (call yield item)
-                       (assign last item)
-                       (assign hasLast true)))))))))
+  (fn distinctUntilChanged ((comparator: (t:fn (t:ref T) (t:ref T) type-boolean)
+                                          default (lambda ((a b)) (=== a b))))
+    : (t:ref Pipe (array (t:ref T) (t:ref T)))
+    (return
+      (fn async generator ((source: (t:ref Source (array (t:ref T)))))
+        (let* ((hasLast false)
+               (last null))
+          (for await ((item source))
+            (if (|| (! hasLast) (! (call comparator last item)))
+              (block
+                (call yield item)
+                (assign last item)
+                (assign hasLast true)))))))
+  (export (export-spec (named distinctUntilChanged)))
   
   ;; skip - skip first n values (alias for drop)
-  (export (const skip drop))
+  (const* ((skip drop)))
+  (export (export-spec (named skip)))
   
   ;; skipWhile - skip while predicate is true (alias for dropWhile)
-  (export (const skipWhile dropWhile))
+  (const* ((skipWhile dropWhile)))
+  (export (export-spec (named skipWhile)))
   
   ;; flatten - flatten nested sources
-  (export (fn flatten ()
-                : (t:ref Pipe (array (t:ref Source (array (t:ref T))) (t:ref T)))
-           (return
-             (fn async generator ((source: (t:ref Source (array (t:ref Source (array (t:ref T)))))))
-               (for await ((inner source))
-                 (for await ((item inner))
-                   (call yield item)))))))
+  (fn flatten ()
+    : (t:ref Pipe (array (t:ref Source (array (t:ref T))) (t:ref T)))
+    (return
+      (fn async generator ((source: (t:ref Source (array (t:ref Source (array (t:ref T)))))))
+        (for await ((inner source))
+          (for await ((item inner))
+            (call yield item))))))
+  (export (export-spec (named flatten)))
   
   ;; flatMapLatest - switch to latest inner source, canceling previous
-  (export (fn flatMapLatest ((fn: (t:function (t:ref A) (t:ref Source (array (t:ref B))))))
-                : (t:ref Pipe (array (t:ref A) (t:ref B)))
-           (return
-             (fn async generator ((source: (t:ref Source (array (t:ref A)))))
-               ;; Simplified - real version would handle cancellation
-               (for await ((item source))
-                 (const* ((inner (call fn item)))
-                   (for await ((value inner))
-                     (call yield value))))))))
+  (fn flatMapLatest ((fn: (t:fn (t:ref A) (t:ref Source (array (t:ref B))))))
+    : (t:ref Pipe (array (t:ref A) (t:ref B)))
+    (return
+      (fn async generator ((source: (t:ref Source (array (t:ref A)))))
+        ;; Simplified - real version would handle cancellation
+        (for await ((item source))
+          (const* ((inner (call fn item)))
+            (for await ((value inner))
+              (call yield value)))))))
+  (export (export-spec (named flatMapLatest)))
   
   ;; pairwise - emit pairs of consecutive values
-  (export (fn pairwise ()
-                : (t:ref Pipe (array (t:ref T) (t:ref Array (array (t:ref T)))))
-           (return
-             (fn async generator ((source: (t:ref Source (array (t:ref T)))))
-               (let* ((hasLast false)
-                      (last null))
-                 (for await ((item source))
-                   (if hasLast
-                     (call yield (array last item)))
-                   (assign last item)
-                   (assign hasLast true)))))))
+  (fn pairwise ()
+    : (t:ref Pipe (array (t:ref T) (t:ref Array (array (t:ref T)))))
+    (return
+      (fn async generator ((source: (t:ref Source (array (t:ref T)))))
+        (let* ((hasLast false)
+               (last null))
+          (for await ((item source))
+            (if hasLast
+              (call yield (array last item)))
+            (assign last item)
+            (assign hasLast true))))))
+  (export (export-spec (named pairwise)))
   
   ;; partition - split into two sources based on predicate
-  (export (fn partition ((predicate: (t:function (t:ref T) type-boolean)))
-                : (t:function
-                    (t:ref Source (array (t:ref T)))
-                    (t:ref Array (array (t:ref Source (array (t:ref T))))))
-           (return
-             (lambda ((source: (t:ref Source (array (t:ref T)))))
-               (const* ((passing (array))
-                        (failing (array)))
-                 (block
-                   ;; Simplified - real version would handle async splitting
-                   (array
-                     (call (fn async generator ()
-                             (for await ((item source))
-                               (if (call predicate item)
-                                 (call yield item)))))
-                     (call (fn async generator ()
-                             (for await ((item source))
-                               (if (! (call predicate item))
-                                 (call yield item))))))))))))
+  (fn partition ((predicate: (t:fn (t:ref T) type-boolean)))
+    : (t:fn
+        (t:ref Source (array (t:ref T)))
+        (t:ref Array (array (t:ref Source (array (t:ref T))))))
+    (return
+      (lambda ((source: (t:ref Source (array (t:ref T)))))
+        (const* ((passing (array))
+                 (failing (array)))
+          (block
+            ;; Simplified - real version would handle async splitting
+            (array
+              (call (fn async generator ()
+                      (for await ((item source))
+                        (if (call predicate item)
+                          (call yield item)))))
+              (call (fn async generator ()
+                      (for await ((item source))
+                        (if (! (call predicate item))
+                          (call yield item))))))))))
+  (export (export-spec (named partition)))
 
   ;; ============================================================================
   ;; WINDOWING & GROUPING
   ;; ============================================================================
   
   ;; window - create overlapping windows
-  (export (fn window ((size: type-number))
-                : (t:ref Pipe (array (t:ref T) (t:ref Array (array (t:ref T)))))
-           (return
-             (fn async generator ((source: (t:ref Source (array (t:ref T)))))
-               (let* ((buffer (array)))
-                 (for await ((item source))
-                   (call (prop buffer "push") item)
-                   (if :(buffer.length > size)
-                     (call (prop buffer "shift")))
-                   (if :(buffer.length === size)
-                     (call yield (call (prop buffer "slice"))))))))))
+  (fn window ((size: type-number))
+    : (t:ref Pipe (array (t:ref T) (t:ref Array (array (t:ref T)))))
+    (return
+      (fn async generator ((source: (t:ref Source (array (t:ref T)))))
+        (let* ((buffer (array)))
+          (for await ((item source))
+            (call (prop buffer "push") item)
+            (if :(buffer.length > size)
+              (call (prop buffer "shift")))
+            (if :(buffer.length === size)
+              (call yield (call (prop buffer "slice")))))))))
+  (export (export-spec (named window)))
   
   ;; groupBy - group consecutive values by key
-  (export (fn groupBy ((keyFn: (t:function (t:ref T) (t:ref K))))
-                : (t:ref Pipe (array (t:ref T)
-                                    (t:ref Array (array (t:ref K) (t:ref Array (array (t:ref T)))))))
-           (return
-             (fn async generator ((source: (t:ref Source (array (t:ref T)))))
-               (let* ((currentKey null)
-                      (currentGroup (array))
-                      (hasKey false))
-                 (block
-                   (for await ((item source))
-                     (const* ((key (call keyFn item)))
-                       (if (|| (! hasKey) (!== key currentKey))
-                         (block
-                           (if :(currentGroup.length > 0)
-                             (call yield (array currentKey currentGroup)))
-                           (assign currentKey key)
-                           (assign currentGroup (array))
-                           (assign hasKey true)))
-                       (call (prop currentGroup "push") item)))
-                   (if :(currentGroup.length > 0)
-                     (call yield (array currentKey currentGroup)))))))))
+  (fn groupBy ((keyFn: (t:fn (t:ref T) (t:ref K))))
+    : (t:ref Pipe (array (t:ref T)
+                        (t:ref Array (array (t:ref K) (t:ref Array (array (t:ref T)))))))
+    (return
+      (fn async generator ((source: (t:ref Source (array (t:ref T)))))
+        (let* ((currentKey null)
+               (currentGroup (array))
+               (hasKey false))
+          (block
+            (for await ((item source))
+              (const* ((key (call keyFn item)))
+                (if (|| (! hasKey) (!== key currentKey))
+                  (block
+                    (if :(currentGroup.length > 0)
+                      (call yield (array currentKey currentGroup)))
+                    (assign currentKey key)
+                    (assign currentGroup (array))
+                    (assign hasKey true)))
+                (call (prop currentGroup "push") item)))
+            (if :(currentGroup.length > 0)
+              (call yield (array currentKey currentGroup)))))))
+  (export (export-spec (named groupBy)))
 
   ;; ============================================================================
   ;; STATISTICAL OPERATORS
   ;; ============================================================================
   
   ;; sum - sum all numeric values
-  (export (fn sum ()
-                : (t:ref Sink (array type-number) type-number)
-           (return
-             (call reduce
-                   (lambda ((acc x)) :(acc + x))
-                   0))))
+  (fn sum ()
+    : (t:ref Sink (array type-number) type-number)
+    (return
+      (call reduce
+            (lambda ((acc x)) :(acc + x))
+            0)))
+  (export (export-spec (named sum)))
   
   ;; average - compute mean
-  (export (fn average ()
-                : (t:ref Sink (array type-number) type-number)
-           (return
-             (fn async ((source: (t:ref Source (array type-number))))
-               (let* ((sum 0)
-                      (count 0))
-                 (block
-                   (for await ((item source))
-                     (assign sum :(sum + item))
-                     (assign count :(count + 1)))
-                   (return (if :(count === 0) 0 :(sum / count)))))))))
+  (fn average ()
+    : (t:ref Sink (array type-number) type-number)
+    (return
+      (fn async ((source: (t:ref Source (array type-number))))
+        (let* ((sum 0)
+               (count 0))
+          (block
+            (for await ((item source))
+              (assign sum :(sum + item))
+              (assign count :(count + 1)))
+            (return (if :(count === 0) 0 :(sum / count)))))))
+  (export (export-spec (named average)))
   
   ;; min - find minimum value
-  (export (fn min ()
-                : (t:ref Sink (array type-number) (t:union type-number type-undefined)))
-           (return
-             (fn async ((source: (t:ref Source (array type-number))))
-               (let* ((minVal (t:ref Infinity))
-                      (hasValue false))
-                 (block
-                   (for await ((item source))
-                     (if :(item < minVal)
-                       (assign minVal item))
-                     (assign hasValue true))
-                   (return (if hasValue minVal undefined)))))))
+  (fn min ()
+    : (t:ref Sink (array type-number) (t:union type-number type-undefined))
+    (return
+      (fn async ((source: (t:ref Source (array type-number))))
+        (let* ((minVal Infinity)
+               (hasValue false))
+          (block
+            (for await ((item source))
+              (if :(item < minVal)
+                (assign minVal item))
+              (assign hasValue true))
+            (return (if hasValue minVal undefined))))))
+  (export (export-spec (named min)))
   
   ;; max - find maximum value
-  (export (fn max ()
-                : (t:ref Sink (array type-number) (t:union type-number type-undefined)))
-           (return
-             (fn async ((source: (t:ref Source (array type-number))))
-               (let* ((maxVal (- (t:ref Infinity)))
-                      (hasValue false))
-                 (block
-                   (for await ((item source))
-                     (if :(item > maxVal)
-                       (assign maxVal item))
-                     (assign hasValue true))
-                   (return (if hasValue maxVal undefined)))))))
+  (fn max ()
+    : (t:ref Sink (array type-number) (t:union type-number type-undefined))
+    (return
+      (fn async ((source: (t:ref Source (array type-number))))
+        (let* ((maxVal (- Infinity))
+               (hasValue false))
+          (block
+            (for await ((item source))
+              (if :(item > maxVal)
+                (assign maxVal item))
+              (assign hasValue true))
+            (return (if hasValue maxVal undefined))))))
+  (export (export-spec (named max)))
   )
