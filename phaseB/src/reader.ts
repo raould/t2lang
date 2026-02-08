@@ -7,6 +7,7 @@ import { expand } from "./expander.js";
 import { MacroRegistry } from "./macroRegistry.js";
 import { lowerPhaseB } from "./lower.js";
 import { parsePhaseBPeg } from "./pegParser.js";
+import { rewriteInfixNodes } from "./infixParser.js";
 
 export interface BaseNode {
   loc: SourceLoc;
@@ -84,11 +85,12 @@ export function parsePhaseBRaw(source: string, file = "<input>"): PhaseBNode[] {
   }
   const nodes = parsePhaseBPeg(source, file);
   const registry = new MacroRegistry();
-  return expand(nodes, registry) as PhaseBNode[];
+  const expanded = expand(nodes, registry) as PhaseBNode[];
+  return rewriteInfixNodes(expanded);
 }
 
 function shouldUseReaderMacros(source: string): boolean {
-  return /\bdefreadermacro\b/.test(source) || /[#@]\s*\(/.test(source) || /:\s*\(/.test(source);
+  return /\bdefreadermacro\b/.test(source) || /[#@]\s*\(/.test(source);
 }
 
 function parsePhaseBRawWithReaderMacros(source: string, file: string): PhaseBNode[] {
@@ -98,7 +100,8 @@ function parsePhaseBRawWithReaderMacros(source: string, file: string): PhaseBNod
   const stripped = stripReaderMacroDefs(nodes);
   const wrapped = stripped.map(wrapPhaseBNode);
   const macroRegistry = new MacroRegistry();
-  return expand(wrapped, macroRegistry) as PhaseBNode[];
+  const expanded = expand(wrapped, macroRegistry) as PhaseBNode[];
+  return rewriteInfixNodes(expanded);
 }
 
 function wrapPhaseBNode(node: SExprNode): PhaseBNode {

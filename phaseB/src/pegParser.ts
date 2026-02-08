@@ -4,6 +4,7 @@ import { ParseError } from "./parseError.js";
 import type { TypeAst } from "./typeExpr.js";
 import { parseTypeExpression } from "./typeExpr.js";
 import { serializePhaseBNode } from "./typeAnnotationUtils.js";
+import { parseInfixTokens } from "./infixParser.js";
 import { gensym } from "./gensym.js";
 import { reportError } from "../../common/dist/errorRegistry.js";
 
@@ -68,10 +69,13 @@ const NON_CALL_HEADS = new Set([
 
 const CALLABLE_HEADS = new Set(["fn", "lambda", "method", "getter", "setter"]);
 const CALLABLE_MODIFIERS = new Set(["async", "generator"]);
+const EXPORT_CALLABLE_HEADS = new Set(["fn", "lambda", "method", "getter", "setter"]);
+const EXPORT_DECL_HEADS = new Set(["class", "enum", "namespace", "type-alias", "type-interface", "interface"]);
+const EXPORT_BINDING_HEADS = new Set(["const", "const*", "let", "let*"]);
 
 const GRAMMAR_SOURCE = String.raw`
 T2PhaseB {
-  Program = Spacing FormSpacing*
+  Program = Spacing FormSpacing* end
   FormSpacing = Form Spacing
 
   Form = Expr
@@ -95,7 +99,8 @@ T2PhaseB {
 
   TypeAnnotationTail = Spacing ":" Spacing TypeExpr
 
-  Primary = List
+  Primary = InfixMacro
+    | List
     | ArrayLit
     | ObjectLit
     | String
@@ -106,6 +111,8 @@ T2PhaseB {
     | Atom
     | Comma
     | Colon
+
+  InfixMacro = ":(" Spacing ListBody? Spacing ")"
 
   Postfix = Primary PostfixTail*
   PostfixTail = "." ident &"(" CallArgs -- call
@@ -163,7 +170,8 @@ T2PhaseB {
   ForKind = "of" | "in" | "await"
   BindingExpr = "(" Spacing BindingTarget Spacing Expr Spacing ")"
 
-  TypeDecl = "type" Spacing ident Spacing TypeParams? Spacing TypeExpr
+  TypeDecl = "type" Spacing ident Spacing TypeParams? Spacing TypeDeclExpr
+  TypeDeclExpr = TypeExpr | List
 
   TemplateWith = "template-with" Spacing String Spacing Pair*
   Pair = "(" Spacing Key Spacing Expr Spacing ")"
@@ -189,7 +197,8 @@ T2PhaseB {
     | "typeof" Spacing ident -- typeof
   TypeExprTail = Spacing "," Spacing TypeExpr
 
-  Atom = SpreadIdent | YieldStar | operator | ident
+  Atom = SpreadIdent | YieldStar | TIdent | operator | ident
+  TIdent = "t:" ident
   SpreadIdent = "..." ident
   YieldStar = "yield*"
   operator = operatorChar+
@@ -206,20 +215,22 @@ T2PhaseB {
   number = digit+ fraction?
   fraction = "." digit+
 
-  Spacing = (space | "\n" | "\t")*
+  Spacing = (space | "\n" | "\t" | "\r" | Comment)*
+  Comment = ";" (~"\n" any)* ("\n" | end)
 }
 `;
 
 export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
   const grammar = ohm.grammar(GRAMMAR_SOURCE);
-  const lineStarts = computeLineStarts(source);
+  const maskedSource = maskLineComments(source);
+  const lineStarts = computeLineStarts(maskedSource);
   const locLookup = createLocLookupWithLineStarts(source, file, lineStarts);
   const locFromIndex = createLocFromIndex(lineStarts, file);
-  const preScanError = detectParseError(source, locFromIndex);
+  const preScanError = detectParseError(maskedSource, locFromIndex);
   if (preScanError) {
     throw preScanError;
   }
-  const match = grammar.match(source);
+  const match = grammar.match(maskedSource);
   if (!match.succeeded()) {
     const failurePos =
       (match as unknown as { getRightmostFailurePosition?: () => number }).getRightmostFailurePosition?.() ?? 0;
@@ -510,6 +521,35 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
     }
     return node;
   };
+  const unwrapTypeListValue = (node: PhaseBNode): PhaseBNode => {
+    if (node.phaseKind === "type-annotation") {
+      const annotation = node as PhaseBTypeAnnotation;
+      const target = unwrapTypeListValue(annotation.target);
+      const normalizedAnnotation = unwrapTypeListValue(annotation.annotation);
+      return {
+        ...annotation,
+        target,
+        annotation: normalizedAnnotation,
+        elements: [target, normalizedAnnotation],
+      } as PhaseBNode;
+    }
+    if (node.phaseKind !== "list") {
+      return node;
+    }
+    const listNode = node as PhaseBListNode;
+    const elements = listNode.elements.map(unwrapTypeListValue);
+    const head = elements[0];
+    const second = elements[1];
+    if (head && head.phaseKind === "symbol" && (head as { name: string }).name === "call") {
+      if (second && second.phaseKind === "symbol") {
+        const name = (second as { name: string }).name;
+        if (name.startsWith("t:") || name.startsWith("type-")) {
+          return { ...listNode, elements: elements.slice(1) };
+        }
+      }
+    }
+    return { ...listNode, elements };
+  };
   const unwrapSingleList = (node: PhaseBNode): PhaseBNode => {
     if (node.phaseKind !== "list") {
       return node;
@@ -715,11 +755,108 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
     const normalizedBindings: PhaseBListNode = { ...bindingList, elements: normalizedEntries };
     return [normalizedBindings, ...rest];
   };
+  const rewriteExportDeclaration = (node: PhaseBListNode): PhaseBNode | null => {
+    const head = node.elements[0];
+    if (!head || head.phaseKind !== "symbol" || (head as { name: string }).name !== "export") {
+      return null;
+    }
+    if (node.elements.length !== 2) {
+      return null;
+    }
+    const target = node.elements[1];
+    if (!target || target.phaseKind !== "list") {
+      return null;
+    }
+    const targetList = target as PhaseBListNode;
+    const targetHead = targetList.elements[0];
+    if (targetHead && targetHead.phaseKind === "symbol" && (targetHead as { name: string }).name === "export-spec") {
+      return null;
+    }
+    const names = collectExportNames(targetList);
+    if (names.length === 0) {
+      return null;
+    }
+    const exportSpec = listFromLoc(
+      node.loc,
+      symFromLoc("export-spec", node.loc),
+      ...names.map((name) => symFromLoc(name, node.loc)),
+    );
+    const exportList = listFromLoc(node.loc, symFromLoc("export", node.loc), exportSpec);
+    return listFromLoc(node.loc, symFromLoc("program", node.loc), targetList, exportList);
+  };
+  const collectExportNames = (target: PhaseBListNode): string[] => {
+    const head = target.elements[0];
+    if (!head || head.phaseKind !== "symbol") {
+      return [];
+    }
+    const headName = (head as { name: string }).name;
+    if (EXPORT_CALLABLE_HEADS.has(headName)) {
+      const nameNode = extractCallableName(target.elements.slice(1));
+      return nameNode ? [nameNode] : [];
+    }
+    if (EXPORT_DECL_HEADS.has(headName)) {
+      const nameNode = target.elements[1];
+      const name = nameNode ? stringFromExportName(nameNode) : null;
+      return name ? [name] : [];
+    }
+    if (EXPORT_BINDING_HEADS.has(headName)) {
+      return collectBindingNames(target.elements.slice(1));
+    }
+    return [];
+  };
+  const extractCallableName = (nodes: PhaseBNode[]): string | null => {
+    for (const entry of nodes) {
+      if (entry.phaseKind === "symbol") {
+        const name = (entry as { name: string }).name;
+        if (CALLABLE_MODIFIERS.has(name)) {
+          continue;
+        }
+        return name;
+      }
+      return null;
+    }
+    return null;
+  };
+  const stringFromExportName = (node: PhaseBNode): string | null => {
+    if (node.phaseKind === "symbol") {
+      return (node as { name: string }).name;
+    }
+    if (node.phaseKind === "literal" && typeof (node as { value: unknown }).value === "string") {
+      return (node as { value: string }).value;
+    }
+    return null;
+  };
+  const collectBindingNames = (nodes: PhaseBNode[]): string[] => {
+    if (nodes.length === 0) {
+      return [];
+    }
+    if (nodes.length >= 2 && nodes[0].phaseKind !== "list") {
+      const name = stringFromExportName(nodes[0]);
+      return name ? [name] : [];
+    }
+    const bindingList = nodes[0];
+    if (!bindingList || bindingList.phaseKind !== "list") {
+      return [];
+    }
+    const names: string[] = [];
+    for (const entry of (bindingList as PhaseBListNode).elements) {
+      if (entry.phaseKind !== "list") {
+        continue;
+      }
+      const target = (entry as PhaseBListNode).elements[0];
+      const name = target ? stringFromExportName(target) : null;
+      if (name) {
+        names.push(name);
+      }
+    }
+    return names;
+  };
   const semantics = grammar.createSemantics().addOperation("ast", {
     _iter(...children: OhmNode[]) {
       return children.map((child) => child.ast());
     },
-    Program(_sp: OhmNode, forms: OhmIteration) {
+    Program(_sp: OhmNode, forms: OhmIteration, _end: OhmNode) {
+      void _end;
       const nodes: PhaseBNode[] = [];
       for (const child of forms.asIteration().children) {
         const value = child.ast();
@@ -783,15 +920,27 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
         if (headName === "let" || headName === "let*" || headName === "const" || headName === "const*") {
           normalizedArgs = normalizeLetBindings(normalizedArgs);
         }
-        if (headName === "infix" && normalizedArgs.length === 1) {
-          const onlyArg = normalizedArgs[0];
-          if (onlyArg && onlyArg.phaseKind === "list") {
-            const listArg = onlyArg as PhaseBListNode;
-            const listHead = listArg.elements[0];
-            if (listHead && listHead.phaseKind === "symbol" && (listHead as { name: string }).name === "call") {
-              normalizedArgs = [{ ...listArg, elements: listArg.elements.slice(1) }];
-            }
+        if (headName === "export") {
+          const exportNode = rewriteExportDeclaration(list(this as ohm.Node, head, ...normalizedArgs));
+          if (exportNode) {
+            return exportNode;
           }
+        }
+        if (headName === "infix") {
+          if (normalizedArgs.length !== 1) {
+            throw reportError("T2:0320", (head as PhaseBNode).loc);
+          }
+          const onlyArg = normalizedArgs[0];
+          if (!onlyArg || onlyArg.phaseKind !== "list") {
+            throw reportError("T2:0320", (head as PhaseBNode).loc);
+          }
+          const listArg = onlyArg as PhaseBListNode;
+          const listHead = listArg.elements[0];
+          const tokens =
+            listHead && listHead.phaseKind === "symbol" && (listHead as { name: string }).name === "call"
+              ? listArg.elements.slice(1)
+              : listArg.elements;
+          return parseInfixTokens(tokens, locLookup(this as ohm.Node));
         }
         if (headName === "object") {
           const normalized = normalizeObjectEntries(normalizedArgs as PhaseBNode[]);
@@ -828,6 +977,21 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
     TypeAnnotationTail(_sp1: OhmNode, _colon: OhmNode, _sp2: OhmNode, annotation: OhmNode) {
       void [_sp1, _colon, _sp2];
       return annotation.ast();
+    },
+    InfixMacro(_prefix: OhmNode, _sp1: OhmNode, body: OhmNode, _sp2: OhmNode, _close: OhmNode) {
+      void [_prefix, _sp1, _sp2, _close];
+      let inner: PhaseBNode;
+      if (!body.children.length) {
+        inner = list(this as ohm.Node);
+      } else {
+        const value = unwrapNode(body.ast());
+        if (value && value.phaseKind === "list") {
+          inner = { ...(value as PhaseBListNode), loc: locLookup(this as ohm.Node) };
+        } else {
+          inner = value;
+        }
+      }
+      return list(this as ohm.Node, sym("infix", this as ohm.Node), inner);
     },
     Primary(expr: OhmNode) {
       return expr.ast();
@@ -1043,7 +1207,7 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
       return list(this as ohm.Node, targetNode, unwrapNode(expr.ast()));
     },
     TypeDecl(_kw: OhmNode, _sp1: OhmNode, name: OhmNode, _sp2: OhmNode, typeParams: OhmNode, _sp3: OhmNode, typeExpr: OhmNode) {
-      const typeValue = unwrapNode(typeExpr.ast());
+      const typeValue = unwrapTypeListValue(unwrapNode(typeExpr.ast()));
       if (typeParams.children.length) {
         const params = typeParams.ast() as PhaseBNode[];
         const paramsNode = buildTypeParamsList(params, locLookup(typeParams as ohm.Node));
@@ -1062,6 +1226,9 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
         sym(name.sourceString, name as ohm.Node),
         typeValue,
       );
+    },
+    TypeDeclExpr(expr: OhmNode) {
+      return expr.ast();
     },
     TemplateWith(_kw: OhmNode, _sp1: OhmNode, template: OhmNode, _sp2: OhmNode, pairs: OhmIteration) {
       const loc = locLookup(this as ohm.Node);
@@ -1207,6 +1374,10 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
     SpreadIdent(_dots: OhmNode, name: OhmNode) {
       void _dots;
       return sym(`...${name.sourceString}`, this as ohm.Node);
+    },
+    TIdent(_prefix: OhmNode, name: OhmNode) {
+      void _prefix;
+      return sym(`t:${name.sourceString}`, this as ohm.Node);
     },
     YieldStar(_kw: OhmNode) {
       void _kw;
@@ -1423,6 +1594,33 @@ function computeLineStarts(source: string): number[] {
     }
   }
   return starts;
+}
+
+function maskLineComments(source: string): string {
+  const chars = source.split("");
+  let inString = false;
+  for (let i = 0; i < chars.length; i += 1) {
+    const ch = chars[i];
+    if (inString) {
+      if (ch === "\\") {
+        i += 1;
+      } else if (ch === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === "\"") {
+      inString = true;
+      continue;
+    }
+    if (ch === ";") {
+      for (let j = i; j < chars.length && chars[j] !== "\n"; j += 1) {
+        chars[j] = " ";
+        i = j;
+      }
+    }
+  }
+  return chars.join("");
 }
 
 function positionFromIndex(index: number, lineStarts: number[]): { line: number; column: number } {

@@ -42,7 +42,7 @@ test("operator translations", async () => {
     }
 });
 
-  test.skip("infix operator precedence is inductive", async () => { // no infix yet.
+  test("infix operator precedence is inductive", async () => {
     for (const entry of infixPrecedenceTable) {
       const source = `(infix (a ${entry.low} b ${entry.high} c))`;
       const nodes = parsePhaseBRaw(source, "infix-inductive.t2");

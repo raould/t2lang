@@ -306,6 +306,11 @@ const semantics = grammar.createSemantics().addOperation("ast", {
 
 ## Infix
 
+- admittedly unclear how far we want to go with infix: what expressions can be inside the infix boundaries. e.g. can method calls happen etc.?
+    - ideally only basic math and logic.
+    - primitive values and individual variables.
+    - no other arbitrary nested expressions or forms.
+    - no callables.
 - PEG must hand off to Pratt/parsec for infix.
 - parsec returns full AST back to PEG.
 - use typescript-parsec for Pratt.
@@ -324,3 +329,33 @@ const semantics = grammar.createSemantics().addOperation("ast", {
     - Handle Left Recursion: Ohm supports left-recursive rules, allowing expressions like Expr = Expr "+" Term | Term directly.
     - Generate Types: Use the @ohm-js/cli to generate TypeScript definition files (.d.ts) from the grammar to ensure type safety in semantic actions.
     - Implement Semantics: Create an Ohm operation (semantics.addOperation) in TypeScript to walk the parse tree and build an AST or evaluate the expression.
+
+### Note 
+
+- Right Associativity Note
+
+For right-associative operators (like ^), you'd need to use recursion differently:
+
+```typescript// Right-associative power
+const powerExpr = alt(
+  apply(
+    seq(
+      unaryExpr,
+      tok(TokenKind.Power),
+      rule.ref(() => powerExpr) // Recurse on right side
+    ),
+    ([left, op, right]): Expr => ({
+      type: 'binary',
+      op: op.text,
+      left,
+      right,
+    })
+  ),
+  unaryExpr
+);
+```
+
+### Cleanup
+
+- move tables from sugar.ts to infixParser.ts, pegParser.ts.
+- delete rewrite-based sugar implementation.

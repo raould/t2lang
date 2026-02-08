@@ -3,7 +3,7 @@ import { helperStrictNode, helperMatchNode } from "./e2e_helpers.js";
 
 // things that have failed somewhere before...
 
-test.skip("was empirically failing #4", async () => { // no infix yet.
+test("was empirically failing #4", async () => {
     const source = `(program
         (let ((myobj {x: 42}))
             (if (> myobj.x 41) (console.log "yes1"))
@@ -13,7 +13,7 @@ test.skip("was empirically failing #4", async () => { // no infix yet.
     await helperMatchNode(source, /yes1[\s\S]*yes2[\s\S]*yes3/);
 });
 
-test.skip("was empirically failing #3", async () => { // no infix yet.
+test("was empirically failing #3", async () => {
     const source = `
     (program
         (let ((x 42))
