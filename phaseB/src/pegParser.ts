@@ -227,23 +227,31 @@ T2PhaseB {
 
   TypeParams = "<" Spacing ident TypeParamTail* Spacing ">"
   TypeParamTail = Spacing "," Spacing ident
-  TypeExpr = TypeUnion
+  TypeExpr = TypeConditional
+  TypeConditional = TypeUnion TypeConditionalTail?
+  TypeConditionalTail = Spacing "extends" Spacing TypeUnionNoOptional Spacing "?" Spacing TypeUnion Spacing ":" Spacing TypeUnion
   TypeUnion = TypeIntersection TypeUnionTail*
   TypeUnionTail = Spacing "|" Spacing TypeIntersection
   TypeIntersection = TypePostfix TypeIntersectionTail*
   TypeIntersectionTail = Spacing "&" Spacing TypePostfix
   TypePostfix = TypePrimary TypePostfixTail*
   TypePostfixTail = "[]" | "?" | TypeArgs | TypeIndex
+  TypeUnionNoOptional = TypeIntersectionNoOptional TypeUnionNoOptionalTail*
+  TypeUnionNoOptionalTail = Spacing "|" Spacing TypeIntersectionNoOptional
+  TypeIntersectionNoOptional = TypePostfixNoOptional TypeIntersectionNoOptionalTail*
+  TypeIntersectionNoOptionalTail = Spacing "&" Spacing TypePostfixNoOptional
+  TypePostfixNoOptional = TypePrimary TypePostfixTailNoOptional*
+  TypePostfixTailNoOptional = "[]" | TypeArgs | TypeIndex
   TypeIndex = "[" Spacing TypeExpr Spacing "]"
   TypeArgs = "<" Spacing TypeExpr TypeArgTail* Spacing ">"
   TypeArgTail = Spacing "," Spacing TypeExpr
-  TypePrimary = ident  -- ident
+  TypePrimary = "keyof" Spacing TypeExpr -- keyof
+    | "infer" Spacing ident -- infer
+    | "typeof" Spacing ident -- typeof
+    | ident  -- ident
     | String -- string
     | "(" Spacing TypeExpr Spacing ")" -- paren
     | "[" Spacing TypeExpr TypeExprTail* Spacing "]" -- tuple
-    | "keyof" Spacing TypeExpr -- keyof
-    | "infer" Spacing ident -- infer
-    | "typeof" Spacing ident -- typeof
   TypeExprTail = Spacing "," Spacing TypeExpr
 
   Atom = SpreadIdent | YieldStar | TIdent | operator | identNoAs
@@ -1653,6 +1661,51 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
       const raw = this.sourceString.trim();
       const ast = parseTypeExpression(raw);
       return typeAstToPhaseB(ast, locLookup(this as ohm.Node));
+    },
+    TypeConditional(_first: OhmNode, _tail: OhmNode) {
+      void [_first, _tail];
+      return null;
+    },
+    TypeConditionalTail(
+      _sp1: OhmNode,
+      _extends: OhmNode,
+      _sp2: OhmNode,
+      _check: OhmNode,
+      _sp3: OhmNode,
+      _question: OhmNode,
+      _sp4: OhmNode,
+      _trueType: OhmNode,
+      _sp5: OhmNode,
+      _colon: OhmNode,
+      _sp6: OhmNode,
+      _falseType: OhmNode,
+    ) {
+      void [_sp1, _extends, _sp2, _check, _sp3, _question, _sp4, _trueType, _sp5, _colon, _sp6, _falseType];
+      return null;
+    },
+    TypeUnionNoOptional(_first: OhmNode, _rest: OhmIteration) {
+      void [_first, _rest];
+      return null;
+    },
+    TypeUnionNoOptionalTail(_sp1: OhmNode, _pipe: OhmNode, _sp2: OhmNode, _expr: OhmNode) {
+      void [_sp1, _pipe, _sp2, _expr];
+      return null;
+    },
+    TypeIntersectionNoOptional(_first: OhmNode, _rest: OhmIteration) {
+      void [_first, _rest];
+      return null;
+    },
+    TypeIntersectionNoOptionalTail(_sp1: OhmNode, _amp: OhmNode, _sp2: OhmNode, _expr: OhmNode) {
+      void [_sp1, _amp, _sp2, _expr];
+      return null;
+    },
+    TypePostfixNoOptional(_primary: OhmNode, _rest: OhmIteration) {
+      void [_primary, _rest];
+      return null;
+    },
+    TypePostfixTailNoOptional(_tail: OhmNode) {
+      void _tail;
+      return null;
     },
     TypeUnion(_first: OhmNode, _rest: OhmIteration) {
       void [_first, _rest];
