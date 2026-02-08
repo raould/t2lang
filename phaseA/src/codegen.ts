@@ -129,21 +129,23 @@ export async function generateCode(program: Program, config: CompilerConfig = {}
   }
   const requiresAsync = programRequiresAsync(program);
   const isModule = program.body.some((stmt) => stmt instanceof ImportStmt || stmt instanceof ExportStmt);
-  let tsLines = lines;
-  let lineShift = 0;
+  const libLines = DEFAULT_LIB_REFERENCES.map((lib) => `/// <reference lib="${lib}" />`);
+  let bodyLines = lines;
+  let lineShift = libLines.length;
   if (config.prettyOption === "pretty" && !isModule) {
-    tsLines = ["{", ...tsLines, "}"];
+    bodyLines = ["{", ...bodyLines, "}"];
     lineShift += 1;
   }
   if (requiresAsync) {
     const wrapperPrefix = "async ";
-    tsLines = [
+    bodyLines = [
       `void (${wrapperPrefix}() => {`,
-      ...tsLines.map((line) => (line ? `  ${line}` : "")),
+      ...bodyLines.map((line) => (line ? `  ${line}` : "")),
       "})();",
     ];
     lineShift += 1;
   }
+  const tsLines = libLines.length > 0 ? [...libLines, ...bodyLines] : bodyLines;
   const shiftedMappings = mappings.map((mapping) => ({
     ...mapping,
     generated: {
@@ -154,6 +156,8 @@ export async function generateCode(program: Program, config: CompilerConfig = {}
   const tsSource = tsLines.join("\n");
   return { tsSource, mappings: shiftedMappings };
 }
+
+const DEFAULT_LIB_REFERENCES = ["es2015", "es2018.asynciterable", "dom"];
 
 async function emitStatement(stmt: Statement): Promise<EmittedStatement> {
   if (stmt instanceof StaticBlockStmt) {
@@ -645,9 +649,10 @@ async function emitFunctionSignature(expr: FunctionExpr): Promise<{ typeParams: 
       const paramProperty = param.paramProperty;
       const access = paramProperty?.access ? `${paramProperty.access} ` : "";
       const readonlyPrefix = paramProperty?.readonly ? "readonly " : "";
+      const restPrefix = param.rest ? "..." : "";
       const annotation = param.typeAnnotation ? `: ${await emitTypeNode(param.typeAnnotation)}` : "";
       const defaultValue = param.defaultValue ? ` = ${await emitExpression(param.defaultValue)}` : "";
-      return `${access}${readonlyPrefix}${param.name.name}${annotation}${defaultValue}`;
+      return `${access}${readonlyPrefix}${restPrefix}${param.name.name}${annotation}${defaultValue}`;
     })
   );
   const returnAnnotation = expr.signature.returnType ? `: ${await emitTypeNode(expr.signature.returnType)}` : "";
@@ -1166,8 +1171,9 @@ async function emitTypeNode(node: TypeNode): Promise<string> {
   if (node instanceof TypeFunction) {
     const typeParamText = await emitTypeParams(node.typeParams);
     const params = await Promise.all(node.params.map(emitTypeNode));
+    const namedParams = params.map((param, index) => `arg${index}: ${param}`);
     const returns = await emitTypeNode(node.returns);
-    return `${typeParamText}(${params.join(", ")}) => ${returns}`;
+    return `${typeParamText}(${namedParams.join(", ")}) => ${returns}`;
   }
   if (node instanceof TypeObject) {
     const entries = await Promise.all(node.fields.map(emitTypeField));

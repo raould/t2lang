@@ -1,6 +1,9 @@
+/// <reference lib="es2015" />
+/// <reference lib="es2018.asynciterable" />
+/// <reference lib="dom" />
 type Source<T> = AsyncIterable<T>;
-type Pipe<A, B> = (Source) => Source;
-type Sink<T, R> = (Source) => Promise;
+type Pipe<A, B> = (arg0: Source<A>) => Source<B>;
+type Sink<T, R> = (arg0: Source<T>) => Promise<R>;
 function pipe2(source, op1) {
 return op1(source);
 }
@@ -17,19 +20,42 @@ function pipe5(source, op1, op2, op3, op4) {
 return op4(op3(op2(op1(source))));
 }
 export { pipe5 };
-function pipe(source, rest) {
+function pipe(source, ...ops) {
 let result = source;
-block(for(of, op(ops), result = op(result)), return(result));
+{
+  for (let op of ops) {
+    result = op(result);
+  }
+  return result;
+}
 }
 export { pipe };
 async function* fromArray(items) {
-block(for(of, item(items), yield(item)));
+{
+  for (let item of items) {
+    yield(item);
+  }
+}
 }
 export { fromArray };
 const from = fromArray;
 export { from };
 async function* fromResponse(res) {
-block(const*(reader(res.body.getReader())(), try(while(true, const*(object-pattern("done"(done), "value"(value))(await reader.read())()), if(done, break()), yield(value)), finally(reader.releaseLock()))));
+{
+  const reader = res.body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      yield(value);
+    }
+  }
+  finally {
+    reader.releaseLock();
+  }
+}
 }
 export { fromResponse };
 function fromLazyPromise(fn) {
@@ -39,29 +65,54 @@ yield(await fn());
 }
 export { fromLazyPromise };
 async function* fromIterator(iter) {
-block(for(of, item(iter), yield(item)));
+{
+  for (let item of iter) {
+    yield(item);
+  }
+}
 }
 export { fromIterator };
 async function* fromAsyncIterator(iter) {
-block(for(await, item(iter), yield(item)));
+{
+  for await (let item of iter) {
+    yield(item);
+  }
+}
 }
 export { fromAsyncIterator };
 async function* empty() {
-block(return());
+{
+  return;
+}
 }
 export { empty };
 async function* never() {
-block(await new Promise(() => {
-block();
-}));
+{
+  await new Promise(() => {
+{
+}
+});
+}
 }
 export { never };
 async function* range(start, end, step) {
-block(let*(i(start)(), while((i < end), yield(i), i = (i + step))));
+{
+  let i = start;
+  while ((i < end)) {
+    yield(i);
+    i = (i + step);
+  }
+}
 }
 export { range };
 async function* repeat(value, count) {
-block(let*(i(0)(), while((i < count), yield(value), i = (i + 1))));
+{
+  let i = 0;
+  while ((i < count)) {
+    yield(value);
+    i = (i + 1);
+  }
+}
 }
 export { repeat };
 function map(fn) {
@@ -136,7 +187,18 @@ export { dropWhile };
 function chunk(size) {
 return async function*(source) {
 let batch = [];
-block(for(await, item(source), batch.push(item), if((batch.length >= size), block(yield(batch), batch = []))), if((batch.length > 0), yield(batch)));
+{
+  for await (let item of source) {
+    batch.push(item);
+    if ((batch.length >= size)) {
+      yield(batch);
+      batch = [];
+    }
+  }
+  if ((batch.length > 0)) {
+    yield(batch);
+  }
+}
 };
 }
 export { chunk };
@@ -180,7 +242,8 @@ return async function*(source) {
 const seen = new Set();
 for await (let item of source) {
   if (!seen.has(item)) {
-    block(seen.add(item), yield(item));
+    seen.add(item);
+    yield(item);
   }
 }
 };
@@ -189,27 +252,47 @@ export { distinct };
 function collect() {
 return async function(source) {
 const items = [];
-block(for(await, item(source), items.push(item)), return(items));
+{
+  for await (let item of source) {
+    items.push(item);
+  }
+  return items;
+}
 };
 }
 export { collect };
 function first() {
 return async function(source) {
-block(for(await, item(source), return(item)), return(undefined));
+{
+  for await (let item of source) {
+    return item;
+  }
+  return undefined;
+}
 };
 }
 export { first };
 function last() {
 return async function(source) {
 let lastItem = undefined;
-block(for(await, item(source), lastItem = item), return(lastItem));
+{
+  for await (let item of source) {
+    lastItem = item;
+  }
+  return lastItem;
+}
 };
 }
 export { last };
 function reduce(fn, init) {
 return async function(source) {
 let acc = init;
-block(for(await, item(source), acc = fn(acc, item)), return(acc));
+{
+  for await (let item of source) {
+    acc = fn(acc, item);
+  }
+  return acc;
+}
 };
 }
 export { reduce };
@@ -224,7 +307,6 @@ export { forEach };
 function drain() {
 return async function(source) {
 for await (let _ of source) {
-  block();
 }
 };
 }
@@ -232,19 +314,38 @@ export { drain };
 function count() {
 return async function(source) {
 let n = 0;
-block(for(await, _(source), n = (n + 1)), return(n));
+{
+  for await (let _ of source) {
+    n = (n + 1);
+  }
+  return n;
+}
 };
 }
 export { count };
 function some(fn) {
 return async function(source) {
-block(for(await, item(source), if(fn(item), return(true))), return(false));
+{
+  for await (let item of source) {
+    if (fn(item)) {
+      return true;
+    }
+  }
+  return false;
+}
 };
 }
 export { some };
 function every(fn) {
 return async function(source) {
-block(for(await, item(source), if(!fn(item), return(false))), return(true));
+{
+  for await (let item of source) {
+    if (!fn(item)) {
+      return false;
+    }
+  }
+  return true;
+}
 };
 }
 export { every };

@@ -359,3 +359,4 @@ const powerExpr = alt(
 
 - move tables from sugar.ts to infixParser.ts, pegParser.ts.
 - delete rewrite-based sugar implementation.
+- in general, our cli is apparently not invoking Prettier.

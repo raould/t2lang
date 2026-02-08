@@ -821,11 +821,16 @@ function normalizeFnParams(elements: PhaseBNode[]): PhaseBNode[] {
 function lowerFnParam(node: PhaseBNode): FnParam {
   let target: PhaseBNode | undefined;
   let annotationNode: PhaseBNode | undefined;
+  let rest = false;
 
   if (node.phaseKind === "list") {
     const list = node as PhaseBListNode;
     const first = list.elements[0];
-    if (first && first.phaseKind === "type-annotation") {
+    if (first && first.phaseKind === "symbol" && (first as SymbolNode).name === "rest") {
+      rest = true;
+      target = list.elements[1];
+      annotationNode = list.elements[2];
+    } else if (first && first.phaseKind === "type-annotation") {
       const annotation = first as PhaseBTypeAnnotation;
       target = annotation.target;
       annotationNode = annotation.annotation;
@@ -849,11 +854,21 @@ function lowerFnParam(node: PhaseBNode): FnParam {
     target = annotation.target;
     annotationNode = annotation.annotation;
   } else {
-    target = node;
+    if (node.phaseKind === "symbol") {
+      const spreadTarget = stripSpreadPrefix(node as SymbolNode);
+      if (spreadTarget) {
+        rest = true;
+        target = spreadTarget;
+      } else {
+        target = node;
+      }
+    } else {
+      target = node;
+    }
   }
 
   const typeAnnotation = annotationNode ? lowerTypeNode(annotationNode) : undefined;
-  return { name: lowerIdentifier(target), typeAnnotation };
+  return { name: lowerIdentifier(target), typeAnnotation, rest: rest ? true : undefined };
 }
 
 function typeAstToPhaseB(ast: TypeAst, loc: SourceLoc): PhaseBNode {
@@ -1221,7 +1236,8 @@ function buildRefType(nodes: PhaseBNode[], span: Span): TypeRef | undefined {
   if (!identifier) {
     return undefined;
   }
-  return new TypeRef({ identifier, span });
+  const typeArgs = lowerTypeArgsFromNodes(nodes.slice(1));
+  return new TypeRef({ identifier, span, typeArgs: typeArgs.length > 0 ? typeArgs : undefined });
 }
 
 function buildArrayType(nodes: PhaseBNode[], span: Span): TypeArray | undefined {
@@ -1273,7 +1289,7 @@ function buildApplyType(nodes: PhaseBNode[], span: Span): TypeApp | undefined {
   if (!expr) {
     return undefined;
   }
-  const typeArgs = nodes.slice(1).map((child) => lowerTypeNode(child)).filter((entry): entry is TypeNode => Boolean(entry));
+  const typeArgs = lowerTypeArgsFromNodes(nodes.slice(1));
   if (typeArgs.length === 0) {
     return undefined;
   }
@@ -1339,6 +1355,22 @@ function buildLiteralType(nodes: PhaseBNode[], span: Span): TypeLiteral | undefi
 
 function typeNodesFromList(nodes: PhaseBNode[]): TypeNode[] {
   return nodes.map((node) => lowerTypeNode(node)).filter((entry): entry is TypeNode => Boolean(entry));
+}
+
+function lowerTypeArgsFromNodes(nodes: PhaseBNode[]): TypeNode[] {
+  if (nodes.length === 0) {
+    return [];
+  }
+  const trimmed = stripCommaNodes(nodes);
+  if (trimmed.length === 1 && trimmed[0].phaseKind === "list") {
+    const list = trimmed[0] as PhaseBListNode;
+    const head = list.elements[0];
+    if (head && head.phaseKind === "symbol" && (head as SymbolNode).name === "array") {
+      const entries = stripCommaNodes(list.elements.slice(1));
+      return entries.map((entry) => lowerTypeNode(entry)).filter((entry): entry is TypeNode => Boolean(entry));
+    }
+  }
+  return trimmed.map((entry) => lowerTypeNode(entry)).filter((entry): entry is TypeNode => Boolean(entry));
 }
 
 function stringFromNode(node: PhaseBNode | undefined): string | undefined {

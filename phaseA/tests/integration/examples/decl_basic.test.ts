@@ -12,7 +12,7 @@ test("let declaration as expression", async () => {
 
   assert.strictEqual(result.diagnostics.length, 0);
 
-  const ts = result.tsSource.trim();
+  const ts = result.tsSource.replace(/^\/\/\/ <reference lib="[^"]+" \/>\n/gm, "").trim();
   assert.strictEqual(ts, "{\nlet foo = (x) => {\nx;\n};\nlet x = 42;\nfoo(x);\n}");
 
   const resolveDump = result.events.find(e => e.kind === "resolveDump");

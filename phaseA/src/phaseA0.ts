@@ -417,6 +417,7 @@ export class TryCatchExpr {
 
 export interface FnParam {
   name: Identifier;
+  rest?: boolean;
 }
 
 export interface FnSignature {

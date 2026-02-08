@@ -31,7 +31,7 @@ test("type-function emits parameter and return types", async () => {
   const result = await compile(src, { dumpAst: false, emitTypes: true });
   if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
   assert.equal(result.diagnostics.length, 0, `errors: ${JSON.stringify(result.diagnostics)}`);
-  assert.match(result.tsSource, /type Fn = \(number, string\) => boolean/, "expected function type emission");
+  assert.match(result.tsSource, /type Fn = \(arg0: number, arg1: string\) => boolean/, "expected function type emission");
 });
 
 test("type-interface emits fields", async () => {
@@ -43,5 +43,5 @@ test("type-interface emits fields", async () => {
   if (result.diagnostics.length > 0) { console.error(result.diagnostics); }
   assert.equal(result.diagnostics.length, 0, `errors: ${JSON.stringify(result.diagnostics)}`);
   assert.match(result.tsSource, /interface IContainer/, "expected interface emission");
-  assert.match(result.tsSource, /get:\s*\(string\) => string/, "expected interface field with function type");
+  assert.match(result.tsSource, /get:\s*\(arg0: string\) => string/, "expected interface field with function type");
 });

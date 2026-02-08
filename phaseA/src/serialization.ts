@@ -132,6 +132,7 @@ export type SerializedFnParam = {
   typeAnnotation?: SerializedTypeNode;
   paramProperty?: SerializedParamProperty;
   defaultValue?: SerializedExpression;
+  rest?: boolean;
 };
 
 export type SerializedExpression =
@@ -264,7 +265,7 @@ export async function serializeIdentifier(id: Identifier): Promise<SerializedIde
   return { kind: "identifier", name: id.name, span: await serializeSpan(id.span) };
 }
 
-async function serializeFnParam(param: { name: Identifier; typeAnnotation?: TypeNode; paramProperty?: { access?: "public" | "protected" | "private"; readonly?: boolean }; defaultValue?: Expression }): Promise<SerializedFnParam> {
+async function serializeFnParam(param: { name: Identifier; typeAnnotation?: TypeNode; paramProperty?: { access?: "public" | "protected" | "private"; readonly?: boolean }; defaultValue?: Expression; rest?: boolean }): Promise<SerializedFnParam> {
   const serialized: SerializedFnParam = { name: await serializeIdentifier(param.name) };
   if (param.typeAnnotation) {
     serialized.typeAnnotation = await serializeTypeNode(param.typeAnnotation);
@@ -274,6 +275,9 @@ async function serializeFnParam(param: { name: Identifier; typeAnnotation?: Type
   }
   if (param.defaultValue) {
     serialized.defaultValue = await serializeExpression(param.defaultValue);
+  }
+  if (param.rest) {
+    serialized.rest = true;
   }
   return serialized;
 }
@@ -946,6 +950,7 @@ async function deserializeFnParam(serialized: SerializedFnParam): Promise<FnPara
     typeAnnotation: serialized.typeAnnotation ? await deserializeTypeNode(serialized.typeAnnotation) : undefined,
     paramProperty: serialized.paramProperty ? { ...serialized.paramProperty } : undefined,
     defaultValue: serialized.defaultValue ? await deserializeExpression(serialized.defaultValue) : undefined,
+    rest: serialized.rest ? true : undefined,
   };
 }
 

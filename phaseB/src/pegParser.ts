@@ -13,6 +13,16 @@ type OhmIteration = ohm.IterationNode;
 
 const NON_CALL_HEADS = new Set([
   "program",
+  "block",
+  "static-block",
+  "class-body",
+  "namespace-body",
+  "interface-body",
+  "enum-body",
+  "case",
+  "default",
+  "catch",
+  "finally",
   "fn",
   "lambda",
   "method",

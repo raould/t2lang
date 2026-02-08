@@ -340,6 +340,7 @@ export interface FnParam {
   typeAnnotation?: TypeNode;
   paramProperty?: { access?: "public" | "protected" | "private"; readonly?: boolean };
   defaultValue?: Expression;
+  rest?: boolean;
 }
 export interface FnSignature { parameters: FnParam[]; returnType?: TypeNode; }
 
