@@ -46,7 +46,6 @@ interface CliOptions {
   logPhases?: string[];
   seed?: string;
   prettyOption?: PrettyOption;
-  prettier?: boolean;
   logLevel?: "debug" | "info" | "warn" | "error";
   trace?: boolean;
   tracePhases?: string[];
@@ -160,7 +159,7 @@ export async function main(argv: string[]): Promise<void> {
   }
 
   const target = options.output ?? (isStdin ? "stdout.ts" : getDefaultOutput(inputPath));
-  const formattedSource = options.prettier ? await formatWithPrettier(result.tsSource) : result.tsSource;
+  const formattedSource = prettyOption === "pretty" ? await formatWithPrettier(result.tsSource) : result.tsSource;
   if (writeStdout) {
     console.log(formattedSource);
   } else {
@@ -184,7 +183,6 @@ function buildCommand(): Command {
     .option("-o, --output <path>", "Output file path")
     .option("--stdout", "Write output to stdout")
     .option("--seed <seed>", "Deterministic seed value", "default")
-    .option("--prettier", "Format output with Prettier", false)
     .addOption(new Option("--pretty-option <style>", "Format output").default("pretty").choices([...VALID_PRETTY_OPTIONS]))
     .addOption(
       new Option("--log-level <level>", "Log verbosity")
