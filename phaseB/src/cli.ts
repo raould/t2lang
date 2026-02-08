@@ -4,6 +4,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { Command, CommanderError, Option } from "commander";
+import prettier from "prettier";
 import { ParseError } from "./reader.js";
 import type { ReaderErrorCode } from "./reader.js";
 import type { SourceLoc } from "./location.js";
@@ -45,6 +46,7 @@ interface CliOptions {
   logPhases?: string[];
   seed?: string;
   prettyOption?: PrettyOption;
+  prettier?: boolean;
   logLevel?: "debug" | "info" | "warn" | "error";
   trace?: boolean;
   tracePhases?: string[];
@@ -158,11 +160,12 @@ export async function main(argv: string[]): Promise<void> {
   }
 
   const target = options.output ?? (isStdin ? "stdout.ts" : getDefaultOutput(inputPath));
+  const formattedSource = options.prettier ? await formatWithPrettier(result.tsSource) : result.tsSource;
   if (writeStdout) {
-    console.log(result.tsSource);
+    console.log(formattedSource);
   } else {
     await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.writeFile(target, result.tsSource, "utf8");
+    await fs.writeFile(target, formattedSource, "utf8");
     console.error(`Compiled ${inputPath} -> ${target}`);
   }
 
@@ -181,6 +184,7 @@ function buildCommand(): Command {
     .option("-o, --output <path>", "Output file path")
     .option("--stdout", "Write output to stdout")
     .option("--seed <seed>", "Deterministic seed value", "default")
+    .option("--prettier", "Format output with Prettier", false)
     .addOption(new Option("--pretty-option <style>", "Format output").default("pretty").choices([...VALID_PRETTY_OPTIONS]))
     .addOption(
       new Option("--log-level <level>", "Log verbosity")
@@ -209,6 +213,16 @@ function buildCommand(): Command {
     .option("--warn-return-expected", "Warn when non-void return types omit an explicit return", false)
     .allowUnknownOption(false);
   return cmd;
+}
+
+async function formatWithPrettier(source: string): Promise<string> {
+  try {
+    return await prettier.format(source, { parser: "typescript" });
+  } catch (error) {
+    console.error("Failed to format output with Prettier.");
+    console.error(error);
+    return source;
+  }
 }
 
 function parsePhaseList(value: string): string[] {
