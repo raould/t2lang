@@ -7,7 +7,7 @@
   ;; PROJECT METADATA
   ;; ============================================================================
   
-  (export (const projectConfig
+  (export (const* ((projectConfig
     (object
       ("name" "t2conduit")
       ("version" "1.0.0")
@@ -99,11 +99,11 @@
         (call (prop console "log") "Build complete!")))))
   
   ;; Compile single .t2 file
-  (fn async compileT2File ((sourcePath: type-string)
-                           (outputPath: type-string))
-    (const* ((({compile} (call require "t2lang/compiler")))
-             (({readFile writeFile} (call require "fs/promises")))
-             (({dirname} (call require "path"))))
+  (fn async compileT2File ((sourcePath : type-string)
+                           (outputPath : type-string))
+    (const* (((object-pattern ("compile" compile)) (call require "t2lang/compiler"))
+             ((object-pattern ("readFile" readFile) ("writeFile" writeFile)) (call require "fs/promises"))
+             ((object-pattern ("dirname" dirname)) (call require "path")))
       (block
         ;; Read source
         (const* ((source (await (call readFile sourcePath "utf-8"))))
@@ -127,7 +127,7 @@
   ;; TSCONFIG GENERATION
   ;; ============================================================================
   
-  (export (const tsconfig
+  (export (const* ((tsconfig
     (object
       ("compilerOptions" (object
         ("target" "ES2020")
@@ -147,11 +147,11 @@
         ("allowSyntheticDefaultImports" true)))
       
       ("include" (array "dist/**/*.ts"))
-      ("exclude" (array "node_modules" "dist/**/*.test.ts")))))
+      ("exclude" (array "node_modules" "dist/**/*.test.ts"))))))
   
   ;; Write tsconfig.json
   (export (fn async generateTsConfig ()
-    (const* ((({writeFile} (call require "fs/promises"))))
+    (const* (((object-pattern ("writeFile" writeFile)) (call require "fs/promises")))
       (await (call writeFile
                   "tsconfig.json"
                   (call (prop (t:ref JSON) "stringify") tsconfig null 2)
@@ -162,7 +162,7 @@
   ;; ============================================================================
   
   ;; Generate different strictness level type definitions
-  (export (const typeDefinitionLevels
+  (export (const* ((typeDefinitionLevels
     (array
       (object
         ("name" "loose")
@@ -213,7 +213,7 @@
   ;; TEST CONFIGURATION
   ;; ============================================================================
   
-  (export (const vitestConfig
+  (export (const* ((vitestConfig
     (object
       ("test" (object
         ("globals" true)
@@ -228,7 +228,7 @@
             "**/*.spec.ts"))))
         ("include" (array "dist/**/*.test.ts"))
         ("threads" true)
-        ("isolate" true))))))
+        ("isolate" true)))))
 
   ;; ============================================================================
   ;; DOCUMENTATION GENERATION
@@ -254,7 +254,7 @@
   ;; RELEASE WORKFLOW
   ;; ============================================================================
   
-  (export (fn async release ((version: type-string))
+  (export (fn async release ((version : type-string))
     (block
       (call (prop console "log") (template "Releasing version " version))
       
@@ -276,17 +276,17 @@
       
       ;; 5. Create git tag
       (call (prop console "log") "5. Creating git tag...")
-      (const* ((({exec} (call require "child_process"))))
+      (const* (((object-pattern ("exec" exec)) (call require "child_process")))
         (call exec (template "git tag v" version)))
       
       (call (prop console "log") (template "Release " version " complete!")))))
   
   (fn async runTests ()
-    (const* ((({exec} (call require "child_process"))))
+    (const* (((object-pattern ("exec" exec)) (call require "child_process")))
       (return (new (t:ref Promise)
-                  (lambda ((resolve reject))
+                  (lambda ((resolve) (reject))
                     (call exec "npm test"
-                          (lambda ((error stdout stderr))
+                          (lambda ((error) (stdout) (stderr))
                             (if error
                               (call reject error)
                               (call resolve stdout)))))))))
@@ -297,7 +297,7 @@
   
   ;; Watch mode - rebuild on file changes
   (export (fn async watch ()
-    (const* ((({watch} (call require "chokidar")))
+    (const* (((object-pattern ("watch" watch)) (call require "chokidar"))
              (watcher (call watch "*.t2")))
       (block
         (call (prop console "log") "Watching for changes...")
@@ -312,8 +312,8 @@
   (export (fn async format ()
     (call (prop console "log") "Formatting .t2 files...")
     ;; T2lang formatter
-    (const* ((({format} (call require "t2lang/formatter")))
-             (({readdir readFile writeFile} (call require "fs/promises")))
+    (const* (((object-pattern ("format" format)) (call require "t2lang/formatter"))
+             ((object-pattern ("readdir" readdir) ("readFile" readFile) ("writeFile" writeFile)) (call require "fs/promises"))
              (files (await (call readdir "." ))))
       (block
         (for of ((file files))
@@ -326,7 +326,7 @@
   ;; Lint all files
   (export (fn async lint ()
     (call (prop console "log") "Linting...")
-    (const* ((({lint} (call require "t2lang/linter"))))
+    (const* (((object-pattern ("lint" lint)) (call require "t2lang/linter")))
       (block
         ;; Run linter
         (const* ((results (call lint (array "*.t2"))))

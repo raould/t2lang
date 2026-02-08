@@ -4,6 +4,6 @@
 const VALUE = 7;
 export { VALUE };
 function addValue(x: number): number {
-return (x + VALUE);
+  return x + VALUE;
 }
 export { addValue };

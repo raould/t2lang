@@ -3,7 +3,7 @@
 /// <reference lib="dom" />
 import { addValue, VALUE } from "./A";
 function useA(n: number): number {
-return addValue(n);
+  return addValue(n);
 }
 export { useA };
 const RESULT = useA(VALUE);

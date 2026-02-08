@@ -4,8 +4,6 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = resolve(fileURLToPath(new URL(".", import.meta.url)));
-const rootDir = resolve(scriptDir, "../..");
-const testsDir = resolve(rootDir, ".");
 const testFiles = [];
 
 const collectTests = (dir) => {
@@ -26,7 +24,7 @@ const collectTests = (dir) => {
   }
 };
 
-collectTests(testsDir);
+collectTests(scriptDir);
 console.log(`Found ${testFiles.length} t2 source files.`);
 
 if (testFiles.length === 0) {
