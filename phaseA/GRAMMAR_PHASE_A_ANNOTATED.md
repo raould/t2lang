@@ -137,6 +137,26 @@
     @noncallhead
 ```
 
+### Binding patterns
+
+```ebnf
+<array-pattern> ::= "(" "array-pattern" <binding-target>* <rest-target>? ")"
+    @canonical
+    @noncallhead
+
+<object-pattern> ::= "(" "object-pattern" <object-pattern-field>* <rest-target>? ")"
+    @canonical
+    @noncallhead
+
+<rest> ::= "(" "rest" <binding-target> ")"
+    @canonical
+    @noncallhead
+
+<default> ::= "(" "default" <binding-target> <expression> ")"
+    @canonical
+    @noncallhead
+```
+
 ---
 
 # Functions
@@ -239,6 +259,30 @@ Heritage nodes:
     @canonical
     @noncallhead
     @specialform
+
+<import-default> ::= "(" "import-default" <identifier> <module-spec> ")"
+    @canonical
+    @noncallhead
+
+<import-named> ::= "(" "import-named" "(" <named-import>* ")" <module-spec> ")"
+    @canonical
+    @noncallhead
+
+<import-all> ::= "(" "import-all" <identifier> <module-spec> ")"
+    @canonical
+    @noncallhead
+
+<import-spec> ::= "(" "import-spec" <import-clause>* ")"
+    @canonical
+    @noncallhead
+
+<export-spec> ::= "(" "export-spec" <expression>* ")"
+    @canonical
+    @noncallhead
+
+<named> ::= "(" "named" <identifier> <identifier>? ")"
+    @canonical
+    @noncallhead
 ```
 
 ---
@@ -438,6 +482,41 @@ Heritage nodes:
     @noncallhead
 ```
 
+### await / yield
+
+```ebnf
+<await> ::= "(" "await" <expression> ")"
+    @canonical
+    @noncallhead
+    @specialform
+
+<yield> ::= "(" "yield" <expression>? ")"
+    @canonical
+    @noncallhead
+    @specialform
+
+<yield*> ::= "(" "yield*" <expression> ")"
+    @canonical
+    @noncallhead
+    @specialform
+```
+
+### type-assert
+
+```ebnf
+<type-assert> ::= "(" "type-assert" <expression> <type> ")"
+    @canonical
+    @noncallhead
+```
+
+### computed
+
+```ebnf
+<computed> ::= "(" "computed" <expression> <expression> ")"
+    @canonical
+    @noncallhead
+```
+
 ---
 
 # Type Expressions
@@ -479,4 +558,129 @@ Heritage nodes:
 <type-mapped> ::= "(" "type-mapped" <type-param> <value-type> <name-remap>? <readonly-modifier>? <optional-modifier>? <via>? ")"
     @canonical
     @noncallhead
+
+<type-string> ::= "type-string"
+    @canonical
+    @noncallhead
+    @literal
+
+<type-number> ::= "type-number"
+    @canonical
+    @noncallhead
+    @literal
+
+<type-boolean> ::= "type-boolean"
+    @canonical
+    @noncallhead
+    @literal
+
+<type-null> ::= "type-null"
+    @canonical
+    @noncallhead
+    @literal
+
+<type-undefined> ::= "type-undefined"
+    @canonical
+    @noncallhead
+    @literal
+
+<typeparams> ::= "(" "typeparams" <type-param>* ")"
+    @canonical
+    @noncallhead
+
+<type-app> ::= "(" "type-app" <expression> <type>* ")"
+    @canonical
+    @noncallhead
+
+<interface-body> ::= "(" "interface-body" <expression>* ")"
+    @canonical
+    @noncallhead
+
+<index-signature> ::= "(" "index-signature" "(" <identifier> <type> ")" <type> ("readonly")? ")"
+    @canonical
+    @noncallhead
 ```
+
+---
+
+# Operators
+
+Operators are canonical Phase A forms but are not enumerated individually as node types. They are represented as bare lists like `(+ x y)`, not `(call + x y)`.
+
+```ebnf
+<operator> ::= "(" <operator-symbol> <expression>* ")"
+    @canonical
+    @noncallhead
+
+<operator-symbol> ::= "+" | "-" | "*" | "/" | "%" | "**"
+                    | "==" | "!=" | "===" | "!==" | "<" | ">" | "<=" | ">="
+                    | "&&" | "||" | "!"
+                    | "&" | "|" | "^" | "~" | "<<" | ">>" | ">>>"
+                    | "in" | "instanceof"
+                    | "typeof" | "void" | "delete"
+```
+
+**Note:** These operators are derived from `phaseB/src/sugar.ts` (INFIX_OPERATOR_TABLE) and are lowered by Phase B into canonical operator forms.
+
+---
+
+# Runtime Helpers
+
+Runtime helpers are special functions that Phase B lowers to directly without call wrapping. They provide immutable data structure operations.
+
+```ebnf
+<runtime-helper> ::= "(" <helper-name> <expression>* ")"
+    @canonical
+    @noncallhead
+
+<helper-name> ::= "__t2_setIn" | "__t2_setInMut"
+                | "__t2_updateIn" | "__t2_updateInMut"
+                | "__t2_merge" | "__t2_mergeMut"
+                | "__t2_set" | "__t2_setMut"
+                | "__t2_push" | "__t2_pushMut"
+                | "__t2_pop" | "__t2_popMut"
+                | "__t2_sortBy" | "__t2_sortByMut"
+                | "__t2_reverse" | "__t2_reverseMut"
+                | "__t2_delete" | "__t2_deleteMut"
+                | "__t2_isEqual"
+```
+
+**Note:** These helpers are imported from the `t2lang-runtime` package and are treated as canonical forms during lowering.
+
+---
+
+# Phase B Special Forms
+
+These forms exist only in Phase B and are eliminated during macro expansion or sugar processing:
+
+```ebnf
+<defmacro> ::= "(" "defmacro" <identifier> "(" <identifier>* ")" <expression>* ")"
+    @sugar
+    @noncallhead
+
+<quote> ::= "(" "quote" <expression> ")"
+    @sugar
+    @noncallhead
+
+<quasiquote> ::= "(" "quasiquote" <expression> ")"
+    @sugar
+    @noncallhead
+
+<unquote> ::= "(" "unquote" <expression> ")"
+    @sugar
+    @noncallhead
+
+<unquote-splicing> ::= "(" "unquote-splicing" <expression> ")"
+    @sugar
+    @noncallhead
+
+<infix> ::= "(" "infix" <expression>* ")"
+    @sugar
+    @noncallhead
+
+<list> ::= "(" "list" <expression>* ")"
+    @sugar
+    @noncallhead
+```
+
+**Note:** These are eliminated before Phase A processing and should never appear in Phase A IR.
