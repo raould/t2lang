@@ -889,6 +889,14 @@ function lowerFunction(node: PhaseBListNode, kind: CallableKind): FunctionExpr {
       typeAnnotation: replaceTypeParamsInTypeNode(param.typeAnnotation, typeParamNames),
     }));
     returnType = replaceTypeParamsInTypeNode(returnType, typeParamNames);
+  } else {
+    // Auto-infer type parameters from unresolved TypeRef names in the signature
+    const inferred = inferTypeParamsFromSignature(parameters, returnType, span);
+    if (inferred) {
+      typeParams = inferred.typeParams;
+      parameters = inferred.parameters;
+      returnType = inferred.returnType;
+    }
   }
 
   const body = entries.map(lowerStatement);
@@ -907,6 +915,81 @@ function lowerFunction(node: PhaseBListNode, kind: CallableKind): FunctionExpr {
     async: async ? true : undefined,
     generator: generator ? true : undefined,
   });
+}
+
+function looksLikeTypeVar(name: string): boolean {
+  return name.length === 1 && name >= "A" && name <= "Z";
+}
+
+function collectTypeVarRefs(typeNode: TypeNode | undefined, seen: Set<string>, ordered: string[]): void {
+  if (!typeNode) return;
+  if (typeNode instanceof TypeRef) {
+    const name = typeNode.identifier.name;
+    if (looksLikeTypeVar(name) && !seen.has(name)) {
+      seen.add(name);
+      ordered.push(name);
+    }
+    if (typeNode.typeArgs) {
+      for (const arg of typeNode.typeArgs) collectTypeVarRefs(arg, seen, ordered);
+    }
+    return;
+  }
+  if (typeNode instanceof TypeUnion || typeNode instanceof TypeIntersection) {
+    for (const t of typeNode.types) collectTypeVarRefs(t, seen, ordered);
+    return;
+  }
+  if (typeNode instanceof TypeArray) { collectTypeVarRefs(typeNode.element, seen, ordered); return; }
+  if (typeNode instanceof TypeNullable) { collectTypeVarRefs(typeNode.inner, seen, ordered); return; }
+  if (typeNode instanceof TypeTuple) { for (const t of typeNode.types) collectTypeVarRefs(t, seen, ordered); return; }
+  if (typeNode instanceof TypeFunction) {
+    for (const p of typeNode.params) collectTypeVarRefs(p, seen, ordered);
+    collectTypeVarRefs(typeNode.returns, seen, ordered);
+    return;
+  }
+  if (typeNode instanceof TypeKeyof) { collectTypeVarRefs(typeNode.target, seen, ordered); return; }
+  if (typeNode instanceof TypeIndexed) {
+    collectTypeVarRefs(typeNode.object, seen, ordered);
+    collectTypeVarRefs(typeNode.index, seen, ordered);
+    return;
+  }
+  if (typeNode instanceof TypeConditional) {
+    collectTypeVarRefs(typeNode.check, seen, ordered);
+    collectTypeVarRefs(typeNode.extends, seen, ordered);
+    collectTypeVarRefs(typeNode.trueType, seen, ordered);
+    collectTypeVarRefs(typeNode.falseType, seen, ordered);
+    return;
+  }
+  if (typeNode instanceof TypeObject) {
+    for (const f of typeNode.fields) collectTypeVarRefs(f.fieldType, seen, ordered);
+    return;
+  }
+}
+
+function inferTypeParamsFromSignature(
+  parameters: FnParam[],
+  returnType: TypeNode | undefined,
+  span: Span,
+): { typeParams: TypeParam[]; parameters: FnParam[]; returnType: TypeNode | undefined } | undefined {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const param of parameters) {
+    collectTypeVarRefs(param.typeAnnotation, seen, ordered);
+  }
+  collectTypeVarRefs(returnType, seen, ordered);
+
+  if (ordered.length === 0) return undefined;
+
+  const typeParams = ordered.map(
+    (name) => new TypeParam({ name: new Identifier({ name, span }), span }),
+  );
+  const typeParamNames = new Set(ordered);
+  const newParameters = parameters.map((param) => ({
+    ...param,
+    typeAnnotation: replaceTypeParamsInTypeNode(param.typeAnnotation, typeParamNames),
+  }));
+  const newReturnType = replaceTypeParamsInTypeNode(returnType, typeParamNames);
+
+  return { typeParams, parameters: newParameters, returnType: newReturnType };
 }
 
 function normalizeFnParams(elements: PhaseBNode[]): PhaseBNode[] {
@@ -1190,6 +1273,9 @@ function lowerTypeList(node: PhaseBListNode): TypeNode | undefined {
       return buildInferType(args, span);
     case "t:literal":
       return buildLiteralType(args, span);
+    case "type-object":
+    case "t:object":
+      return buildObjectType(args, span);
     case "type-function":
     case "t:fn":
       return buildFunctionType(args, span);
@@ -1203,6 +1289,29 @@ function lowerTypeList(node: PhaseBListNode): TypeNode | undefined {
     default:
       return undefined;
   }
+}
+
+function buildObjectType(nodes: PhaseBNode[], span: Span): TypeObject | undefined {
+  const fields: TypeField[] = [];
+  for (const node of nodes) {
+    if (node.phaseKind !== "list") continue;
+    const list = node as PhaseBListNode;
+    for (const entry of list.elements) {
+      if (entry.phaseKind !== "list") continue;
+      const fieldList = entry as PhaseBListNode;
+      const keyNode = fieldList.elements[0];
+      const typeNode = fieldList.elements[1];
+      if (!keyNode || !typeNode) continue;
+      const key = keyNode.phaseKind === "literal" ? String((keyNode as LiteralNode).value)
+        : keyNode.phaseKind === "symbol" ? (keyNode as SymbolNode).name
+        : undefined;
+      if (!key) continue;
+      const fieldType = lowerTypeNode(typeNode);
+      if (!fieldType) continue;
+      fields.push(new TypeField({ key, fieldType, span: spanFromLoc(entry.loc) }));
+    }
+  }
+  return new TypeObject({ fields, span });
 }
 
 function buildFunctionType(nodes: PhaseBNode[], span: Span): TypeFunction | undefined {

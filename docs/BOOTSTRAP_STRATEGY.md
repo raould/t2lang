@@ -1,6 +1,192 @@
 # T2Lang Compiler Bootstrap Strategy
 
-## Overview
+## From ground zero
+
+Below is a staged progression from the smallest viable kernel to a full macro‑ and sugar‑rich language with optimizations. Each stage is intentionally minimal, but each unlocks a qualitatively new capability.
+
+---
+
+### **Stage 0 — The Absolute Kernel**
+#### *Goal: Parse s-expressions and emit TypeScript strings.*
+
+This is the “bare metal” of your language.
+
+**Capabilities**
+- Tokenizer for parentheses, symbols, numbers, strings.
+- S-expression parser → nested arrays.
+- A dispatcher that maps a tiny set of forms to TypeScript strings:
+  - `fn` → arrow function
+  - `let` → `const`
+  - `seq` → block `{ … }`
+  - `raw` → embed literal TS
+  - function call → `f(a, b)`
+
+**No macros. No sugar. No hygiene. No modules.**
+
+**Why this stage matters**
+- It’s small enough to hand-write.
+- It can compile the next stage of the compiler.
+- It establishes the canonical AST shape.
+
+---
+
+### **Stage 1 — Self-Hosting Minimal Core**
+#### *Goal: Rewrite the compiler in its own language.*
+
+Now that Stage 0 can compile simple code, you rewrite the compiler in the language itself.
+
+**Capabilities**
+- The compiler is now written in the language.
+- Still no macros.
+- Still no sugar.
+- Add minimal conveniences:
+  - `if`
+  - `do`
+  - `lambda` alias for `fn`
+  - basic arithmetic lowering
+
+**Why this stage matters**
+- You now have a self-hosting system.
+- You can evolve the language without touching TypeScript.
+
+---
+
+### **Stage 2 — Hygienic Macro System (but no sugar yet)**
+#### *Goal: Introduce real power: macros, hygiene, gensym, expansion phases.*
+
+This is the first *qualitative* leap.
+
+**Capabilities**
+- Macro expander with:
+  - hygiene
+  - gensym
+  - quasiquote / unquote
+  - pattern matching (minimal)
+- Clear phase separation:
+  - **Reader** → raw s-exprs
+  - **Parser** → AST
+  - **Macro expander** → expanded AST
+  - **Compiler** → TS
+
+**Why this stage matters**
+- You can now express language features *in the language*.
+- You can implement sugar as macros later.
+- You can build the standard library using macros.
+
+---
+
+### **Stage 3 — Structural Sugar (Reader + Parser Sugar)**
+#### *Goal: Add syntactic conveniences that lower to canonical AST before macros.*
+
+This is where you add sugar that is *not* expressible as macros because it affects parsing.
+
+**Capabilities**
+- Reader-level sugar:
+  - quasiquote characters (`, ,@ '`)
+  - vector literals
+  - keyword literals
+  - commas as list separators
+- Parser-level sugar:
+  - infix operators (with precedence table)
+  - pipeline operators (`->`, `->>`)
+  - destructuring patterns
+  - implicit function call sugar (`(f x y)` vs `f(x, y)`)
+
+**Key invariant**
+All sugar lowers to the same canonical AST that macros operate on.
+
+**Why this stage matters**
+- You now have a pleasant surface syntax.
+- Macro authors don’t need to worry about precedence or sugar interactions.
+
+---
+
+### **Stage 4 — Macro-Defined Sugar (Surface-Level Macros)**
+#### *Goal: Let macros define new syntax-like constructs.*
+
+Now that structural sugar is stable, you allow macros to introduce higher-level constructs:
+
+**Capabilities**
+- `defmacro` can define:
+  - new binding forms (`for`, `match`, `when`, `unless`)
+  - new control flow
+  - DSL-like constructs
+- Macro expansion is deterministic and hygienic.
+- Macro errors include source provenance.
+
+**Why this stage matters**
+- The language becomes *extensible*.
+- Users can build domain-specific layers.
+- You can implement most of the standard library as macros.
+
+---
+
+### **Stage 5 — Semantic Sugar + Type Inference Hooks**
+#### *Goal: Add sugar that depends on semantic information.*
+
+This is sugar that requires knowing types or symbol resolution.
+
+**Capabilities**
+- Dot-access sugar (`obj.field` → `(get obj "field")`)
+- Method call sugar (`obj.method(x)` → `(call obj "method" x)`)
+- Optional chaining sugar
+- Type-directed desugaring (e.g., numeric literal widening)
+
+**Why this stage matters**
+- You now have a language that feels modern and ergonomic.
+- You can interop with TypeScript more naturally.
+
+---
+
+### **Stage 6 — Optimizing Compiler**
+#### *Goal: Introduce real optimizations, but only after the language stabilizes.*
+
+Now that syntax and macros are stable, you can optimize.
+
+**Capabilities**
+- Constant folding
+- Dead code elimination
+- Inline expansion (macro-aware)
+- Tail-call optimization (if desired)
+- Peephole optimizations on emitted TS
+- Optional: emit JS directly instead of TS
+
+**Why this stage matters**
+- You can now target production workloads.
+- You can introduce optimization passes without breaking macro semantics.
+
+---
+
+### **Stage 7 — Advanced Features (Optional)**
+#### *Goal: Add features that require a mature ecosystem.*
+
+Examples:
+- Module system with compile-time linking
+- Incremental compilation
+- Hot-reloadable macro environments
+- Provenance-aware error reporting
+- Semantic drift detection (your specialty)
+- Plugin architecture for sugar/macro packs
+
+---
+
+## **Summary Ladder**
+Here’s the whole progression in one glance:
+
+1. **Stage 0:** Kernel → parse s-exprs, emit TS  
+2. **Stage 1:** Self-hosting minimal core  
+3. **Stage 2:** Hygienic macros + quasiquote  
+4. **Stage 3:** Structural sugar (reader + parser)  
+5. **Stage 4:** Macro-defined sugar  
+6. **Stage 5:** Semantic sugar + type-aware lowering  
+7. **Stage 6:** Optimizing compiler  
+8. **Stage 7:** Advanced ecosystem features  
+
+Each stage is minimal but unlocks the next.
+
+---
+
+## What if we had a working t2lang already?
 
 This document outlines a strategy to bootstrap a new t2lang compiler written in t2lang itself (`.t2` files), while also using this opportunity to implement a cleaner, strictly staged architecture.
 
