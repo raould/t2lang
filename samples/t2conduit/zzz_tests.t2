@@ -12,10 +12,18 @@
       (object
         ("toBe" (lambda ((expected))
           (if (!== expected (unquote var))
-            (console.log (template "toBe fail: " (unquote (str var)) " = " (unquote var))))))
+          (block
+            (console.log (template "toBe fail: " (unquote (String var)) " = " (unquote var)))
+            (return false)
+          )
+          (return true))))
         ("toEqual" (lambda ((expected))
           (if (!= expected (unquote var))
-            (console.log (template "toEqual fail: " (unquote (str var)) " = " (unquote var))))))
+          (block
+            (console.log (template "toBe fail: " (unquote (String var)) " = " (unquote var)))
+            (return false)
+          )
+          (return true))))
       )))
   (console.log (call (prop (expect 4) "toBe") 4))
   (console.log (call (prop (expect "4") "toEqual") 4))
@@ -102,7 +110,7 @@
                   (const* ((result (run source (first))))
                     (block
                       (call (prop (expect executed) "toBe") true)
-                      (call (prop (call expect result) "toBe") 42))))))))
+                      (call (prop (expect result) "toBe") 42))))))))
         
         (call it "empty should emit no values"
           (fn async ()
@@ -195,7 +203,7 @@
                                     (collect))))
                 (block
                   (call (prop (expect result) "toEqual") (array 1 2 3))
-                  (call (prop (call expect sideEffects) "toEqual") (array 10 20 30)))))))
+                  (call (prop (expect sideEffects) "toEqual") (array 10 20 30)))))))
         
         (call it "scan should produce running accumulation"
           (fn async ()
@@ -226,40 +234,40 @@
         (call it "first should return first value"
           (fn async ()
             (const* ((result (run (from (array 1 2 3)) (first))))
-              (call (prop (call expect result) "toBe") 1))))
+              (call (prop (expect result) "toBe") 1))))
         
         (call it "first should return undefined for empty source"
           (fn async ()
             (const* ((result (run (empty) (first))))
-              (call (prop (call expect result) "toBe") undefined))))
+              (call (prop (expect result) "toBe") undefined))))
         
         (call it "last should return last value"
           (fn async ()
             (const* ((result (run (from (array 1 2 3)) (last))))
-              (call (prop (call expect result) "toBe") 3))))
+              (call (prop (expect result) "toBe") 3))))
         
         (call it "reduce should fold stream"
           (fn async ()
             (const* ((result (run (from (array 1 2 3 4))
                                   (reduce (lambda ((acc) (x)) :(acc + x)) 0))))
-              (call (prop (call expect result) "toBe") 10))))
+              (call (prop (expect result) "toBe") 10))))
         
         (call it "count should count values"
           (fn async ()
             (const* ((result (run (from (array 1 2 3 4 5)) (count))))
-              (call (prop (call expect result) "toBe") 5))))
+              (call (prop (expect result) "toBe") 5))))
         
         (call it "some should return true if any match"
           (fn async ()
             (const* ((result (run (from (array 1 2 3 4))
                                   (some (lambda ((x)) :(x > 3))))))
-              (call (prop (call expect result) "toBe") true))))
+              (call (prop (expect result) "toBe") true))))
         
         (call it "every should return true if all match"
           (fn async ()
             (const* ((result (run (from (array 2 4 6))
                                   (every (lambda ((x)) :(x % 2 === 0))))))
-              (call (prop (call expect result) "toBe") true))))
+              (call (prop (expect result) "toBe") true))))
         
         (call it "forEach should execute for each value"
           (fn async ()
@@ -268,7 +276,7 @@
                 (run (from (array 1 2 3))
                      (forEach (lambda ((x))
                                 (assign sum :(sum + x)))))
-                 (call (prop (call expect sum) "toBe") 6)))))
+                 (call (prop (expect sum) "toBe") 6)))))
         
         (call it "drain should consume all values"
           (fn async ()
@@ -278,7 +286,7 @@
                      (tap (lambda ((_))
                             (assign count :(count + 1))))
                      (drain))
-                 (call (prop (call expect count) "toBe") 3))))))))
+                 (call (prop (expect count) "toBe") 3))))))))
 
   ;; ============================================================================
   ;; COMBINING OPERATOR TESTS
@@ -334,7 +342,7 @@
             (const* ((result (run (empty)
                                   (defaultIfEmpty 42)
                                   (first))))
-              (call (prop (call expect result) "toBe") 42))))
+              (call (prop (expect result) "toBe") 42))))
         
         (call it "defaultIfEmpty should not affect non-empty stream"
           (fn async ()
@@ -354,8 +362,8 @@
                                            (yield 42)))))
                       (result (run source (retry 3 (object)) (first))))
                 (block
-                  (call (prop (call expect result) "toBe") 42)
-                  (call (prop (call expect attempts) "toBe") 3)))))))))
+                  (call (prop (expect result) "toBe") 42)
+                  (call (prop (expect attempts) "toBe") 3)))))))))
 
   ;; ============================================================================
   ;; ADVANCED PATTERN TESTS
@@ -373,7 +381,7 @@
                                          (scan (lambda ((acc) (x)) :(acc + x)) 0)
                                          (collect)))))
               ;; [0, 4, 20, 56, 120]
-              (call (prop (call expect (prop result "length")) "toBe") 5))))
+              (call (prop (expect (prop result "length")) "toBe") 5))))
         
         (call it "should handle nested sources"
           (fn async ()
@@ -453,8 +461,8 @@
                                  (count)))
                      (elapsed :((call (prop Date "now")) - start)))
               (block
-                (call (prop (call expect totalCount) "toBe") 50000)
-                (call (prop (call expect :(elapsed < 1000)) "toBe") true)))))
+                (call (prop (expect totalCount) "toBe") 50000)
+                (call (prop (expect :(elapsed < 1000)) "toBe") true)))))
         
         (call it "should support lazy evaluation"
           (fn async ()
@@ -467,9 +475,9 @@
                                            (assign i :(i + 1)))))))
                        (result (await (run source (take 5) (collect)))))
                 (block
-                  (call (prop (call expect (prop result "length")) "toBe") 5)
+                  (call (prop (expect (prop result "length")) "toBe") 5)
                   ;; Should only iterate 5 times due to laziness
-                  (call (prop (call expect iterations) "toBe") 5))))))
+                  (call (prop (expect iterations) "toBe") 5))))))
         
         (call it "should not load entire stream into memory"
           (fn async ()
@@ -488,9 +496,9 @@
                                              (object))
                                     (count))))
                 (block
-                  (call (prop (call expect result) "toBe") 10000)
+                  (call (prop (expect result) "toBe") 10000)
                   ;; With proper backpressure, we shouldn't load everything
-                  (call (prop (call expect :(maxActive < 100)) "toBe") true)))))))))
+                  (call (prop (expect :(maxActive < 100)) "toBe") true)))))))))
 
   ;; ============================================================================
   ;; INTEROP TESTS
@@ -503,21 +511,21 @@
           (fn async ()
             (const* ((promise (call (prop Promise "resolve") 42))
                      (result (run (fromPromise promise) (first))))
-              (call (prop (call expect result) "toBe") 42))))
+              (call (prop (expect result) "toBe") 42))))
         
         (call it "should convert Source to Promise"
           (fn async ()
             (const* ((source (from (array 1 2 3)))
                      (result (await (toPromise source))))
-              (call (prop (call expect result) "toBe") 1))))
+              (call (prop (expect result) "toBe") 1))))
         
         (call it "should check if value is Source"
           (fn async ()
             (const* ((source (from (array 1 2 3))))
               (block
-                (call (prop (call expect (isSource source)) "toBe") true)
-                (call (prop (call expect (isSource (array 1 2 3))) "toBe") false)
-                (call (prop (call expect (isSource 42)) "toBe") false))))))))
+                (call (prop (expect (isSource source)) "toBe") true)
+                (call (prop (expect (isSource (array 1 2 3))) "toBe") false)
+                (call (prop (expect (isSource 42)) "toBe") false))))))))
 
   ;; Run all tests
   (call (prop console "log") "All tests defined"))
