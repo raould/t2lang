@@ -4,7 +4,7 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
 function usage() {
-	console.error("Usage: t2jc <input.t2> [t2b options] [-- <tsc args>]");
+	console.error("Usage: t2jc <input.t2...> [t2b options] [-- <tsc args>]");
 	process.exit(1);
 }
 
@@ -17,8 +17,44 @@ const dashIndex = rawArgs.indexOf("--");
 const t2bArgs = dashIndex === -1 ? rawArgs : rawArgs.slice(0, dashIndex);
 const extraTsc = dashIndex === -1 ? [] : rawArgs.slice(dashIndex + 1);
 
-const input = t2bArgs[0];
-if (!input) {
+const optionArgs = new Set([
+	"-o",
+	"--output",
+	"--seed",
+	"--pretty-option",
+	"--log-level",
+	"--log-phases",
+	"--trace-phases",
+	"--error-format",
+]);
+const flagArgs = new Set([
+	"--stdout",
+	"--log",
+	"--trace",
+	"--dump-ast",
+	"--color",
+	"--no-color",
+	"--warn-no-return-any",
+	"--warn-return-expected",
+]);
+
+const inputs = [];
+for (let i = 0; i < t2bArgs.length; i += 1) {
+	const arg = t2bArgs[i];
+	if (optionArgs.has(arg)) {
+		i += 1;
+		continue;
+	}
+	if (flagArgs.has(arg)) {
+		continue;
+	}
+	if (arg.startsWith("-")) {
+		continue;
+	}
+	inputs.push(arg);
+}
+
+if (inputs.length === 0) {
 	usage();
 }
 
@@ -40,19 +76,23 @@ if (compileResult.status !== 0) {
 const outputIndex = t2bArgs.findIndex((arg) => arg === "-o" || arg === "--output");
 const outputArg = outputIndex >= 0 ? t2bArgs[outputIndex + 1] : undefined;
 const outputPath = outputArg && outputArg !== "-" ? outputArg : undefined;
-if (input === "-" || outputArg === "-" || !input) {
+if (inputs.includes("-") || outputArg === "-") {
 	console.error("t2jc does not support stdin/stdout when compiling to JS");
 	process.exit(1);
 }
+if (inputs.length > 1 && outputPath) {
+	console.error("t2jc does not support --output with multiple input files");
+	process.exit(1);
+}
 
-const tsFile = outputPath
-	? outputPath
-	: (() => {
-			const parsed = path.parse(input);
+const tsFiles = outputPath
+	? [outputPath]
+	: inputs.map((file) => {
+			const parsed = path.parse(file);
 			return path.join(parsed.dir || ".", `${parsed.name}.ts`);
-		})();
+		});
 
-const tscArgs = [tsFile, ...extraTsc];
+const tscArgs = [...tsFiles, ...extraTsc];
 function tryRun(cmd, args) {
 	try {
 		return spawnSync(cmd, args, { stdio: "inherit" });
