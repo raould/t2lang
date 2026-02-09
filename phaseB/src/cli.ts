@@ -178,7 +178,6 @@ export async function main(argv: string[]): Promise<void> {
     } else {
       await fs.mkdir(path.dirname(target), { recursive: true });
       await fs.writeFile(target, formattedSource, "utf8");
-      console.error(`Compiled ${inputPath} -> ${target}`);
     }
 
     for (const event of result.events) {

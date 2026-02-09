@@ -4,345 +4,348 @@
 type Source<T> = AsyncIterable<T>;
 type Pipe<A, B> = (arg0: Source<A>) => Source<B>;
 type Sink<T, R> = (arg0: Source<T>) => Promise<R>;
-function pipe2(source, op1) {
-  return op1(source);
+function pipe2(source: Source<A>, op1: Pipe<A, B> | Sink<A, R>) {
+return op1(source);
 }
 export { pipe2 };
-function pipe3(source, op1, op2) {
-  return op2(op1(source));
+function pipe3(source: Source<A>, op1: Pipe<A, B>, op2: Pipe<B, C> | Sink<B, R>) {
+return op2(op1(source));
 }
 export { pipe3 };
-function pipe4(source, op1, op2, op3) {
-  return op3(op2(op1(source)));
+function pipe4(source: Source<A>, op1: Pipe<A, B>, op2: Pipe<B, C>, op3: Pipe<C, D> | Sink<C, R>) {
+return op3(op2(op1(source)));
 }
 export { pipe4 };
-function pipe5(source, op1, op2, op3, op4) {
-  return op4(op3(op2(op1(source))));
+function pipe5(source: Source<A>, op1: Pipe<A, B>, op2: Pipe<B, C>, op3: Pipe<C, D>, op4: Pipe<D, E> | Sink<D, R>) {
+return op4(op3(op2(op1(source))));
 }
 export { pipe5 };
-function pipe(source, ...ops) {
-  let result = source;
-  {
-    for (let op of ops) {
-      result = op(result);
-    }
-    return result;
+function pipe(source: Source<A>, ...ops: Array<Function>) {
+let result = source;
+{
+  for (let op of ops) {
+    result = op(result);
   }
+  return result;
+}
 }
 export { pipe };
-async function* fromArray(items) {
-  {
-    for (let item of items) {
-      yield item;
-    }
+async function* fromArray(items: Array<T>): Source<T> {
+{
+  for (let item of items) {
+    yield(item);
   }
+}
 }
 export { fromArray };
 const from = fromArray;
 export { from };
-async function* fromResponse(res) {
-  {
-    const reader = res.body.getReader();
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          break;
-        }
-        yield value;
+async function* fromResponse(res: Response): Source<Uint8Array> {
+{
+  const reader = res.body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
       }
-    } finally {
-      reader.releaseLock();
+      yield(value);
     }
   }
+  finally {
+    reader.releaseLock();
+  }
+}
 }
 export { fromResponse };
-function fromLazyPromise(fn) {
-  return (async function* () {
-    yield await fn();
-  })();
+function fromLazyPromise(fn): Source<T> {
+return (async function*() {
+yield(await fn());
+})();
 }
 export { fromLazyPromise };
-async function* fromIterator(iter) {
-  {
-    for (let item of iter) {
-      yield item;
-    }
+async function* fromIterator(iter: Iterable<T>): Source<T> {
+{
+  for (let item of iter) {
+    yield(item);
   }
+}
 }
 export { fromIterator };
-async function* fromAsyncIterator(iter) {
-  {
-    for await (let item of iter) {
-      yield item;
-    }
+async function* fromAsyncIterator(iter: AsyncIterable<T>): Source<T> {
+{
+  for await (let item of iter) {
+    yield(item);
   }
+}
 }
 export { fromAsyncIterator };
-async function* empty() {
-  {
-    return;
-  }
+async function* empty(): Source<any> {
+{
+  return;
+}
 }
 export { empty };
-async function* never() {
-  {
-    await new Promise(() => {
-      {
-      }
-    });
-  }
+async function* never(): Source<any> {
+{
+  await new Promise(() => {
+{
+}
+});
+}
 }
 export { never };
-async function* range(start, end, step) {
-  {
-    let i = start;
-    while (i < end) {
-      yield i;
-      i = i + step;
-    }
+async function* range(start: number, end: number, step: number = 1): Source<number> {
+{
+  let i = start;
+  while ((i < end)) {
+    yield(i);
+    i = (i + step);
   }
+}
 }
 export { range };
-async function* repeat(value, count) {
-  {
-    let i = 0;
-    while (i < count) {
-      yield value;
-      i = i + 1;
-    }
+async function* repeat(value: T, count: number): Source<T> {
+{
+  let i = 0;
+  while ((i < count)) {
+    yield(value);
+    i = (i + 1);
   }
 }
+}
 export { repeat };
-function map(fn) {
-  return async function* (source) {
-    for await (let item of source) {
-      yield fn(item);
-    }
-  };
+function map(fn): Pipe<A, B> {
+return async function*(source: Source<A>) {
+for await (let item of source) {
+  yield(fn(item));
+}
+};
 }
 export { map };
-function filter(fn) {
-  return async function* (source) {
-    for await (let item of source) {
-      if (fn(item)) {
-        yield item;
-      }
-    }
-  };
+function filter(fn): Pipe<T, T> {
+return async function*(source: Source<T>) {
+for await (let item of source) {
+  if (fn(item)) {
+    yield(item);
+  }
+}
+};
 }
 export { filter };
-function take(n) {
-  return async function* (source) {
-    let count = 0;
-    for await (let item of source) {
-      if (count >= n) {
-        break;
-      }
-      yield item;
-      count = count + 1;
-    }
-  };
+function take(n: number): Pipe<T, T> {
+return async function*(source: Source<T>) {
+let count = 0;
+for await (let item of source) {
+  if ((count >= n)) {
+    break;
+  }
+  yield(item);
+  count = (count + 1);
+}
+};
 }
 export { take };
-function drop(n) {
-  return async function* (source) {
-    let count = 0;
-    for await (let item of source) {
-      if (count >= n) {
-        yield item;
-      } else {
-        count = count + 1;
-      }
-    }
-  };
+function drop(n: number): Pipe<T, T> {
+return async function*(source: Source<T>) {
+let count = 0;
+for await (let item of source) {
+  if ((count >= n)) {
+    yield(item);
+  }
+  else {
+    count = (count + 1);
+  }
+}
+};
 }
 export { drop };
-function takeWhile(fn) {
-  return async function* (source) {
-    for await (let item of source) {
-      if (!fn(item)) {
-        break;
-      }
-      yield item;
-    }
-  };
+function takeWhile(fn): Pipe<T, T> {
+return async function*(source: Source<T>) {
+for await (let item of source) {
+  if (!fn(item)) {
+    break;
+  }
+  yield(item);
+}
+};
 }
 export { takeWhile };
-function dropWhile(fn) {
-  return async function* (source) {
-    let dropping = true;
-    for await (let item of source) {
-      if (dropping && fn(item)) {
-        continue;
-      }
-      dropping = false;
-      yield item;
-    }
-  };
+function dropWhile(fn): Pipe<T, T> {
+return async function*(source: Source<T>) {
+let dropping = true;
+for await (let item of source) {
+  if ((dropping && fn(item))) {
+    continue;
+  }
+  dropping = false;
+  yield(item);
+}
+};
 }
 export { dropWhile };
-function chunk(size) {
-  return async function* (source) {
-    let batch = [];
-    {
-      for await (let item of source) {
-        batch.push(item);
-        if (batch.length >= size) {
-          yield batch;
-          batch = [];
-        }
-      }
-      if (batch.length > 0) {
-        yield batch;
-      }
+function chunk(size: number): Pipe<T, Array<T>> {
+return async function*(source: Source<T>) {
+let batch = [];
+{
+  for await (let item of source) {
+    batch.push(item);
+    if ((batch.length >= size)) {
+      yield(batch);
+      batch = [];
     }
-  };
+  }
+  if ((batch.length > 0)) {
+    yield(batch);
+  }
+}
+};
 }
 export { chunk };
-function flatMap(fn, opts) {
-  const concurrency = opts.concurrency || 1;
-  return async function* (source) {
-    if (concurrency === 1) {
-      for await (let item of source) {
-        yield await fn(item);
-      }
-    } else {
-      for await (let item of source) {
-        yield await fn(item);
-      }
-    }
-  };
+function flatMap(fn, opts = {}): Pipe<A, B> {
+const concurrency = (opts.concurrency || 1);
+return async function*(source: Source<A>) {
+if ((concurrency === 1)) {
+  for await (let item of source) {
+    yield(await fn(item));
+  }
+}
+else {
+  for await (let item of source) {
+    yield(await fn(item));
+  }
+}
+};
 }
 export { flatMap };
-function tap(fn) {
-  return async function* (source) {
-    for await (let item of source) {
-      fn(item);
-      yield item;
-    }
-  };
+function tap(fn): Pipe<T, T> {
+return async function*(source: Source<T>) {
+for await (let item of source) {
+  fn(item);
+  yield(item);
+}
+};
 }
 export { tap };
-function scan(fn, init) {
-  return async function* (source) {
-    let acc = init;
-    for await (let item of source) {
-      acc = fn(acc, item);
-      yield acc;
-    }
-  };
+function scan(fn, init: R): Pipe<T, R> {
+return async function*(source: Source<T>) {
+let acc = init;
+for await (let item of source) {
+  acc = fn(acc, item);
+  yield(acc);
+}
+};
 }
 export { scan };
-function distinct() {
-  return async function* (source) {
-    const seen = new Set();
-    for await (let item of source) {
-      if (!seen.has(item)) {
-        seen.add(item);
-        yield item;
-      }
-    }
-  };
+function distinct(): Pipe<T, T> {
+return async function*(source: Source<T>) {
+const seen = new Set();
+for await (let item of source) {
+  if (!seen.has(item)) {
+    seen.add(item);
+    yield(item);
+  }
+}
+};
 }
 export { distinct };
-function collect() {
-  return async function (source) {
-    const items = [];
-    {
-      for await (let item of source) {
-        items.push(item);
-      }
-      return items;
-    }
-  };
+function collect(): Sink<T, Array<T>> {
+return async function(source: Source<T>) {
+const items = [];
+{
+  for await (let item of source) {
+    items.push(item);
+  }
+  return items;
+}
+};
 }
 export { collect };
-function first() {
-  return async function (source) {
-    {
-      for await (let item of source) {
-        return item;
-      }
-      return undefined;
-    }
-  };
+function first(): Sink<T, T | undefined> {
+return async function(source: Source<T>) {
+{
+  for await (let item of source) {
+    return item;
+  }
+  return undefined;
+}
+};
 }
 export { first };
-function last() {
-  return async function (source) {
-    let lastItem = undefined;
-    {
-      for await (let item of source) {
-        lastItem = item;
-      }
-      return lastItem;
-    }
-  };
+function last(): Sink<T, T | undefined> {
+return async function(source: Source<T>) {
+let lastItem = undefined;
+{
+  for await (let item of source) {
+    lastItem = item;
+  }
+  return lastItem;
+}
+};
 }
 export { last };
-function reduce(fn, init) {
-  return async function (source) {
-    let acc = init;
-    {
-      for await (let item of source) {
-        acc = fn(acc, item);
-      }
-      return acc;
-    }
-  };
+function reduce(fn, init: R): Sink<T, R> {
+return async function(source: Source<T>) {
+let acc = init;
+{
+  for await (let item of source) {
+    acc = fn(acc, item);
+  }
+  return acc;
+}
+};
 }
 export { reduce };
-function forEach(fn) {
-  return async function (source) {
-    for await (let item of source) {
-      fn(item);
-    }
-  };
+function forEach(fn): Sink<T, undefined> {
+return async function(source: Source<T>) {
+for await (let item of source) {
+  fn(item);
+}
+};
 }
 export { forEach };
-function drain() {
-  return async function (source) {
-    for await (let _ of source) {
-    }
-  };
+function drain(): Sink<any, undefined> {
+return async function(source: Source<any>) {
+for await (let _ of source) {
+}
+};
 }
 export { drain };
-function count() {
-  return async function (source) {
-    let n = 0;
-    {
-      for await (let _ of source) {
-        n = n + 1;
-      }
-      return n;
-    }
-  };
+function count(): Sink<any, number> {
+return async function(source: Source<any>) {
+let n = 0;
+{
+  for await (let _ of source) {
+    n = (n + 1);
+  }
+  return n;
+}
+};
 }
 export { count };
-function some(fn) {
-  return async function (source) {
-    {
-      for await (let item of source) {
-        if (fn(item)) {
-          return true;
-        }
-      }
-      return false;
-    }
-  };
-}
-export { some };
-function every(fn) {
-  return async function (source) {
-    {
-      for await (let item of source) {
-        if (!fn(item)) {
-          return false;
-        }
-      }
+function some(fn): Sink<T, boolean> {
+return async function(source: Source<T>) {
+{
+  for await (let item of source) {
+    if (fn(item)) {
       return true;
     }
-  };
+  }
+  return false;
+}
+};
+}
+export { some };
+function every(fn): Sink<T, boolean> {
+return async function(source: Source<T>) {
+{
+  for await (let item of source) {
+    if (!fn(item)) {
+      return false;
+    }
+  }
+  return true;
+}
+};
 }
 export { every };
