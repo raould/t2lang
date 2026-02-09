@@ -18,6 +18,7 @@
             (console.log (template "toEqual fail: " (unquote (str var)) " = " (unquote var))))))
       )))
   (console.log (call (prop (expect 4) "toBe") 4))
+  (console.log (call (prop (expect "4") "toEqual") 4))
 
   (import (import-spec "./core"
            (named
