@@ -619,3 +619,986 @@ Here’s the grab bag of things that bite people:
 - **Macro expansion order:**
   - Expanding macros in the wrong order (e.g., inner before outer) can break semantics.
   - Fix: standard outermost-first expansion with recursion on results.
+
+# Drastic Improvements Required
+
+You’re absolutely right to feel that the current approach—hand‑maintained lists like `NON_CALL_HEADS` duplicated across PEG, sugar, and post‑macro phases—is a classic “software engineering smell.” It’s brittle, it’s easy to forget, and it violates the very thing you’re trying to build: a clean, layered, declarative language system.
+
+And yes: **there is a much better way.**  
+In fact, the moment you said “why can’t the grammar itself mark which heads are canonical?” you basically rediscovered what real compiler toolchains do when they mature: **they unify grammar, AST definitions, and semantic metadata into a single source of truth.**
+
+Let me show you what that looks like in a principled, language‑designer‑friendly way.
+
+---
+
+# 🌱 The core insight  
+You want:
+
+- **One place** where canonical node types are defined  
+- **One place** where each node’s semantics are declared  
+- **One place** where the compiler learns which heads are:
+  - canonical IR constructors  
+  - sugar forms  
+  - macro forms  
+  - literal forms  
+  - call‑eligible forms  
+
+Right now, that knowledge is scattered across:
+
+- PEG grammar  
+- Phase B sugar  
+- Macro expander  
+- Post‑macro call lowering  
+- Hand‑maintained lists like `NON_CALL_HEADS`  
+
+This is why you’re feeling the pain.
+
+---
+
+# 🌳 The fix: enrich the grammar with *semantic annotations*
+
+You don’t want to change the grammar’s *shape*—you want to enrich it with metadata.
+
+Something like:
+
+```ebnf
+<call> ::= "(" "call" <expression> <expression>* ")" 
+    @canonical
+    @noncallhead
+```
+
+Or:
+
+```ebnf
+<if> ::= "(" "if" <expression> <statement> (<statement>)? ")"
+    @canonical
+    @noncallhead
+    @specialform
+```
+
+Or:
+
+```ebnf
+<array> ::= "(" "array" <expression>* ")"
+    @canonical
+    @noncallhead
+```
+
+Or:
+
+```ebnf
+<fn> ::= "(" "fn" <callable-flag>* <identifier>? <fn-signature> <statement>* ")"
+    @canonical
+    @noncallhead
+    @binds-scope
+```
+
+These annotations don’t change parsing—they change *how the compiler interprets the parsed tree*.
+
+---
+
+# 🌐 How this becomes the single source of truth
+
+You write a tiny metadata extractor that walks the grammar file and produces:
+
+### 1. A generated `NON_CALL_HEADS` list  
+Everything marked `@noncallhead`.
+
+### 2. A generated list of canonical node tags  
+Everything marked `@canonical`.
+
+### 3. A generated list of special forms  
+Everything marked `@specialform`.
+
+### 4. A generated list of scope‑introducing forms  
+Everything marked `@binds-scope`.
+
+### 5. A generated list of sugar forms  
+Everything marked `@sugar` (if you add that).
+
+### 6. A generated list of macro‑expandable forms  
+Everything *not* marked `@canonical` or `@literal`.
+
+### 7. A generated AST schema  
+So Phase A and Phase B agree on node shapes.
+
+### 8. A generated validator  
+So you can check that Phase B never emits illegal nodes.
+
+### 9. A generated pretty‑printer  
+So you can round‑trip canonical AST.
+
+### 10. A generated error‑message table  
+So each node type has a default error context.
+
+All from the same annotated grammar.
+
+This is how you eliminate the “spread across five files” problem.
+
+---
+
+# 🧩 Why this works so well for s‑expr languages
+
+S‑expr languages are *perfect* for this because:
+
+- Every node has a symbolic head  
+- Every canonical form has a unique head  
+- Every sugar form expands into a canonical form  
+- Every macro expands into canonical forms  
+- Every call is “everything else”  
+
+So the compiler only needs to know:
+
+> “Which heads are canonical?”  
+> “Which heads are sugar?”  
+> “Which heads are special forms?”  
+> “Which heads are literal constructors?”  
+> “Which heads are not calls?”
+
+And all of that can be declared right next to the grammar rule.
+
+---
+
+# 🧠 Why this is better than hand‑maintained lists
+
+### ❌ Current approach  
+- PEG parser has a list  
+- Phase B has a list  
+- Macro expander has a list  
+- Post‑macro sugar has a list  
+- They drift  
+- Bugs appear  
+- You fix one list but forget the others  
+- You add a new canonical node and forget to update `NON_CALL_HEADS`  
+- You get the exact bug you’re seeing now
+
+### ✔️ Annotated grammar approach  
+- One place to declare semantics  
+- Compiler generates all lists  
+- No drift  
+- No duplication  
+- No guessing  
+- No “magic strings”  
+- No “why is this in NON_CALL_HEADS but not that?”  
+- No “why does PEG think this is a call?”  
+- No “why does macro expander treat this as a special form?”  
+
+You get a **declarative, self‑documenting, self‑consistent** system.
+
+---
+
+# 🧱 What this looks like in practice
+
+You add a tiny annotation syntax to your grammar:
+
+```ebnf
+<call> ::= "(" "call" <expression> <expression>* ")" 
+    @canonical
+    @noncallhead
+```
+
+Then you write a 50‑line script that:
+
+- parses the grammar file  
+- extracts all `@noncallhead` tags  
+- emits a JSON or TS file:
+
+```ts
+export const NON_CALL_HEADS = new Set([
+  "call",
+  "if",
+  "while",
+  "for",
+  "array",
+  "object",
+  "type-ref",
+  ...
+]);
+```
+
+Then Phase B and Phase A both import that file.
+
+Boom: one source of truth.
+
+---
+
+# 🔥 The deeper point:  
+You’re not just fixing a bug.  
+You’re evolving your language toolchain into a **real compiler architecture**.
+
+This is exactly how:
+
+- Racket  
+- Clojure  
+- Rust  
+- Elm  
+- OCaml  
+- Swift  
+- Zig  
+- TypeScript  
+
+all eventually converge:  
+**the grammar becomes annotated with semantic metadata, and the compiler generates its own internal tables from it.**
+
+You’re on the right track.
+
+---
+
+Absolutely — let me show you a clean, expressive annotation syntax that fits naturally into your existing `GRAMMAR.md`, keeps everything human‑readable, and gives you a **single source of truth** for Phase A semantics, Phase B sugar, and post‑macro lowering.
+
+I’ll give you:
+
+- a **minimal annotation syntax** that feels native to EBNF  
+- a **richer annotation syntax** if you want more semantic categories  
+- examples applied directly to your grammar  
+- how the compiler would consume these annotations  
+- how this eliminates `NON_CALL_HEADS` and all other duplicated lists  
+
+Let’s build something that feels like a natural extension of your current workflow.
+
+---
+
+# 🌟 Minimal annotation syntax (recommended starting point)
+
+Add metadata lines starting with `@` immediately after a production:
+
+```ebnf
+<call> ::= "(" "call" <expression> <expression>* ")"
+    @canonical
+    @noncallhead
+```
+
+This is simple, readable, and tool‑friendly.
+
+### Supported annotations (minimal set)
+
+| Annotation | Meaning |
+|-----------|---------|
+| `@canonical` | This is a Phase A canonical IR node. |
+| `@noncallhead` | This head must *never* be treated as a function call. |
+| `@specialform` | This node is a special form (macro‑like semantics). |
+| `@literal` | This node is a literal constructor. |
+| `@sugar` | This node is produced by Phase B sugar, not user code. |
+
+This is enough to generate:
+
+- `NON_CALL_HEADS`
+- `CANONICAL_NODE_TAGS`
+- `SPECIAL_FORMS`
+- `LITERAL_FORMS`
+- `SUGAR_FORMS`
+
+All from one file.
+
+---
+
+# 🌱 Example: Annotating your grammar
+
+Here’s what your `<call>` and `<if>` productions look like with annotations:
+
+```ebnf
+<call> ::= "(" "call" <expression> <expression>* ")"
+    @canonical
+    @noncallhead
+
+<if> ::= "(" "if" <expression> <statement> (<statement>)? ")"
+    @canonical
+    @noncallhead
+    @specialform
+```
+
+### Annotating `<array>` and `<object>`:
+
+```ebnf
+<array> ::= "(" "array" <expression>* ")"
+    @canonical
+    @noncallhead
+
+<object> ::= "(" "object" <object-field>* ")"
+    @canonical
+    @noncallhead
+```
+
+### Annotating `<fn>`:
+
+```ebnf
+<fn> ::= "(" "fn" <callable-flag>* <identifier>? <fn-signature> <statement>* ")"
+    @canonical
+    @noncallhead
+    @specialform
+```
+
+### Annotating `<type-ref>`:
+
+```ebnf
+<type-ref> ::= "(" "type-ref" <identifier> <type-args>? ")"
+    @canonical
+    @noncallhead
+```
+
+### Annotating sugar-only nodes:
+
+```ebnf
+<optional-call> ::= "(" "?.call" <expression> <expression>* ")"
+    @canonical
+    @noncallhead
+    @sugar
+```
+
+---
+
+# 🌳 Richer annotation syntax (optional)
+
+If you want more structure, you can use key/value annotations:
+
+```ebnf
+<call> ::= "(" "call" <expression> <expression>* ")"
+    @node(kind="canonical", callhead="never")
+```
+
+Or multiple attributes:
+
+```ebnf
+<if> ::= "(" "if" <expression> <statement> (<statement>)? ")"
+    @node(kind="canonical", callhead="never", form="special")
+```
+
+Or even:
+
+```ebnf
+<fn> ::= "(" "fn" ... ")"
+    @node(
+        kind="canonical",
+        callhead="never",
+        form="special",
+        scope="introduces"
+    )
+```
+
+This is more verbose but gives you room to grow.
+
+---
+
+# 🧠 How the compiler consumes these annotations
+
+You write a tiny script (50–100 lines) that:
+
+1. Reads `GRAMMAR.md`
+2. Finds productions of the form:
+
+   ```
+   <foo> ::= ...
+       @canonical
+       @noncallhead
+       @specialform
+   ```
+
+3. Builds metadata tables:
+
+```ts
+export const CANONICAL = new Set(["call", "if", "array", "object", ...]);
+export const NON_CALL_HEADS = new Set(["call", "if", "array", "object", ...]);
+export const SPECIAL_FORMS = new Set(["if", "fn", "lambda", ...]);
+export const SUGAR_FORMS = new Set(["?.call", "?.[]", ...]);
+```
+
+4. Emits them as a generated file:
+
+```
+generated/phaseA_metadata.ts
+```
+
+5. Phase B and Phase A both import this file.
+
+---
+
+# 🧩 How this fixes your current bug
+
+Right now:
+
+- PEG parser has a list  
+- Phase B sugar has a list  
+- Post‑macro sugar has a list  
+- They drift  
+- You get incorrect call lowering  
+
+With annotations:
+
+- `NON_CALL_HEADS` is generated  
+- PEG parser uses it to recognize canonical forms  
+- Post‑macro sugar uses it to decide call lowering  
+- Macros use it to know which heads are special forms  
+- No duplication  
+- No drift  
+- No guessing  
+
+You get a **single source of truth**.
+
+---
+
+# 🧱 Example: How call lowering becomes trivial
+
+After macro expansion:
+
+```ts
+function lowerCalls(expr) {
+  if (expr.kind === "List") {
+    const head = expr.items[0];
+    if (head.kind === "Symbol" && !NON_CALL_HEADS.has(head.name)) {
+      return Call(head, expr.items.slice(1));
+    }
+  }
+  return mapChildren(expr, lowerCalls);
+}
+```
+
+That’s it.  
+No more hand‑maintained lists.  
+No more bugs.
+
+---
+
+# 🌌 Why this is the right direction
+
+You’re building a language with:
+
+- a PEG parser  
+- a sugar layer  
+- a macro expander  
+- a canonical IR  
+- a type system  
+- a code generator  
+
+The only sane way to keep this consistent is:
+
+> **The grammar must declare the semantics of each node, and the compiler must generate its internal tables from that.**
+
+This is how:
+
+- Racket  
+- Clojure  
+- Rust  
+- Elm  
+- Swift  
+- OCaml  
+- Zig  
+- TypeScript  
+
+all eventually converge.
+
+You’re on the same trajectory.
+
+---
+
+Absolutely — let’s do this properly.
+
+Below is a **fully annotated version of your entire `GRAMMAR.md`**, using the minimal annotation syntax we discussed:
+
+- `@canonical` — Phase A canonical IR node  
+- `@noncallhead` — must *never* be treated as a function call  
+- `@specialform` — special evaluation rules (like `if`, `fn`, `let*`)  
+- `@literal` — literal constructor  
+- `@sugar` — Phase B–only sugar node  
+- `@scope` — introduces a lexical scope  
+
+This gives you a **single source of truth** for Phase A semantics.  
+Your tooling can now extract all metadata automatically.
+
+I’ll annotate **every production that corresponds to a canonical node head**.  
+Non-head productions (like `<identifier>`, `<binding>`, `<param>`, etc.) don’t need annotations.
+
+Let’s begin.
+
+---
+
+# ✅ **FULLY ANNOTATED `GRAMMAR.md`**
+
+Below is your grammar with semantic annotations added.
+
+---
+
+# Phase A Grammar (EBNF)
+
+## Tokens  
+*(no annotations needed)*
+
+---
+
+# Program
+
+```ebnf
+<program> ::= "(" "program" <statement>* ")"
+    @canonical
+    @noncallhead
+    @specialform
+    @scope
+```
+
+---
+
+# Statements
+
+### Block
+
+```ebnf
+<block> ::= "(" "block" <statement>* ")"
+    @canonical
+    @noncallhead
+    @specialform
+    @scope
+```
+
+### If
+
+```ebnf
+<if> ::= "(" "if" <expression> <statement> (<statement>)? ")"
+    @canonical
+    @noncallhead
+    @specialform
+```
+
+### While
+
+```ebnf
+<scope-loop> ::= "(" "while" <expression> <statement> ")"
+    @canonical
+    @noncallhead
+    @specialform
+```
+
+### For (classic)
+
+```ebnf
+<for-classic> ::= "(" "for" "classic" <init>? <condition>? <update>? <statement> ")"
+    @canonical
+    @noncallhead
+    @specialform
+```
+
+### For-of
+
+```ebnf
+<for-of> ::= "(" "for" "of" "(" <binding> <expression> ")" <statement> ")"
+    @canonical
+    @noncallhead
+    @specialform
+```
+
+### For-await
+
+```ebnf
+<for-await> ::= "(" "for" "await" "(" <binding> <expression> ")" <statement> ")"
+    @canonical
+    @noncallhead
+    @specialform
+```
+
+### Return / Break / Continue
+
+```ebnf
+<return> ::= "(" "return" <expression>? ")"
+    @canonical
+    @noncallhead
+    @specialform
+
+<break> ::= "(" "break" <identifier>? ")"
+    @canonical
+    @noncallhead
+    @specialform
+
+<continue> ::= "(" "continue" <identifier>? ")"
+    @canonical
+    @noncallhead
+    @specialform
+```
+
+---
+
+# Bindings
+
+### let* / const*
+
+```ebnf
+<let-star> ::= "(" "let*" <binding>* <statement>* ")"
+    @canonical
+    @noncallhead
+    @specialform
+    @scope
+
+<const-star> ::= "(" "const*" <binding>* <statement>* ")"
+    @canonical
+    @noncallhead
+    @specialform
+    @scope
+```
+
+### assign
+
+```ebnf
+<assign> ::= "(" "assign" <expression> <expression> ")"
+    @canonical
+    @noncallhead
+```
+
+---
+
+# Functions
+
+### fn
+
+```ebnf
+<fn> ::= "(" "fn" <callable-flag>* <identifier>? <fn-signature> <statement>* ")"
+    @canonical
+    @noncallhead
+    @specialform
+    @scope
+```
+
+### lambda
+
+```ebnf
+<lambda> ::= "(" "lambda" <callable-flag>* <fn-signature> <statement>* ")"
+    @canonical
+    @noncallhead
+    @specialform
+    @scope
+```
+
+### method / getter / setter
+
+```ebnf
+<method> ::= "(" "method" <callable-flag>* <string> <fn-signature> <statement>* ")"
+    @canonical
+    @noncallhead
+    @specialform
+    @scope
+
+<getter> ::= "(" "getter" <callable-flag>* <string> <fn-signature> <statement>* ")"
+    @canonical
+    @noncallhead
+    @specialform
+    @scope
+
+<setter> ::= "(" "setter" <callable-flag>* <string> <fn-signature> <statement>* ")"
+    @canonical
+    @noncallhead
+    @specialform
+    @scope
+```
+
+---
+
+# Classes
+
+```ebnf
+<class> ::= "(" "class" <identifier> <type-params>? <class-heritage>* <class-body> ")"
+    @canonical
+    @noncallhead
+    @specialform
+    @scope
+
+<class-body> ::= "(" "class-body" <statement>* ")"
+    @canonical
+    @noncallhead
+    @scope
+
+<static-block> ::= "(" "static-block" <statement>* ")"
+    @canonical
+    @noncallhead
+    @scope
+```
+
+Heritage nodes:
+
+```ebnf
+<class-extends> ::= "(" "extends" <expression> ")"
+    @canonical
+    @noncallhead
+
+<class-implements> ::= "(" "implements" <expression>+ ")"
+    @canonical
+    @noncallhead
+
+<class-abstract> ::= "(" "abstract" ")"
+    @canonical
+    @noncallhead
+
+<class-decorators> ::= "(" "decorators" <expression>+ ")"
+    @canonical
+    @noncallhead
+```
+
+---
+
+# Imports / Exports
+
+```ebnf
+<import> ::= "(" "import" <import-spec> ")"
+    @canonical
+    @noncallhead
+    @specialform
+
+<export> ::= "(" "export" <export-spec> ")"
+    @canonical
+    @noncallhead
+    @specialform
+```
+
+---
+
+# Enums
+
+```ebnf
+<enum> ::= "(" "enum" <identifier> <enum-body> ")"
+    @canonical
+    @noncallhead
+    @specialform
+
+<enum-body> ::= "(" "enum-body" <enum-member>* ")"
+    @canonical
+    @noncallhead
+
+<enum-member> ::= "(" <string> <expression>? ")"
+    @canonical
+    @noncallhead
+```
+
+---
+
+# Namespaces
+
+```ebnf
+<namespace> ::= "(" "namespace" <identifier> <namespace-body> ")"
+    @canonical
+    @noncallhead
+    @specialform
+    @scope
+
+<namespace-body> ::= "(" "namespace-body" <statement>* ")"
+    @canonical
+    @noncallhead
+    @scope
+```
+
+---
+
+# Types
+
+```ebnf
+<type-alias> ::= "(" "type-alias" <identifier> <type-params>? <type> ")"
+    @canonical
+    @noncallhead
+    @specialform
+
+<type-interface> ::= "(" "type-interface" <identifier> <interface-body> ")"
+    @canonical
+    @noncallhead
+    @specialform
+```
+
+---
+
+# Switch
+
+```ebnf
+<switch> ::= "(" "switch" <expression> <case>* <default>? ")"
+    @canonical
+    @noncallhead
+    @specialform
+
+<case> ::= "(" "case" <expression> <statement>* ")"
+    @canonical
+    @noncallhead
+
+<default> ::= "(" "default" <statement>* ")"
+    @canonical
+    @noncallhead
+```
+
+---
+
+# Expressions
+
+### Calls
+
+```ebnf
+<call> ::= "(" "call" <expression> <expression>* ")"
+    @canonical
+    @noncallhead
+
+<call-with-this> ::= "(" "call-with-this" <expression> <expression> <expression>* ")"
+    @canonical
+    @noncallhead
+
+<optional-call> ::= "(" "?.call" <expression> <expression>* ")"
+    @canonical
+    @noncallhead
+    @sugar
+```
+
+### Property access
+
+```ebnf
+<prop> ::= "(" "prop" <expression> (<string> | <expression>) ")"
+    @canonical
+    @noncallhead
+
+<optional-prop> ::= "(" "?." <expression> (<string> | <expression>) ")"
+    @canonical
+    @noncallhead
+    @sugar
+```
+
+### Indexing
+
+```ebnf
+<index> ::= "(" "index" <expression> <expression> ")"
+    @canonical
+    @noncallhead
+
+<optional-index> ::= "(" "?.[]" <expression> <expression> ")"
+    @canonical
+    @noncallhead
+    @sugar
+```
+
+### new / throw / try
+
+```ebnf
+<new> ::= "(" "new" <expression> <expression>* ")"
+    @canonical
+    @noncallhead
+
+<throw> ::= "(" "throw" <expression> ")"
+    @canonical
+    @noncallhead
+    @specialform
+
+<try> ::= "(" "try" <statement> <catch>? <finally>? ")"
+    @canonical
+    @noncallhead
+    @specialform
+```
+
+### catch / finally
+
+```ebnf
+<catch> ::= "(" "catch" <binding>? <statement>* ")"
+    @canonical
+    @noncallhead
+    @scope
+
+<finally> ::= "(" "finally" <statement>* ")"
+    @canonical
+    @noncallhead
+    @scope
+```
+
+### array / object
+
+```ebnf
+<array> ::= "(" "array" <expression>* ")"
+    @canonical
+    @noncallhead
+    @literal
+
+<object> ::= "(" "object" <object-field>* ")"
+    @canonical
+    @noncallhead
+    @literal
+```
+
+### spread
+
+```ebnf
+<spread> ::= "(" "spread" <spread-kind> <expression> ")"
+    @canonical
+    @noncallhead
+```
+
+### ternary
+
+```ebnf
+<ternary> ::= "(" "ternary" <expression> <expression> <expression> ")"
+    @canonical
+    @noncallhead
+    @specialform
+```
+
+### template
+
+```ebnf
+<template> ::= "(" "template" <expression>* ")"
+    @canonical
+    @noncallhead
+```
+
+### non-null
+
+```ebnf
+<non-null> ::= "(" "non-null" <expression> ")"
+    @canonical
+    @noncallhead
+```
+
+---
+
+# Type Expressions
+
+```ebnf
+<type-ref> ::= "(" "type-ref" <identifier> <type-args>? ")"
+    @canonical
+    @noncallhead
+
+<type-function> ::= "(" "type-function" <type-params>? <type>* <type> ")"
+    @canonical
+    @noncallhead
+
+<type-object> ::= "(" "type-object" <type-field>* ")"
+    @canonical
+    @noncallhead
+
+<type-union> ::= "(" "type-union" <type>+ ")"
+    @canonical
+    @noncallhead
+
+<type-intersection> ::= "(" "type-intersection" <type>+ ")"
+    @canonical
+    @noncallhead
+
+<type-literal> ::= "(" "type-literal" <literal>* ")"
+    @canonical
+    @noncallhead
+    @literal
+
+<type-this> ::= "(" "type-this" ")"
+    @canonical
+    @noncallhead
+
+<type-template> ::= "(" "type-template" (<string> | <type>)* ")"
+    @canonical
+    @noncallhead
+
+<type-mapped> ::= "(" "type-mapped" <type-param> <value-type> <name-remap>? <readonly-modifier>? <optional-modifier>? <via>? ")"
+    @canonical
+    @noncallhead
+```
+
+---
+
+# 🎉 **Done. Your grammar is now fully annotated.**
+
+This gives you:
+
+- **One source of truth**  
+- Automatic generation of:
+  - `NON_CALL_HEADS`
+  - `CANONICAL_NODE_TAGS`
+  - `SPECIAL_FORMS`
+  - `SCOPE_FORMS`
+  - `LITERAL_FORMS`
+  - `SUGAR_FORMS`
+- No more drift  
+- No more duplicated lists  
+- No more Phase B guessing  
+- No more call-lowering bugs  

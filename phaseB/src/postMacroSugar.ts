@@ -33,7 +33,9 @@ const NON_CALL_HEADS = new Set([
   "switch",
   "case",
   "default",
+  "let", // Phase B sugar form, lowerer accepts both let and let*
   "let*",
+  "const", // Phase B sugar form, lowerer accepts both const and const*
   "const*",
   "assign",
 
@@ -104,6 +106,9 @@ const NON_CALL_HEADS = new Set([
   "template",
   "non-null",
   "type-assert",
+  "await",
+  "yield",
+  "yield*",
 
   // Type expressions
   "type-string",
@@ -143,9 +148,6 @@ const NON_CALL_HEADS = new Set([
 
   // Unary operators (also canonical Phase A forms)
   "!", "typeof", "void", "delete",
-
-  // Special operators
-  "?", ":", // ternary components
 
   // ===== Runtime helpers (canonical Phase A forms) =====
   // These are special functions that Phase B lowers to directly, without call wrapping
@@ -223,9 +225,30 @@ function applyCallSugarToNode(node: PhaseBNode): PhaseBNode {
       if (child.phaseKind === "type-annotation") {
         return child;
       }
-      // For fn/lambda/method, skip parameter lists (first non-type-param argument)
-      if ((headName === "fn" || headName === "lambda" || headName === "method") && idx === 1) {
-        return child; // Don't process parameter lists
+      // For fn/lambda/method, skip parameter lists and return type annotations
+      if (headName === "fn" || headName === "lambda" || headName === "method") {
+        if (idx === 1) {
+          return child; // Don't process parameter lists
+        }
+        // Skip return types after : marker
+        if (idx >= 2 && listNode.elements[idx - 1]?.phaseKind === "symbol" &&
+            (listNode.elements[idx - 1] as SymbolNode).name === ":") {
+          return child; // Don't process return type annotations
+        }
+      }
+      // For type-alias and type-interface, skip everything after :type-params or typeparams
+      if ((headName === "type-alias" || headName === "type-interface") && idx >= 2) {
+        // Skip :type-params marker and the following list, and all type expressions
+        if (child.phaseKind === "symbol" && (child as SymbolNode).name === ":type-params") {
+          return child;
+        }
+        if (child.phaseKind === "list") {
+          const listHead = (child as PhaseBListNode).elements[0];
+          if (listHead && listHead.phaseKind === "symbol" && (listHead as SymbolNode).name === "typeparams") {
+            return child; // Don't process type param lists
+          }
+        }
+        return child; // Don't process type expressions
       }
       return applyCallSugarToNode(child);
     });
