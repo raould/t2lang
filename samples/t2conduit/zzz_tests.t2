@@ -7,9 +7,8 @@
   (const* ((describe (lambda ((name) (fn)) (call fn)))
            (it (lambda ((name) (fn)) (console.log name) (call fn)))))
 
-  (defmacro defexpect (var)
-   (quasiquote (expect (lambda ((,var))
-    (return
+  (defmacro expect (var)
+   (quasiquote
       (object
         ("toBe" (lambda ((expected))
           (if (!== expected (unquote var))
@@ -17,7 +16,8 @@
         ("toEqual" (lambda ((expected))
           (if (!= expected (unquote var))
             (console.log (template "toEqual fail: " (unquote (str var)) " = " (unquote var))))))
-      ))))))
+      )))
+  (console.log (call (prop (expect 4) "toBe") 4))
 
   (import (import-spec "./core"
            (named
@@ -86,7 +86,7 @@
           (fn async ()
             (const* ((result (run (fromArray (array 1 2 3))
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 1 2 3)))))
+              (call (prop (expect result) "toEqual") (array 1 2 3)))))
         
         (call it "fromLazyPromise should not execute until consumed"
           (fn async ()
@@ -97,26 +97,26 @@
                                      (assign executed true)
                                      (return (call (prop Promise "resolve") 42)))))))
                 (block
-                  (call (prop (call expect executed) "toBe") false)
+                  (call (prop (expect executed) "toBe") false)
                   (const* ((result (run source (first))))
                     (block
-                      (call (prop (call expect executed) "toBe") true)
+                      (call (prop (expect executed) "toBe") true)
                       (call (prop (call expect result) "toBe") 42))))))))
         
         (call it "empty should emit no values"
           (fn async ()
             (const* ((result (run (empty) (collect))))
-              (call (prop (call expect result) "toEqual") (array)))))
+              (call (prop (expect result) "toEqual") (array)))))
         
         (call it "range should generate numeric sequence"
           (fn async ()
             (const* ((result (run (range 0 5 1) (collect))))
-              (call (prop (call expect result) "toEqual") (array 0 1 2 3 4)))))
+              (call (prop (expect result) "toEqual") (array 0 1 2 3 4)))))
         
         (call it "repeat should repeat value n times"
           (fn async ()
             (const* ((result (run (repeat "x" 3) (collect))))
-              (call (prop (call expect result) "toEqual") (array "x" "x" "x"))))))))
+              (call (prop (expect result) "toEqual") (array "x" "x" "x"))))))))
 
   ;; ============================================================================
   ;; PIPE OPERATOR TESTS
@@ -130,49 +130,49 @@
             (const* ((result (run (from (array 1 2 3))
                                   (map (lambda ((x)) :(x * 2)))
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 2 4 6)))))
+              (call (prop (expect result) "toEqual") (array 2 4 6)))))
         
         (call it "filter should keep matching values"
           (fn async ()
             (const* ((result (run (from (array 1 2 3 4 5))
                                   (filter (lambda ((x)) :(x % 2 === 0)))
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 2 4)))))
+              (call (prop (expect result) "toEqual") (array 2 4)))))
         
         (call it "take should limit values"
           (fn async ()
             (const* ((result (run (range 0 100 1)
                                   (take 5)
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 0 1 2 3 4)))))
+              (call (prop (expect result) "toEqual") (array 0 1 2 3 4)))))
         
         (call it "drop should skip values"
           (fn async ()
             (const* ((result (run (from (array 1 2 3 4 5))
                                   (drop 2)
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 3 4 5)))))
+              (call (prop (expect result) "toEqual") (array 3 4 5)))))
         
         (call it "takeWhile should take until predicate fails"
           (fn async ()
             (const* ((result (run (from (array 1 2 3 4 5))
                                   (takeWhile (lambda ((x)) :(x < 4)))
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 1 2 3)))))
+              (call (prop (expect result) "toEqual") (array 1 2 3)))))
         
         (call it "dropWhile should drop until predicate fails"
           (fn async ()
             (const* ((result (run (from (array 1 2 3 4 5))
                                   (dropWhile (lambda ((x)) :(x < 3)))
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 3 4 5)))))
+              (call (prop (expect result) "toEqual") (array 3 4 5)))))
         
         (call it "chunk should group values"
           (fn async ()
             (const* ((result (run (from (array 1 2 3 4 5))
                                   (chunk 2)
                                   (collect))))
-              (call (prop (call expect result) "toEqual")
+              (call (prop (expect result) "toEqual")
                     (array (array 1 2) (array 3 4) (array 5))))))
         
         (call it "flatMap should flatten mapped results"
@@ -183,7 +183,7 @@
                                                    :(x * 2)))
                                            (object))
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 2 4 6)))))
+              (call (prop (expect result) "toEqual") (array 2 4 6)))))
         
         (call it "tap should execute side effects without modifying stream"
           (fn async ()
@@ -193,7 +193,7 @@
                                            (call (prop sideEffects "push") :(x * 10))))
                                     (collect))))
                 (block
-                  (call (prop (call expect result) "toEqual") (array 1 2 3))
+                  (call (prop (expect result) "toEqual") (array 1 2 3))
                   (call (prop (call expect sideEffects) "toEqual") (array 10 20 30)))))))
         
         (call it "scan should produce running accumulation"
@@ -201,14 +201,14 @@
             (const* ((result (run (from (array 1 2 3 4))
                                   (scan (lambda ((acc) (x)) :(acc + x)) 0)
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 1 3 6 10)))))
+              (call (prop (expect result) "toEqual") (array 1 3 6 10)))))
         
         (call it "distinct should remove duplicates"
           (fn async ()
             (const* ((result (run (from (array 1 2 2 3 3 3 4))
                                   (distinct)
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 1 2 3 4))))))))
+              (call (prop (expect result) "toEqual") (array 1 2 3 4))))))))
 
   ;; ============================================================================
   ;; SINK OPERATOR TESTS
@@ -220,7 +220,7 @@
         (call it "collect should gather all values"
           (fn async ()
             (const* ((result (run (from (array 1 2 3)) (collect))))
-              (call (prop (call expect result) "toEqual") (array 1 2 3)))))
+              (call (prop (expect result) "toEqual") (array 1 2 3)))))
         
         (call it "first should return first value"
           (fn async ()
@@ -291,14 +291,14 @@
             (const* ((result (run (concat (from (array 1 2))
                                           (from (array 3 4)))
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 1 2 3 4)))))
+              (call (prop (expect result) "toEqual") (array 1 2 3 4)))))
         
         (call it "zip should combine pairwise"
           (fn async ()
             (const* ((result (run (zip (from (array 1 2 3))
                                        (from (array "a" "b" "c")))
                                   (collect))))
-              (call (prop (call expect result) "toEqual")
+              (call (prop (expect result) "toEqual")
                     (array (array 1 "a") (array 2 "b") (array 3 "c"))))))
         
         (call it "zip should stop at shortest stream"
@@ -306,7 +306,7 @@
             (const* ((result (run (zip (from (array 1 2))
                                        (from (array "a" "b" "c")))
                                   (collect))))
-              (call (prop (call expect result) "toEqual")
+              (call (prop (expect result) "toEqual")
                     (array (array 1 "a") (array 2 "b")))))))))
 
   ;; ============================================================================
@@ -326,7 +326,7 @@
                                   (catchError (lambda ((err))
                                                 (return (from (array :(0 - 1))))))
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 1 :(0 - 1))))))
+              (call (prop (expect result) "toEqual") (array 1 :(0 - 1))))))
         
         (call it "defaultIfEmpty should provide default for empty stream"
           (fn async ()
@@ -340,7 +340,7 @@
             (const* ((result (run (from (array 1 2))
                                   (defaultIfEmpty 42)
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 1 2)))))
+              (call (prop (expect result) "toEqual") (array 1 2)))))
         
         (call it "retry should retry on error"
           (fn async ()
@@ -383,7 +383,7 @@
                                                          (lambda ((a) (b)) :(a + b)))))
                                            (object))
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 3 7)))))
+              (call (prop (expect result) "toEqual") (array 3 7)))))
         
         (call it "should support pairwise operations"
           (fn async ()
@@ -391,14 +391,14 @@
                                   (pairwise)
                                   (map (lambda ((pair)) :((index pair 0) + (index pair 1))))
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 3 5 7)))))
+              (call (prop (expect result) "toEqual") (array 3 5 7)))))
         
         (call it "distinctUntilChanged should only emit when value changes"
           (fn async ()
             (const* ((result (run (from (array 1 1 2 2 2 3 3 1))
                                   (distinctUntilChanged (lambda ((a) (b)) :(a === b)))
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 1 2 3 1))))))
+              (call (prop (expect result) "toEqual") (array 1 2 3 1))))))
 
   ;; ============================================================================
   ;; MACRO TESTS
@@ -412,7 +412,7 @@
             (const* ((result (run (fromArray (array 1 2 3))
                                   (map (lambda ((x)) :(x * 2)))
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 2 4 6)))))
+              (call (prop (expect result) "toEqual") (array 2 4 6)))))
         
         (call it "-> threading macro should work"
           (fn async ()
@@ -420,21 +420,21 @@
                                   (filter (lambda ((x)) :(x > 2)))
                                   (map (lambda ((x)) :(x * 2)))
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 6 8 10)))))
+              (call (prop (expect result) "toEqual") (array 6 8 10)))))
         
         (call it "map-collect macro should work"
           (fn async ()
             (const* ((result (run (from (array 1 2 3))
                                   (map (lambda ((x)) :(x + 1)))
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 2 3 4)))))
+              (call (prop (expect result) "toEqual") (array 2 3 4)))))
         
         (call it "filter-collect macro should work"
           (fn async ()
             (const* ((result (run (from (array 1 2 3 4 5))
                                   (filter (lambda ((x)) :(x % 2 === 0)))
                                   (collect))))
-              (call (prop (call expect result) "toEqual") (array 2 4))))))))
+              (call (prop (expect result) "toEqual") (array 2 4))))))))
 
   ;; ============================================================================
   ;; PERFORMANCE TESTS

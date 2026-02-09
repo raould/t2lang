@@ -1,4 +1,6 @@
-1* check all other TODO files.
+## soon
+
+* check all other TODO files.
 * compare all this with actual typescript docs
     * e.g. https://www.typescriptlang.org/docs/handbook/2/classes.html
 * fix use of relative paths in the compiler implementation.
@@ -10,11 +12,32 @@
 * revisit `(return value)`, the whole implicit return and type heuristic again.
 * more .t2 examples generated from existing .ts examples, and assert equivalence.
     * e.g. static blocks.
-* fix logLevel use re: "none".
-* update GRAMMER.md (and GRAMMAR_TABLE.md perhaps).
-* phase B compile() is wtf vs. phase A compile().
-    * no errors, etc.
-* infix.
+* macros are not expanding correctly.
+    * hard to get any output at all.
+    * hard to use them, the syntax is wonky.
+    * fix reader / macro / sugar / parser ordering.
+    1. Reader
+        tokenize
+        handle literal sugar
+        handle quoting sugar
+        produce raw S-expressions
+    2. Parser (structural sugar, but NOT call sugar)
+        infix → prefix
+        dot sugar → prefix
+        array/object sugar → canonical AST
+        pipeline sugar → canonical AST
+        if/for/while sugar → canonical AST
+        But do not rewrite (f x y) into (call f x y) yet.
+    3. Macro Expander
+        sees raw list forms
+        expands macros
+        expands special forms
+        produces canonical AST
+    4. Post-expansion lowering
+* really really really delete the old rewrite-based sugar.
+
+## some day ideally
+
 * properly hygenic gensym.
 * collate the good things from phase0/1 and phaseA/B and try again.
     * know that it will get squirrely quickly and do random incorrect things you didn't notice.

@@ -8,6 +8,7 @@ import { MacroRegistry } from "./macroRegistry.js";
 import { lowerPhaseB } from "./lower.js";
 import { parsePhaseBPeg } from "./pegParser.js";
 import { rewriteInfixNodes } from "./infixParser.js";
+import { applyCallSugar } from "./postMacroSugar.js";
 
 export interface BaseNode {
   loc: SourceLoc;
@@ -86,7 +87,8 @@ export function parsePhaseBRaw(source: string, file = "<input>"): PhaseBNode[] {
   const nodes = parsePhaseBPeg(source, file);
   const registry = new MacroRegistry();
   const expanded = expand(nodes, registry) as PhaseBNode[];
-  return rewriteInfixNodes(expanded);
+  const withCallSugar = applyCallSugar(expanded);
+  return rewriteInfixNodes(withCallSugar);
 }
 
 function shouldUseReaderMacros(source: string): boolean {
@@ -101,7 +103,8 @@ function parsePhaseBRawWithReaderMacros(source: string, file: string): PhaseBNod
   const wrapped = stripped.map(wrapPhaseBNode);
   const macroRegistry = new MacroRegistry();
   const expanded = expand(wrapped, macroRegistry) as PhaseBNode[];
-  return rewriteInfixNodes(expanded);
+  const withCallSugar = applyCallSugar(expanded);
+  return rewriteInfixNodes(withCallSugar);
 }
 
 function wrapPhaseBNode(node: SExprNode): PhaseBNode {

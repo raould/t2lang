@@ -1279,6 +1279,12 @@ export function parsePhaseBPeg(source: string, file = "<input>"): PhaseBNode[] {
         const wrappedHead = listFromLoc(head.loc, head);
         return list(this as ohm.Node, wrappedHead, ...args);
       }
+      // Don't wrap bare symbols in (call ...) - defer to post-macro pass
+      // This allows macros to be invoked with (macro-name args) syntax
+      if (head && head.phaseKind === "symbol") {
+        return list(this as ohm.Node, head, ...args);
+      }
+      // Only wrap complex expressions in (call ...)
       return list(this as ohm.Node, sym("call", this as ohm.Node), head, ...args);
     },
     Expr(expr: OhmNode) {

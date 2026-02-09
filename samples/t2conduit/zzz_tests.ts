@@ -8,6 +8,7 @@ const it = (name, fn) => {
   console.log(name);
   fn();
 };
+console.log(expect(4).toBe(4));
 import {
   from,
   fromArray,
