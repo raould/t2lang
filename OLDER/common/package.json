@@ -1,0 +1,46 @@
+{
+    "name": "t2lang-common",
+    "version": "0.1.0",
+    "type": "module",
+    "main": "src/cliHelper.js",
+    "exports": {
+        ".": "./src/cliHelper.js",
+        "./ast/sexprPrinter.js": "./dist/ast/sexprPrinter.js",
+        "./ast/sexprPrinter": "./dist/ast/sexprPrinter.js",
+        "./sexprPrinter.js": "./dist/ast/sexprPrinter.js",
+        "./sexprPrinter": "./dist/ast/sexprPrinter.js"
+    },
+    "types": "src/index.d.ts",
+    "files": [
+        "src/*.js",
+        "src/*.d.ts",
+        "src/ast/*.js",
+        "src/ast/*.d.ts",
+        "src/index.d.ts",
+        "dist/*.js",
+        "dist/*.d.ts",
+        "README.md",
+        "tests"
+    ],
+    "license": "MIT",
+    "scripts": {
+        "build": "tsc -p tsconfig.build.json",
+        "clean": "node -e \"const fs=require('fs');['node_modules','dist'].forEach(p=>{try{fs.rmSync(p,{recursive:true,force:true});console.log('removed',p)}catch(e){}})\"",
+        "test": "npm run build && node --import tsx --test \"tests/**/*.test.mjs\"",
+        "lint": "eslint . --ext .ts,.js",
+        "prepublishOnly": "npm run build"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.0.0",
+        "@types/node": "^22.0.0",
+        "@types/prettier": "^3.0.0",
+        "@typescript-eslint/eslint-plugin": "^8.0.0",
+        "@typescript-eslint/parser": "^8.0.0",
+        "eslint": "^9.0.0",
+        "globals": "^15.0.0",
+        "prettier": "^2.8.8",
+        "tsx": "^4.21.0",
+        "typescript": "^5.6.0",
+        "typescript-eslint": "^8.53.0"
+    }
+}

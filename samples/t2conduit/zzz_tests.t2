@@ -3,6 +3,8 @@
 
 (program
 
+  (console.log "start")
+
   ;; Minimal test helpers (avoid external deps for t2run)
   (const* ((describe (lambda ((name) (fn)) (call fn)))
            (it (lambda ((name) (fn)) (console.log name) (call fn)))))
@@ -25,7 +27,7 @@
           )
           (return true))))
       )))
-  (console.log (call (prop (expect 4) "toBe") 4))
+  (console.log (call (prop (expect 5) "toBe") 4))
   (console.log (call (prop (expect "4") "toEqual") 4))
 
   (import (import-spec "./core"

@@ -889,6 +889,14 @@ function lowerFunction(node: PhaseBListNode, kind: CallableKind): FunctionExpr {
       typeAnnotation: replaceTypeParamsInTypeNode(param.typeAnnotation, typeParamNames),
     }));
     returnType = replaceTypeParamsInTypeNode(returnType, typeParamNames);
+  } else {
+    // Auto-infer type parameters from unresolved TypeRef names in the signature
+    const inferred = inferTypeParamsFromSignature(parameters, returnType, span);
+    if (inferred) {
+      typeParams = inferred.typeParams;
+      parameters = inferred.parameters;
+      returnType = inferred.returnType;
+    }
   }
 
   const body = entries.map(lowerStatement);
@@ -907,6 +915,81 @@ function lowerFunction(node: PhaseBListNode, kind: CallableKind): FunctionExpr {
     async: async ? true : undefined,
     generator: generator ? true : undefined,
   });
+}
+
+function looksLikeTypeVar(name: string): boolean {
+  return name.length === 1 && name >= "A" && name <= "Z";
+}
+
+function collectTypeVarRefs(typeNode: TypeNode | undefined, seen: Set<string>, ordered: string[]): void {
+  if (!typeNode) return;
+  if (typeNode instanceof TypeRef) {
+    const name = typeNode.identifier.name;
+    if (looksLikeTypeVar(name) && !seen.has(name)) {
+      seen.add(name);
+      ordered.push(name);
+    }
+    if (typeNode.typeArgs) {
+      for (const arg of typeNode.typeArgs) collectTypeVarRefs(arg, seen, ordered);
+    }
+    return;
+  }
+  if (typeNode instanceof TypeUnion || typeNode instanceof TypeIntersection) {
+    for (const t of typeNode.types) collectTypeVarRefs(t, seen, ordered);
+    return;
+  }
+  if (typeNode instanceof TypeArray) { collectTypeVarRefs(typeNode.element, seen, ordered); return; }
+  if (typeNode instanceof TypeNullable) { collectTypeVarRefs(typeNode.inner, seen, ordered); return; }
+  if (typeNode instanceof TypeTuple) { for (const t of typeNode.types) collectTypeVarRefs(t, seen, ordered); return; }
+  if (typeNode instanceof TypeFunction) {
+    for (const p of typeNode.params) collectTypeVarRefs(p, seen, ordered);
+    collectTypeVarRefs(typeNode.returns, seen, ordered);
+    return;
+  }
+  if (typeNode instanceof TypeKeyof) { collectTypeVarRefs(typeNode.target, seen, ordered); return; }
+  if (typeNode instanceof TypeIndexed) {
+    collectTypeVarRefs(typeNode.object, seen, ordered);
+    collectTypeVarRefs(typeNode.index, seen, ordered);
+    return;
+  }
+  if (typeNode instanceof TypeConditional) {
+    collectTypeVarRefs(typeNode.check, seen, ordered);
+    collectTypeVarRefs(typeNode.extends, seen, ordered);
+    collectTypeVarRefs(typeNode.trueType, seen, ordered);
+    collectTypeVarRefs(typeNode.falseType, seen, ordered);
+    return;
+  }
+  if (typeNode instanceof TypeObject) {
+    for (const f of typeNode.fields) collectTypeVarRefs(f.fieldType, seen, ordered);
+    return;
+  }
+}
+
+function inferTypeParamsFromSignature(
+  parameters: FnParam[],
+  returnType: TypeNode | undefined,
+  span: Span,
+): { typeParams: TypeParam[]; parameters: FnParam[]; returnType: TypeNode | undefined } | undefined {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const param of parameters) {
+    collectTypeVarRefs(param.typeAnnotation, seen, ordered);
+  }
+  collectTypeVarRefs(returnType, seen, ordered);
+
+  if (ordered.length === 0) return undefined;
+
+  const typeParams = ordered.map(
+    (name) => new TypeParam({ name: new Identifier({ name, span }), span }),
+  );
+  const typeParamNames = new Set(ordered);
+  const newParameters = parameters.map((param) => ({
+    ...param,
+    typeAnnotation: replaceTypeParamsInTypeNode(param.typeAnnotation, typeParamNames),
+  }));
+  const newReturnType = replaceTypeParamsInTypeNode(returnType, typeParamNames);
+
+  return { typeParams, parameters: newParameters, returnType: newReturnType };
 }
 
 function normalizeFnParams(elements: PhaseBNode[]): PhaseBNode[] {
@@ -940,9 +1023,37 @@ function normalizeFnParams(elements: PhaseBNode[]): PhaseBNode[] {
   return normalized;
 }
 
+function isPossibleTypeExpression(node: PhaseBNode): boolean {
+  if (node.phaseKind === "type-annotation") {
+    return true;
+  }
+  if (node.phaseKind === "symbol") {
+    const name = (node as SymbolNode).name;
+    return name.toLowerCase() in PRIMITIVE_TYPE_MAP;
+  }
+  if (node.phaseKind === "list") {
+    const list = node as PhaseBListNode;
+    const head = list.elements[0];
+    if (head?.phaseKind === "symbol") {
+      const name = (head as SymbolNode).name;
+      return name.startsWith("t:") || name.startsWith("type-");
+    }
+    // Handle wrapped type head: ((t:fn) ...) where the parser wraps the t: keyword in a list
+    if (head?.phaseKind === "list") {
+      const innerList = head as PhaseBListNode;
+      if (innerList.elements.length === 1 && innerList.elements[0]?.phaseKind === "symbol") {
+        const name = (innerList.elements[0] as SymbolNode).name;
+        return name.startsWith("t:") || name.startsWith("type-");
+      }
+    }
+  }
+  return false;
+}
+
 function lowerFnParam(node: PhaseBNode): FnParam {
   let target: PhaseBNode | undefined;
   let annotationNode: PhaseBNode | undefined;
+  let defaultExpr: PhaseBNode | undefined;
   let rest = false;
 
   if (node.phaseKind === "list") {
@@ -970,6 +1081,26 @@ function lowerFnParam(node: PhaseBNode): FnParam {
       }
     } else {
       target = first ?? node;
+      // Handle (name type) and (name type (default expr)) patterns
+      if (list.elements.length >= 2) {
+        const second = list.elements[1];
+        if (isPossibleTypeExpression(second)) {
+          annotationNode = second;
+        }
+      }
+      // Look for (default expr) in remaining elements
+      const searchStart = annotationNode ? 2 : 1;
+      for (let i = searchStart; i < list.elements.length; i++) {
+        const el = list.elements[i];
+        if (el.phaseKind === "list") {
+          const defaultList = el as PhaseBListNode;
+          const defaultHead = defaultList.elements[0];
+          if (defaultHead?.phaseKind === "symbol" && (defaultHead as SymbolNode).name === "default") {
+            defaultExpr = defaultList.elements[1];
+            break;
+          }
+        }
+      }
     }
   } else if (node.phaseKind === "type-annotation") {
     const annotation = node as PhaseBTypeAnnotation;
@@ -990,7 +1121,8 @@ function lowerFnParam(node: PhaseBNode): FnParam {
   }
 
   const typeAnnotation = annotationNode ? lowerTypeNode(annotationNode) : undefined;
-  return { name: lowerIdentifier(target), typeAnnotation, rest: rest ? true : undefined };
+  const defaultValue = defaultExpr ? lowerExpression(defaultExpr) : undefined;
+  return { name: lowerIdentifier(target), typeAnnotation, defaultValue, rest: rest ? true : undefined };
 }
 
 function typeAstToPhaseB(ast: TypeAst, loc: SourceLoc): PhaseBNode {
@@ -1047,17 +1179,29 @@ function typeAstToPhaseB(ast: TypeAst, loc: SourceLoc): PhaseBNode {
 
 const PRIMITIVE_TYPE_MAP: Record<string, TypePrimitive["kind"]> = {
   number: "type-number",
+  "type-number": "type-number",
   string: "type-string",
+  "type-string": "type-string",
   boolean: "type-boolean",
+  "type-boolean": "type-boolean",
   void: "type-void",
+  "type-void": "type-void",
   null: "type-null",
+  "type-null": "type-null",
   undefined: "type-undefined",
+  "type-undefined": "type-undefined",
   any: "type-any",
+  "type-any": "type-any",
   unknown: "type-unknown",
+  "type-unknown": "type-unknown",
   never: "type-never",
+  "type-never": "type-never",
   object: "type-object",
+  "type-object": "type-object",
   symbol: "type-symbol",
+  "type-symbol": "type-symbol",
   bigint: "type-bigint",
+  "type-bigint": "type-bigint",
 };
 
 function lowerTypeNode(node: PhaseBNode | undefined): TypeNode | undefined {
@@ -1129,6 +1273,9 @@ function lowerTypeList(node: PhaseBListNode): TypeNode | undefined {
       return buildInferType(args, span);
     case "t:literal":
       return buildLiteralType(args, span);
+    case "type-object":
+    case "t:object":
+      return buildObjectType(args, span);
     case "type-function":
     case "t:fn":
       return buildFunctionType(args, span);
@@ -1142,6 +1289,29 @@ function lowerTypeList(node: PhaseBListNode): TypeNode | undefined {
     default:
       return undefined;
   }
+}
+
+function buildObjectType(nodes: PhaseBNode[], span: Span): TypeObject | undefined {
+  const fields: TypeField[] = [];
+  for (const node of nodes) {
+    if (node.phaseKind !== "list") continue;
+    const list = node as PhaseBListNode;
+    for (const entry of list.elements) {
+      if (entry.phaseKind !== "list") continue;
+      const fieldList = entry as PhaseBListNode;
+      const keyNode = fieldList.elements[0];
+      const typeNode = fieldList.elements[1];
+      if (!keyNode || !typeNode) continue;
+      const key = keyNode.phaseKind === "literal" ? String((keyNode as LiteralNode).value)
+        : keyNode.phaseKind === "symbol" ? (keyNode as SymbolNode).name
+        : undefined;
+      if (!key) continue;
+      const fieldType = lowerTypeNode(typeNode);
+      if (!fieldType) continue;
+      fields.push(new TypeField({ key, fieldType, span: spanFromLoc(entry.loc) }));
+    }
+  }
+  return new TypeObject({ fields, span });
 }
 
 function buildFunctionType(nodes: PhaseBNode[], span: Span): TypeFunction | undefined {

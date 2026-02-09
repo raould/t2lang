@@ -4,23 +4,38 @@
 type Source<T> = AsyncIterable<T>;
 type Pipe<A, B> = (arg0: Source<A>) => Source<B>;
 type Sink<T, R> = (arg0: Source<T>) => Promise<R>;
-function pipe2(source, op1) {
+function pipe2<A, B, R>(source: Source<A>, op1: Pipe<A, B> | Sink<A, R>) {
   return op1(source);
 }
 export { pipe2 };
-function pipe3(source, op1, op2) {
+function pipe3<A, B, C, R>(
+  source: Source<A>,
+  op1: Pipe<A, B>,
+  op2: Pipe<B, C> | Sink<B, R>,
+) {
   return op2(op1(source));
 }
 export { pipe3 };
-function pipe4(source, op1, op2, op3) {
+function pipe4<A, B, C, D, R>(
+  source: Source<A>,
+  op1: Pipe<A, B>,
+  op2: Pipe<B, C>,
+  op3: Pipe<C, D> | Sink<C, R>,
+) {
   return op3(op2(op1(source)));
 }
 export { pipe4 };
-function pipe5(source, op1, op2, op3, op4) {
+function pipe5<A, B, C, D, E, R>(
+  source: Source<A>,
+  op1: Pipe<A, B>,
+  op2: Pipe<B, C>,
+  op3: Pipe<C, D>,
+  op4: Pipe<D, E> | Sink<D, R>,
+) {
   return op4(op3(op2(op1(source))));
 }
 export { pipe5 };
-function pipe(source, ...ops) {
+function pipe<A>(source: Source<A>, ...ops: Array<Function>) {
   let result = source;
   {
     for (let op of ops) {
@@ -30,7 +45,7 @@ function pipe(source, ...ops) {
   }
 }
 export { pipe };
-async function* fromArray(items) {
+async function* fromArray<T>(items: Array<T>): Source<T> {
   {
     for (let item of items) {
       yield item;
@@ -40,7 +55,7 @@ async function* fromArray(items) {
 export { fromArray };
 const from = fromArray;
 export { from };
-async function* fromResponse(res) {
+async function* fromResponse(res: Response): Source<Uint8Array> {
   {
     const reader = res.body.getReader();
     try {
@@ -57,13 +72,13 @@ async function* fromResponse(res) {
   }
 }
 export { fromResponse };
-function fromLazyPromise(fn) {
+function fromLazyPromise<T>(fn): Source<T> {
   return (async function* () {
     yield await fn();
   })();
 }
 export { fromLazyPromise };
-async function* fromIterator(iter) {
+async function* fromIterator<T>(iter: Iterable<T>): Source<T> {
   {
     for (let item of iter) {
       yield item;
@@ -71,7 +86,7 @@ async function* fromIterator(iter) {
   }
 }
 export { fromIterator };
-async function* fromAsyncIterator(iter) {
+async function* fromAsyncIterator<T>(iter: AsyncIterable<T>): Source<T> {
   {
     for await (let item of iter) {
       yield item;
@@ -79,13 +94,13 @@ async function* fromAsyncIterator(iter) {
   }
 }
 export { fromAsyncIterator };
-async function* empty() {
+async function* empty(): Source<any> {
   {
     return;
   }
 }
 export { empty };
-async function* never() {
+async function* never(): Source<any> {
   {
     await new Promise(() => {
       {
@@ -94,7 +109,11 @@ async function* never() {
   }
 }
 export { never };
-async function* range(start, end, step) {
+async function* range(
+  start: number,
+  end: number,
+  step: number = 1,
+): Source<number> {
   {
     let i = start;
     while (i < end) {
@@ -104,7 +123,7 @@ async function* range(start, end, step) {
   }
 }
 export { range };
-async function* repeat(value, count) {
+async function* repeat<T>(value: T, count: number): Source<T> {
   {
     let i = 0;
     while (i < count) {
@@ -114,16 +133,16 @@ async function* repeat(value, count) {
   }
 }
 export { repeat };
-function map(fn) {
-  return async function* (source) {
+function map<A, B>(fn): Pipe<A, B> {
+  return async function* <A>(source: Source<A>) {
     for await (let item of source) {
       yield fn(item);
     }
   };
 }
 export { map };
-function filter(fn) {
-  return async function* (source) {
+function filter<T>(fn): Pipe<T, T> {
+  return async function* <T>(source: Source<T>) {
     for await (let item of source) {
       if (fn(item)) {
         yield item;
@@ -132,8 +151,8 @@ function filter(fn) {
   };
 }
 export { filter };
-function take(n) {
-  return async function* (source) {
+function take<T>(n: number): Pipe<T, T> {
+  return async function* <T>(source: Source<T>) {
     let count = 0;
     for await (let item of source) {
       if (count >= n) {
@@ -145,8 +164,8 @@ function take(n) {
   };
 }
 export { take };
-function drop(n) {
-  return async function* (source) {
+function drop<T>(n: number): Pipe<T, T> {
+  return async function* <T>(source: Source<T>) {
     let count = 0;
     for await (let item of source) {
       if (count >= n) {
@@ -158,8 +177,8 @@ function drop(n) {
   };
 }
 export { drop };
-function takeWhile(fn) {
-  return async function* (source) {
+function takeWhile<T>(fn): Pipe<T, T> {
+  return async function* <T>(source: Source<T>) {
     for await (let item of source) {
       if (!fn(item)) {
         break;
@@ -169,8 +188,8 @@ function takeWhile(fn) {
   };
 }
 export { takeWhile };
-function dropWhile(fn) {
-  return async function* (source) {
+function dropWhile<T>(fn): Pipe<T, T> {
+  return async function* <T>(source: Source<T>) {
     let dropping = true;
     for await (let item of source) {
       if (dropping && fn(item)) {
@@ -182,8 +201,8 @@ function dropWhile(fn) {
   };
 }
 export { dropWhile };
-function chunk(size) {
-  return async function* (source) {
+function chunk<T>(size: number): Pipe<T, Array<T>> {
+  return async function* <T>(source: Source<T>) {
     let batch = [];
     {
       for await (let item of source) {
@@ -200,9 +219,12 @@ function chunk(size) {
   };
 }
 export { chunk };
-function flatMap(fn, opts) {
+function flatMap<A, B>(
+  fn,
+  opts: { concurrency: number } = { concurrency: 1 }(),
+): Pipe<A, B> {
   const concurrency = opts.concurrency || 1;
-  return async function* (source) {
+  return async function* <A>(source: Source<A>) {
     if (concurrency === 1) {
       for await (let item of source) {
         yield await fn(item);
@@ -215,8 +237,8 @@ function flatMap(fn, opts) {
   };
 }
 export { flatMap };
-function tap(fn) {
-  return async function* (source) {
+function tap<T>(fn): Pipe<T, T> {
+  return async function* <T>(source: Source<T>) {
     for await (let item of source) {
       fn(item);
       yield item;
@@ -224,8 +246,8 @@ function tap(fn) {
   };
 }
 export { tap };
-function scan(fn, init) {
-  return async function* (source) {
+function scan<R, T>(fn, init: R): Pipe<T, R> {
+  return async function* <T>(source: Source<T>) {
     let acc = init;
     for await (let item of source) {
       acc = fn(acc, item);
@@ -234,8 +256,8 @@ function scan(fn, init) {
   };
 }
 export { scan };
-function distinct() {
-  return async function* (source) {
+function distinct<T>(): Pipe<T, T> {
+  return async function* <T>(source: Source<T>) {
     const seen = new Set();
     for await (let item of source) {
       if (!seen.has(item)) {
@@ -246,8 +268,8 @@ function distinct() {
   };
 }
 export { distinct };
-function collect() {
-  return async function (source) {
+function collect<T>(): Sink<T, Array<T>> {
+  return async function <T>(source: Source<T>) {
     const items = [];
     {
       for await (let item of source) {
@@ -258,8 +280,8 @@ function collect() {
   };
 }
 export { collect };
-function first() {
-  return async function (source) {
+function first<T>(): Sink<T, T | undefined> {
+  return async function <T>(source: Source<T>) {
     {
       for await (let item of source) {
         return item;
@@ -269,8 +291,8 @@ function first() {
   };
 }
 export { first };
-function last() {
-  return async function (source) {
+function last<T>(): Sink<T, T | undefined> {
+  return async function <T>(source: Source<T>) {
     let lastItem = undefined;
     {
       for await (let item of source) {
@@ -281,8 +303,8 @@ function last() {
   };
 }
 export { last };
-function reduce(fn, init) {
-  return async function (source) {
+function reduce<R, T>(fn, init: R): Sink<T, R> {
+  return async function <T>(source: Source<T>) {
     let acc = init;
     {
       for await (let item of source) {
@@ -293,23 +315,23 @@ function reduce(fn, init) {
   };
 }
 export { reduce };
-function forEach(fn) {
-  return async function (source) {
+function forEach<T>(fn): Sink<T, undefined> {
+  return async function <T>(source: Source<T>) {
     for await (let item of source) {
       fn(item);
     }
   };
 }
 export { forEach };
-function drain() {
-  return async function (source) {
+function drain(): Sink<any, undefined> {
+  return async function (source: Source<any>) {
     for await (let _ of source) {
     }
   };
 }
 export { drain };
-function count() {
-  return async function (source) {
+function count(): Sink<any, number> {
+  return async function (source: Source<any>) {
     let n = 0;
     {
       for await (let _ of source) {
@@ -320,8 +342,8 @@ function count() {
   };
 }
 export { count };
-function some(fn) {
-  return async function (source) {
+function some<T>(fn): Sink<T, boolean> {
+  return async function <T>(source: Source<T>) {
     {
       for await (let item of source) {
         if (fn(item)) {
@@ -333,8 +355,8 @@ function some(fn) {
   };
 }
 export { some };
-function every(fn) {
-  return async function (source) {
+function every<T>(fn): Sink<T, boolean> {
+  return async function <T>(source: Source<T>) {
     {
       for await (let item of source) {
         if (!fn(item)) {

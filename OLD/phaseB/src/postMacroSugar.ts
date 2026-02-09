@@ -227,7 +227,11 @@ function applyCallSugarToNode(node: PhaseBNode): PhaseBNode {
       }
       // For fn/lambda/method, skip parameter lists and return type annotations
       if (headName === "fn" || headName === "lambda" || headName === "method") {
-        if (idx === 1) {
+        // The parameter list is the first list-type child after the head.
+        // It may not be at idx 1 due to modifiers (async, generator) and the function name.
+        const isParamList = child.phaseKind === "list" &&
+          listNode.elements.slice(1, idx).every(el => el.phaseKind === "symbol");
+        if (isParamList) {
           return child; // Don't process parameter lists
         }
         // Skip return types after : marker

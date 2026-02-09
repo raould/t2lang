@@ -1,0 +1,237 @@
+(program
+  (let*
+   (
+;;
+;; helpers
+
+      (parseString
+        (lambda ((tokenText))
+    (raw """//console.log('parseString', tokenText)""")
+    (raw """const raw = tokenText;
+    const inner = raw.slice(1, -1);
+    // antlr and json escapes are the same (?!)
+    return JSON.parse('"' + inner.replace(/"/g, '\\"') + '"');"""))
+      )
+
+;;
+;; ========== CST -> AST ==========
+
+;;  
+;; ast program
+      (astProgram
+        (lambda ((ctx))
+    (raw """//console.log('astProgram', ctx)""")
+    (raw """return {
+        tag: "program",
+        body: ctx.statement().map(astStatement),
+    };"""))
+      )
+
+;;
+;; ast statement
+      (astStatement
+        (lambda ((ctx))
+    (raw """//console.log('astStatement', ctx)""")
+    (raw """if (ctx.letStar()) {
+        return astLetStar(ctx.letStar()!);
+    }
+    if (ctx.lambda()) {
+        return astLambda(ctx.lambda()!);
+    }
+    if (ctx.raw()) {
+        return astRaw(ctx.raw()!);
+    }
+    return astExpression(ctx.expression()!);"""))
+      )
+
+;;  
+;; ast let*
+
+      (astLetStar
+        (lambda ((ctx))
+    (raw """//console.log('astLetStar', ctx)""")
+    (raw """const bindings = ctx
+    .binding()
+    .map((b: BindingContext) => {
+        const id = b.IDENTIFIER().getText();
+        const init = b.expression() ? astExpression(b.expression()!) : undefined;
+        return { name: id, init };
+    });
+    const body = ctx.statement().map(astStatement);
+    return { tag: 'let*', bindings, body };"""))
+      )
+
+;;  
+;; ast lambda
+      (astLambda
+        (lambda ((ctx))
+    (raw """//console.log('astLambda', ctx)""")
+    (raw """const params = ctx
+    .fnSignature()
+    .param()
+    .map((p: ParamContext) => p.IDENTIFIER().getText());
+    const body = ctx.statement().map(astStatement);
+    return { tag: "lambda", params, body };"""))
+      )
+
+;;
+;; ast expression
+
+      (astExpression
+        (lambda ((ctx))
+    (raw """//console.log('astExpression', ctx)""")
+    (raw """    if (ctx.literal()) {
+        return astLiteral(ctx.literal()!);
+    }
+    if (ctx.IDENTIFIER()) {
+        return { tag: "identifier", name: ctx.IDENTIFIER()!.getText() };
+    }
+    if (ctx.call()) {
+        return astCall(ctx.call()!);
+    }
+    if (ctx.lambda()) {
+        return astLambda(ctx.lambda()!); 
+    }
+    if (ctx.raw()) {
+        return astRaw(ctx.raw()!);
+    }
+    throw new Error("Unknown expression node");"""))
+      )
+
+;;
+;; ast call
+
+      (astCall
+        (lambda ((ctx))
+    (raw """//console.log('astCall', ctx)""")
+    (raw """const exprs = ctx
+    .expression()
+    .map(astExpression);
+    return {
+        tag: "call",
+        fn: exprs[0],
+        args: exprs.slice(1)
+    };"""))
+      )
+
+;;
+;; ast literal
+
+      (astLiteral
+        (lambda ((ctx))
+    (raw """//console.log('astLiteral', ctx)""")
+    (raw """if (ctx.NUMBER()) return { tag: "literal", value: Number(ctx.NUMBER()!.getText()) };
+    if (ctx.STRING()) return { tag: "literal", value: parseString(ctx.STRING()!.getText()) }; 
+    if (ctx.BOOLEAN()) return { tag: "literal", value: ctx.BOOLEAN()!.getText() === "true" }; 
+    if (ctx.NULL()) return { tag: "literal", value: null }; 
+    if (ctx.UNDEFINED()) return { tag: "literal", value: undefined };
+    throw new Error("Unknown literal");"""))
+      )
+
+;;
+;; ast raw
+
+      (astRaw
+        (lambda ((ctx))
+    (raw """//console.log('astRaw', ctx)""")
+    (raw """return {
+        tag: "raw",
+        code: parseString(ctx.STRING()!.getText())
+    };"""))
+      )
+
+;;
+;; ========== codegen ==========
+
+;;
+;; emit program
+      (emitProgram
+        (lambda ((node))
+    (raw """//console.log('emitProgram', node)""")
+    (raw """return node.body.map(emitStmt).join('\n');"""))
+      )
+
+;;
+;; emit let*
+      (emitLetStar
+        (lambda ((node))
+    (raw """//console.log('emitStar', node)""")
+    (raw """const lines = [];
+  for (const b of node.bindings) {
+    if (b.init) {
+      lines.push(`let ${b.name} = ${emitExpr(b.init)};`);
+    } else {
+      lines.push(`let ${b.name};`);
+    }
+  }
+  for (const s of node.body) {
+    lines.push(emitStmt(s));
+  }
+  return lines.join('\n');"""))
+      )
+
+;;
+;; emit expr
+      (emitExpr
+        (lambda ((expr))
+    (raw """//console.log('emitExpr', expr)""")
+    (raw """switch (expr.tag) {
+    case 'literal':     return JSON.stringify(expr.value);
+    case 'identifier':  return expr.name;
+    case 'call':        return emitCall(expr);
+    case 'lambda':      return emitLambda(expr);
+    case 'raw':         return expr.code;
+    default: throw new Error(expr.tag);
+  }"""))
+      )
+
+;;
+;; emit lambda
+      (emitLambda
+        (lambda ((node))
+    (raw """//console.log('emitLambda', node)""")
+    (raw """const params = node.params.join(', ');
+  const body = node.body.map(emitStmt).join('\n');
+  return `(${params}) => {\n${indent(body)}\n}`;"""))
+      )
+      (emitCall
+        (lambda ((node)) (raw """const fn = emitExpr(node.fn); const args = node.args.map(emitExpr).join(', '); return `${fn}(${args})`;"""))
+      )
+      (emitStmt
+        (lambda ((stmt)) (raw """switch (stmt.tag) {
+    case 'let*': return emitLetStar(stmt);
+    default:     return emitExpr(stmt as Expr) + ';';
+  }"""))
+      )
+
+;;
+;; emit indent
+      (indent
+        (lambda ((text))
+    (raw """//console.log('emitIndent', text)""")
+    (raw """return text.split('\n').map(line => '  ' + line).join('\n');"""))
+      )
+
+;;
+;; ========== main ==========
+
+      (main
+        (lambda ()
+    (raw """const input = fs.readFileSync(process.argv[2], "utf-8");
+//console.log(input);
+const inputStream = CharStream.fromString(input);
+const lexer = new Stage1Lexer(inputStream);
+const tokenStream = new CommonTokenStream(lexer);
+const parser = new Stage1Parser(tokenStream);
+const tree = parser.program();
+//console.log(tree.toStringTree(parser));
+const ast = astProgram(tree);
+//console.log(JSON.stringify(ast, null, 2));
+console.log(emitProgram(ast));"""))
+      )
+
+  )
+  (call main)
+ )
+)
+

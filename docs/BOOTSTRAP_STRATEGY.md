@@ -1,6 +1,225 @@
 # T2Lang Compiler Bootstrap Strategy
 
-## Overview
+## From ground zero
+
+Below is a staged progression from the smallest viable kernel to a full macro‑ and sugar‑rich language with optimizations. Each stage is intentionally minimal, but each unlocks a qualitatively new capability.
+
+---
+
+Here’s the cleanest way to think about *when* TypeScript‑specific syntax should enter a bootstrapped s‑expression language that transpiles to **TypeScript *syntax*** (not AST). The key is to introduce TS features only when the underlying language has enough structure to express them without contaminating earlier phases.
+
+Below is a staged integration plan that aligns with the bootstrap ladder we sketched earlier.
+
+---
+
+### **Stage 0 — The Absolute Kernel**
+#### *Goal: Parse s-expressions and emit TypeScript strings.*
+
+This is the “bare metal” of your language.
+**Do *not* introduce any TypeScript-specific syntax here.**
+
+**Capabilities**
+- Tokenizer for parentheses, symbols, numbers, strings.
+- S-expression parser → nested arrays.
+- no TypeScript types.
+- A dispatcher that maps a tiny set of forms to TypeScript strings:
+  - `(raw "...")` → escape hatches for TS fragments, emit string directly.
+  - `(lambda ((x) (y)) ...)` → `(x, y) => { ... }`
+  - `(let* ((x 1) (y 2)))` → `let x = 1; let y = 2;`
+
+---
+
+### **Stage 1 — Self-Hosting Minimal Core**
+#### *Goal: Rewrite the compiler in its own language.*
+
+**Capabilities**
+- The compiler is now written in the language.
+- Still no macros.
+- Still no sugar.
+- Add minimal conveniences:
+  - add `if`
+  - add `do`
+  - add basic arithmetic lowering
+
+**Why this stage matters**
+- You now have a self-hosting system.
+- You can evolve the language without touching TypeScript.
+
+---
+
+### **Stage 2 — Hygienic Macro System (but no sugar yet)**
+#### *Goal: Introduce real power: macros, hygiene, gensym, expansion phases.*
+
+This is the first *qualitative* leap.
+
+**Capabilities**
+- Macro expander with:
+  - hygiene
+  - gensym
+  - quasiquote / unquote
+  - pattern matching (minimal)
+- Clear phase separation:
+  - **Grammar Annotations** → @canonical @noncallhead @specialform @scope
+  - **Reader** → raw s-exprs
+  - **Parser** → AST
+  - **Macro expander** → expanded AST
+  - **Compiler** → TS
+
+**Why this stage matters**
+- You can now express language features *in the language*.
+- You can implement sugar as macros later.
+- You can build the standard library using macros.
+
+---
+
+### ***Stage 2B - TypeScript internal representation.
+
+**Introduce the *internal representation* of TypeScript types, but not the surface syntax.**
+
+At this stage you can add:
+- AST nodes for type annotations  
+- AST nodes for generics  
+- AST nodes for conditional/mapped types  
+- AST nodes for optional chaining  
+
+But **do not** expose them as surface syntax yet.
+
+---
+
+### **Stage 3 — Structural Sugar (Reader + Parser Sugar)**
+#### *Goal: Add syntactic conveniences that lower to canonical AST before macros.*
+
+This is where you add sugar that is *not* expressible as macros because it affects parsing.
+
+**Capabilities**
+- Reader-level sugar:
+  - quasiquote characters (`, ,@ '`)
+  - vector literals
+  - keyword literals
+  - commas as list separators
+- Parser-level sugar:
+  - infix operators (with precedence table)
+  - pipeline operators (`->`, `->>`)
+  - destructuring patterns
+  - implicit function call sugar (`(f x y)` vs `f(x, y)`)
+
+**Key invariant**
+All sugar lowers to the same canonical AST that macros operate on.
+
+**Why this stage matters**
+- You now have a pleasant surface syntax.
+- Macro authors don’t need to worry about precedence or sugar interactions.
+
+---
+
+### **Stage 3B - Structural Sugar (Reader/Parser Sugar)**
+**Introduce TypeScript syntax that is purely structural and does not require semantic knowledge.**
+
+This includes:
+- Type annotations on parameters  
+- Type annotations on variables  
+- Generic parameter lists  
+- Optional chaining (syntactic lowering only)  
+- Basic TS operators (`as`, `!`, `?`)  
+
+These are all *syntactic* and can be lowered without type inference.
+
+### Examples you can safely introduce here:
+- `(fn ((x : number)) ...)`
+- `(let* (x : string) "hi")`
+- `(call (foo? bar))` → `foo?.bar` [???]
+- `(fn ((x : T)) ...)` with `(generic T ...)`
+
+You can safely lower these constructs to TS syntax.
+
+---
+
+### **Stage 4 — Macro-Defined Sugar (Surface-Level Macros)**
+#### *Goal: Let macros define new syntax-like constructs.*
+
+Now that structural sugar is stable, you allow macros to introduce higher-level constructs:
+
+**Capabilities**
+- `defmacro` can define:
+  - new binding forms (`for`, `match`, `when`, `unless`)
+  - new control flow
+  - DSL-like constructs
+- Macro expansion is deterministic and hygienic.
+- Macro errors include source provenance.
+
+**Why this stage matters**
+- The language becomes *extensible*.
+- Users can build domain-specific layers.
+- You can implement most of the standard library as macros.
+
+---
+
+### **Stage 4B - **Introduce TypeScript constructs that can be expressed as macros.**
+
+This includes:
+- richer loop variants (`for-of`, `for-in`, `for-await-of`)  
+- `switch`  
+- `try/catch/finally`  
+- `interface` and `type` declarations  
+- mapped types (as macro-generated TS strings)  
+
+These are all *structural* and can be expressed as macro expansions.
+
+**Why here?**
+Macros can now define new constructs that lower to TS syntax.
+
+---
+
+### **Stage 5 — Semantic Sugar + Type Inference Hooks**
+#### *Goal: Add sugar that depends on semantic information.*
+
+This is sugar that requires knowing types or symbol resolution.
+
+**Capabilities**
+- Dot-access sugar (`obj.field` → `(get obj "field")`)
+- Method call sugar (`obj.method(x)` → `(call obj "method" x)`)
+- Optional chaining sugar
+- Type-directed desugaring (e.g., numeric literal widening)
+
+**Why this stage matters**
+- You now have a language that feels modern and ergonomic.
+- You can interop with TypeScript more naturally.
+
+---
+
+### **Stage 5B Semantic Sugar + Type-Directed Lowering**
+**Introduce TypeScript features that require semantic knowledge or symbol resolution.**
+
+This includes:
+- conditional types (`T extends U ? X : Y`)  
+- mapped types with key remapping  
+- type inference helpers  
+- optional chaining with fallback semantics  
+- discriminated unions  
+- type narrowing sugar  
+
+These require:
+- symbol tables  
+- type environment tracking  
+- semantic lowering  
+
+---
+
+## **Summary Ladder**
+Here’s the whole progression in one glance:
+
+1. **Stage 0:** Kernel → parse s-exprs, emit TS  
+2. **Stage 1:** Self-hosting minimal core  
+3. **Stage 2:** Hygienic macros + quasiquote  
+4. **Stage 3:** Structural sugar (reader + parser)  
+5. **Stage 4:** Macro-defined sugar  
+6. **Stage 5:** Semantic sugar + type-aware lowering  
+
+Each stage is minimal but unlocks the next.
+
+---
+
+## What if we had a working t2lang already?
 
 This document outlines a strategy to bootstrap a new t2lang compiler written in t2lang itself (`.t2` files), while also using this opportunity to implement a cleaner, strictly staged architecture.
 

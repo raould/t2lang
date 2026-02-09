@@ -1,0 +1,194 @@
+import { CharStream, CommonTokenStream } from "antlr4ng";
+import { Stage1Lexer } from "./Stage1Lexer.js";
+import { RawContext, BindingContext, CallContext, ExpressionContext, LambdaContext, LetStarContext, LiteralContext, ParamContext, ProgramContext, Stage1Parser, StatementContext } from "./Stage1Parser.js";
+import fs from "node:fs";
+
+// INSERT_STAGE0_COMPILED
+
+// AST node types.
+
+type Literal = { tag: "literal", value: any };
+type Identifier = { tag: "identifier", name: string };
+type Call = { tag: "call", fn: Expr, args: Expr[] };
+type Lambda = { tag: "lambda", params: string[], body: Stmt[] };
+type Raw = { tag: "raw", code: string };
+type Expr = Literal | Identifier | Call | Lambda | Raw;
+
+type LetStar = { tag: "let*", bindings: { name: string, init?: Expr }[], body: Stmt[] };
+type Stmt = LetStar | Expr;
+
+type Program = { tag: "program"; body: Stmt[] };
+
+// CTS -> AST.
+
+function buildProgram(ctx: ProgramContext): Program {
+    //console.log("buildProgram", ctx);
+    return {
+        tag: "program",
+        body: ctx.statement().map(buildStatement),
+    };
+}
+
+function buildStatement(ctx: StatementContext): Stmt {
+    //console.log("buildStatement", ctx);
+    if (ctx.letStar()) {
+        return buildLetStar(ctx.letStar()!);
+    }
+    if (ctx.lambda()) {
+        return buildLambda(ctx.lambda()!);
+    }
+    if (ctx.raw()) {
+        return buildRaw(ctx.raw()!);
+    }
+    return buildExpression(ctx.expression()!);
+}
+
+function buildLetStar(ctx: LetStarContext): Stmt {
+    //console.log("buildLetStar", ctx);
+    const bindings = ctx
+    .binding()
+    .map((b: BindingContext) => {
+        const id = b.IDENTIFIER().getText();
+        const init = b.expression() ? buildExpression(b.expression()!) : undefined;
+        return { name: id, init };
+    });
+    const body = ctx.statement().map(buildStatement);
+    return { tag: "let*", bindings, body };
+}
+
+function buildLambda(ctx: LambdaContext): Expr {
+    //console.log("buildLambda", ctx);
+    const params = ctx
+    .fnSignature()
+    .param()
+    .map((p: ParamContext) => p.IDENTIFIER().getText());
+    const body = ctx.statement().map(buildStatement);
+    return { tag: "lambda", params, body };
+}
+
+function buildExpression(ctx: ExpressionContext): Expr {
+    //console.log("buildExpression", ctx);
+    if (ctx.literal()) {
+        return buildLiteral(ctx.literal()!);
+    }
+    if (ctx.IDENTIFIER()) {
+        return { tag: "identifier", name: ctx.IDENTIFIER()!.getText() };
+    }
+    if (ctx.call()) {
+        return buildCall(ctx.call()!);
+    }
+    if (ctx.lambda()) {
+        return buildLambda(ctx.lambda()!); 
+    }
+    if (ctx.raw()) {
+        return buildRaw(ctx.raw()!);
+    }
+    throw new Error("Unknown expression node");
+}
+
+function buildCall(ctx: CallContext): Expr {
+    //console.log("buildCall", ctx);
+    const exprs = ctx
+    .expression()
+    .map(buildExpression);
+    return {
+        tag: "call",
+        fn: exprs[0],
+        args: exprs.slice(1)
+    };
+}
+
+function buildLiteral(ctx: LiteralContext): Expr {
+    //console.log("buildLiteral", ctx);
+    if (ctx.NUMBER()) return { tag: "literal", value: Number(ctx.NUMBER()!.getText()) };
+    if (ctx.STRING()) return { tag: "literal", value: parseString(ctx.STRING()!.getText()) }; 
+    if (ctx.BOOLEAN()) return { tag: "literal", value: ctx.BOOLEAN()!.getText() === "true" }; 
+    if (ctx.NULL()) return { tag: "literal", value: null }; 
+    if (ctx.UNDEFINED()) return { tag: "literal", value: undefined };
+    throw new Error("Unknown literal");
+}
+
+function buildRaw(ctx: RawContext): Expr {
+    //console.log("buildRaw", ctx);
+    return {
+        tag: "raw",
+        code: parseString(ctx.STRING()!.getText())
+    };
+}
+
+function parseString(tokenText: string): string {
+    const raw = tokenText;
+    const inner = raw.slice(1, -1);
+    // antlr and json escapes are the same (?!)
+    return JSON.parse('"' + inner.replace(/"/g, '\\"') + '"');
+}
+
+// AST -> TS codegen.
+
+export function emitProgram(node: Program): string {
+  return node.body.map(emitStmt).join("\n");
+}
+
+function emitStmt(stmt: Stmt): string {
+  switch (stmt.tag) {
+    case "let*": return emitLetStar(stmt);
+    default:     return emitExpr(stmt as Expr) + ";";
+  }
+}
+
+function emitLetStar(node: LetStar): string {
+  const lines = [];
+
+  for (const b of node.bindings) {
+    if (b.init) {
+      lines.push(`let ${b.name} = ${emitExpr(b.init)};`);
+    } else {
+      lines.push(`let ${b.name};`);
+    }
+  }
+
+  for (const s of node.body) {
+    lines.push(emitStmt(s));
+  }
+
+  return lines.join("\n");
+}
+
+function emitExpr(expr: Expr): string {
+  switch (expr.tag) {
+    case "literal":     return JSON.stringify(expr.value);
+    case "identifier":  return expr.name;
+    case "call":        return emitCall(expr);
+    case "lambda":      return emitLambda(expr);
+    case "raw":         return expr.code;
+  }
+}
+
+// function emitCall(node: Call): string {
+//   const fn = emitExpr(node.fn);
+//   const args = node.args.map(emitExpr).join(", ");
+//   return `${fn}(${args})`;
+//}
+
+function emitLambda(node: Lambda): string {
+  const params = node.params.join(", ");
+  const body = node.body.map(emitStmt).join("\n");
+  return `(${params}) => {\n${indent(body)}\n}`;
+}
+
+function indent(text: string): string {
+  return text.split("\n").map(line => "  " + line).join("\n");
+}
+
+
+const input = fs.readFileSync(process.argv[2], "utf-8");
+console.log(input);
+const inputStream = CharStream.fromString(input);
+const lexer = new Stage1Lexer(inputStream);
+const tokenStream = new CommonTokenStream(lexer);
+const parser = new Stage1Parser(tokenStream);
+const tree = parser.program();
+console.log(tree.toStringTree(parser));
+const ast = buildProgram(tree);
+console.log(JSON.stringify(ast, null, 2));
+console.log(emitProgram(ast));
