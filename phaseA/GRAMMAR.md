@@ -164,9 +164,9 @@ Tokens:
 <call> ::= "(" "call" <expression> <expression>* ")"  ; commas allowed between args
 <call-with-this> ::= "(" "call-with-this" <expression> <expression> <expression>* ")"  ; commas allowed between args
 <optional-call> ::= "(" "?.call" <expression> <expression>* ")"  ; emits optional call `?.(`
-<prop> ::= "(" "prop" <expression> <string> ")"  ; literal property names only; computed cases use <index>
+<prop> ::= "(" "prop" <expression> (<string> | <expression>) ")"  ; string uses dot access, expression lowers to computed access
 <index> ::= "(" "index" <expression> <expression> ")"
-<optional-prop> ::= "(" "?." <expression> <string> ")"  ; optional property access
+<optional-prop> ::= "(" "?." <expression> (<string> | <expression>) ")"  ; optional property access (expression lowers to optional index)
 <optional-index> ::= "(" "?.[]" <expression> <expression> ")"  ; optional computed access
 <new> ::= "(" "new" <expression> <expression>* ")"
 <throw> ::= "(" "throw" <expression> ")"

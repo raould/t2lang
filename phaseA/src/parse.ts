@@ -973,29 +973,46 @@ class Parser {
     return new OptionalCallExpr({ callee, args, span });
   }
 
-  private buildProp(node: ListNode): PropExpr {
+  private buildProp(node: ListNode): Expression {
     const span = node.span;
     const [, objectNode, nameNode] = node.elements;
-    if (!objectNode || !nameNode || nameNode.type !== "atom" || nameNode.tokenType !== "string") {
+    if (!objectNode || !nameNode) {
       throw reportError("T2:0235");
     }
-    return new PropExpr({
-      object: this.nodeToExpression(objectNode),
-      name: nameNode.value,
+    const objectExpr = this.nodeToExpression(objectNode);
+    if (nameNode.type === "atom" && nameNode.tokenType === "string") {
+      return new PropExpr({
+        object: objectExpr,
+        name: nameNode.value,
+        maybeNull: false,
+        span,
+      });
+    }
+    return new IndexExpr({
+      object: objectExpr,
+      index: this.nodeToExpression(nameNode),
       maybeNull: false,
       span,
     });
   }
 
-  private buildOptionalProp(node: ListNode): OptionalPropExpr {
+  private buildOptionalProp(node: ListNode): Expression {
     const span = node.span;
     const [, objectNode, nameNode] = node.elements;
-    if (!objectNode || !nameNode || nameNode.type !== "atom" || nameNode.tokenType !== "string") {
+    if (!objectNode || !nameNode) {
       throw reportError("T2:0235");
     }
-    return new OptionalPropExpr({
-      object: this.nodeToExpression(objectNode),
-      name: nameNode.value,
+    const objectExpr = this.nodeToExpression(objectNode);
+    if (nameNode.type === "atom" && nameNode.tokenType === "string") {
+      return new OptionalPropExpr({
+        object: objectExpr,
+        name: nameNode.value,
+        span,
+      });
+    }
+    return new OptionalIndexExpr({
+      object: objectExpr,
+      index: this.nodeToExpression(nameNode),
       span,
     });
   }
