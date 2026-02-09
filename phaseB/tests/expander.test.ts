@@ -31,16 +31,19 @@ test("expander substitutes arguments into macro bodies", () => {
   assert.strictEqual((secondArg as SymbolNode).name, "bar");
 });
 
-test("expander rewrites quasiquote into list construction", () => {
+test("expander rewrites quasiquote into list form", () => {
   const registry = new MacroRegistry();
   const nodes = parseSexpr("`(a ~b)", "quasi.t2");
   const expanded = expand(nodes, registry);
   assert.strictEqual(expanded.length, 1);
   const list = expanded[0] as ListNode;
   assert.strictEqual(list.kind, "list");
+  // Quasiquote now returns the list structure directly (a b)
+  assert.strictEqual(list.elements.length, 2);
+  // First element is the literal symbol 'a'
   assert.strictEqual(list.elements[0].kind, "symbol");
-  assert.strictEqual((list.elements[0] as SymbolNode).name, "list");
-  assert.strictEqual(list.elements[1].kind, "list");
-  assert.strictEqual(((list.elements[1] as ListNode).elements[0] as SymbolNode).name, "quote");
-  assert.strictEqual(((list.elements[2] as SymbolNode).name), "b");
+  assert.strictEqual((list.elements[0] as SymbolNode).name, "a");
+  // Second element is the unquoted 'b'
+  assert.strictEqual(list.elements[1].kind, "symbol");
+  assert.strictEqual((list.elements[1] as SymbolNode).name, "b");
 });

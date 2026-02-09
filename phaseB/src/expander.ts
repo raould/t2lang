@@ -1,5 +1,5 @@
 import type { ListNode, PhaseBListNode, PhaseBNode, PhaseBTypeAnnotation, SExprNode, SymbolNode } from "./reader.js";
-import type { ExpansionFrame, SourceLoc } from "./location.js";
+import type { ExpansionFrame } from "./location.js";
 import { MacroRegistry } from "./macroRegistry.js";
 import { reportError } from "../../common/dist/errorRegistry.js";
 
@@ -199,7 +199,7 @@ function convertQuasiquote(node: MacroNode): MacroNode {
         throw reportError("T2:0102", node.loc);
       }
     }
-    const listSymbol = createSymbol("list", node.loc);
+    // Process each element of the quasiquoted list
     const elements: MacroNode[] = [];
     for (const child of node.elements) {
       if (isListNode(child)) {
@@ -213,48 +213,33 @@ function convertQuasiquote(node: MacroNode): MacroNode {
           continue;
         }
         if (isSymbolNode(childHead) && childHead.name === "unquote-splicing") {
-          const unquoted = child.elements[1];
-          if (!unquoted || !isListNode(unquoted)) {
-            throw reportError("T2:0102", child.loc);
-          }
-          elements.push(...unquoted.elements.map((entry) => cloneNode(entry)));
-          continue;
+          throw reportError("T2:0102", node.loc);
         }
       }
       elements.push(convertQuasiquoteElement(child));
     }
+    // Return the list structure directly (this IS the form)
     return {
       kind: "list",
-      elements: [listSymbol, ...elements],
+      elements,
       loc: node.loc,
       delimiter: "(",
       phaseKind: "list",
     } as PhaseBListNode;
   }
-  return createQuoteNode(node);
+  // For quoted literals, just return the node directly
+  return cloneNode(node);
 }
 
 function convertQuasiquoteElement(node: MacroNode): MacroNode {
   if (isListNode(node)) {
     return convertQuasiquote(node);
   }
-  return createQuoteNode(node);
+  // For quoted elements, just return the node directly (no quote wrapper)
+  return cloneNode(node);
 }
 
-function createSymbol(name: string, loc: SourceLoc): SymbolNode & PhaseBNode {
-  return { kind: "symbol", name, loc, phaseKind: "symbol" } as SymbolNode & PhaseBNode;
-}
-
-function createQuoteNode(node: MacroNode): PhaseBListNode {
-  const quoteSym = createSymbol("quote", node.loc);
-  return {
-    kind: "list",
-    elements: [quoteSym, cloneNode(node) as PhaseBNode],
-    loc: node.loc,
-    delimiter: "(",
-    phaseKind: "list",
-  };
-}
+// createSymbol is no longer needed after quasiquote refactor
 
 function attachExpansionFrame(node: MacroNode, frame: ExpansionFrame): MacroNode {
   const expandedStack = [...(node.expansionStack ?? []), frame];
