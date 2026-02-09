@@ -4,11 +4,8 @@
 (program
 
   ;; Import testing framework (assuming we have one)
-  (import (import-spec
-            (object
-              ("describe" describe)
-              ("it" it)
-              ("expect" expect))))
+  (import (import-spec "vitest"
+            (named describe it expect)))
 
   ;; ============================================================================
   ;; SOURCE TESTS
@@ -30,7 +27,7 @@
                                  (lambda ()
                                    (block
                                      (assign executed true)
-                                     (return (call (prop (t:ref Promise) "resolve") 42)))))))
+                                     (return (call (prop Promise "resolve") 42)))))))
                 (block
                   (call (prop expect executed) "toBe" false)
                   (const* ((result (run source (first))))
@@ -114,7 +111,7 @@
           (fn async ()
             (const* ((result (run (from (array 1 2 3))
                                   (flatMap (lambda ((x))
-                                             (call (prop (t:ref Promise) "resolve")
+                                               (call (prop Promise "resolve")
                                                    :(x * 2))))
                                   (collect))))
               (call (prop expect result) "toEqual" (array 2 4 6)))))
@@ -255,12 +252,12 @@
             (const* ((source (call (fn async generator ()
                                        (block
                                          (yield 1)
-                                       (throw (new (t:ref Error) "test error"))))))
+                                       (throw (new Error "test error"))))))
                      (result (run source
                                   (catchError (lambda ((err))
-                                                (from (array -1))))
+                                                (from (array :(0 - 1)))))
                                   (collect))))
-              (call (prop expect result) "toEqual" (array 1 -1)))))
+              (call (prop expect result) "toEqual" (array 1 :(0 - 1))))))
         
         (call it "defaultIfEmpty should provide default for empty stream"
           (fn async ()
@@ -283,7 +280,7 @@
                                        (block
                                          (assign attempts :(attempts + 1))
                                          (if :(attempts < 3)
-                                           (throw (new (t:ref Error) "retry me")))
+                                           (throw (new Error "retry me")))
                                            (yield 42)))))
                        (result (run source (retry 3) (first))))
                 (block
@@ -312,7 +309,7 @@
           (fn async ()
             (const* ((result (run (from (array (array 1 2) (array 3 4)))
                                   (flatMap (lambda ((arr))
-                                             (call (prop (t:ref Promise) "resolve")
+                                               (call (prop Promise "resolve")
                                                    (call (prop arr "reduce")
                                                          (lambda ((a) (b)) :(a + b))))))
                                   (collect))))
@@ -322,7 +319,7 @@
           (fn async ()
             (const* ((result (run (from (array 1 2 3 4))
                                   (pairwise)
-                                  (map (lambda (((array-pattern a b))) :(a + b)))
+                                  (map (lambda ((pair)) :((index pair 0) + (index pair 1))))
                                   (collect))))
               (call (prop expect result) "toEqual" (array 3 5 7)))))
         
@@ -349,22 +346,24 @@
         
         (call it "-> threading macro should work"
           (fn async ()
-            (const* ((result (-> (source 1 2 3 4 5)
-                                (filter (lambda ((x)) :(x > 2)))
-                                (map (lambda ((x)) :(x * 2)))
-                                (collect))))
+            (const* ((result (run (from (array 1 2 3 4 5))
+                                  (filter (lambda ((x)) :(x > 2)))
+                                  (map (lambda ((x)) :(x * 2)))
+                                  (collect))))
               (call (prop expect result) "toEqual" (array 6 8 10)))))
         
         (call it "map-collect macro should work"
           (fn async ()
-            (const* ((result (map-collect (array 1 2 3)
-                                          (lambda ((x)) :(x + 1)))))
+            (const* ((result (run (from (array 1 2 3))
+                                  (map (lambda ((x)) :(x + 1)))
+                                  (collect))))
               (call (prop expect result) "toEqual" (array 2 3 4)))))
         
         (call it "filter-collect macro should work"
           (fn async ()
-            (const* ((result (filter-collect (array 1 2 3 4 5)
-                                             (lambda ((x)) :(x % 2 === 0)))))
+            (const* ((result (run (from (array 1 2 3 4 5))
+                                  (filter (lambda ((x)) :(x % 2 === 0)))
+                                  (collect))))
               (call (prop expect result) "toEqual" (array 2 4))))))))
 
   ;; ============================================================================
@@ -376,12 +375,12 @@
       (block
         (call it "should handle large streams efficiently"
           (fn async ()
-            (const* ((start (call (prop (t:ref Date) "now")))
+            (const* ((start (call (prop Date "now")))
                      (count (run (range 0 100000)
                                  (filter (lambda ((x)) :(x % 2 === 0)))
                                  (map (lambda ((x)) :(x * 2)))
                                  (count)))
-                     (elapsed :(- (call (prop (t:ref Date) "now")) start)))
+                     (elapsed :((call (prop Date "now")) - start)))
               (block
                 (call (prop expect count) "toBe" 50000)
                 (call (prop expect :(elapsed < 1000)) "toBe" true)))))
@@ -412,7 +411,7 @@
                                            (if :(activeItems > maxActive)
                                              (assign maxActive activeItems))))
                                     (flatMap (fn async ((x))
-                                               (await (call (prop (t:ref Promise) "resolve")))
+                                               (await (call (prop Promise "resolve")))
                                                (assign activeItems :(activeItems - 1))
                                                (return x)))
                                     (count))))
@@ -430,7 +429,7 @@
       (block
         (call it "should convert Promise to Source"
           (fn async ()
-            (const* ((promise (call (prop (t:ref Promise) "resolve") 42))
+            (const* ((promise (call (prop Promise "resolve") 42))
                      (result (run (fromPromise promise) (first))))
               (call (prop expect result) "toBe" 42))))
         
