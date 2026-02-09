@@ -39,23 +39,27 @@
        (named fromEvent)))
 
   ;; External stubs for examples
-  (export (const ((db
-                   (object
-                     ("query" (lambda ((query params)) (array)))
-                     ("insertMany" (lambda ((table rows)) null)))))))
+  (const* ((db
+            (object
+              ("query" (lambda ((query) (params))
+                         (return (array))))
+              ("insertMany" (lambda ((table) (rows))
+                              (return null)))))))
+  (export (export-spec db))
 
-  (export (const ((fallbackItem (object)))))
+  (const* ((fallbackItem (object))))
+  (export (export-spec fallbackItem))
 
-  (export (fn async fetchItem ((id: string)) : any
+  (export (fn async fetchItem ((id: string))
            (return (object))))
 
-  (export (fn async fetchUser ((id: string)) : any
+  (export (fn async fetchUser ((id: string))
            (return (object))))
 
-  (export (fn async checkTaskStatus ((taskId: string)) : any
+  (export (fn async checkTaskStatus ((taskId: string))
            (return (object))))
 
-  (export (fn async searchAPI ((query: string)) : any
+  (export (fn async searchAPI ((query: string))
            (return (array))))
 
   (export (fn handleSubmit ((data: any)) : any
@@ -64,14 +68,11 @@
   (export (fn displayResults ((results: any)) : any
            (return undefined)))
 
-  (export (fn async processBatch ((batch: Array<any>)) : any
+  (export (fn async processBatch ((batch: Array<any>))
            (return batch)))
 
-  (export (fn async processChunk ((batch: Array<any>)) : any
+  (export (fn async processChunk ((batch: Array<any>))
            (return batch)))
-
-  (export (fn template ((s: string) (suffix: string)) : string
-           (return :(s + suffix))))
 
   (export (fn encode () : any
            (return (fn ((source)) (return source)))))
@@ -79,16 +80,20 @@
   (export (fn toResponse ((opts: any)) : any
            (return (fn async ((source)) (return (object))))))
 
-  (export (fn async readFile ((filename: string) (encoding: string)) : Promise<string>
-           (return "")))
+  (const* ((readFile
+            (lambda async ((filename: string) (encoding: string))
+              (return "")))))
+  (export (export-spec readFile))
 
   ;; Runtime pipeline helper (macro-free)
-  (export (fn async run ((source: any) (rest ops Array<Function>)) : any
-           (let* ((result source))
-             (block
-               (for of (op ops)
-                 (assign result (call op result)))
-               (return (await result))))))
+  (const* ((run
+            (lambda async ((source: any) (rest ops (t:ref Array (array (t:ref Function)))))
+              (let* ((result source))
+                (block
+                  (for of (op ops)
+                    (assign result (call op result)))
+                  (return (await result))))))))
+  (export (export-spec run))
 
   ;; ============================================================================
   ;; BASIC EXAMPLES
@@ -192,21 +197,20 @@
            (return
              (run (fromQuery db "SELECT * FROM users")
                   (map (prop JSON "stringify"))
-                  (map (lambda ((s)) (template s "
-")))
+                 (map (lambda ((s)) :(s + "\n")))
                   (encode)
                   (toResponse (object ("contentType" "application/x-ndjson")))))))
   
   ;; Example 7: Parallel API fetching with concurrency limit
   (export (fn async parallelFetch ((urls: Array<string>))
            (const* ((results
-                      (run (from urls)
-                           (flatMap (lambda ((url))
-                                      (call (prop (call fetch url) "then")
-                                            (lambda ((r))
-                                              (call (prop r "json")))))
-                                    (object ("concurrency" 5)))
-                           (collect))))
+                      (await (run (from urls)
+                                  (flatMap (lambda ((url))
+                                             (call (prop (call fetch url) "then")
+                                                   (lambda ((r))
+                                                     (call (prop r "json")))))
+                                           (object ("concurrency" 5)))
+                                  (collect)))))
              (block
                (call (prop console "log") "Fetched" (prop results "length") "results")
                (return results)))))
@@ -232,7 +236,7 @@
   ;; Example 9: WebSocket message stream
   (export (fn async websocketStream ((url: string))
            (const* ((ws (new WebSocket url)))
-             (run (fromEvent ws "message")
+            (run (fromEvent ws "message" (object))
                   (map (lambda ((event))
                          (call (prop JSON "parse") (prop event "data"))))
                   (filter (lambda ((msg))
@@ -245,7 +249,7 @@
   ;; Example 10: Button click stream with throttling
   (export (fn async buttonClickHandler ()
            (const* ((button (call (prop document "querySelector") "#submit")))
-             (run (fromEvent button "click")
+        (run (fromEvent button "click" (object))
                   (throttle 1000)
                   (map (lambda ((event))
                          (call (prop event "preventDefault"))
@@ -285,9 +289,9 @@
   
   ;; Example 12: Combining multiple streams
   (export (fn async combineStreams ()
-           (const* ((source1 (range 0 5))
-                    (source2 (range 10 15))
-                    (source3 (range 20 25)))
+           (const* ((source1 (range 0 5 1))
+                    (source2 (range 10 15 1))
+                    (source3 (range 20 25 1)))
              (const* ((combined
                         (run (concat source1 source2 source3)
                              (collect))))
@@ -302,11 +306,11 @@
   
   ;; Example 13: Debounced search
   (export (fn async searchWithDebounce ((searchInput: HTMLInputElement))
-           (run (fromEvent searchInput "input")
+       (run (fromEvent searchInput "input" (object))
                 (map (lambda ((event))
                        (prop (prop event "target") "value")))
                 (debounce 300)
-                (distinctUntilChanged)
+         (distinctUntilChanged (lambda ((a) (b)) :(a === b)))
                 (filter (lambda ((query))
                           :(query.length >= 3)))
                 (flatMap (lambda ((query))
@@ -321,7 +325,8 @@
            (const* ((finalStatus
                       (run (fromInterval 2000)
                            (flatMap (lambda ((_))
-                                      (call checkTaskStatus taskId)))
+                                      (call checkTaskStatus taskId))
+                                    (object))
                            (takeWhile (lambda ((status))
                                        (!== (prop status "state") "complete")))
                            (last))))
@@ -335,7 +340,7 @@
                           :(batch.length > 0)))
                 (tap (lambda ((batch))
                        (call (prop console "log") "Processing batch of" (prop batch "length"))))
-                (flatMap processBatch)
+        (flatMap processBatch (object))
                 (drain))))
 
   ;; ============================================================================
@@ -351,8 +356,9 @@
                                         (return (await (pipe (fetchUser id) (first))))
                                         (catch (err)
                                           (block
-                                            (call (prop console "warn") "Failed to fetch" id ":" err)
-                                            (return null))))))
+                                            (call (prop console "warn") "Failed to fetch" id)
+                                            (return null)))))
+                                    (object))
                            (filter (lambda ((user)) (!== user null)))
                            (collect))))
              (return results))))
@@ -374,7 +380,7 @@
   (export (fn async benchmarkExample ()
            (const* ((start (call (prop Date "now")))
                     (result
-                      (run (range 0 10000)
+                      (run (range 0 10000 1)
                            (filter (lambda ((x)) :(x % 2 === 0)))
                            (map (lambda ((x)) :(x * x)))
                            (chunk 100)
@@ -391,7 +397,7 @@
            ;; Process 100GB file without loading into memory
            (const* ((stats
                       (run (fromLines filename)
-                           (scan (lambda ((acc line))
+                           (scan (lambda ((acc) (line))
                                    (return
                                      (object
                                        ("lines" :(acc.lines + 1))
@@ -409,10 +415,11 @@
            ;; Define custom operator
            (const* ((removeNulls
                       (fn async generator ((source))
-                        (for await (item (pipe source
-                                                (filter (lambda ((x)) (!== x null)))
-                                                (filter (lambda ((x)) (!== x undefined))))))
-                          (call yield item)))))
+                        (const* ((filtered (pipe source
+                                                  (filter (lambda ((x)) (!== x null)))
+                                                  (filter (lambda ((x)) (!== x undefined))))))
+                          (for await (item filtered)
+                            (yield item)))))))
              (const* ((result
                         (run (from (array 1 null 2 undefined 3))
                              removeNulls
@@ -427,7 +434,7 @@
                       (call (fn async generator ()
                               (let* ((a 0) (b 1))
                                 (while true
-                                  (call yield a)
+                                  (yield a)
                                   (const* ((next :(a + b)))
                                     (assign a b)
                                     (assign b next))))))))
@@ -450,7 +457,7 @@
                               (for await (item source)
                                 (assign count :(count + 1))
                                 (assign sum :(sum + item))
-                                (call yield :(sum / count)))))))))
+                                (yield :(sum / count)))))))))
              (const* ((averages
                         (run (from (array 10 20 30 40 50))
                              (call runningAverage)
@@ -464,7 +471,8 @@
   ;; ============================================================================
 
   (export (fn index ((items: Array<any>) (i: number))
-           (return (prop items i))))
+           (return (call (prop items "find")
+                         (lambda ((item) (idx)) :(idx === i))))))
 
   (export (fn extractTimestamp ((line: string))
            ;; Extract timestamp from log line
@@ -482,7 +490,7 @@
                        (lines (call (prop content "split") "
 ")))
                 (for of (line lines)
-                  (call yield line))))))))
+                  (yield line))))))))
   
   (export (fn fromQuery ((db: any) (query: string))
     ;; Simplified database query
@@ -490,7 +498,7 @@
       (call (fn async generator ()
               (const* ((results (await (call (prop db "query") query))))
                 (for of (row results)
-                  (call yield row))))))))
+                  (yield row))))))))
   
   (export (fn fromInterval ((ms: number))
     ;; Generate values at regular intervals
@@ -501,7 +509,7 @@
                   (await (new Promise
                              (lambda ((resolve))
                                (call setTimeout resolve ms))))
-                  (call yield count)
+                  (yield count)
                   (assign count :(count + 1)))))))))
   
   (export (fn fromEventSource ((url: string))
@@ -510,8 +518,9 @@
       (call (fn async generator ()
               (const* ((es (new EventSource url)))
                 (try
-                  (for await (event (fromEvent es "message"))
-                    (call yield (call (prop JSON "parse") (prop event "data"))))
+                  (const* ((events (fromEvent es "message" (object))))
+                    (for await (event events)
+                      (yield (call (prop JSON "parse") (prop event "data")))))
                   (finally
                     (call (prop es "close"))))))))))
   
@@ -522,4 +531,5 @@
         (for of (item items)
           (call (prop map "set") (call keyFn item) item))
         (return map)))))
+
 )

@@ -33,15 +33,24 @@
     : (t:ref Source (array (t:ref Array (array (t:union (t:ref A) (t:ref B))))))
     (return
       (call (fn async generator ()
-              (const* ((iter1 (call (prop source1 "asyncIterator")))
-                       (iter2 (call (prop source2 "asyncIterator"))))
-                (while true
-                  (const* ((result1 (await (call (prop iter1 "next"))))
-                           (result2 (await (call (prop iter2 "next")))))
-                    (if (|| (prop result1 "done") (prop result2 "done"))
-                      (break))
-                    (yield (array (prop result1 "value")
-                                  (prop result2 "value"))))))))))
+                (const* ((items1 (array))
+                     (items2 (array))
+                     (getAt (lambda ((arr) (idx))
+                     (call (prop arr "find")
+                       (lambda ((item) (i)) :(i === idx))))))
+                (block
+                  (for await ((item) source1)
+                    (call (prop items1 "push") item))
+                  (for await ((item) source2)
+                    (call (prop items2 "push") item))
+                  (let* ((i 0)
+                         (len (call (prop Math "min")
+                                    (prop items1 "length")
+                                    (prop items2 "length"))))
+                    (while :(i < len)
+                      (yield (array (call getAt items1 i)
+                                    (call getAt items2 i)))
+                      (assign i :(i + 1))))))))))
   (export (export-spec (named zip)))
   
   ;; combineLatest - emit array of latest values from all sources

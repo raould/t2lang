@@ -23,15 +23,26 @@ function merge(...sources) {
 export { merge };
 function zip(source1, source2) {
   return (async function* () {
-    const iter1 = source1.asyncIterator();
-    const iter2 = source2.asyncIterator();
-    while (true) {
-      const result1 = await iter1.next();
-      const result2 = await iter2.next();
-      if (result1.done || result2.done) {
-        break;
+    const items1 = [];
+    const items2 = [];
+    const getAt = (arr, idx) => {
+      arr.find((item, i) => {
+        i === idx;
+      });
+    };
+    {
+      for await (let item of source1) {
+        items1.push(item);
       }
-      yield [result1.value, result2.value];
+      for await (let item of source2) {
+        items2.push(item);
+      }
+      let i = 0;
+      let len = Math.min(items1.length, items2.length);
+      while (i < len) {
+        yield [getAt(items1, i), getAt(items2, i)];
+        i = i + 1;
+      }
     }
   })();
 }

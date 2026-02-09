@@ -300,7 +300,7 @@
     (const* ((require (prop globalThis "require"))
              (streamModule (call require "stream"))
              (Readable (prop streamModule "Readable"))
-             (iterator (call (prop source "asyncIterator"))))
+             (iterator source))
       (return
         (new Readable
              (object
@@ -366,8 +366,8 @@
   ;; isSource - check if value is a Source
   (fn isSource ((value (t:ref any)))
     (return
-      (&& value
-          (!== (prop value "asyncIterator") undefined))))
+        (&& value
+          (!== (prop value "next") undefined))))
   (export (export-spec (named isSource)))
 
   ;; isAsyncIterable - check if value is async iterable

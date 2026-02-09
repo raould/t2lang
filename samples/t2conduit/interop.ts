@@ -283,7 +283,7 @@ function toNodeStream(source) {
   const require = globalThis.require;
   const streamModule = require("stream");
   const Readable = streamModule.Readable;
-  const iterator = source.asyncIterator();
+  const iterator = source;
   return new Readable({
     read: async () => {
       try {
@@ -328,7 +328,7 @@ export { fromCallback };
 const fromNodeback = fromCallback;
 export { fromNodeback };
 function isSource(value) {
-  return value && value.asyncIterator !== undefined;
+  return value && value.next !== undefined;
 }
 export { isSource };
 const isAsyncIterable = isSource;
