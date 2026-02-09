@@ -1,0 +1,8 @@
+;; Minimal test case for object literal parentheses bug
+(program
+  ;; Case 1: Object with property access as statement
+  (call (prop (object ("a" 1)) "a") 2)
+
+  ;; Case 2: Object with method property
+  (call (prop (object ("method" (lambda ((x)) (return x)))) "method") 42)
+)
