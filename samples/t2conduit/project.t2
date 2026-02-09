@@ -7,7 +7,7 @@
   ;; PROJECT METADATA
   ;; ============================================================================
   
-  (export (const* ((projectConfig
+  (const* ((projectConfig
     (object
       ("name" "t2conduit")
       ("version" "1.0.0")
@@ -73,15 +73,16 @@
         "reactive"
         "pull-based"
         "backpressure"
-        "t2lang"
-        "lisp")))))
+          "t2lang"
+          "lisp")))))
+        (export (export-spec projectConfig))
 
   ;; ============================================================================
   ;; BUILD SCRIPTS
   ;; ============================================================================
   
   ;; Compile all .t2 files to TypeScript
-  (export (fn async buildAll ()
+  (fn async buildAll ()
     (const* ((files (array
                       (object ("source" "core.t2") ("output" "dist/core.ts"))
                       (object ("source" "operators.t2") ("output" "dist/operators.ts"))
@@ -96,11 +97,12 @@
             (block
               (call (prop console "log") (template "Compiling " source " -> " output))
               (await (call compileT2File source output)))))
-        (call (prop console "log") "Build complete!")))))
+          (call (prop console "log") "Build complete!")))))
+        (export (export-spec buildAll))
   
   ;; Compile single .t2 file
-  (fn async compileT2File ((sourcePath : type-string)
-                           (outputPath : type-string))
+  (fn async compileT2File ((sourcePath: string)
+                           (outputPath: string))
     (const* (((object-pattern ("compile" compile)) (call require "t2lang/compiler"))
              ((object-pattern ("readFile" readFile) ("writeFile" writeFile)) (call require "fs/promises"))
              ((object-pattern ("dirname" dirname)) (call require "path")))
@@ -127,7 +129,7 @@
   ;; TSCONFIG GENERATION
   ;; ============================================================================
   
-  (export (const* ((tsconfig
+  (const* ((tsconfig
     (object
       ("compilerOptions" (object
         ("target" "ES2020")
@@ -145,24 +147,25 @@
         ("forceConsistentCasingInFileNames" true)
         ("resolveJsonModule" true)
         ("allowSyntheticDefaultImports" true)))
-      
       ("include" (array "dist/**/*.ts"))
       ("exclude" (array "node_modules" "dist/**/*.test.ts"))))))
+  (export (export-spec tsconfig))
   
   ;; Write tsconfig.json
-  (export (fn async generateTsConfig ()
+  (fn async generateTsConfig ()
     (const* (((object-pattern ("writeFile" writeFile)) (call require "fs/promises")))
       (await (call writeFile
                   "tsconfig.json"
-                  (call (prop (t:ref JSON) "stringify") tsconfig null 2)
+                  (call (prop JSON "stringify") tsconfig null 2)
                   "utf-8")))))
+  (export (export-spec generateTsConfig))
 
   ;; ============================================================================
   ;; TYPE DEFINITION LEVELS
   ;; ============================================================================
   
   ;; Generate different strictness level type definitions
-  (export (const* ((typeDefinitionLevels
+  (const* ((typeDefinitionLevels
     (array
       (object
         ("name" "loose")
@@ -208,12 +211,13 @@
           ("ownership" true)
           ("scoped" true)
           ("distributivity" true)))))))
+        (export (export-spec typeDefinitionLevels))
 
   ;; ============================================================================
   ;; TEST CONFIGURATION
   ;; ============================================================================
   
-  (export (const* ((vitestConfig
+  (const* ((vitestConfig
     (object
       ("test" (object
         ("globals" true)
@@ -226,15 +230,16 @@
             "dist/**"
             "**/*.test.ts"
             "**/*.spec.ts"))))
-        ("include" (array "dist/**/*.test.ts"))
-        ("threads" true)
-        ("isolate" true)))))
+          ("include" (array "dist/**/*.test.ts"))
+          ("threads" true)
+          ("isolate" true))))))
+        (export (export-spec vitestConfig))
 
   ;; ============================================================================
   ;; DOCUMENTATION GENERATION
   ;; ============================================================================
   
-  (export (fn async generateDocs ()
+  (fn async generateDocs ()
     (const* ((operators (array
                           (object ("name" "map") ("category" "transformation"))
                           (object ("name" "filter") ("category" "filtering"))
@@ -248,13 +253,14 @@
           (const* ((name (prop op "name"))
                    (category (prop op "category")))
             (call (prop console "log") (template "  " name " (" category ")"))))
-        (call (prop console "log") "Documentation generated!")))))
+          (call (prop console "log") "Documentation generated!")))))
+        (export (export-spec generateDocs))
 
   ;; ============================================================================
   ;; RELEASE WORKFLOW
   ;; ============================================================================
   
-  (export (fn async release ((version : type-string))
+  (fn async release ((version: string))
     (block
       (call (prop console "log") (template "Releasing version " version))
       
@@ -279,11 +285,12 @@
       (const* (((object-pattern ("exec" exec)) (call require "child_process")))
         (call exec (template "git tag v" version)))
       
-      (call (prop console "log") (template "Release " version " complete!")))))
+        (call (prop console "log") (template "Release " version " complete!")))))
+      (export (export-spec release))
   
   (fn async runTests ()
     (const* (((object-pattern ("exec" exec)) (call require "child_process")))
-      (return (new (t:ref Promise)
+      (return (new Promise
                   (lambda ((resolve) (reject))
                     (call exec "npm test"
                           (lambda ((error) (stdout) (stderr))
@@ -296,7 +303,7 @@
   ;; ============================================================================
   
   ;; Watch mode - rebuild on file changes
-  (export (fn async watch ()
+  (fn async watch ()
     (const* (((object-pattern ("watch" watch)) (call require "chokidar"))
              (watcher (call watch "*.t2")))
       (block
@@ -304,27 +311,28 @@
         (call (prop watcher "on") "change"
               (fn async ((path))
                 (block
-                  (call (prop console "log") (template "
-" path " changed, rebuilding..."))
-                  (await (call buildAll)))))))))
+                  (call (prop console "log") (template "\n" path " changed, rebuilding..."))
+                  (await (call buildAll))))))))
+  (export (export-spec watch))
   
   ;; Format all .t2 files
-  (export (fn async format ()
+  (fn async format ()
     (call (prop console "log") "Formatting .t2 files...")
     ;; T2lang formatter
     (const* (((object-pattern ("format" format)) (call require "t2lang/formatter"))
              ((object-pattern ("readdir" readdir) ("readFile" readFile) ("writeFile" writeFile)) (call require "fs/promises"))
-             (files (await (call readdir "." ))))
+             (files (await (call readdir "."))))
       (block
         (for of ((file files))
           (if (call (prop file "endsWith") ".t2")
             (const* ((source (await (call readFile file "utf-8")))
                      (formatted (call format source)))
               (await (call writeFile file formatted "utf-8")))))
-        (call (prop console "log") "Formatting complete!")))))
+        (call (prop console "log") "Formatting complete!"))))
+  (export (export-spec format))
   
   ;; Lint all files
-  (export (fn async lint ()
+  (fn async lint ()
     (call (prop console "log") "Linting...")
     (const* (((object-pattern ("lint" lint)) (call require "t2lang/linter")))
       (block
@@ -334,6 +342,6 @@
             (block
               (call (prop console "error") (template results.errors " errors found"))
               (call (prop process "exit") 1))
-            (call (prop console "log") "No errors found")))))))
+            (call (prop console "log") "No errors found"))))))
+  (export (export-spec lint))
 
-)
