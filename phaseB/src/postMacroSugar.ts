@@ -6,88 +6,178 @@ import type { PhaseBListNode, PhaseBNode, SymbolNode } from "./reader.js";
  * This must run AFTER macro expansion so macros can be invoked with (macro-name args) syntax.
  */
 
+/**
+ * Canonical Phase A node tags and operators.
+ * Derived from phaseA/GRAMMAR.md and phaseB/src/sugar.ts (INFIX_OPERATOR_TABLE).
+ *
+ * These are the ONLY list heads that should NOT be wrapped in (call ...).
+ * Everything else (user-defined functions, macros before expansion) becomes a function call.
+ *
+ * Note: Operators and runtime helpers are canonical Phase A forms even though GRAMMAR.md
+ * doesn't enumerate them explicitly. They're represented as bare lists like (+ x y), not (call + x y).
+ */
 const NON_CALL_HEADS = new Set([
+  // ===== Canonical Phase A node tags (from GRAMMAR.md) =====
+
+  // Program
   "program",
-  "if",
+
+  // Statements
   "block",
-  "let",
-  "let*",
-  "const",
-  "const*",
-  "assign",
-  "for",
+  "if",
   "while",
-  "switch",
-  "case",
-  "default",
-  "try",
-  "catch",
-  "finally",
-  "throw",
+  "for", // with modifiers: "classic", "of", "await"
   "return",
   "break",
   "continue",
-  "import",
-  "export",
-  "type-alias",
+  "switch",
+  "case",
+  "default",
+  "let*",
+  "const*",
+  "assign",
+
+  // Callables
   "fn",
   "lambda",
   "method",
   "getter",
   "setter",
+
+  // Class
+  "class",
+  "class-body",
+  "extends",
+  "implements",
+  "abstract",
+  "decorators",
+
+  // Import/Export
+  "import",
+  "import-default",
+  "import-named",
+  "import-all",
+  "import-spec",
+  "export",
+  "export-spec",
+  "named",
+
+  // Modules
+  "enum",
+  "enum-body",
+  "namespace",
+  "namespace-body",
+
+  // Types
+  "type-alias",
+  "type-interface",
+  "interface-body",
+  "index-signature",
+
+  // Binding patterns
+  "array-pattern",
+  "object-pattern",
+  "rest",
+  "default", // destructuring default
+
+  // Static blocks
+  "static-block",
+
+  // Expressions
   "call",
   "call-with-this",
-  "new",
+  "?.call",
   "prop",
   "index",
   "?.",
   "?.[]",
-  "?.call",
-  "await",
-  "yield",
-  "yield*",
+  "new",
+  "throw",
+  "try",
+  "catch",
+  "finally",
   "array",
   "object",
-  "template",
   "spread",
-  "type-assert",
+  "computed",
   "ternary",
+  "template",
+  "non-null",
+  "type-assert",
+
+  // Type expressions
+  "type-string",
+  "type-number",
+  "type-boolean",
+  "type-null",
+  "type-undefined",
+  "type-ref",
+  "type-function",
+  "type-object",
+  "type-union",
+  "type-intersection",
+  "type-this",
+  "type-mapped",
+  "type-template",
+  "type-literal",
+  "typeparams",
+  "type-app",
+
+  // ===== Operators (canonical Phase A forms, from INFIX_OPERATOR_TABLE) =====
+  // These are represented as (op left right), not (call op left right)
+
+  // Arithmetic
+  "+", "-", "*", "/", "%", "**",
+
+  // Comparison
+  "==", "!=", "===", "!==", "<", ">", "<=", ">=",
+
+  // Logical
+  "&&", "||",
+
+  // Bitwise
+  "&", "|", "^", "~", "<<", ">>", ">>>",
+
+  // Other
+  "in", "instanceof",
+
+  // Unary operators (also canonical Phase A forms)
+  "!", "typeof", "void", "delete",
+
+  // Special operators
+  "?", ":", // ternary components
+
+  // ===== Runtime helpers (canonical Phase A forms) =====
+  // These are special functions that Phase B lowers to directly, without call wrapping
+  "__t2_setIn",
+  "__t2_setInMut",
+  "__t2_updateIn",
+  "__t2_updateInMut",
+  "__t2_merge",
+  "__t2_mergeMut",
+  "__t2_set",
+  "__t2_setMut",
+  "__t2_push",
+  "__t2_pushMut",
+  "__t2_pop",
+  "__t2_popMut",
+  "__t2_sortBy",
+  "__t2_sortByMut",
+  "__t2_reverse",
+  "__t2_reverseMut",
+  "__t2_delete",
+  "__t2_deleteMut",
+  "__t2_isEqual",
+
+  // ===== Phase B special forms =====
+  // These should be gone after macro expansion, but kept for safety during transition
   "defmacro",
-  "macro",
   "quote",
   "quasiquote",
   "unquote",
   "unquote-splicing",
   "infix",
-  "computed",
-  "array-pattern",
-  "object-pattern",
-  "rest",
-  "default",
-  "list", // Added to handle quasiquote output
-  // Type system forms
-  "t:primitive", "t:union", "t:apply", "t:array", "t:nullable", "t:tuple",
-  "t:keyof", "t:typeof", "t:indexed", "t:conditional", "t:infer", "t:literal",
-  "t:ref", "t:var",
-  "typeparams", // Generic type parameters
-  // Operators - these should NOT be wrapped in (call ...)
-  "+", "-", "*", "/", "%", "**",
-  "==", "!=", "===", "!==", "<", ">", "<=", ">=",
-  "&&", "||", "!",
-  "&", "|", "^", "~", "<<", ">>", ">>>",
-  "typeof", "instanceof", "in", "void", "delete",
-  "?", ":",
-  // Runtime helpers
-  "__t2_setIn", "__t2_setInMut",
-  "__t2_updateIn", "__t2_updateInMut",
-  "__t2_merge", "__t2_mergeMut",
-  "__t2_set", "__t2_setMut",
-  "__t2_push", "__t2_pushMut",
-  "__t2_pop", "__t2_popMut",
-  "__t2_sortBy", "__t2_sortByMut",
-  "__t2_reverse", "__t2_reverseMut",
-  "__t2_delete", "__t2_deleteMut",
-  "__t2_isEqual",
+  "list",
 ]);
 
 export function applyCallSugar(nodes: PhaseBNode[]): PhaseBNode[] {
