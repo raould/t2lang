@@ -33,7 +33,7 @@ function cleanup(filePath: string) {
 }
 
 async function compileExpected(): Promise<string> {
-  const result = await compile(sampleSource, { prettyOption: "ugly", logLevel: "none" });
+  const result = await compile(sampleSource, { prettyOption: "ugly" });
   return result.tsSource.trim();
 }
 

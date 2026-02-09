@@ -30,7 +30,7 @@ test("call form accept obj of keyword-style arguments", async () => {
       (let ((greet (lambda (args:any) (console.log args))))
         (call greet { name: \"Bob\" formal: true })))
     `;
-    await helperMatchNode(source, /Bob/, true);
+    await helperMatchNode(source, /Bob/);
 });
 
 

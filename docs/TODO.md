@@ -12,6 +12,7 @@
 * revisit `(return value)`, the whole implicit return and type heuristic again.
 * more .t2 examples generated from existing .ts examples, and assert equivalence.
     * e.g. static blocks.
+* tests are pulling in { compile } from too many rando places.
 * macros are not expanding correctly.
     * hard to get any output at all.
     * hard to use them, the syntax is wonky.

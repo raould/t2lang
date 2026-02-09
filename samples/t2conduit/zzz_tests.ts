@@ -17,6 +17,15 @@ if ((expected != 4)) {
   console.log(`toEqual fail: ${str(4)} = ${4}`);
 }
 } }.toBe(4));
+console.log({ toBe: (expected) => {
+if ((expected !== "4")) {
+  console.log(`toBe fail: ${str("4")} = 4`);
+}
+}, toEqual: (expected) => {
+if ((expected != "4")) {
+  console.log(`toEqual fail: ${str("4")} = 4`);
+}
+} }.toEqual(4));
 import { from, fromArray, fromLazyPromise, empty, range, repeat, map, filter, take, drop, takeWhile, dropWhile, chunk, flatMap, tap, scan, collect, first, last, reduce, count, some, every, forEach, drain, distinct } from "./core";
 import { concat, zip, catchError, retry, defaultIfEmpty, distinctUntilChanged, pairwise } from "./operators";
 import { fromPromise, toPromise, isSource } from "./interop";
