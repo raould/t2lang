@@ -400,6 +400,159 @@ Rewrites to canonical optional forms: `(?. obj prop)`, `(?.[] obj key)`, and `(c
 (for in ((key) obj) body...)
 ```
 
+---
+
+## Callable examples (surface + canonical)
+
+This section lists **concrete examples** of each callable form and the **allowed parameter formats** in Phase B.
+Each example shows the **Phase B surface** form and the **Phase A canonical** form it lowers to.
+
+### 1) `fn`
+
+**Surface (name optional):**
+```
+(fn (x) x)
+(fn name (x) x)
+```
+
+**Canonical:**
+```
+(fn ((x)) x)
+(fn name ((x)) x)
+```
+
+**Typed params (colon required):**
+```
+(fn (x: number) x)
+(fn (x: number, y: string) x)
+(fn (x: number y: string) x)
+```
+```
+(fn ((x (t:primitive "number"))) x)
+(fn ((x (t:primitive "number")) (y (t:primitive "string"))) x)
+(fn ((x (t:primitive "number")) (y (t:primitive "string"))) x)
+```
+
+**Mixed typed/untyped:**
+```
+(fn (x, y: number, z) x)
+```
+```
+(fn ((x) (y (t:primitive "number")) (z)) x)
+```
+
+**Defaults:**
+```
+(fn (x default 1) x)
+(fn (x: number default 1) x)
+```
+```
+(fn ((x (default 1))) x)
+(fn ((x (t:primitive "number") (default 1))) x)
+```
+
+**Param modifiers (constructor param props):**
+```
+(fn (public x: number, readonly y: string) x)
+```
+```
+(fn ((public x (t:primitive "number")) (readonly y (t:primitive "string"))) x)
+```
+
+**Return type:**
+```
+(fn (x): number x)
+(fn (x: number): string x)
+```
+```
+(fn ((x)) (t:primitive "number") x)
+(fn ((x (t:primitive "number"))) (t:primitive "string") x)
+```
+
+**Callable flags:**
+```
+(fn async (x) x)
+(fn generator (x) (yield x))
+(fn overload (x) x)
+(fn abstract (x) x)
+```
+
+### 2) `lambda`
+
+**Surface:**
+```
+(lambda (x) x)
+(lambda async (x: number) x)
+```
+
+**Canonical:**
+```
+(lambda ((x)) x)
+(lambda async ((x (t:primitive "number"))) x)
+```
+
+### 3) `method`
+
+**Surface:**
+```
+(method greet (name) (call console.log name))
+(method async greet (name: string) (call console.log name))
+```
+
+**Canonical (method name becomes string):**
+```
+(method "greet" ((name)) (call console.log name))
+(method async "greet" ((name (t:primitive "string"))) (call console.log name))
+```
+
+### 4) `getter`
+
+**Surface:**
+```
+(getter size () size)
+```
+
+**Canonical:**
+```
+(getter "size" (()) size)
+```
+
+### 5) `setter`
+
+**Surface:**
+```
+(setter size (value) (assign size value))
+```
+
+**Canonical:**
+```
+(setter "size" ((value)) (assign size value))
+```
+
+---
+
+### Parameter format summary (Phase B surface)
+
+Allowed parameter forms inside the single‑paren parameter list:
+
+```
+(x)
+(x: T)
+(x default Expr)
+(x: T default Expr)
+(public x)
+(public x: T)
+(readonly x)
+(readonly x: T)
+(protected x: T)
+(private x: T)
+```
+
+Comma rules:
+- Either **no commas** anywhere: `(fn (x y z) ...)`
+- Or **commas between all params** (optional trailing comma): `(fn (x, y, z,) ...)`
+- **Never mix styles** in one list.
+
 `for in` lowers to `for of` over `(Object.keys obj)`.
 
 ### Object and array literals

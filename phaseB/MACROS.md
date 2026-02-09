@@ -1,3 +1,30 @@
+## Limitation: Reader Macro Sugar (Backtick, Comma) Not Supported Inside `defmacro`
+
+Currently, the t2lang Phase B macro system does **not** support reader macro sugar (such as backtick `` ` ``, comma `,`, or comma-at `,@`) inside the body of a `defmacro`. These forms are only recognized at the top level by the reader, not recursively inside macro bodies. As a result, macro authors must use the canonical forms `(quasiquote ...)`, `(unquote ...)`, and `(unquote-splicing ...)` inside macros, rather than the shorthand reader macro syntax.
+
+**Example (not supported):**
+
+```lisp
+(defmacro mymacro (x)
+  `(something ,x)) ; ❌ This will cause a parse error
+```
+
+**Use this instead:**
+
+```lisp
+(defmacro mymacro (x)
+  (quasiquote (something (unquote x)))) ; ✅ This works
+```
+
+### Why?
+
+The current parser only expands reader macro sugar at the surface level, not recursively inside macro bodies. Supporting reader macro sugar inside macros would require the reader/parser to expand these forms at all levels, which is not yet implemented.
+
+### TODO
+
+- [ ] **Remove this limitation:**
+    - Update the reader/parser to support recursive expansion of reader macro sugar (backtick, comma, comma-at) inside macro bodies and other nested forms.
+    - Update tests and documentation when this is supported.
 # Phase B Macro Specification
 
 ## Overview

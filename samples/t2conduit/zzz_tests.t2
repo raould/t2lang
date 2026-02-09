@@ -5,12 +5,19 @@
 
   ;; Minimal test helpers (avoid external deps for t2run)
   (const* ((describe (lambda ((name) (fn)) (call fn)))
-           (it (lambda ((name) (fn)) (call fn)))
-           (expect (lambda ((value))
-                     (return
-                       (object
-                         ("toBe" (lambda ((expected)) (return null)))
-                         ("toEqual" (lambda ((expected)) (return null)))))))))
+           (it (lambda ((name) (fn)) (console.log name) (call fn)))))
+
+  (defmacro defexpect (var)
+   (quasiquote (expect (lambda ((,var))
+    (return
+      (object
+        ("toBe" (lambda ((expected))
+          (if (!== expected (unquote var))
+            (console.log (template "toBe fail: " (unquote (str var)) " = " (unquote var))))))
+        ("toEqual" (lambda ((expected))
+          (if (!= expected (unquote var))
+            (console.log (template "toEqual fail: " (unquote (str var)) " = " (unquote var))))))
+      ))))))
 
   (import (import-spec "./core"
            (named

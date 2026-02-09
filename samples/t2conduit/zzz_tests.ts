@@ -5,17 +5,8 @@ const describe = (name, fn) => {
   fn();
 };
 const it = (name, fn) => {
+  console.log(name);
   fn();
-};
-const expect = (value) => {
-  return {
-    toBe: (expected) => {
-      return null;
-    },
-    toEqual: (expected) => {
-      return null;
-    },
-  };
 };
 import {
   from,
