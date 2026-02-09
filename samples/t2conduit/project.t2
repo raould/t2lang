@@ -91,11 +91,11 @@
                       (object ("source" "examples.t2") ("output" "dist/examples.ts"))
                       (object ("source" "tests.t2") ("output" "dist/tests.ts")))))
       (block
-        (for of ((file files))
+        (for of ((file) files)
           (const* ((source (prop file "source"))
                    (output (prop file "output")))
             (block
-              (call (prop console "log") (template "Compiling " source " -> " output))
+              (call (prop console "log") :("Compiling " + source + " -> " + output))
               (await (call compileT2File source output)))))
           (call (prop console "log") "Build complete!")))))
         (export (export-spec buildAll))
@@ -103,9 +103,10 @@
   ;; Compile single .t2 file
   (fn async compileT2File ((sourcePath: string)
                            (outputPath: string))
-    (const* (((object-pattern ("compile" compile)) (call require "t2lang/compiler"))
-             ((object-pattern ("readFile" readFile) ("writeFile" writeFile)) (call require "fs/promises"))
-             ((object-pattern ("dirname" dirname)) (call require "path")))
+    (const* ((require (prop globalThis "require"))
+         ((object-pattern ("compile" compile)) (call require "t2lang/compiler"))
+         ((object-pattern ("readFile" readFile) ("writeFile" writeFile) ("mkdir" mkdir)) (call require "fs/promises"))
+         ((object-pattern ("dirname" dirname)) (call require "path")))
       (block
         ;; Read source
         (const* ((source (await (call readFile sourcePath "utf-8"))))
@@ -119,9 +120,7 @@
               (block
                 ;; Ensure output directory exists
                 (const* ((outputDir (call dirname outputPath)))
-                  (await (call (call require "fs/promises") "mkdir"
-                              outputDir
-                              (object ("recursive" true)))))
+                  (await (call mkdir outputDir (object ("recursive" true)))))
                 ;; Write output
                 (await (call writeFile outputPath typescript "utf-8")))))))))
   
@@ -153,7 +152,8 @@
   
   ;; Write tsconfig.json
   (fn async generateTsConfig ()
-    (const* (((object-pattern ("writeFile" writeFile)) (call require "fs/promises")))
+    (const* ((require (prop globalThis "require"))
+             ((object-pattern ("writeFile" writeFile)) (call require "fs/promises")))
       (await (call writeFile
                   "tsconfig.json"
                   (call (prop JSON "stringify") tsconfig null 2)
@@ -249,10 +249,10 @@
       (block
         (call (prop console "log") "Generating documentation...")
         ;; Generate markdown docs from operator metadata
-        (for of ((op operators))
+        (for of ((op) operators)
           (const* ((name (prop op "name"))
                    (category (prop op "category")))
-            (call (prop console "log") (template "  " name " (" category ")"))))
+            (call (prop console "log") :("  " + name + " (" + category + ")"))))
           (call (prop console "log") "Documentation generated!")))))
         (export (export-spec generateDocs))
 
@@ -262,7 +262,7 @@
   
   (fn async release ((version: string))
     (block
-      (call (prop console "log") (template "Releasing version " version))
+      (call (prop console "log") :("Releasing version " + version))
       
       ;; 1. Build
       (call (prop console "log") "1. Building...")
@@ -282,14 +282,16 @@
       
       ;; 5. Create git tag
       (call (prop console "log") "5. Creating git tag...")
-      (const* (((object-pattern ("exec" exec)) (call require "child_process")))
-        (call exec (template "git tag v" version)))
+      (const* ((require (prop globalThis "require"))
+               ((object-pattern ("exec" exec)) (call require "child_process")))
+        (call exec :("git tag v" + version)))
       
-        (call (prop console "log") (template "Release " version " complete!")))))
+        (call (prop console "log") :("Release " + version + " complete!")))))
       (export (export-spec release))
   
   (fn async runTests ()
-    (const* (((object-pattern ("exec" exec)) (call require "child_process")))
+    (const* ((require (prop globalThis "require"))
+             ((object-pattern ("exec" exec)) (call require "child_process")))
       (return (new Promise
                   (lambda ((resolve) (reject))
                     (call exec "npm test"
@@ -304,14 +306,15 @@
   
   ;; Watch mode - rebuild on file changes
   (fn async watch ()
-    (const* (((object-pattern ("watch" watch)) (call require "chokidar"))
+    (const* ((require (prop globalThis "require"))
+             ((object-pattern ("watch" watch)) (call require "chokidar"))
              (watcher (call watch "*.t2")))
       (block
         (call (prop console "log") "Watching for changes...")
         (call (prop watcher "on") "change"
               (fn async ((path))
                 (block
-                  (call (prop console "log") (template "\n" path " changed, rebuilding..."))
+                  (call (prop console "log") :("\n" + path + " changed, rebuilding..."))
                   (await (call buildAll))))))))
   (export (export-spec watch))
   
@@ -319,11 +322,12 @@
   (fn async format ()
     (call (prop console "log") "Formatting .t2 files...")
     ;; T2lang formatter
-    (const* (((object-pattern ("format" format)) (call require "t2lang/formatter"))
+    (const* ((require (prop globalThis "require"))
+             ((object-pattern ("format" format)) (call require "t2lang/formatter"))
              ((object-pattern ("readdir" readdir) ("readFile" readFile) ("writeFile" writeFile)) (call require "fs/promises"))
              (files (await (call readdir "."))))
       (block
-        (for of ((file files))
+        (for of ((file) files)
           (if (call (prop file "endsWith") ".t2")
             (const* ((source (await (call readFile file "utf-8")))
                      (formatted (call format source)))
@@ -334,14 +338,15 @@
   ;; Lint all files
   (fn async lint ()
     (call (prop console "log") "Linting...")
-    (const* (((object-pattern ("lint" lint)) (call require "t2lang/linter")))
+    (const* ((require (prop globalThis "require"))
+             ((object-pattern ("lint" lint)) (call require "t2lang/linter")))
       (block
         ;; Run linter
         (const* ((results (call lint (array "*.t2"))))
           (if :(results.errors > 0)
             (block
-              (call (prop console "error") (template results.errors " errors found"))
-              (call (prop process "exit") 1))
+              (call (prop console "error") :(results.errors + " errors found"))
+              (call (prop (prop globalThis "process") "exit") 1))
             (call (prop console "log") "No errors found"))))))
   (export (export-spec lint))
 

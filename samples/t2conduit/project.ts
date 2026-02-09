@@ -73,11 +73,11 @@ async function buildAll() {
     { source: "tests.t2", output: "dist/tests.ts" },
   ];
   {
-    for (let call of file(files)) {
+    for (let file of files) {
       const source = file.source;
       const output = file.output;
       {
-        console.log(template("Compiling ", source, " -> ", output));
+        console.log("Compiling " + source + " -> " + output);
         await compileT2File(source, output);
       }
     }
@@ -86,8 +86,9 @@ async function buildAll() {
 }
 export { buildAll };
 async function compileT2File(sourcePath: string, outputPath: string) {
+  const require = globalThis.require;
   const { compile } = require("t2lang/compiler");
-  const { readFile, writeFile } = require("fs/promises");
+  const { readFile, writeFile, mkdir } = require("fs/promises");
   const { dirname } = require("path");
   {
     const source = await readFile(sourcePath, "utf-8");
@@ -99,7 +100,7 @@ async function compileT2File(sourcePath: string, outputPath: string) {
       });
       {
         const outputDir = dirname(outputPath);
-        await require("fs/promises")("mkdir", outputDir, { recursive: true });
+        await mkdir(outputDir, { recursive: true });
         await writeFile(outputPath, typescript, "utf-8");
       }
     }
@@ -128,6 +129,7 @@ const tsconfig = {
 };
 export { tsconfig };
 async function generateTsConfig() {
+  const require = globalThis.require;
   const { writeFile } = require("fs/promises");
   await writeFile("tsconfig.json", JSON.stringify(tsconfig, null, 2), "utf-8");
 }
@@ -208,10 +210,10 @@ async function generateDocs() {
   ];
   {
     console.log("Generating documentation...");
-    for (let call of op(operators)) {
+    for (let op of operators) {
       const name = op.name;
       const category = op.category;
-      console.log(template("  ", name, " (", category, ")"));
+      console.log("  " + name + " (" + category + ")");
     }
     console.log("Documentation generated!");
   }
@@ -219,7 +221,7 @@ async function generateDocs() {
 export { generateDocs };
 async function release(version: string) {
   {
-    console.log(template("Releasing version ", version));
+    console.log("Releasing version " + version);
     console.log("1. Building...");
     await buildAll();
     console.log("2. Running tests...");
@@ -229,13 +231,15 @@ async function release(version: string) {
     console.log("4. Updating version...");
     projectConfig.version = version;
     console.log("5. Creating git tag...");
+    const require = globalThis.require;
     const { exec } = require("child_process");
-    exec(template("git tag v", version));
-    console.log(template("Release ", version, " complete!"));
+    exec("git tag v" + version);
+    console.log("Release " + version + " complete!");
   }
 }
 export { release };
 async function runTests() {
+  const require = globalThis.require;
   const { exec } = require("child_process");
   return new Promise((resolve, reject) => {
     exec("npm test", (error, stdout, stderr) => {
@@ -248,13 +252,14 @@ async function runTests() {
   });
 }
 async function watch() {
+  const require = globalThis.require;
   const { watch } = require("chokidar");
   const watcher = watch("*.t2");
   {
     console.log("Watching for changes...");
     watcher.on("change", async function (path) {
       {
-        console.log(template("\n", path, " changed, rebuilding..."));
+        console.log("\n" + path + " changed, rebuilding...");
         await buildAll();
       }
     });
@@ -263,11 +268,12 @@ async function watch() {
 export { watch };
 async function format() {
   console.log("Formatting .t2 files...");
+  const require = globalThis.require;
   const { format } = require("t2lang/formatter");
   const { readdir, readFile, writeFile } = require("fs/promises");
   const files = await readdir(".");
   {
-    for (let call of file(files)) {
+    for (let file of files) {
       if (file.endsWith(".t2")) {
         const source = await readFile(file, "utf-8");
         const formatted = format(source);
@@ -280,12 +286,13 @@ async function format() {
 export { format };
 async function lint() {
   console.log("Linting...");
+  const require = globalThis.require;
   const { lint } = require("t2lang/linter");
   {
     const results = lint(["*.t2"]);
     if (results.errors > 0) {
-      console.error(template(results.errors, " errors found"));
-      process.exit(1);
+      console.error(results.errors + " errors found");
+      globalThis.process.exit(1);
     } else {
       console.log("No errors found");
     }
