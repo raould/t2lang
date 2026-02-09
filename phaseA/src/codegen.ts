@@ -576,27 +576,35 @@ async function emitExpression(expr: Expression): Promise<string> {
   }
   if (expr instanceof PropExpr) {
     const objectExpr = await emitExpression(expr.object);
+    const needsParens = expr.object instanceof ObjectExpr;
+    const wrappedObject = needsParens ? `(${objectExpr})` : objectExpr;
     if (isIdentifierName(expr.name)) {
-      return `${objectExpr}.${expr.name}`;
+      return `${wrappedObject}.${expr.name}`;
     }
-    return `${objectExpr}[${JSON.stringify(expr.name)}]`;
+    return `${wrappedObject}[${JSON.stringify(expr.name)}]`;
   }
   if (expr instanceof OptionalPropExpr) {
     const objectExpr = await emitExpression(expr.object);
+    const needsParens = expr.object instanceof ObjectExpr;
+    const wrappedObject = needsParens ? `(${objectExpr})` : objectExpr;
     if (isIdentifierName(expr.name)) {
-      return `${objectExpr}?.${expr.name}`;
+      return `${wrappedObject}?.${expr.name}`;
     }
-    return `${objectExpr}?.[${JSON.stringify(expr.name)}]`;
+    return `${wrappedObject}?.[${JSON.stringify(expr.name)}]`;
   }
   if (expr instanceof IndexExpr) {
     const objectExpr = await emitExpression(expr.object);
+    const needsParens = expr.object instanceof ObjectExpr;
+    const wrappedObject = needsParens ? `(${objectExpr})` : objectExpr;
     const indexExpr = await emitExpression(expr.index);
-    return `${objectExpr}[${indexExpr}]`;
+    return `${wrappedObject}[${indexExpr}]`;
   }
   if (expr instanceof OptionalIndexExpr) {
     const objectExpr = await emitExpression(expr.object);
+    const needsParens = expr.object instanceof ObjectExpr;
+    const wrappedObject = needsParens ? `(${objectExpr})` : objectExpr;
     const indexExpr = await emitExpression(expr.index);
-    return `${objectExpr}?.[${indexExpr}]`;
+    return `${wrappedObject}?.[${indexExpr}]`;
   }
   if (expr instanceof ObjectExpr) {
     if (expr.fields.length === 0) {
