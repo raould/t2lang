@@ -8,9 +8,11 @@ import fs from "node:fs";""")
 ;;
 ;; helpers
 
+      (dbg (lambda ((...msgs)) (raw """console.log(...msgs);""")))
+
       (parseString
         (lambda ((tokenText))
-    (raw """//console.log('+++parseString', tokenText);""")
+    (raw """dbg('+++parseString', tokenText);""")
     (raw """const raw = tokenText;
     const inner = raw.slice(1, -1);
     // antlr and json escapes are the same (?!)
@@ -24,7 +26,7 @@ import fs from "node:fs";""")
 ;; ast program
       (astProgram
         (lambda ((ctx))
-    (raw """//console.log('+++astProgram', Object.keys(ctx));""")
+    (raw """dbg('+++astProgram', Object.keys(ctx), ctx.getText())""")
     (raw """return {
         tag: "program",
         body: ctx.statement().map(astStatement),
@@ -35,7 +37,7 @@ import fs from "node:fs";""")
 ;; ast statement
       (astStatement
         (lambda ((ctx))
-    (raw """//console.log('+++astStatement', Object.keys(ctx));""")
+    (raw """dbg('+++astStatement', Object.keys(ctx), ctx.getText());""")
     (raw """if (ctx.letStar()) {
         return astLetStar(ctx.letStar()!);
     }
@@ -48,6 +50,9 @@ import fs from "node:fs";""")
     if (ctx.if()) {
         return astIf(ctx.if());
     }
+    if (ctx.while()) {
+      return astWhile(ctx.while());
+    }
     return astExpression(ctx.expression()!);"""))
       )
 
@@ -57,7 +62,7 @@ import fs from "node:fs";""")
 
       (astIf
         (lambda ((ctx))
-    (raw """//console.log('+++astIf', Object.keys(ctx));""")
+    (raw """dbg('+++astIf', Object.keys(ctx), ctx.getText());""")
     (raw """const test = astExpression(ctx.expression());
       const ifthen = astStatement(ctx.statement(0));
       const ctxElse = ctx.statement(1);
@@ -70,7 +75,10 @@ import fs from "node:fs";""")
 
       (astWhile
         (lambda ((ctx))
-    (raw """//console.log('+++astWhile', Object.keys(ctx));""")
+    (raw """dbg('+++astWhile', Object.keys(ctx), ctx.getText());""")
+    (raw """const test = astExpression(ctx.expression());
+      const body = astStatement(ctx.statement());
+      return { tag: 'while', test, body };""")
         )
       )
 
@@ -79,7 +87,7 @@ import fs from "node:fs";""")
 
       (astLetStar
         (lambda ((ctx))
-    (raw """//console.log('+++astLetStar', Object.keys(ctx));""")
+    (raw """dbg('+++astLetStar', Object.keys(ctx), ctx.getText());""")
     (raw """const bindings = ctx
     .binding()
     .map((b: BindingContext) => {
@@ -95,7 +103,7 @@ import fs from "node:fs";""")
 ;; ast lambda
       (astLambda
         (lambda ((ctx))
-    (raw """//console.log('+++astLambda', Object.keys(ctx));""")
+    (raw """dbg('+++astLambda', Object.keys(ctx), ctx.getText());""")
     (raw """const params = ctx
     .fnSignature()
     .param()
@@ -109,7 +117,7 @@ import fs from "node:fs";""")
 
       (astExpression
         (lambda ((ctx))
-    (raw """//console.log('+++astExpression', Object.keys(ctx));""")
+    (raw """dbg('+++astExpression', Object.keys(ctx), ctx.getText());""")
     (raw """    if (ctx.literal()) {
         return astLiteral(ctx.literal()!);
     }
@@ -133,7 +141,7 @@ import fs from "node:fs";""")
 
       (astCall
         (lambda ((ctx))
-    (raw """//console.log('+++astCall', Object.keys(ctx));""")
+    (raw """dbg('+++astCall', Object.keys(ctx), ctx.getText());""")
     (raw """const exprs = ctx
     .expression()
     .map(astExpression);
@@ -149,7 +157,7 @@ import fs from "node:fs";""")
 
       (astLiteral
         (lambda ((ctx))
-    (raw """//console.log('+++astLiteral', Object.keys(ctx));""")
+    (raw """dbg('+++astLiteral', Object.keys(ctx), ctx.getText());""")
     (raw """if (ctx.NUMBER()) return { tag: "literal", value: Number(ctx.NUMBER()!.getText()) };
     if (ctx.STRING()) return { tag: "literal", value: parseString(ctx.STRING()!.getText()) }; 
     if (ctx.BOOLEAN()) return { tag: "literal", value: ctx.BOOLEAN()!.getText() === "true" }; 
@@ -163,7 +171,7 @@ import fs from "node:fs";""")
 
       (astRaw
         (lambda ((ctx))
-    (raw """//console.log('+++astRaw', Object.keys(ctx));""")
+    (raw """dbg('+++astRaw', Object.keys(ctx), ctx.getText());""")
     (raw """return {
         tag: "raw",
         code: parseString(ctx.STRING()!.getText())
@@ -177,7 +185,7 @@ import fs from "node:fs";""")
 ;; emit program
       (emitProgram
         (lambda ((node))
-    (raw """//console.log('+++emitProgram', Object.keys(node));""")
+    (raw """dbg('+++emitProgram', Object.keys(node));""")
     (raw """return node.body.map(emitStmt).join('\n');"""))
       )
 
@@ -185,7 +193,7 @@ import fs from "node:fs";""")
 ;; emit if
       (emitIf
         (lambda ((node))    
-    (raw """//console.log('+++if', Object.keys(node));""")
+    (raw """dbg('+++if', Object.keys(node));""")
     (raw """const lines=[];
       lines.push(`if (${emitExpr(node.test)}) {`);
       lines.push(indent(emitStmt(node.ifthen)));
@@ -200,12 +208,22 @@ import fs from "node:fs";""")
       )
 ;;
 ;; emit while
+      (emitWhile
+        (lambda ((node))
+    (raw """dbg('+++while', Object.keys(node));""")
+    (raw """const lines=[];
+      lines.push(`while (${emitExpr(node.test)}) {`);
+      lines.push(indent(emitStmt(node.body)));
+      lines.push("}");
+      return lines.join('\n');""")
+        )
+      )
 
 ;;
 ;; emit let*
       (emitLetStar
         (lambda ((node))
-    (raw """//console.log('+++emitStar', Object.keys(node));""")
+    (raw """dbg('+++emitStar', Object.keys(node));""")
     (raw """const lines = [];
   for (const b of node.bindings) {
     if (b.init) {
@@ -224,7 +242,7 @@ import fs from "node:fs";""")
 ;; emit expr
       (emitExpr
         (lambda ((expr))
-    (raw """//console.log('+++emitExpr', Object.keys(expr));""")
+    (raw """dbg('+++emitExpr', Object.keys(expr));""")
     (raw """switch (expr.tag) {
     case 'literal':     return JSON.stringify(expr.value);
     case 'identifier':  return expr.name;
@@ -232,7 +250,8 @@ import fs from "node:fs";""")
     case 'lambda':      return emitLambda(expr);
     case 'raw':         return expr.code;
     case 'if':          return emitIf(expr);
-    default: throw new Error("unhandled expr.tag >" + expr.tag + "<");
+    case 'while':       return emitWhile(expr);
+    default: throw new Error("Unhandled expr.tag >" + expr.tag + "<");
   }"""))
       )
 
@@ -240,7 +259,7 @@ import fs from "node:fs";""")
 ;; emit lambda
       (emitLambda
         (lambda ((node))
-    (raw """//console.log('+++emitLambda', Object.keys(node));""")
+    (raw """dbg('+++emitLambda', Object.keys(node));""")
     (raw """const params = node.params.join(', ');
   const body = node.body.map(emitStmt).join('\n');
   return `(${params}) => {\n${indent(body)}\n}`;"""))
@@ -259,7 +278,7 @@ import fs from "node:fs";""")
 ;; emit indent
       (indent
         (lambda ((text))
-    (raw """//console.log('+++emitIndent', text);""")
+    (raw """dbg('+++emitIndent', text);""")
     (raw """return text.split('\n').map(line => '  ' + line).join('\n');"""))
       )
 
@@ -274,7 +293,7 @@ const lexer = new Stage1Lexer(inputStream);
 const tokenStream = new CommonTokenStream(lexer);
 const parser = new Stage1Parser(tokenStream);
 const tree = parser.program();
-//console.log("???", tree.toStringTree(parser));
+console.log("???", tree.toStringTree(parser));
 const ast = astProgram(tree);
 console.log(emitProgram(ast));"""))
       )

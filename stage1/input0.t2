@@ -1,6 +1,8 @@
 (program
   (let*
     ((x true)
+     (fnw (lambda () (while false (if x 1 0))))
      (fn (lambda ((z)) z))
        (y (call add x 2)))
+   (call fnw)
    (if x 1 0)))
