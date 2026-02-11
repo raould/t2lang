@@ -219,7 +219,10 @@ function chunk<T>(size: number): Pipe<T, Array<T>> {
   };
 }
 export { chunk };
-function flatMap<A, B>(fn, opts: { concurrency: number } = {}): Pipe<A, B> {
+function flatMap<A, B>(
+  fn,
+  opts: { concurrency: number } = { concurrency: 1 }(),
+): Pipe<A, B> {
   const concurrency = opts.concurrency || 1;
   return async function* <A>(source: Source<A>) {
     if (concurrency === 1) {

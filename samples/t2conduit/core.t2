@@ -222,7 +222,7 @@
   
   ;; flatMap - map and flatten with concurrency control
   (export (fn flatMap ((fn (t:fn (t:ref A) (t:ref Promise (array (t:ref B)))))
-                       (opts (t:object (("concurrency" type-number))) (default (object))))
+                       (opts (t:object (("concurrency" type-number))) (default ({concurrency:1}))))
                 : (t:ref Pipe (array (t:ref A) (t:ref B)))
            (const* ((concurrency (|| (prop opts "concurrency") 1)))
              (return

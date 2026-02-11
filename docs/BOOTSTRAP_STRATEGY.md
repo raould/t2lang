@@ -6,44 +6,40 @@ Below is a staged progression from the smallest viable kernel to a full macro‑
 
 ---
 
+Here’s the cleanest way to think about *when* TypeScript‑specific syntax should enter a bootstrapped s‑expression language that transpiles to **TypeScript *syntax*** (not AST). The key is to introduce TS features only when the underlying language has enough structure to express them without contaminating earlier phases.
+
+Below is a staged integration plan that aligns with the bootstrap ladder we sketched earlier.
+
+---
+
 ### **Stage 0 — The Absolute Kernel**
 #### *Goal: Parse s-expressions and emit TypeScript strings.*
 
 This is the “bare metal” of your language.
+**Do *not* introduce any TypeScript-specific syntax here.**
 
 **Capabilities**
 - Tokenizer for parentheses, symbols, numbers, strings.
 - S-expression parser → nested arrays.
+- no TypeScript types.
 - A dispatcher that maps a tiny set of forms to TypeScript strings:
-  - `fn` → arrow function
-  - `let` → `const`
-  - `seq` → block `{ … }`
-  - `raw` → embed literal TS
-  - function call → `f(a, b)`
-
-**No macros. No sugar. No hygiene. No modules.**
-
-**Why this stage matters**
-- It’s small enough to hand-write.
-- It can compile the next stage of the compiler.
-- It establishes the canonical AST shape.
+  - `(raw "...")` → escape hatches for TS fragments, emit string directly.
+  - `(lambda ((x) (y)) ...)` → `(x, y) => { ... }`
+  - `(let* ((x 1) (y 2)))` → `let x = 1; let y = 2;`
 
 ---
 
 ### **Stage 1 — Self-Hosting Minimal Core**
 #### *Goal: Rewrite the compiler in its own language.*
 
-Now that Stage 0 can compile simple code, you rewrite the compiler in the language itself.
-
 **Capabilities**
 - The compiler is now written in the language.
 - Still no macros.
 - Still no sugar.
 - Add minimal conveniences:
-  - `if`
-  - `do`
-  - `lambda` alias for `fn`
-  - basic arithmetic lowering
+  - add `if`
+  - add `do`
+  - add basic arithmetic lowering
 
 **Why this stage matters**
 - You now have a self-hosting system.
@@ -63,6 +59,7 @@ This is the first *qualitative* leap.
   - quasiquote / unquote
   - pattern matching (minimal)
 - Clear phase separation:
+  - **Grammar Annotations** → @canonical @noncallhead @specialform @scope
   - **Reader** → raw s-exprs
   - **Parser** → AST
   - **Macro expander** → expanded AST
@@ -72,6 +69,20 @@ This is the first *qualitative* leap.
 - You can now express language features *in the language*.
 - You can implement sugar as macros later.
 - You can build the standard library using macros.
+
+---
+
+### ***Stage 2B - TypeScript internal representation.
+
+**Introduce the *internal representation* of TypeScript types, but not the surface syntax.**
+
+At this stage you can add:
+- AST nodes for type annotations  
+- AST nodes for generics  
+- AST nodes for conditional/mapped types  
+- AST nodes for optional chaining  
+
+But **do not** expose them as surface syntax yet.
 
 ---
 
@@ -101,6 +112,28 @@ All sugar lowers to the same canonical AST that macros operate on.
 
 ---
 
+### **Stage 3B - Structural Sugar (Reader/Parser Sugar)**
+**Introduce TypeScript syntax that is purely structural and does not require semantic knowledge.**
+
+This includes:
+- Type annotations on parameters  
+- Type annotations on variables  
+- Generic parameter lists  
+- Optional chaining (syntactic lowering only)  
+- Basic TS operators (`as`, `!`, `?`)  
+
+These are all *syntactic* and can be lowered without type inference.
+
+### Examples you can safely introduce here:
+- `(fn ((x : number)) ...)`
+- `(let* (x : string) "hi")`
+- `(call (foo? bar))` → `foo?.bar` [???]
+- `(fn ((x : T)) ...)` with `(generic T ...)`
+
+You can safely lower these constructs to TS syntax.
+
+---
+
 ### **Stage 4 — Macro-Defined Sugar (Surface-Level Macros)**
 #### *Goal: Let macros define new syntax-like constructs.*
 
@@ -121,6 +154,22 @@ Now that structural sugar is stable, you allow macros to introduce higher-level 
 
 ---
 
+### **Stage 4B - **Introduce TypeScript constructs that can be expressed as macros.**
+
+This includes:
+- richer loop variants (`for-of`, `for-in`, `for-await-of`)  
+- `switch`  
+- `try/catch/finally`  
+- `interface` and `type` declarations  
+- mapped types (as macro-generated TS strings)  
+
+These are all *structural* and can be expressed as macro expansions.
+
+**Why here?**
+Macros can now define new constructs that lower to TS syntax.
+
+---
+
 ### **Stage 5 — Semantic Sugar + Type Inference Hooks**
 #### *Goal: Add sugar that depends on semantic information.*
 
@@ -138,35 +187,21 @@ This is sugar that requires knowing types or symbol resolution.
 
 ---
 
-### **Stage 6 — Optimizing Compiler**
-#### *Goal: Introduce real optimizations, but only after the language stabilizes.*
+### **Stage 5B Semantic Sugar + Type-Directed Lowering**
+**Introduce TypeScript features that require semantic knowledge or symbol resolution.**
 
-Now that syntax and macros are stable, you can optimize.
+This includes:
+- conditional types (`T extends U ? X : Y`)  
+- mapped types with key remapping  
+- type inference helpers  
+- optional chaining with fallback semantics  
+- discriminated unions  
+- type narrowing sugar  
 
-**Capabilities**
-- Constant folding
-- Dead code elimination
-- Inline expansion (macro-aware)
-- Tail-call optimization (if desired)
-- Peephole optimizations on emitted TS
-- Optional: emit JS directly instead of TS
-
-**Why this stage matters**
-- You can now target production workloads.
-- You can introduce optimization passes without breaking macro semantics.
-
----
-
-### **Stage 7 — Advanced Features (Optional)**
-#### *Goal: Add features that require a mature ecosystem.*
-
-Examples:
-- Module system with compile-time linking
-- Incremental compilation
-- Hot-reloadable macro environments
-- Provenance-aware error reporting
-- Semantic drift detection (your specialty)
-- Plugin architecture for sugar/macro packs
+These require:
+- symbol tables  
+- type environment tracking  
+- semantic lowering  
 
 ---
 
@@ -179,8 +214,6 @@ Here’s the whole progression in one glance:
 4. **Stage 3:** Structural sugar (reader + parser)  
 5. **Stage 4:** Macro-defined sugar  
 6. **Stage 5:** Semantic sugar + type-aware lowering  
-7. **Stage 6:** Optimizing compiler  
-8. **Stage 7:** Advanced ecosystem features  
 
 Each stage is minimal but unlocks the next.
 
