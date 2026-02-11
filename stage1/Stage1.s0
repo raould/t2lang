@@ -6,7 +6,7 @@
 
       (parseString
         (lambda ((tokenText))
-    (raw """//console.log('parseString', tokenText)""")
+    (raw """console.log('+++parseString', tokenText);""")
     (raw """const raw = tokenText;
     const inner = raw.slice(1, -1);
     // antlr and json escapes are the same (?!)
@@ -20,7 +20,7 @@
 ;; ast program
       (astProgram
         (lambda ((ctx))
-    (raw """//console.log('astProgram', ctx)""")
+    (raw """console.log('+++astProgram', Object.keys(ctx));""")
     (raw """return {
         tag: "program",
         body: ctx.statement().map(astStatement),
@@ -31,7 +31,7 @@
 ;; ast statement
       (astStatement
         (lambda ((ctx))
-    (raw """//console.log('astStatement', ctx)""")
+    (raw """console.log('+++astStatement', Object.keys(ctx));""")
     (raw """if (ctx.letStar()) {
         return astLetStar(ctx.letStar()!);
     }
@@ -41,7 +41,33 @@
     if (ctx.raw()) {
         return astRaw(ctx.raw()!);
     }
+    if (ctx.if()) {
+        return astIf(ctx.if());
+    }
     return astExpression(ctx.expression()!);"""))
+      )
+
+;;
+;; ast if
+;; LPAREN IF expression statement statement? RPAREN
+
+      (astIf
+        (lambda ((ctx))
+    (raw """console.log('+++astIf', Object.keys(ctx));""")
+    (raw """const test = astExpression(ctx.expression());
+      const ifthen = astStatement(ctx.statement(0));
+      const ctxElse = ctx.statement(1);
+      const ifelse = (ctxElse == undefined) ? undefined : astStatement(ctxElse);
+      return { tag: 'if', test, ifthen, ifelse };""")
+        )
+      )
+;;
+;; ast while
+
+      (astWhile
+        (lambda ((ctx))
+    (raw """console.log('+++astWhile', Object.keys(ctx));""")
+        )
       )
 
 ;;  
@@ -49,7 +75,7 @@
 
       (astLetStar
         (lambda ((ctx))
-    (raw """//console.log('astLetStar', ctx)""")
+    (raw """console.log('+++astLetStar', Object.keys(ctx));""")
     (raw """const bindings = ctx
     .binding()
     .map((b: BindingContext) => {
@@ -65,7 +91,7 @@
 ;; ast lambda
       (astLambda
         (lambda ((ctx))
-    (raw """//console.log('astLambda', ctx)""")
+    (raw """console.log('+++astLambda', Object.keys(ctx));""")
     (raw """const params = ctx
     .fnSignature()
     .param()
@@ -79,7 +105,7 @@
 
       (astExpression
         (lambda ((ctx))
-    (raw """//console.log('astExpression', ctx)""")
+    (raw """console.log('+++astExpression', Object.keys(ctx));""")
     (raw """    if (ctx.literal()) {
         return astLiteral(ctx.literal()!);
     }
@@ -103,7 +129,7 @@
 
       (astCall
         (lambda ((ctx))
-    (raw """//console.log('astCall', ctx)""")
+    (raw """console.log('+++astCall', Object.keys(ctx));""")
     (raw """const exprs = ctx
     .expression()
     .map(astExpression);
@@ -119,7 +145,7 @@
 
       (astLiteral
         (lambda ((ctx))
-    (raw """//console.log('astLiteral', ctx)""")
+    (raw """console.log('+++astLiteral', Object.keys(ctx));""")
     (raw """if (ctx.NUMBER()) return { tag: "literal", value: Number(ctx.NUMBER()!.getText()) };
     if (ctx.STRING()) return { tag: "literal", value: parseString(ctx.STRING()!.getText()) }; 
     if (ctx.BOOLEAN()) return { tag: "literal", value: ctx.BOOLEAN()!.getText() === "true" }; 
@@ -133,7 +159,7 @@
 
       (astRaw
         (lambda ((ctx))
-    (raw """//console.log('astRaw', ctx)""")
+    (raw """console.log('+++astRaw', Object.keys(ctx));""")
     (raw """return {
         tag: "raw",
         code: parseString(ctx.STRING()!.getText())
@@ -147,15 +173,35 @@
 ;; emit program
       (emitProgram
         (lambda ((node))
-    (raw """//console.log('emitProgram', node)""")
+    (raw """console.log('+++emitProgram', Object.keys(node));""")
     (raw """return node.body.map(emitStmt).join('\n');"""))
       )
+
+;;
+;; emit if
+      (emitIf
+        (lambda ((node))    
+    (raw """console.log('+++if', Object.keys(node));""")
+    (raw """const lines=[];
+      lines.push(`if (${emitExpr(node.test)}) {`);
+      lines.push(indent(emitStmt(node.ifthen)));
+      lines.push("}");
+      if (node.ifelse != undefined) {
+        lines.push("else {");
+        lines.push(indent(emitStmt(node.ifelse)));
+        lines.push("}");
+      }
+      return lines.join('\n');""")
+        )
+      )
+;;
+;; emit while
 
 ;;
 ;; emit let*
       (emitLetStar
         (lambda ((node))
-    (raw """//console.log('emitStar', node)""")
+    (raw """console.log('+++emitStar', Object.keys(node));""")
     (raw """const lines = [];
   for (const b of node.bindings) {
     if (b.init) {
@@ -174,14 +220,15 @@
 ;; emit expr
       (emitExpr
         (lambda ((expr))
-    (raw """//console.log('emitExpr', expr)""")
+    (raw """console.log('+++emitExpr', Object.keys(expr));""")
     (raw """switch (expr.tag) {
     case 'literal':     return JSON.stringify(expr.value);
     case 'identifier':  return expr.name;
     case 'call':        return emitCall(expr);
     case 'lambda':      return emitLambda(expr);
     case 'raw':         return expr.code;
-    default: throw new Error(expr.tag);
+    case 'if':          return emitIf(expr);
+    default: throw new Error("unhandled expr.tag >" + expr.tag + "<");
   }"""))
       )
 
@@ -189,7 +236,7 @@
 ;; emit lambda
       (emitLambda
         (lambda ((node))
-    (raw """//console.log('emitLambda', node)""")
+    (raw """console.log('+++emitLambda', Object.keys(node));""")
     (raw """const params = node.params.join(', ');
   const body = node.body.map(emitStmt).join('\n');
   return `(${params}) => {\n${indent(body)}\n}`;"""))
@@ -208,7 +255,7 @@
 ;; emit indent
       (indent
         (lambda ((text))
-    (raw """//console.log('emitIndent', text)""")
+    (raw """console.log('+++emitIndent', text);""")
     (raw """return text.split('\n').map(line => '  ' + line).join('\n');"""))
       )
 
@@ -218,15 +265,13 @@
       (main
         (lambda ()
     (raw """const input = fs.readFileSync(process.argv[2], "utf-8");
-//console.log(input);
 const inputStream = CharStream.fromString(input);
 const lexer = new Stage1Lexer(inputStream);
 const tokenStream = new CommonTokenStream(lexer);
 const parser = new Stage1Parser(tokenStream);
 const tree = parser.program();
-//console.log(tree.toStringTree(parser));
+console.log("???", tree.toStringTree(parser));
 const ast = astProgram(tree);
-//console.log(JSON.stringify(ast, null, 2));
 console.log(emitProgram(ast));"""))
       )
 

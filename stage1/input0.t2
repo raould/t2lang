@@ -1,6 +1,6 @@
 (program
   (let*
-    ((x 1)
+    ((x true)
      (fn (lambda ((z)) z))
-     (y (call add x 2)))
-   (call print y)))
+       (y (call add x 2)))
+   (if x 1 0)))
