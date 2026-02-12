@@ -22,75 +22,75 @@ let astProgram = (ctx) => {
 let astStatement = (ctx) => {
   dbg('+++astStatement', Object.keys(ctx), ctx.getText());;
   if (ctx.letStar()) {
-          return astLetStar(ctx.letStar()!);
-      }
-      if (ctx.lambda()) {
-          return astLambda(ctx.lambda()!);
-      }
-      if (ctx.raw()) {
-          return astRaw(ctx.raw()!);
-      }
-      if (ctx.if()) {
-          return astIf(ctx.if());
-      }
-      if (ctx.while()) {
-        return astWhile(ctx.while());
-      }
-      return astExpression(ctx.expression()!);;
+                  return astLetStar(ctx.letStar()!);
+              }
+              if (ctx.lambda()) {
+                  return astLambda(ctx.lambda()!);
+              }
+              if (ctx.raw()) {
+                  return astRaw(ctx.raw()!);
+              }
+              if (ctx.if()) {
+                  return astIf(ctx.if());
+              }
+              if (ctx.while()) {
+                return astWhile(ctx.while());
+              }
+              return astExpression(ctx.expression()!);;
 };
 let astIf = (ctx) => {
   dbg('+++astIf', Object.keys(ctx), ctx.getText());;
   const test = astExpression(ctx.expression());
-        const ifthen = astStatement(ctx.statement(0));
-        const ctxElse = ctx.statement(1);
-        const ifelse = (ctxElse == undefined) ? undefined : astStatement(ctxElse);
-        return { tag: 'if', test, ifthen, ifelse };;
+              const ifthen = astStatement(ctx.statement(0));
+              const ctxElse = ctx.statement(1);
+              const ifelse = (ctxElse == undefined) ? undefined : astStatement(ctxElse);
+              return { tag: 'if', test, ifthen, ifelse };;
 };
 let astWhile = (ctx) => {
   dbg('+++astWhile', Object.keys(ctx), ctx.getText());;
   const test = astExpression(ctx.expression());
-        const body = astStatement(ctx.statement());
-        return { tag: 'while', test, body };;
+              const body = astStatement(ctx.statement());
+              return { tag: 'while', test, body };;
 };
 let astLetStar = (ctx) => {
   dbg('+++astLetStar', Object.keys(ctx), ctx.getText());;
   const bindings = ctx
-      .binding()
-      .map((b: BindingContext) => {
-          const id = b.IDENTIFIER().getText();
-          const init = b.expression() ? astExpression(b.expression()!) : undefined;
-          return { name: id, init };
-      });
-      const body = ctx.statement().map(astStatement);
-      return { tag: 'let*', bindings, body };;
+            .binding()
+            .map((b: BindingContext) => {
+                const id = b.IDENTIFIER().getText();
+                const init = b.expression() ? astExpression(b.expression()!) : undefined;
+                return { name: id, init };
+            });
+            const body = ctx.statement().map(astStatement);
+            return { tag: 'let*', bindings, body };;
 };
 let astLambda = (ctx) => {
   dbg('+++astLambda', Object.keys(ctx), ctx.getText());;
   const params = ctx
-      .fnSignature()
-      .param()
-      .map((p: ParamContext) => p.IDENTIFIER().getText());
-      const body = ctx.statement().map(astStatement);
-      return { tag: "lambda", params, body };;
+            .fnSignature()
+            .param()
+            .map((p: ParamContext) => p.IDENTIFIER().getText());
+            const body = ctx.statement().map(astStatement);
+            return { tag: "lambda", params, body };;
 };
 let astExpression = (ctx) => {
   dbg('+++astExpression', Object.keys(ctx), ctx.getText());;
-      if (ctx.literal()) {
-          return astLiteral(ctx.literal()!);
-      }
-      if (ctx.IDENTIFIER()) {
-          return { tag: "identifier", name: ctx.IDENTIFIER()!.getText() };
-      }
-      if (ctx.call()) {
-          return astCall(ctx.call()!);
-      }
-      if (ctx.lambda()) {
-          return astLambda(ctx.lambda()!); 
-      }
-      if (ctx.raw()) {
-          return astRaw(ctx.raw()!);
-      }
-      throw new Error("Unknown expression node");;
+  if (ctx.literal()) {
+                return astLiteral(ctx.literal()!);
+            }
+            if (ctx.IDENTIFIER()) {
+                return { tag: "identifier", name: ctx.IDENTIFIER()!.getText() };
+            }
+            if (ctx.call()) {
+                return astCall(ctx.call()!);
+            }
+            if (ctx.lambda()) {
+                return astLambda(ctx.lambda()!); 
+            }
+            if (ctx.raw()) {
+                return astRaw(ctx.raw()!);
+            }
+            throw new Error("Unknown expression node");;
 };
 let astCall = (ctx) => {
   dbg('+++astCall', Object.keys(ctx), ctx.getText());;
@@ -175,17 +175,19 @@ let emitExpr = (expr) => {
 let emitLambda = (node) => {
   dbg('+++emitLambda', Object.keys(node));;
   const params = node.params.join(', ');
-    const body = node.body.map(emitStmt).join('\n');
-    return `(${params}) => {\n${indent(body)}\n}`;;
+              const body = node.body.map(emitStmt).join('\n');
+              return `(${params}) => {\n${indent(body)}\n}`;;
 };
 let emitCall = (node) => {
-  const fn = emitExpr(node.fn); const args = node.args.map(emitExpr).join(', '); return `${fn}(${args})`;;
+  const fn = emitExpr(node.fn);
+            const args = node.args.map(emitExpr).join(', ');
+            return `${fn}(${args})`;;
 };
 let emitStmt = (stmt) => {
   switch (stmt.tag) {
-      case 'let*': return emitLetStar(stmt);
-      default:     return emitExpr(stmt as Expr) + ';';
-    };
+              case 'let*': return emitLetStar(stmt);
+              default:     return emitExpr(stmt as Expr) + ';';
+            };
 };
 let indent = (text) => {
   dbg('+++emitIndent', text);;

@@ -37,23 +37,24 @@ import fs from "node:fs";""")
 ;; ast statement
       (astStatement
         (lambda ((ctx))
-    (raw """dbg('+++astStatement', Object.keys(ctx), ctx.getText());""")
-    (raw """if (ctx.letStar()) {
-        return astLetStar(ctx.letStar()!);
-    }
-    if (ctx.lambda()) {
-        return astLambda(ctx.lambda()!);
-    }
-    if (ctx.raw()) {
-        return astRaw(ctx.raw()!);
-    }
-    if (ctx.if()) {
-        return astIf(ctx.if());
-    }
-    if (ctx.while()) {
-      return astWhile(ctx.while());
-    }
-    return astExpression(ctx.expression()!);"""))
+          (raw """dbg('+++astStatement', Object.keys(ctx), ctx.getText());""")
+          (raw """if (ctx.letStar()) {
+                return astLetStar(ctx.letStar()!);
+            }
+            if (ctx.lambda()) {
+                return astLambda(ctx.lambda()!);
+            }
+            if (ctx.raw()) {
+                return astRaw(ctx.raw()!);
+            }
+            if (ctx.if()) {
+                return astIf(ctx.if());
+            }
+            if (ctx.while()) {
+              return astWhile(ctx.while());
+            }
+            return astExpression(ctx.expression()!);""")
+        )
       )
 
 ;;
@@ -62,78 +63,80 @@ import fs from "node:fs";""")
 
       (astIf
         (lambda ((ctx))
-    (raw """dbg('+++astIf', Object.keys(ctx), ctx.getText());""")
-    (raw """const test = astExpression(ctx.expression());
-      const ifthen = astStatement(ctx.statement(0));
-      const ctxElse = ctx.statement(1);
-      const ifelse = (ctxElse == undefined) ? undefined : astStatement(ctxElse);
-      return { tag: 'if', test, ifthen, ifelse };""")
+          (raw """dbg('+++astIf', Object.keys(ctx), ctx.getText());""")
+          (raw """const test = astExpression(ctx.expression());
+            const ifthen = astStatement(ctx.statement(0));
+            const ctxElse = ctx.statement(1);
+            const ifelse = (ctxElse == undefined) ? undefined : astStatement(ctxElse);
+            return { tag: 'if', test, ifthen, ifelse };""")
+          )
         )
-      )
 ;;
 ;; ast while
 
       (astWhile
         (lambda ((ctx))
-    (raw """dbg('+++astWhile', Object.keys(ctx), ctx.getText());""")
-    (raw """const test = astExpression(ctx.expression());
-      const body = astStatement(ctx.statement());
-      return { tag: 'while', test, body };""")
+          (raw """dbg('+++astWhile', Object.keys(ctx), ctx.getText());""")
+          (raw """const test = astExpression(ctx.expression());
+            const body = astStatement(ctx.statement());
+            return { tag: 'while', test, body };""")
+          )
         )
-      )
 
 ;;  
 ;; ast let*
 
       (astLetStar
         (lambda ((ctx))
-    (raw """dbg('+++astLetStar', Object.keys(ctx), ctx.getText());""")
-    (raw """const bindings = ctx
-    .binding()
-    .map((b: BindingContext) => {
-        const id = b.IDENTIFIER().getText();
-        const init = b.expression() ? astExpression(b.expression()!) : undefined;
-        return { name: id, init };
-    });
-    const body = ctx.statement().map(astStatement);
-    return { tag: 'let*', bindings, body };"""))
+          (raw """dbg('+++astLetStar', Object.keys(ctx), ctx.getText());""")
+          (raw """const bindings = ctx
+          .binding()
+          .map((b: BindingContext) => {
+              const id = b.IDENTIFIER().getText();
+              const init = b.expression() ? astExpression(b.expression()!) : undefined;
+              return { name: id, init };
+          });
+          const body = ctx.statement().map(astStatement);
+          return { tag: 'let*', bindings, body };""")
+        )
       )
 
 ;;  
 ;; ast lambda
       (astLambda
         (lambda ((ctx))
-    (raw """dbg('+++astLambda', Object.keys(ctx), ctx.getText());""")
-    (raw """const params = ctx
-    .fnSignature()
-    .param()
-    .map((p: ParamContext) => p.IDENTIFIER().getText());
-    const body = ctx.statement().map(astStatement);
-    return { tag: "lambda", params, body };"""))
+          (raw """dbg('+++astLambda', Object.keys(ctx), ctx.getText());""")
+          (raw """const params = ctx
+          .fnSignature()
+          .param()
+          .map((p: ParamContext) => p.IDENTIFIER().getText());
+          const body = ctx.statement().map(astStatement);
+          return { tag: "lambda", params, body };""")
+        )
       )
 
 ;;
 ;; ast expression
-
       (astExpression
         (lambda ((ctx))
-    (raw """dbg('+++astExpression', Object.keys(ctx), ctx.getText());""")
-    (raw """    if (ctx.literal()) {
-        return astLiteral(ctx.literal()!);
-    }
-    if (ctx.IDENTIFIER()) {
-        return { tag: "identifier", name: ctx.IDENTIFIER()!.getText() };
-    }
-    if (ctx.call()) {
-        return astCall(ctx.call()!);
-    }
-    if (ctx.lambda()) {
-        return astLambda(ctx.lambda()!); 
-    }
-    if (ctx.raw()) {
-        return astRaw(ctx.raw()!);
-    }
-    throw new Error("Unknown expression node");"""))
+          (raw """dbg('+++astExpression', Object.keys(ctx), ctx.getText());""")
+          (raw """if (ctx.literal()) {
+              return astLiteral(ctx.literal()!);
+          }
+          if (ctx.IDENTIFIER()) {
+              return { tag: "identifier", name: ctx.IDENTIFIER()!.getText() };
+          }
+          if (ctx.call()) {
+              return astCall(ctx.call()!);
+          }
+          if (ctx.lambda()) {
+              return astLambda(ctx.lambda()!); 
+          }
+          if (ctx.raw()) {
+              return astRaw(ctx.raw()!);
+          }
+          throw new Error("Unknown expression node");""")
+        )
       )
 
 ;;
@@ -259,19 +262,30 @@ import fs from "node:fs";""")
 ;; emit lambda
       (emitLambda
         (lambda ((node))
-    (raw """dbg('+++emitLambda', Object.keys(node));""")
-    (raw """const params = node.params.join(', ');
-  const body = node.body.map(emitStmt).join('\n');
-  return `(${params}) => {\n${indent(body)}\n}`;"""))
+          (raw """dbg('+++emitLambda', Object.keys(node));""")
+          (raw """const params = node.params.join(', ');
+            const body = node.body.map(emitStmt).join('\n');
+            return `(${params}) => {\n${indent(body)}\n}`;"""))
       )
+
+;;
+;; emit call
       (emitCall
-        (lambda ((node)) (raw """const fn = emitExpr(node.fn); const args = node.args.map(emitExpr).join(', '); return `${fn}(${args})`;"""))
+        (lambda ((node))
+          (raw """const fn = emitExpr(node.fn);
+          const args = node.args.map(emitExpr).join(', ');
+          return `${fn}(${args})`;""")
+          )
       )
+
+;;
+;; emit stmt
       (emitStmt
-        (lambda ((stmt)) (raw """switch (stmt.tag) {
-    case 'let*': return emitLetStar(stmt);
-    default:     return emitExpr(stmt as Expr) + ';';
-  }"""))
+        (lambda ((stmt))
+          (raw """switch (stmt.tag) {
+            case 'let*': return emitLetStar(stmt);
+            default:     return emitExpr(stmt as Expr) + ';';
+          }"""))
       )
 
 ;;
