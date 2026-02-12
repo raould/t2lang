@@ -5,4 +5,5 @@
      (fn (lambda ((z)) z))
        (y (call add x 2)))
    (call fnw)
+   (+ 1 2)
    (if x 1 0)))

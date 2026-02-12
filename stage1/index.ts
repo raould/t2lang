@@ -1,6 +1,6 @@
 import { CharStream, CommonTokenStream } from "antlr4ng";
 import { Stage1Lexer } from "./Stage1Lexer";
-import { RawContext, BindingContext, CallContext, ExpressionContext, LambdaContext, LetStarContext, LiteralContext, ParamContext, ProgramContext, Stage1Parser, StatementContext } from "./Stage1Parser";
+import { BindingContext, ParamContext, Stage1Parser } from "./Stage1Parser";
 import fs from "node:fs";;
 let dbg = (...msgs) => {
   console.log(...msgs);;
@@ -75,6 +75,11 @@ let astLambda = (ctx) => {
 };
 let astExpression = (ctx) => {
   dbg('+++astExpression', Object.keys(ctx), ctx.getText());;
+  dbg('+++astExpression literal?', !!ctx.literal());;
+  dbg('+++astExpression identifier?', !!ctx.IDENTIFIER());;
+  dbg('+++astExpression call?', !!ctx.call());;
+  dbg('+++astExpression lambda?', !!ctx.lambda());;
+  dbg('+++astExpression raw?', !!ctx.raw());;
   if (ctx.literal()) {
                 return astLiteral(ctx.literal()!);
             }
@@ -95,13 +100,13 @@ let astExpression = (ctx) => {
 let astCall = (ctx) => {
   dbg('+++astCall', Object.keys(ctx), ctx.getText());;
   const exprs = ctx
-      .expression()
-      .map(astExpression);
-      return {
-          tag: "call",
-          fn: exprs[0],
-          args: exprs.slice(1)
-      };;
+              .expression()
+              .map(astExpression);
+              return {
+                  tag: "call",
+                  fn: exprs[0],
+                  args: exprs.slice(1)
+              };;
 };
 let astLiteral = (ctx) => {
   dbg('+++astLiteral', Object.keys(ctx), ctx.getText());;
@@ -178,8 +183,15 @@ let emitLambda = (node) => {
               const body = node.body.map(emitStmt).join('\n');
               return `(${params}) => {\n${indent(body)}\n}`;;
 };
+let isOperator = (name) => {
+  ["<", ">", "<=", ">=", "&&", "||", "!=", "==", "===", "+", "-", "*", "/", "%", "^"].includes(name);  ;
+};
 let emitCall = (node) => {
-  const fn = emitExpr(node.fn);
+  
+            if (node.fn.tag === 'identifier' && isOperator(node.fn.name)) {
+              dbg("OPERATOR", node.fn.name);
+            }
+            const fn = emitExpr(node.fn);
             const args = node.args.map(emitExpr).join(', ');
             return `${fn}(${args})`;;
 };

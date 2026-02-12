@@ -26,11 +26,12 @@ import fs from "node:fs";""")
 ;; ast program
       (astProgram
         (lambda ((ctx))
-    (raw """dbg('+++astProgram', Object.keys(ctx), ctx.getText())""")
-    (raw """return {
-        tag: "program",
-        body: ctx.statement().map(astStatement),
-    };"""))
+          (raw """dbg('+++astProgram', Object.keys(ctx), ctx.getText())""")
+          (raw """return {
+              tag: "program",
+              body: ctx.statement().map(astStatement),
+          };""")
+        )
       )
 
 ;;
@@ -120,6 +121,11 @@ import fs from "node:fs";""")
       (astExpression
         (lambda ((ctx))
           (raw """dbg('+++astExpression', Object.keys(ctx), ctx.getText());""")
+          (raw """dbg('+++astExpression literal?', !!ctx.literal());""")
+          (raw """dbg('+++astExpression identifier?', !!ctx.IDENTIFIER());""")
+          (raw """dbg('+++astExpression call?', !!ctx.call());""")
+          (raw """dbg('+++astExpression lambda?', !!ctx.lambda());""")
+          (raw """dbg('+++astExpression raw?', !!ctx.raw());""")
           (raw """if (ctx.literal()) {
               return astLiteral(ctx.literal()!);
           }
@@ -143,15 +149,16 @@ import fs from "node:fs";""")
 ;; ast call
       (astCall
         (lambda ((ctx))
-    (raw """dbg('+++astCall', Object.keys(ctx), ctx.getText());""")
-    (raw """const exprs = ctx
-    .expression()
-    .map(astExpression);
-    return {
-        tag: "call",
-        fn: exprs[0],
-        args: exprs.slice(1)
-    };"""))
+          (raw """dbg('+++astCall', Object.keys(ctx), ctx.getText());""")
+          (raw """const exprs = ctx
+            .expression()
+            .map(astExpression);
+            return {
+                tag: "call",
+                fn: exprs[0],
+                args: exprs.slice(1)
+            };""")
+        )
       )
 
 ;;
@@ -267,9 +274,14 @@ import fs from "node:fs";""")
 
 ;;
 ;; emit call
+      (isOperator (lambda ((name)) (raw """["<", ">", "<=", ">=", "&&", "||", "!=", "==", "===", "+", "-", "*", "/", "%", "^"].includes(name);  """)))
       (emitCall
         (lambda ((node))
-          (raw """const fn = emitExpr(node.fn);
+          (raw """
+          if (node.fn.tag === 'identifier' && isOperator(node.fn.name)) {
+            dbg("OPERATOR", node.fn.name);
+          }
+          const fn = emitExpr(node.fn);
           const args = node.args.map(emitExpr).join(', ');
           return `${fn}(${args})`;""")
           )
