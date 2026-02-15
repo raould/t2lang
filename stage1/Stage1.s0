@@ -12,11 +12,11 @@ import fs from "node:fs";""")
 
       (parseString
         (lambda ((tokenText))
-    (raw """dbg('+++parseString', tokenText);""")
-    (raw """const raw = tokenText;
-    const inner = raw.slice(1, -1);
-    // antlr and json escapes are the same (?!)
-    return JSON.parse('"' + inner.replace(/"/g, '\\"') + '"');"""))
+          (raw """dbg('+++parseString', tokenText);""")
+          (raw """const raw = tokenText;
+          const inner = raw.slice(1, -1);
+          // antlr and json escapes are the same (?!)
+          return JSON.parse('"' + inner.replace(/"/g, '\\"') + '"');"""))
       )
 
 ;;
@@ -26,6 +26,7 @@ import fs from "node:fs";""")
 ;; ast program
       (astProgram
         (lambda ((ctx))
+;;          (raw """debugger;""")
           (raw """dbg('+++astProgram', Object.keys(ctx), ctx.getText())""")
           (raw """return {
               tag: "program",
@@ -39,6 +40,11 @@ import fs from "node:fs";""")
       (astStatement
         (lambda ((ctx))
           (raw """dbg('+++astStatement', Object.keys(ctx), ctx.getText());""")
+          (raw """dbg("letStar", !!ctx.letStar());""")
+          (raw """dbg("lambda", !!ctx.lambda());""")
+          (raw """dbg("raw", !!ctx.raw());""")
+          (raw """dbg("if", !!ctx.if());""")
+          (raw """dbg("while", !!ctx.while());""")
           (raw """if (ctx.letStar()) {
                 return astLetStar(ctx.letStar()!);
             }
@@ -54,6 +60,7 @@ import fs from "node:fs";""")
             if (ctx.while()) {
               return astWhile(ctx.while());
             }
+            dbg("expression", ctx.expression());
             return astExpression(ctx.expression()!);""")
         )
       )
@@ -274,17 +281,22 @@ import fs from "node:fs";""")
 
 ;;
 ;; emit call
-      (isOperator (lambda ((name)) (raw """["<", ">", "<=", ">=", "&&", "||", "!=", "==", "===", "+", "-", "*", "/", "%", "^"].includes(name);  """)))
+      (isOperator (lambda ((name)) (raw """return ["<", ">", "<=", ">=", "&&", "||", "!=", "==", "===", "+", "-", "*", "/", "%", "^"].includes(name);  """)))
       (emitCall
         (lambda ((node))
+          (raw """dbg('+++emitCall', Object.keys(node));""")
           (raw """
+          console.log("???", node.fn.name, node.fn.tag);
           if (node.fn.tag === 'identifier' && isOperator(node.fn.name)) {
             dbg("OPERATOR", node.fn.name);
+            const fn = emitExpr(node.fn);
+            const args = node.args.map(emitExpr);
+            return `${args.join(fn)};`;
           }
           const fn = emitExpr(node.fn);
           const args = node.args.map(emitExpr).join(', ');
           return `${fn}(${args})`;""")
-          )
+        )
       )
 
 ;;

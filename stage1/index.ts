@@ -8,19 +8,24 @@ let dbg = (...msgs) => {
 let parseString = (tokenText) => {
   dbg('+++parseString', tokenText);;
   const raw = tokenText;
-      const inner = raw.slice(1, -1);
-      // antlr and json escapes are the same (?!)
-      return JSON.parse('"' + inner.replace(/"/g, '\\"') + '"');;
+            const inner = raw.slice(1, -1);
+            // antlr and json escapes are the same (?!)
+            return JSON.parse('"' + inner.replace(/"/g, '\\"') + '"');;
 };
 let astProgram = (ctx) => {
   dbg('+++astProgram', Object.keys(ctx), ctx.getText());
   return {
-          tag: "program",
-          body: ctx.statement().map(astStatement),
-      };;
+                tag: "program",
+                body: ctx.statement().map(astStatement),
+            };;
 };
 let astStatement = (ctx) => {
   dbg('+++astStatement', Object.keys(ctx), ctx.getText());;
+  dbg("letStar", !!ctx.letStar());;
+  dbg("lambda", !!ctx.lambda());;
+  dbg("raw", !!ctx.raw());;
+  dbg("if", !!ctx.if());;
+  dbg("while", !!ctx.while());;
   if (ctx.letStar()) {
                   return astLetStar(ctx.letStar()!);
               }
@@ -36,6 +41,7 @@ let astStatement = (ctx) => {
               if (ctx.while()) {
                 return astWhile(ctx.while());
               }
+              dbg("expression", ctx.expression());
               return astExpression(ctx.expression()!);;
 };
 let astIf = (ctx) => {
@@ -184,12 +190,17 @@ let emitLambda = (node) => {
               return `(${params}) => {\n${indent(body)}\n}`;;
 };
 let isOperator = (name) => {
-  ["<", ">", "<=", ">=", "&&", "||", "!=", "==", "===", "+", "-", "*", "/", "%", "^"].includes(name);  ;
+  return ["<", ">", "<=", ">=", "&&", "||", "!=", "==", "===", "+", "-", "*", "/", "%", "^"].includes(name);  ;
 };
 let emitCall = (node) => {
+  dbg('+++emitCall', Object.keys(node));;
   
+            console.log("???", node.fn.name, node.fn.tag);
             if (node.fn.tag === 'identifier' && isOperator(node.fn.name)) {
               dbg("OPERATOR", node.fn.name);
+              const fn = emitExpr(node.fn);
+              const args = node.args.map(emitExpr);
+              return `${args.join(fn)};`;
             }
             const fn = emitExpr(node.fn);
             const args = node.args.map(emitExpr).join(', ');
