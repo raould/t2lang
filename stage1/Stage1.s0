@@ -8,14 +8,15 @@ import fs from "node:fs";""")
 ;;
 ;; helpers
 
-      (dbg (lambda ((...msgs)) (raw """console.log(...msgs);""")))
+      (dbg (lambda ((...msgs)) (raw """console.error(...msgs);""")))
 
       (parseString
         (lambda ((tokenText))
-          (raw """dbg('+++parseString', tokenText);""")
           (raw """const raw = tokenText;
+          if (raw.startsWith('\"\"\"')) {
+              return raw.slice(3, -3);
+          }
           const inner = raw.slice(1, -1);
-          // antlr and json escapes are the same (?!)
           return JSON.parse('"' + inner.replace(/"/g, '\\"') + '"');"""))
       )
 
@@ -304,7 +305,7 @@ import fs from "node:fs";""")
         (lambda ((node))
           (raw """dbg('+++emitCall', Object.keys(node));""")
           (raw """
-          console.log("???", node.fn.name, node.fn.tag);
+          console.error("???", node.fn.name, node.fn.tag);
           if (node.fn.tag === 'identifier' && isOperator(node.fn.name)) {
             dbg("OPERATOR", node.fn.name);
             const fn = emitExpr(node.fn);
@@ -342,7 +343,7 @@ import fs from "node:fs";""")
               const tokenStream = new CommonTokenStream(lexer);
               const parser = new Stage1Parser(tokenStream);
               const tree = parser.program();
-              console.log("???", tree.toStringTree(parser));
+              console.error("???", tree.toStringTree(parser));
               const ast = astProgram(tree);
               console.log(emitProgram(ast));""")
           )

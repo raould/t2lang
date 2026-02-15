@@ -3,13 +3,14 @@ import { Stage1Lexer } from "./Stage1Lexer";
 import { BindingContext, ParamContext, Stage1Parser } from "./Stage1Parser";
 import fs from "node:fs";;
 let dbg = (...msgs) => {
-  console.log(...msgs);;
+  console.error(...msgs);;
 };
 let parseString = (tokenText) => {
-  dbg('+++parseString', tokenText);;
   const raw = tokenText;
+            if (raw.startsWith('\"\"\"')) {
+                return raw.slice(3, -3);
+            }
             const inner = raw.slice(1, -1);
-            // antlr and json escapes are the same (?!)
             return JSON.parse('"' + inner.replace(/"/g, '\\"') + '"');;
 };
 let astProgram = (ctx) => {
@@ -204,7 +205,7 @@ let isOperator = (name) => {
 let emitCall = (node) => {
   dbg('+++emitCall', Object.keys(node));;
   
-            console.log("???", node.fn.name, node.fn.tag);
+            console.error("???", node.fn.name, node.fn.tag);
             if (node.fn.tag === 'identifier' && isOperator(node.fn.name)) {
               dbg("OPERATOR", node.fn.name);
               const fn = emitExpr(node.fn);
@@ -232,7 +233,7 @@ let main = () => {
                 const tokenStream = new CommonTokenStream(lexer);
                 const parser = new Stage1Parser(tokenStream);
                 const tree = parser.program();
-                console.log("???", tree.toStringTree(parser));
+                console.error("???", tree.toStringTree(parser));
                 const ast = astProgram(tree);
                 console.log(emitProgram(ast));;
 };
