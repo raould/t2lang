@@ -42,7 +42,7 @@ let astStatement = (ctx) => {
                 return astWhile(ctx.while());
               }
               dbg("expression", ctx.expression());
-              return astExpression(ctx.expression()!);;
+              return { tag: 'expr-stmt', expr: astExpression(ctx.expression()!) };;
 };
 let astIf = (ctx) => {
   dbg('+++astIf', Object.keys(ctx), ctx.getText());;
@@ -137,57 +137,66 @@ let emitProgram = (node) => {
 let emitIf = (node) => {
   dbg('+++if', Object.keys(node));;
   const lines=[];
-        lines.push(`if (${emitExpr(node.test)}) {`);
-        lines.push(indent(emitStmt(node.ifthen)));
-        lines.push("}");
-        if (node.ifelse != undefined) {
-          lines.push("else {");
-          lines.push(indent(emitStmt(node.ifelse)));
-          lines.push("}");
-        }
-        return lines.join('\n');;
+              lines.push(`if (${emitExpr(node.test)}) {`);
+              lines.push(indent(emitStmt(node.ifthen)));
+              lines.push("}");
+              if (node.ifelse != undefined) {
+                lines.push("else {");
+                lines.push(indent(emitStmt(node.ifelse)));
+                lines.push("}");
+              }
+              return lines.join('\n');;
 };
 let emitWhile = (node) => {
   dbg('+++while', Object.keys(node));;
   const lines=[];
-        lines.push(`while (${emitExpr(node.test)}) {`);
-        lines.push(indent(emitStmt(node.body)));
-        lines.push("}");
-        return lines.join('\n');;
+              lines.push(`while (${emitExpr(node.test)}) {`);
+              lines.push(indent(emitStmt(node.body)));
+              lines.push("}");
+              return lines.join('\n');;
 };
 let emitLetStar = (node) => {
   dbg('+++emitStar', Object.keys(node));;
   const lines = [];
-    for (const b of node.bindings) {
-      if (b.init) {
-        lines.push(`let ${b.name} = ${emitExpr(b.init)};`);
-      } else {
-        lines.push(`let ${b.name};`);
-      }
-    }
-    for (const s of node.body) {
-      lines.push(emitStmt(s));
-    }
-    return lines.join('\n');;
+        for (const b of node.bindings) {
+          if (b.init) {
+            lines.push(`let ${b.name} = ${emitExpr(b.init)};`);
+          } else {
+            lines.push(`let ${b.name};`);
+          }
+        }
+        for (const s of node.body) {
+          lines.push(emitStmt(s));
+        }
+        return lines.join('\n');;
+};
+let emitStmt = (stmt) => {
+  switch (stmt.tag) {
+              case 'let*':  		return emitLetStar(stmt);
+              case 'if':    		return emitIf(stmt);
+              case 'while': 		return emitWhile(stmt);
+              case 'expr-stmt': return emitExpr(stmt.expr) + ";";
+              default:      		throw new Error("unexpected " + stmt);
+            };
 };
 let emitExpr = (expr) => {
   dbg('+++emitExpr', Object.keys(expr));;
   switch (expr.tag) {
-      case 'literal':     return JSON.stringify(expr.value);
-      case 'identifier':  return expr.name;
-      case 'call':        return emitCall(expr);
-      case 'lambda':      return emitLambda(expr);
-      case 'raw':         return expr.code;
-      case 'if':          return emitIf(expr);
-      case 'while':       return emitWhile(expr);
-      default: throw new Error("Unhandled expr.tag >" + expr.tag + "<");
-    };
+            case 'literal':     return JSON.stringify(expr.value);
+            case 'identifier':  return expr.name;
+            case 'call':        return emitCall(expr);
+            case 'lambda':      return emitLambda(expr);
+            case 'raw':         return expr.code;
+            case 'if':          throw new Error("if");
+            case 'while':       throw new Error("while");
+            default: throw new Error("Unhandled expr.tag >" + expr.tag + "<");
+          };
 };
 let emitLambda = (node) => {
   dbg('+++emitLambda', Object.keys(node));;
   const params = node.params.join(', ');
               const body = node.body.map(emitStmt).join('\n');
-              return `(${params}) => {\n${indent(body)}\n}`;;
+              return `(${params}) => {\n${indent(body)}\n}`;
 };
 let isOperator = (name) => {
   return ["<", ">", "<=", ">=", "&&", "||", "!=", "==", "===", "+", "-", "*", "/", "%", "^"].includes(name);  ;
@@ -201,35 +210,30 @@ let emitCall = (node) => {
               const fn = emitExpr(node.fn);
               const args = node.args.map(emitExpr);
               if (args.length === 1) {
-                return `${fn}${args};`;
+                return `(${fn}${args})`;
               } else {
-                return `${args.join(fn)};`;
+                return `(${args.join(fn)})`;
               }
             } else {
               const fn = emitExpr(node.fn);
               const args = node.args.map(emitExpr).join(', ');
-              return `${fn}(${args})`;;
+              return `${fn}(${args})`;
   };
-};
-let emitStmt = (stmt) => {
-  switch (stmt.tag) {
-              case 'let*': return emitLetStar(stmt);
-              default:     return emitExpr(stmt as Expr) + ';';
-            };
 };
 let indent = (text) => {
   dbg('+++emitIndent', text);;
   return text.split('\n').map(line => '  ' + line).join('\n');;
 };
 let main = () => {
-  const input = fs.readFileSync(process.argv[2], "utf-8");
-  const inputStream = CharStream.fromString(input);
-  const lexer = new Stage1Lexer(inputStream);
-  const tokenStream = new CommonTokenStream(lexer);
-  const parser = new Stage1Parser(tokenStream);
-  const tree = parser.program();
-  console.log("???", tree.toStringTree(parser));
-  const ast = astProgram(tree);
-  console.log(emitProgram(ast));;
+  
+                const input = fs.readFileSync(process.argv[2], "utf-8");
+                const inputStream = CharStream.fromString(input);
+                const lexer = new Stage1Lexer(inputStream);
+                const tokenStream = new CommonTokenStream(lexer);
+                const parser = new Stage1Parser(tokenStream);
+                const tree = parser.program();
+                console.log("???", tree.toStringTree(parser));
+                const ast = astProgram(tree);
+                console.log(emitProgram(ast));;
 };
 main();

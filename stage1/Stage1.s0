@@ -61,7 +61,8 @@ import fs from "node:fs";""")
               return astWhile(ctx.while());
             }
             dbg("expression", ctx.expression());
-            return astExpression(ctx.expression()!);""")
+            return { tag: 'expr-stmt', expr: astExpression(ctx.expression()!) };"""
+          ) 
         )
       )
 
@@ -199,37 +200,40 @@ import fs from "node:fs";""")
 ;; emit program
       (emitProgram
         (lambda ((node))
-    (raw """dbg('+++emitProgram', Object.keys(node));""")
-    (raw """return node.body.map(emitStmt).join('\n');"""))
+          (raw """dbg('+++emitProgram', Object.keys(node));""")
+          (raw """return node.body.map(emitStmt).join('\n');""")
+        )
       )
 
 ;;
 ;; emit if
       (emitIf
         (lambda ((node))    
-    (raw """dbg('+++if', Object.keys(node));""")
-    (raw """const lines=[];
-      lines.push(`if (${emitExpr(node.test)}) {`);
-      lines.push(indent(emitStmt(node.ifthen)));
-      lines.push("}");
-      if (node.ifelse != undefined) {
-        lines.push("else {");
-        lines.push(indent(emitStmt(node.ifelse)));
-        lines.push("}");
-      }
-      return lines.join('\n');""")
+          (raw """dbg('+++if', Object.keys(node));""")
+          (raw """const lines=[];
+            lines.push(`if (${emitExpr(node.test)}) {`);
+            lines.push(indent(emitStmt(node.ifthen)));
+            lines.push("}");
+            if (node.ifelse != undefined) {
+              lines.push("else {");
+              lines.push(indent(emitStmt(node.ifelse)));
+              lines.push("}");
+            }
+            return lines.join('\n');"""
+          )
         )
       )
 ;;
 ;; emit while
       (emitWhile
         (lambda ((node))
-    (raw """dbg('+++while', Object.keys(node));""")
-    (raw """const lines=[];
-      lines.push(`while (${emitExpr(node.test)}) {`);
-      lines.push(indent(emitStmt(node.body)));
-      lines.push("}");
-      return lines.join('\n');""")
+          (raw """dbg('+++while', Object.keys(node));""")
+          (raw """const lines=[];
+            lines.push(`while (${emitExpr(node.test)}) {`);
+            lines.push(indent(emitStmt(node.body)));
+            lines.push("}");
+            return lines.join('\n');"""
+          )
         )
       )
 
@@ -239,34 +243,48 @@ import fs from "node:fs";""")
         (lambda ((node))
     (raw """dbg('+++emitStar', Object.keys(node));""")
     (raw """const lines = [];
-  for (const b of node.bindings) {
-    if (b.init) {
-      lines.push(`let ${b.name} = ${emitExpr(b.init)};`);
-    } else {
-      lines.push(`let ${b.name};`);
-    }
-  }
-  for (const s of node.body) {
-    lines.push(emitStmt(s));
-  }
-  return lines.join('\n');"""))
+      for (const b of node.bindings) {
+        if (b.init) {
+          lines.push(`let ${b.name} = ${emitExpr(b.init)};`);
+        } else {
+          lines.push(`let ${b.name};`);
+        }
+      }
+      for (const s of node.body) {
+        lines.push(emitStmt(s));
+      }
+      return lines.join('\n');"""))
+    )
+
+;;
+;; emit stmt
+      (emitStmt
+        (lambda ((stmt))
+          (raw """switch (stmt.tag) {
+            case 'let*':  		return emitLetStar(stmt);
+            case 'if':    		return emitIf(stmt);
+            case 'while': 		return emitWhile(stmt);
+            case 'expr-stmt': return emitExpr(stmt.expr) + ";";
+            default:      		throw new Error("unexpected " + stmt);
+          }"""))
       )
 
 ;;
 ;; emit expr
       (emitExpr
         (lambda ((expr))
-    (raw """dbg('+++emitExpr', Object.keys(expr));""")
-    (raw """switch (expr.tag) {
-    case 'literal':     return JSON.stringify(expr.value);
-    case 'identifier':  return expr.name;
-    case 'call':        return emitCall(expr);
-    case 'lambda':      return emitLambda(expr);
-    case 'raw':         return expr.code;
-    case 'if':          return emitIf(expr);
-    case 'while':       return emitWhile(expr);
-    default: throw new Error("Unhandled expr.tag >" + expr.tag + "<");
-  }"""))
+          (raw """dbg('+++emitExpr', Object.keys(expr));""")
+          (raw """switch (expr.tag) {
+          case 'literal':     return JSON.stringify(expr.value);
+          case 'identifier':  return expr.name;
+          case 'call':        return emitCall(expr);
+          case 'lambda':      return emitLambda(expr);
+          case 'raw':         return expr.code;
+          case 'if':          throw new Error("if");
+          case 'while':       throw new Error("while");
+          default: throw new Error("Unhandled expr.tag >" + expr.tag + "<");
+        }""")
+        )
       )
 
 ;;
@@ -276,7 +294,7 @@ import fs from "node:fs";""")
           (raw """dbg('+++emitLambda', Object.keys(node));""")
           (raw """const params = node.params.join(', ');
             const body = node.body.map(emitStmt).join('\n');
-            return `(${params}) => {\n${indent(body)}\n}`;"""))
+            return `(${params}) => {\n${indent(body)}\n}`"""))
       )
 
 ;;
@@ -292,34 +310,24 @@ import fs from "node:fs";""")
             const fn = emitExpr(node.fn);
             const args = node.args.map(emitExpr);
             if (args.length === 1) {
-              return `${fn}${args};`;
+              return `(${fn}${args})`;
             } else {
-              return `${args.join(fn)};`;
+              return `(${args.join(fn)})`;
             }
           } else {
             const fn = emitExpr(node.fn);
             const args = node.args.map(emitExpr).join(', ');
-            return `${fn}(${args})`;""")
+            return `${fn}(${args})`""")
           }
         )
-      )
-
-;;
-;; emit stmt
-      (emitStmt
-        (lambda ((stmt))
-          (raw """switch (stmt.tag) {
-            case 'let*': return emitLetStar(stmt);
-            default:     return emitExpr(stmt as Expr) + ';';
-          }"""))
       )
 
 ;;
 ;; emit indent
       (indent
         (lambda ((text))
-    (raw """dbg('+++emitIndent', text);""")
-    (raw """return text.split('\n').map(line => '  ' + line).join('\n');"""))
+          (raw """dbg('+++emitIndent', text);""")
+          (raw """return text.split('\n').map(line => '  ' + line).join('\n');"""))
       )
 
 ;;
@@ -327,19 +335,23 @@ import fs from "node:fs";""")
 
       (main
         (lambda ()
-    (raw """const input = fs.readFileSync(process.argv[2], "utf-8");
-const inputStream = CharStream.fromString(input);
-const lexer = new Stage1Lexer(inputStream);
-const tokenStream = new CommonTokenStream(lexer);
-const parser = new Stage1Parser(tokenStream);
-const tree = parser.program();
-console.log("???", tree.toStringTree(parser));
-const ast = astProgram(tree);
-console.log(emitProgram(ast));"""))
-      )
+          (raw """
+              const input = fs.readFileSync(process.argv[2], "utf-8");
+              const inputStream = CharStream.fromString(input);
+              const lexer = new Stage1Lexer(inputStream);
+              const tokenStream = new CommonTokenStream(lexer);
+              const parser = new Stage1Parser(tokenStream);
+              const tree = parser.program();
+              console.log("???", tree.toStringTree(parser));
+              const ast = astProgram(tree);
+              console.log(emitProgram(ast));""")
+          )
+        )
 
+;; end of let*
+
+      )
+      (call main)
   )
-  (call main)
- )
 )
 

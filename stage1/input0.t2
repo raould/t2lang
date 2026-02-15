@@ -7,4 +7,5 @@
    (call fnw)
    (call - 42)
    (call + 1 2 3)
+   (call + 1 (call * 2 3))
    (if x 1 0)))
