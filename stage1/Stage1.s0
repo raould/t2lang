@@ -291,11 +291,16 @@ import fs from "node:fs";""")
             dbg("OPERATOR", node.fn.name);
             const fn = emitExpr(node.fn);
             const args = node.args.map(emitExpr);
-            return `${args.join(fn)};`;
+            if (args.length === 1) {
+              return `${fn}${args};`;
+            } else {
+              return `${args.join(fn)};`;
+            }
+          } else {
+            const fn = emitExpr(node.fn);
+            const args = node.args.map(emitExpr).join(', ');
+            return `${fn}(${args})`;""")
           }
-          const fn = emitExpr(node.fn);
-          const args = node.args.map(emitExpr).join(', ');
-          return `${fn}(${args})`;""")
         )
       )
 

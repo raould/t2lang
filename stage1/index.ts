@@ -200,11 +200,16 @@ let emitCall = (node) => {
               dbg("OPERATOR", node.fn.name);
               const fn = emitExpr(node.fn);
               const args = node.args.map(emitExpr);
-              return `${args.join(fn)};`;
-            }
-            const fn = emitExpr(node.fn);
-            const args = node.args.map(emitExpr).join(', ');
-            return `${fn}(${args})`;;
+              if (args.length === 1) {
+                return `${fn}${args};`;
+              } else {
+                return `${args.join(fn)};`;
+              }
+            } else {
+              const fn = emitExpr(node.fn);
+              const args = node.args.map(emitExpr).join(', ');
+              return `${fn}(${args})`;;
+  };
 };
 let emitStmt = (stmt) => {
   switch (stmt.tag) {
