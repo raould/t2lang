@@ -117,7 +117,7 @@ indexAccess
 // ─── quasiquote ──────────────────────────────
 
 quasiquote
-    : LPAREN QUASI expression RPAREN
+    : LPAREN (QUASI | QUOTE) expression RPAREN
     ;
 
 unquote
@@ -181,6 +181,7 @@ ARRAY       : 'array' ;
 DOT         : '.' ;
 INDEX       : 'index' ;
 QUASI       : 'quasi' ;
+QUOTE       : 'quote' ;
 UNQUOTE_SPLICING : 'unquote-splicing' ;
 UNQUOTE     : 'unquote' ;
 
