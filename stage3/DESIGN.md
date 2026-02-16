@@ -530,3 +530,426 @@ Codegen prints the identifier name exactly as given.
 
 ### Runtime  
 No runtime behavior changes — gensym is compile‑time only.
+
+---
+
+## Macro implementation details.
+
+Here’s a compact but complete sketch of a Stage 3 macro expander that fits your language and pipeline.
+
+---
+
+## Step-wise implementation details
+
+#### 1. Pipeline placement
+
+Your full compiler pipeline becomes:
+
+1. **Parse**: CST → surface AST (`astProgram`)
+2. **Macro expansion**: `expandProgram(surfaceAst)` → expanded surface AST
+3. **Lowering**: `lowerProgram(expandedAst)` → canonical AST
+4. **Codegen**: `emitProgram(canonicalAst)` → TypeScript
+
+Macros operate **only** on the *surface AST*.
+
+---
+
+#### 2. Core data structures
+
+**Macro definition (from `defmacro`):**
+
+```ts
+type MacroDef = {
+  name: string;
+  params: string[];      // param names
+  body: Stmt[];          // macro body as AST
+};
+```
+
+**Macro environment:**
+
+```ts
+type MacroEnv = Map<string, MacroDef>;
+```
+
+**Macro-time environment (for evaluating macro bodies):**
+
+```ts
+type Env = {
+  parent?: Env;
+  bindings: Map<string | symbol, Value>;
+};
+```
+
+`Value` includes:
+
+- literals (number, string, boolean, null, undefined)
+- keywords (as strings or tagged)
+- arrays
+- objects
+- AST nodes (for quasiquote)
+- functions (for macro-time helpers, including `gensym`)
+
+---
+
+#### 3. Building the macro environment
+
+From the surface AST:
+
+- Walk top-level nodes.
+- For each `{ tag: "defmacro", name, params, body }`, store:
+
+```ts
+macroEnv.set(name, { name, params, body });
+```
+
+You may also keep non-macro top-level forms to expand later.
+
+---
+
+#### 4. Macro expansion entry point
+
+```ts
+function expandProgram(program: Program): Program {
+  const macroEnv = collectMacros(program);
+  const body = program.body
+    .filter(node => node.tag !== "defmacro")
+    .map(node => expandNode(node, macroEnv));
+  return { tag: "program", body };
+}
+```
+
+---
+
+#### 5. Macro call detection
+
+In `expandNode(node, macroEnv)`:
+
+- Recurse structurally.
+- When you see a `call`:
+
+```ts
+if (node.tag === "call" &&
+    node.fn.tag === "identifier" &&
+    macroEnv.has(node.fn.name)) {
+  return expandMacroCall(node, macroEnv);
+}
+```
+
+Otherwise, recursively expand children.
+
+---
+
+#### 6. Expanding a macro call
+
+```ts
+function expandMacroCall(callNode: Call, macroEnv: MacroEnv): Node {
+  const macro = macroEnv.get(callNode.fn.name)!;
+  const args = callNode.args; // AST nodes
+
+  // 1. Bind params → args in a fresh macro-time env
+  const env = makeMacroEnv(macro, args, macroEnv);
+
+  // 2. Evaluate macro body (statements) in macro-time interpreter
+  //    Convention: last expression-statement’s value is the macro result,
+  //    or an explicit `(return ...)` in macro body.
+  const result = evalMacroBody(macro.body, env);
+
+  // 3. `result` must be an AST node
+  // 4. Recursively expand the result (macros can expand to macro calls)
+  return expandNode(result, macroEnv);
+}
+```
+
+---
+
+#### 7. Macro-time interpreter
+
+You need a small evaluator for macro bodies:
+
+Supported:
+
+- literals, keywords
+- identifiers (looked up in `Env`)
+- `lambda` (macro-time functions)
+- `call` (including built-ins like `gensym`, list/array/object helpers)
+- `if`, `let*`, `let`, `begin`/`block`
+- `quasi`, `unquote`, `unquote-splicing` (handled specially)
+- `return` (to exit macro body early)
+
+The interpreter returns **values**, where values can be AST nodes (from quasiquote).
+
+---
+
+#### 8. Quasiquote expansion
+
+Quasiquote is where AST templates are built.
+
+Conceptually:
+
+```ts
+function evalQuasi(node: Node, env: Env, depth = 0): Value {
+  if (isUnquote(node) && depth === 0) {
+    // (unquote expr)
+    return evalExpr(node.expr, env);
+  }
+
+  if (isUnquoteSplicing(node) && depth === 0) {
+    // Only valid inside list/array contexts; handled by caller.
+    throw new Error("unquote-splicing outside list context");
+  }
+
+  if (isQuasi(node)) {
+    // (quasi expr) → increase depth
+    return evalQuasi(node.expr, env, depth + 1);
+  }
+
+  // For literals/keywords/identifiers: wrap as AST literal/identifier nodes
+  if (isLiteralLike(node)) return cloneAstLiteral(node);
+  if (isIdentifier(node)) return cloneAstIdentifier(node);
+
+  // For lists / composite nodes: recursively quasi-expand children
+  // and build AST nodes/arrays/objects accordingly.
+  return quasiMap(node, child => evalQuasi(child, env, depth));
+}
+```
+
+In practice, you’ll implement:
+
+- `quasi` as a special form in the macro-time interpreter.
+- It returns an AST node (or structure of nodes).
+
+`unquote-splicing` is handled when building list/array/object fields: if a child evaluates to an array of nodes, you splice them into the surrounding list.
+
+---
+
+#### 9. Gensym integration
+
+Provide `gensym` in the macro-time environment:
+
+```ts
+let gensymCounter = 0;
+
+function gensym(prefix = "g"): IdentifierNode {
+  gensymCounter++;
+  return { tag: "identifier", name: `${prefix}$g${gensymCounter}` };
+}
+```
+
+Macros use it inside quasiquote:
+
+```lisp
+(defmacro with-temp ((body))
+  (let* ((t (gensym "tmp")))
+    (quasi
+      (let ((unquote t) 0)
+        (unquote body))))
+```
+
+No special handling in the expander beyond treating the returned identifier as any other AST node.
+
+Optionally, attach a `Symbol`-keyed metadata field for hygiene/provenance.
+
+---
+
+#### 10. Recursive expansion and termination
+
+`expandNode` must:
+
+- Walk the AST.
+- Expand macro calls.
+- Recurse into results.
+- Stop when no macro calls remain.
+
+A simple pattern:
+
+```ts
+function expandNode(node: Node, macroEnv: MacroEnv): Node {
+  // 1. Expand children first (post-order or pre-order; choose and stick to it)
+  const expandedChildren = mapChildren(node, child => expandNode(child, macroEnv));
+  node = withChildren(node, expandedChildren);
+
+  // 2. If node is a macro call, expand it
+  if (isMacroCall(node, macroEnv)) {
+    return expandMacroCall(node, macroEnv);
+  }
+
+  return node;
+}
+```
+
+You can also choose pre-order (expand macro call before children) depending on your macro semantics; just be consistent.
+
+---
+
+#### 11. Error handling & invariants
+
+- Macro bodies must return an AST node (or structure) from their last expression.
+- `quasi` must only appear in macro-time, not at runtime (you can enforce this by expanding all `quasi` away before lowering).
+- `unquote`/`unquote-splicing` must only appear inside `quasi`.
+- Macro expansion must not leave any `quasi`/`unquote` nodes in the final expanded AST.
+
+---
+
+#### 12. Summary of responsibilities
+
+- **Parser / AST builder**: just builds surface AST, including `defmacro`, `quasi`, `unquote`, etc.
+- **Macro expander**:
+  - collects macros
+  - runs macro-time interpreter
+  - handles quasiquote/unquote
+  - uses gensym for hygiene
+  - recursively expands until no macro calls remain
+- **Lowering**: assumes all macros are gone; sees only core forms.
+- **Codegen**: assumes canonical AST; no macro constructs, no quasiquote.
+
+This gives you a fully featured, Lisp-grade macro system in Stage 3, aligned with your TS backend and your staged architecture.
+
+### 🌱 **Where JS `Symbol` *should* be used internally in Stage 3**
+
+`Symbol` is perfect for **compiler‑internal metadata** — things that must never collide with user identifiers, never appear in emitted code, and never be visible to macros unless you explicitly expose them.
+
+There are **four** places where `Symbol` is not only safe but *ideal*.
+
+---
+
+#### 1. **Marking AST nodes with hygiene metadata**
+
+When you generate a gensym’d identifier, you may want to attach metadata:
+
+- which macro introduced it  
+- which expansion phase it came from  
+- which scope it belongs to  
+- whether it’s a gensym or a user identifier  
+
+Example:
+
+```ts
+const HYGIENE = Symbol("hygiene");
+
+node[HYGIENE] = {
+  introducedBy: macroName,
+  scopeId: currentScope,
+  isGensym: true
+};
+```
+
+This metadata:
+
+- never appears in emitted TS  
+- never collides with user fields  
+- survives recursive macro expansion  
+- is invisible to lowering and codegen  
+
+This is the **canonical** use of `Symbol` in macro expanders.
+
+---
+
+#### 2. **Marking nodes as “already expanded”**
+
+Macro expansion is recursive.  
+You must avoid:
+
+- infinite recursion  
+- re‑expanding macro output  
+- re‑expanding quasiquoted forms  
+
+Use a symbol:
+
+```ts
+const EXPANDED = Symbol("expanded");
+
+node[EXPANDED] = true;
+```
+
+Then in `expandNode`:
+
+```ts
+if (node[EXPANDED]) return node;
+```
+
+---
+
+#### 3. **Internal keys in the macro‑time environment**
+
+Your macro‑time environment is a nested scope:
+
+```ts
+type Env = {
+  parent?: Env;
+  bindings: Map<string | symbol, Value>;
+};
+```
+
+You can use `Symbol` keys for:
+
+- internal helper functions  
+- quasiquote depth counters  
+- gensym counters  
+- hygiene context  
+- macro‑time builtins  
+
+Example:
+
+```ts
+const QUASI_DEPTH = Symbol("quasi-depth");
+env.bindings.set(QUASI_DEPTH, 0);
+```
+
+This avoids polluting the user namespace.
+
+---
+
+#### 4. **Tagging AST nodes with provenance**
+
+This is optional but extremely useful for debugging:
+
+```ts
+const PROVENANCE = Symbol("provenance");
+
+node[PROVENANCE] = {
+  sourceMacro: "with-temp",
+  originalForm: originalAstNode,
+  expansionStep: stepNumber
+};
+``` 
+
+Again, this metadata never appears in emitted TS.
+
+---
+
+#### 🌿 **Where `Symbol` should *not* be used**
+
+- ❌ Not for gensym output  
+Gensym must produce **identifier names**, not runtime `Symbol` values.
+
+Correct:
+
+```ts
+tmp$g42
+```
+
+Incorrect:
+
+```ts
+Symbol("tmp")
+```
+
+- ❌ Not in emitted TypeScript  
+TS cannot use symbols as variable names.
+
+- ❌ Not in the canonical AST  
+Symbols should be metadata only, not part of the AST shape.
+
+---
+
+- ✔ Use `Symbol` for:
+    - hygiene metadata  
+    - provenance metadata  
+    - marking nodes as expanded  
+    - internal macro‑time environment keys  
+
+- ❌ Do *not* use `Symbol` for:
+    - gensym output  
+    - emitted identifiers  
+    - anything that appears in TypeScript  
