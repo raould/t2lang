@@ -8,394 +8,300 @@ import fs from "node:fs";""")
 ;;
 ;; ========== helpers ==========
 
-      (dbg (lambda ((...msgs)) (raw """console.log(...msgs);""")))
+      (dbg (lambda ((...msgs)) (raw """console.error(...msgs);""")))
 
       (parseString
         (lambda ((tokenText))
-          (raw """const raw = tokenText;
-          const inner = raw.slice(1, -1);
-          return JSON.parse('"' + inner.replace(/"/g, '\\"') + '"');"""))
-      )
+          (let* ((raw_ tokenText))
+            (if (call raw_.startsWith '"""')
+              (raw """return raw_.slice(3, -3)"""))
+            (let* ((inner (call raw_.slice 1 -1)))
+              (raw """return JSON.parse('"' + inner.replace(/"/g, '\\"') + '"')""")))))
 
       (indent
         (lambda ((text))
-          (raw """return text.split('\n').map(line => '  ' + line).join('\n');"""))
-      )
+          (raw """return text.split('\n').map(line => '  ' + line).join('\n')""")))
+
+      (isDefined
+        (lambda ((val))
+          (raw """return val !== undefined""")))
+
+      (isOperator
+        (lambda ((name))
+          (raw """return ["<", ">", "<=", ">=", "&&", "||", "!=", "==", "===",
+                  "+", "-", "*", "/", "%", "^", "!"].includes(name)""")))
 
 ;;
 ;; ========== Phase A: CST → Surface AST ==========
-;;
-;; Walks the ANTLR parse tree and produces a surface AST.
-;; Surface AST nodes use tags like: program, def, defmacro,
-;; let*, let, if, while, block, return, expr-stmt,
-;; lambda, assign, call, literal, identifier
 
 ;;
 ;; ast program
       (astProgram
         (lambda ((ctx))
-          (raw """return {
-              tag: "program",
-              body: ctx.topLevel().map(astTopLevel),
-          };""")
-        )
-      )
+          (let* ((body (raw """ctx.topLevel().map(astTopLevel)""")))
+            (raw """return { tag: "program", body }"""))))
 
 ;;
 ;; ast topLevel
       (astTopLevel
         (lambda ((ctx))
-          (raw """if (ctx.defmacro()) {
-              return astDefmacro(ctx.defmacro()!);
-          }
-          if (ctx.def()) {
-              return astDef(ctx.def()!);
-          }
-          return astStatement(ctx.statement()!);""")
-        )
-      )
+          (if (call ctx.defmacro)
+            (raw """return astDefmacro(ctx.defmacro())"""))
+          (if (call ctx.def)
+            (raw """return astDef(ctx.def())"""))
+          (raw """return astStatement(ctx.statement())""")))
 
 ;;
 ;; ast defmacro
       (astDefmacro
         (lambda ((ctx))
-          (raw """const name = ctx.IDENTIFIER().getText();
-          const params = ctx.fnSignature().param()
-              .map((p: ParamContext) => p.IDENTIFIER().getText());
-          const body = ctx.statement().map(astStatement);
-          return { tag: "defmacro", name, params, body };""")
-        )
-      )
+          (let* ((name (raw """ctx.IDENTIFIER().getText()"""))
+                 (params (raw """ctx.fnSignature().param().map((p: ParamContext) => p.IDENTIFIER().getText())"""))
+                 (body (raw """ctx.statement().map(astStatement)""")))
+            (raw """return { tag: "defmacro", name, params, body }"""))))
 
 ;;
 ;; ast def
       (astDef
         (lambda ((ctx))
-          (raw """const name = ctx.IDENTIFIER().getText();
-          const init = astExpression(ctx.expression()!);
-          return { tag: "def", name, init };""")
-        )
-      )
+          (let* ((name (raw """ctx.IDENTIFIER().getText()"""))
+                 (init (call astExpression (call ctx.expression))))
+            (raw """return { tag: "def", name, init }"""))))
 
 ;;
 ;; ast statement
       (astStatement
         (lambda ((ctx))
-          (raw """if (ctx.letStar()) {
-              return astLetStar(ctx.letStar()!);
-          }
-          if (ctx.letStmt()) {
-              return astLetStmt(ctx.letStmt()!);
-          }
-          if (ctx.ifForm()) {
-              return astIf(ctx.ifForm()!);
-          }
-          if (ctx.whileForm()) {
-              return astWhile(ctx.whileForm()!);
-          }
-          if (ctx.block()) {
-              return astBlock(ctx.block()!);
-          }
-          if (ctx.returnForm()) {
-              return astReturn(ctx.returnForm()!);
-          }
-          return { tag: 'expr-stmt', expr: astExpression(ctx.expression()!) };""")
-        )
-      )
+          (if (call ctx.letStar)
+            (raw """return astLetStar(ctx.letStar())"""))
+          (if (call ctx.letStmt)
+            (raw """return astLetStmt(ctx.letStmt())"""))
+          (if (call ctx.ifForm)
+            (raw """return astIf(ctx.ifForm())"""))
+          (if (call ctx.whileForm)
+            (raw """return astWhile(ctx.whileForm())"""))
+          (if (call ctx.block)
+            (raw """return astBlock(ctx.block())"""))
+          (if (call ctx.returnForm)
+            (raw """return astReturn(ctx.returnForm())"""))
+          (let* ((expr (call astExpression (call ctx.expression))))
+            (raw """return { tag: 'expr-stmt', expr }"""))))
 
 ;;
 ;; ast let*
       (astLetStar
         (lambda ((ctx))
-          (raw """const bindings = ctx
-          .binding()
-          .map((b: BindingContext) => {
-              const id = b.IDENTIFIER().getText();
-              const init = b.expression() ? astExpression(b.expression()!) : undefined;
-              return { name: id, init };
-          });
-          const body = ctx.statement().map(astStatement);
-          return { tag: 'let*', bindings, body };""")
-        )
-      )
+          (let* ((bindings (raw """ctx.binding().map((b: BindingContext) => {
+                    const id = b.IDENTIFIER().getText();
+                    const init = b.expression() ? astExpression(b.expression()) : undefined;
+                    return { name: id, init };
+                  })"""))
+                 (body (raw """ctx.statement().map(astStatement)""")))
+            (raw """return { tag: 'let*', bindings, body }"""))))
 
 ;;
-;; ast let (single binding)
+;; ast let (single)
       (astLetStmt
         (lambda ((ctx))
-          (raw """const name = ctx.IDENTIFIER().getText();
-          const init = astExpression(ctx.expression()!);
-          return { tag: 'let', name, init };""")
-        )
-      )
+          (let* ((name (raw """ctx.IDENTIFIER().getText()"""))
+                 (init (call astExpression (call ctx.expression))))
+            (raw """return { tag: 'let', name, init }"""))))
 
 ;;
 ;; ast if
       (astIf
         (lambda ((ctx))
-          (raw """const test = astExpression(ctx.expression());
-          const ifthen = astStatement(ctx.statement(0));
-          const ctxElse = ctx.statement(1);
-          const ifelse = (ctxElse == undefined) ? undefined : astStatement(ctxElse);
-          return { tag: 'if', test, ifthen, ifelse };""")
-        )
-      )
+          (let* ((test (call astExpression (call ctx.expression)))
+                 (ifthen (call astStatement (call ctx.statement 0)))
+                 (ctxElse (call ctx.statement 1))
+                 (ifelse (raw """ctxElse != undefined ? astStatement(ctxElse) : undefined""")))
+            (raw """return { tag: 'if', test, ifthen, ifelse }"""))))
 
 ;;
 ;; ast while
       (astWhile
         (lambda ((ctx))
-          (raw """const test = astExpression(ctx.expression());
-          const body = ctx.statement().map(astStatement);
-          return { tag: 'while', test, body };""")
-        )
-      )
+          (let* ((test (call astExpression (call ctx.expression)))
+                 (body (raw """ctx.statement().map(astStatement)""")))
+            (raw """return { tag: 'while', test, body }"""))))
 
 ;;
 ;; ast block
       (astBlock
         (lambda ((ctx))
-          (raw """const body = ctx.statement().map(astStatement);
-          return { tag: 'block', body };""")
-        )
-      )
+          (let* ((body (raw """ctx.statement().map(astStatement)""")))
+            (raw """return { tag: 'block', body }"""))))
 
 ;;
 ;; ast return
       (astReturn
         (lambda ((ctx))
-          (raw """const expr = ctx.expression() ? astExpression(ctx.expression()!) : undefined;
-          return { tag: 'return', expr };""")
-        )
-      )
+          (let* ((expr (raw """ctx.expression() ? astExpression(ctx.expression()) : undefined""")))
+            (raw """return { tag: 'return', expr }"""))))
 
 ;;
 ;; ast expression
       (astExpression
         (lambda ((ctx))
-          (raw """if (ctx.literal()) {
-              return astLiteral(ctx.literal()!);
-          }
-          if (ctx.IDENTIFIER()) {
-              return { tag: "identifier", name: ctx.IDENTIFIER()!.getText() };
-          }
-          if (ctx.lambda()) {
-              return astLambda(ctx.lambda()!);
-          }
-          if (ctx.assign()) {
-              return astAssign(ctx.assign()!);
-          }
-          if (ctx.call()) {
-              return astCall(ctx.call()!);
-          }
-          throw new Error("Unknown expression: " + ctx.getText());""")
-        )
-      )
+          (if (call ctx.literal)
+            (raw """return astLiteral(ctx.literal())"""))
+          (if (call ctx.IDENTIFIER)
+            (raw """return { tag: "identifier", name: ctx.IDENTIFIER().getText() }"""))
+          (if (call ctx.lambda)
+            (raw """return astLambda(ctx.lambda())"""))
+          (if (call ctx.assign)
+            (raw """return astAssign(ctx.assign())"""))
+          (if (call ctx.call)
+            (raw """return astCall(ctx.call())"""))
+          (raw """throw new Error("Unknown expression: " + ctx.getText())""")))
 
 ;;
 ;; ast lambda
       (astLambda
         (lambda ((ctx))
-          (raw """const params = ctx
-          .fnSignature()
-          .param()
-          .map((p: ParamContext) => p.IDENTIFIER().getText());
-          const body = ctx.statement().map(astStatement);
-          return { tag: "lambda", params, body };""")
-        )
-      )
+          (let* ((params (raw """ctx.fnSignature().param().map((p: ParamContext) => p.IDENTIFIER().getText())"""))
+                 (body (raw """ctx.statement().map(astStatement)""")))
+            (raw """return { tag: "lambda", params, body }"""))))
 
 ;;
 ;; ast assign
       (astAssign
         (lambda ((ctx))
-          (raw """const name = ctx.IDENTIFIER().getText();
-          const value = astExpression(ctx.expression()!);
-          return { tag: "assign", name, value };""")
-        )
-      )
+          (let* ((name (raw """ctx.IDENTIFIER().getText()"""))
+                 (value (call astExpression (call ctx.expression))))
+            (raw """return { tag: "assign", name, value }"""))))
 
 ;;
-;; ast call  (implicit – no CALL keyword)
+;; ast call (implicit – no CALL keyword)
       (astCall
         (lambda ((ctx))
-          (raw """const exprs = ctx.expression().map(astExpression);
-          return {
-              tag: "call",
-              fn: exprs[0],
-              args: exprs.slice(1)
-          };""")
-        )
-      )
+          (let* ((exprs (raw """ctx.expression().map(astExpression)""")))
+            (raw """return { tag: "call", fn: exprs[0], args: exprs.slice(1) }"""))))
 
 ;;
 ;; ast literal
       (astLiteral
         (lambda ((ctx))
-          (raw """if (ctx.NUMBER()) return { tag: "literal", value: Number(ctx.NUMBER()!.getText()) };
-          if (ctx.STRING()) return { tag: "literal", value: parseString(ctx.STRING()!.getText()) };
-          if (ctx.BOOLEAN()) return { tag: "literal", value: ctx.BOOLEAN()!.getText() === "true" };
-          if (ctx.NULL()) return { tag: "literal", value: null };
-          if (ctx.UNDEFINED()) return { tag: "literal", value: undefined };
-          throw new Error("Unknown literal");"""))
-      )
+          (if (call ctx.NUMBER)
+            (raw """return { tag: "literal", value: Number(ctx.NUMBER().getText()) }"""))
+          (if (call ctx.STRING)
+            (raw """return { tag: "literal", value: parseString(ctx.STRING().getText()) }"""))
+          (if (call ctx.BOOLEAN)
+            (raw """return { tag: "literal", value: ctx.BOOLEAN().getText() === "true" }"""))
+          (if (call ctx.NULL)
+            (raw """return { tag: "literal", value: null }"""))
+          (if (call ctx.UNDEFINED)
+            (raw """return { tag: "literal", value: undefined }"""))
+          (raw """throw new Error("Unknown literal")""")))
 
 ;;
 ;; ========== Phase B: Sugar Lowering ==========
 ;;
 ;; Transforms surface AST → canonical AST.
-;;
-;; Canonical AST tags:
-;;   Expressions: literal, identifier, lambda, call, block-expr,
-;;                if-expr, let-expr, return-expr, assign-expr, operator-expr
-;;   Statements:  expr-stmt, let-stmt, return-stmt, if-stmt,
-;;                while-stmt, block-stmt
 
 ;;
 ;; lower program
       (lowerProgram
         (lambda ((node))
-          (raw """return {
-              tag: "program",
-              body: node.body.map(lowerTopLevel),
-          };""")
-        )
-      )
+          (let* ((body (call node.body.map lowerTopLevel)))
+            (raw """return { tag: "program", body }"""))))
 
 ;;
 ;; lower topLevel
       (lowerTopLevel
         (lambda ((node))
-          (raw """switch (node.tag) {
-          case 'defmacro':
-              return lowerDefmacro(node);
-          case 'def':
-              return lowerDef(node);
-          default:
-              return lowerStmt(node);
-          }""")
-        )
-      )
+          (if (call === node.tag "defmacro")
+            (raw """return lowerDefmacro(node)"""))
+          (if (call === node.tag "def")
+            (raw """return lowerDef(node)"""))
+          (raw """return lowerStmt(node)""")))
 
 ;;
 ;; lower defmacro  (TODO: macro expansion)
       (lowerDefmacro
         (lambda ((node))
-          (raw """return {
-              tag: "defmacro",
-              name: node.name,
-              params: node.params,
-              body: node.body.map(lowerStmt),
-          };""")
-        )
-      )
+          (let* ((body (call node.body.map lowerStmt)))
+            (raw """return { tag: "defmacro", name: node.name, params: node.params, body }"""))))
 
 ;;
 ;; lower def  →  let-stmt
       (lowerDef
         (lambda ((node))
-          (raw """return {
-              tag: "let-stmt",
-              name: node.name,
-              init: lowerExpr(node.init),
-          };""")
-        )
-      )
+          (let* ((init (call lowerExpr node.init)))
+            (raw """return { tag: "let-stmt", name: node.name, init }"""))))
 
 ;;
 ;; lower stmt
       (lowerStmt
         (lambda ((node))
-          (raw """switch (node.tag) {
-          case 'let*':
-              return lowerLetStar(node);
-          case 'let':
-              return { tag: 'let-stmt', name: node.name, init: lowerExpr(node.init) };
-          case 'if':
-              return { tag: 'if-stmt', test: lowerExpr(node.test),
-                       ifthen: lowerStmt(node.ifthen),
-                       ifelse: node.ifelse ? lowerStmt(node.ifelse) : undefined };
-          case 'while':
-              return { tag: 'while-stmt', test: lowerExpr(node.test),
-                       body: node.body.map(lowerStmt) };
-          case 'block':
-              return { tag: 'block-stmt', body: node.body.map(lowerStmt) };
-          case 'return':
-              return { tag: 'return-stmt', expr: node.expr ? lowerExpr(node.expr) : undefined };
-          case 'expr-stmt':
-              return { tag: 'expr-stmt', expr: lowerExpr(node.expr) };
-          default:
-              throw new Error("lowerStmt: unexpected tag " + node.tag);
-          }""")
-        )
-      )
+          (if (call === node.tag "let*")
+            (raw """return lowerLetStar(node)"""))
+          (if (call === node.tag "let")
+            (raw """return { tag: 'let-stmt', name: node.name, init: lowerExpr(node.init) }"""))
+          (if (call === node.tag "if")
+            (raw """return { tag: 'if-stmt', test: lowerExpr(node.test),
+                    ifthen: lowerStmt(node.ifthen),
+                    ifelse: node.ifelse ? lowerStmt(node.ifelse) : undefined }"""))
+          (if (call === node.tag "while")
+            (raw """return { tag: 'while-stmt', test: lowerExpr(node.test),
+                    body: node.body.map(lowerStmt) }"""))
+          (if (call === node.tag "block")
+            (raw """return { tag: 'block-stmt', body: node.body.map(lowerStmt) }"""))
+          (if (call === node.tag "return")
+            (raw """return { tag: 'return-stmt', expr: node.expr ? lowerExpr(node.expr) : undefined }"""))
+          (if (call === node.tag "expr-stmt")
+            (raw """return { tag: 'expr-stmt', expr: lowerExpr(node.expr) }"""))
+          (raw """throw new Error("lowerStmt: unexpected tag " + node.tag)""")))
 
 ;;
 ;; lower let*  →  nested let-stmts in a block-stmt
       (lowerLetStar
         (lambda ((node))
-          (raw """const stmts = [];
-          for (const b of node.bindings) {
-              stmts.push({
-                  tag: 'let-stmt',
-                  name: b.name,
-                  init: b.init ? lowerExpr(b.init) : undefined,
-              });
-          }
-          for (const s of node.body) {
-              stmts.push(lowerStmt(s));
-          }
-          return { tag: 'block-stmt', body: stmts };""")
-        )
-      )
+          (let* ((stmts (raw """[]""")))
+            (call node.bindings.forEach (lambda ((b))
+              (raw """stmts.push({ tag: 'let-stmt', name: b.name,
+                      init: b.init ? lowerExpr(b.init) : undefined })""")))
+            (call node.body.forEach (lambda ((s))
+              (call stmts.push (call lowerStmt s))))
+            (raw """return { tag: 'block-stmt', body: stmts }"""))))
 
 ;;
 ;; lower expr
       (lowerExpr
         (lambda ((node))
-          (raw """switch (node.tag) {
-          case 'literal':
-              return node;
-          case 'identifier':
-              return node;
-          case 'lambda':
-              return { tag: 'lambda', params: node.params,
-                       body: node.body.map(lowerStmt) };
-          case 'assign':
-              return { tag: 'assign-expr', name: node.name,
-                       value: lowerExpr(node.value) };
-          case 'call':
-              return lowerCall(node);
-          default:
-              throw new Error("lowerExpr: unexpected tag " + node.tag);
-          }""")
-        )
-      )
+          (if (call === node.tag "literal")
+            (raw """return node"""))
+          (if (call === node.tag "identifier")
+            (raw """return node"""))
+          (if (call === node.tag "lambda")
+            (raw """return { tag: 'lambda', params: node.params,
+                    body: node.body.map(lowerStmt) }"""))
+          (if (call === node.tag "assign")
+            (raw """return { tag: 'assign-expr', name: node.name,
+                    value: lowerExpr(node.value) }"""))
+          (if (call === node.tag "call")
+            (raw """return lowerCall(node)"""))
+          (raw """throw new Error("lowerExpr: unexpected tag " + node.tag)""")))
 
 ;;
 ;; lower call  –  detects operator sugar
       (lowerCall
         (lambda ((node))
-          (raw """if (node.fn.tag === 'identifier' && isOperator(node.fn.name)) {
-              const op = node.fn.name;
-              const args = node.args.map(lowerExpr);
-              if (args.length === 1) {
-                  return { tag: 'operator-expr', op, args };
-              }
-              // fold (+ a b c) → (operator-expr + (operator-expr + a b) c)
-              let result = { tag: 'operator-expr', op, args: [args[0], args[1]] };
-              for (let i = 2; i < args.length; i++) {
-                  result = { tag: 'operator-expr', op, args: [result, args[i]] };
-              }
-              return result;
-          }
-          return {
-              tag: 'call',
-              fn: lowerExpr(node.fn),
-              args: node.args.map(lowerExpr),
-          };""")
-        )
-      )
+          (if (call && (call === node.fn.tag "identifier") (call isOperator node.fn.name))
+            (let* ((op node.fn.name)
+                   (args (call node.args.map lowerExpr)))
+              (if (call === args.length 1)
+                (raw """return { tag: 'operator-expr', op, args }"""))
+              ;; fold (+ a b c) → nested binary operator-exprs
+              (let* ((result (raw """{ tag: 'operator-expr', op, args: [args[0], args[1]] }"""))
+                     (i 2))
+                (while (call < i args.length)
+                  (let* ()
+                    (raw """result = { tag: 'operator-expr', op, args: [result, args[i]] }""")
+                    (raw """i++""")))
+                (raw """return result"""))))
+          (raw """return { tag: 'call', fn: lowerExpr(node.fn),
+                  args: node.args.map(lowerExpr) }""")))
 
 ;;
 ;; ========== Phase C: Codegen (canonical AST → TypeScript) ==========
@@ -404,179 +310,134 @@ import fs from "node:fs";""")
 ;; emit program
       (emitProgram
         (lambda ((node))
-          (raw """return node.body.map(emitTopLevel).join('\n');""")
-        )
-      )
+          (raw """return node.body.map(emitTopLevel).join('\n')""")))
 
 ;;
 ;; emit topLevel
       (emitTopLevel
         (lambda ((node))
-          (raw """switch (node.tag) {
-          case 'defmacro':
-              // TODO: macros are compile-time only, emit nothing
-              return '// macro: ' + node.name;
-          default:
-              return emitStmt(node);
-          }""")
-        )
-      )
+          (if (call === node.tag "defmacro")
+            (raw """return '// macro: ' + node.name"""))
+          (raw """return emitStmt(node)""")))
 
 ;;
 ;; emit stmt
       (emitStmt
         (lambda ((stmt))
-          (raw """switch (stmt.tag) {
-          case 'let-stmt':
-              return stmt.init != undefined
-                  ? 'let ' + stmt.name + ' = ' + emitExpr(stmt.init) + ';'
-                  : 'let ' + stmt.name + ';';
-          case 'if-stmt':
-              return emitIf(stmt);
-          case 'while-stmt':
-              return emitWhile(stmt);
-          case 'block-stmt':
-              return emitBlock(stmt);
-          case 'return-stmt':
-              return stmt.expr
-                  ? 'return ' + emitExpr(stmt.expr) + ';'
-                  : 'return;';
-          case 'expr-stmt':
-              return emitExpr(stmt.expr) + ';';
-          default:
-              throw new Error("emitStmt: unexpected tag " + stmt.tag);
-          }""")
-        )
-      )
+          (if (call === stmt.tag "let-stmt")
+            (if (call isDefined stmt.init)
+              (raw """return 'let ' + stmt.name + ' = ' + emitExpr(stmt.init) + ';'""")
+              (raw """return 'let ' + stmt.name + ';'""")))
+          (if (call === stmt.tag "if-stmt")
+            (raw """return emitIf(stmt)"""))
+          (if (call === stmt.tag "while-stmt")
+            (raw """return emitWhile(stmt)"""))
+          (if (call === stmt.tag "block-stmt")
+            (raw """return emitBlock(stmt)"""))
+          (if (call === stmt.tag "return-stmt")
+            (if stmt.expr
+              (raw """return 'return ' + emitExpr(stmt.expr) + ';'""")
+              (raw """return 'return;'""")))
+          (if (call === stmt.tag "expr-stmt")
+            (raw """return emitExpr(stmt.expr) + ';'"""))
+          (raw """throw new Error("emitStmt: unexpected tag " + stmt.tag)""")))
 
 ;;
 ;; emit if
       (emitIf
         (lambda ((node))
-          (raw """const lines = [];
-          lines.push('if (' + emitExpr(node.test) + ') {');
-          lines.push(indent(emitStmt(node.ifthen)));
-          lines.push('}');
-          if (node.ifelse != undefined) {
-              lines.push('else {');
-              lines.push(indent(emitStmt(node.ifelse)));
-              lines.push('}');
-          }
-          return lines.join('\n');""")
-        )
-      )
+          (let* ((lines (raw """[]""")))
+            (call lines.push (call + "if (" (call emitExpr node.test) ") {"))
+            (call lines.push (call indent (call emitStmt node.ifthen)))
+            (call lines.push "}")
+            (if (call isDefined node.ifelse)
+              (let* ()
+                (call lines.push "else {")
+                (call lines.push (call indent (call emitStmt node.ifelse)))
+                (call lines.push "}")))
+            (raw """return lines.join('\n')"""))))
 
 ;;
 ;; emit while
       (emitWhile
         (lambda ((node))
-          (raw """const lines = [];
-          lines.push('while (' + emitExpr(node.test) + ') {');
-          for (const s of node.body) {
-              lines.push(indent(emitStmt(s)));
-          }
-          lines.push('}');
-          return lines.join('\n');""")
-        )
-      )
+          (let* ((lines (raw """[]""")))
+            (call lines.push (call + "while (" (call emitExpr node.test) ") {"))
+            (call node.body.forEach (lambda ((s))
+              (call lines.push (call indent (call emitStmt s)))))
+            (call lines.push "}")
+            (raw """return lines.join('\n')"""))))
 
 ;;
 ;; emit block
       (emitBlock
         (lambda ((node))
-          (raw """const lines = ['{'];
-          for (const s of node.body) {
-              lines.push(indent(emitStmt(s)));
-          }
-          lines.push('}');
-          return lines.join('\n');""")
-        )
-      )
+          (let* ((lines (raw """['{']""")))
+            (call node.body.forEach (lambda ((s))
+              (call lines.push (call indent (call emitStmt s)))))
+            (call lines.push "}")
+            (raw """return lines.join('\n')"""))))
 
 ;;
 ;; emit expr
       (emitExpr
         (lambda ((expr))
-          (raw """switch (expr.tag) {
-          case 'literal':
-              return JSON.stringify(expr.value);
-          case 'identifier':
-              return expr.name;
-          case 'call':
-              return emitCall(expr);
-          case 'lambda':
-              return emitLambda(expr);
-          case 'assign-expr':
-              return '(' + expr.name + ' = ' + emitExpr(expr.value) + ')';
-          case 'operator-expr':
-              return emitOperator(expr);
-          default:
-              throw new Error("emitExpr: unexpected tag " + expr.tag);
-          }""")
-        )
-      )
+          (if (call === expr.tag "literal")
+            (raw """return JSON.stringify(expr.value)"""))
+          (if (call === expr.tag "identifier")
+            (raw """return expr.name"""))
+          (if (call === expr.tag "call")
+            (raw """return emitCall(expr)"""))
+          (if (call === expr.tag "lambda")
+            (raw """return emitLambda(expr)"""))
+          (if (call === expr.tag "assign-expr")
+            (raw """return '(' + expr.name + ' = ' + emitExpr(expr.value) + ')'"""))
+          (if (call === expr.tag "operator-expr")
+            (raw """return emitOperator(expr)"""))
+          (raw """throw new Error("emitExpr: unexpected tag " + expr.tag)""")))
 
 ;;
 ;; emit lambda
       (emitLambda
         (lambda ((node))
-          (raw """const params = node.params.join(', ');
-          const body = node.body.map(emitStmt).join('\n');
-          return '(' + params + ') => {\n' + indent(body) + '\n}';""")
-        )
-      )
+          (let* ((params (call node.params.join ", "))
+                 (body (call node.body.map emitStmt)))
+            (raw """return '(' + params + ') => {\n' + indent(body.join('\n')) + '\n}'"""))))
 
 ;;
 ;; emit call
-      (isOperator
-        (lambda ((name))
-          (raw """return ["<", ">", "<=", ">=", "&&", "||", "!=", "==", "===",
-                  "+", "-", "*", "/", "%", "^", "!"].includes(name);"""))
-      )
-
       (emitCall
         (lambda ((node))
-          (raw """const fn = emitExpr(node.fn);
-          const args = node.args.map(emitExpr).join(', ');
-          return fn + '(' + args + ')';""")
-        )
-      )
+          (let* ((fn (call emitExpr node.fn))
+                 (args (call node.args.map emitExpr)))
+            (raw """return fn + '(' + args.join(', ') + ')'"""))))
 
 ;;
 ;; emit operator
       (emitOperator
         (lambda ((node))
-          (raw """const args = node.args.map(emitExpr);
-          if (args.length === 1) {
-              return '(' + node.op + args[0] + ')';
-          }
-          return '(' + args[0] + ' ' + node.op + ' ' + args[1] + ')';""")
-        )
-      )
+          (let* ((args (call node.args.map emitExpr)))
+            (if (call === args.length 1)
+              (raw """return '(' + node.op + args[0] + ')'"""))
+            (raw """return '(' + args[0] + ' ' + node.op + ' ' + args[1] + ')'"""))))
 
 ;;
 ;; ========== main ==========
 
       (main
         (lambda ()
-          (raw """
-          const input = fs.readFileSync(process.argv[2], "utf-8");
-          const inputStream = CharStream.fromString(input);
-          const lexer = new Stage2Lexer(inputStream);
-          const tokenStream = new CommonTokenStream(lexer);
-          const parser = new Stage2Parser(tokenStream);
-          const tree = parser.program();
-
-          // Phase A: CST → surface AST
-          const surfaceAst = astProgram(tree);
-
-          // Phase B: sugar lowering → canonical AST
-          const canonicalAst = lowerProgram(surfaceAst);
-
-          // Phase C: codegen → TypeScript
-          console.log(emitProgram(canonicalAst));""")
-        )
-      )
+          (let* ((input (call fs.readFileSync (raw """process.argv[2]""") "utf-8"))
+                 (inputStream (call CharStream.fromString input))
+                 (lexer (raw """new Stage2Lexer(inputStream)"""))
+                 (tokenStream (raw """new CommonTokenStream(lexer)"""))
+                 (parser (raw """new Stage2Parser(tokenStream)"""))
+                 (tree (call parser.program))
+                 ;; Phase A: CST → surface AST
+                 (surfaceAst (call astProgram tree))
+                 ;; Phase B: sugar lowering → canonical AST
+                 (canonicalAst (call lowerProgram surfaceAst)))
+            ;; Phase C: codegen → TypeScript
+            (call console.log (call emitProgram canonicalAst)))))
 
 ;; end of let*
    )
