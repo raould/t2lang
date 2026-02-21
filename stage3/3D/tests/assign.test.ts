@@ -1,3 +1,8 @@
+import {it} from 'vitest';
+import {fromSourceEndToEnd} from './helpers';
+
+it('assign.test.t2 end-to-end', () => {
+    fromSourceEndToEnd(`
 (program
   (let (ass)
     (lambda ((estr) (v))
@@ -17,3 +22,5 @@
     (set! x 200))
   (ass "200" x)
 )
+  `);
+});
