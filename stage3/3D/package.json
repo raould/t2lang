@@ -10,13 +10,15 @@
     "build": "npm run build-grammar && npm run build-compiler",
     "build-compiler": "npx tsx ../3C/index.ts Stage3D.s3c > index.ts",
     "build-grammar": "antlr-ng -Dlanguage=TypeScript Stage3D.g4",
-      "test": "npm run build && npx tsx bin/test-runner.ts"
+    "test": "npm run build && npx vitest run"
   },
   "dependencies": {
     "antlr-ng": "^1.0.10"
   },
   "devDependencies": {
+    "@vitest/ui": "^4.0.18",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "tsx": "^4.21.0"
+    "vitest": "^4.0.18"
   }
 }
