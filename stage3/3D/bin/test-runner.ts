@@ -46,10 +46,9 @@ files.forEach((filePath) => {
     const m = txt.match(/fromSourceEndToEnd\(`([\s\S]*?)`\)/);
     const rel = path.relative(testsDir, filePath);
     if (m) {
-      process.stdout.write(`--- ${rel} ---\n`);
       process.stdout.write(m[1] + "\n");
     } else {
-      process.stdout.write(`--- ${rel} (no sexpr found) ---\n`);
+      process.stderr.write(`--- ${rel} (no sexpr found) ---\n`);
     }
   }
 });
