@@ -296,6 +296,8 @@
                             (fn (index exprs 0))
                             (args ((. exprs slice) 1))
                             (typeArgs typeArgs))))
+      )
+    )
     (astPropAccess
       (lambda ((ctx))
         (let* ((obj (astExpression ((. ctx expression))))
@@ -322,7 +324,6 @@
         (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
                (value (astExpression ((. ctx expression)))))
           (return (object (tag "assign") (name name) (value value))))))
-                          (typeArgs typeArgs))))))
     (astLiteral
       (lambda ((ctx))
         (if ((. ctx NUMBER))
