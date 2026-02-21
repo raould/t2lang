@@ -1,0 +1,13 @@
+import { it } from 'vitest';
+import { fromSourceEndToEnd } from './helpers';
+
+it('forIn.test.t2 end-to-end', () => {
+  fromSourceEndToEnd(`(program
+  (let* ((obj (object (a 1) (b 2) (c 3)))
+         (keys (array)))
+    (for-in k obj
+      ((. keys push) k))
+    ((. console assert) (=== (. keys length) 3))
+    ((. console log) keys)))
+`);
+});

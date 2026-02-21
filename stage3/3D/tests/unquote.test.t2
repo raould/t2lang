@@ -1,6 +1,0 @@
-(program
-  (let (x) 42)
-
-  ;; unquote inside quasiquote
-  (let (tmpl) (quasi (object (val (unquote x)))))
-  ((. console log) tmpl))

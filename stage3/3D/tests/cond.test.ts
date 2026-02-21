@@ -1,0 +1,31 @@
+import { it } from 'vitest';
+import { fromSourceEndToEnd } from './helpers';
+
+it('cond.test.t2 end-to-end', () => {
+  fromSourceEndToEnd(`(program
+  ;; multi-clause cond (grade classifier)
+  (let (grade) 85)
+  (let (result)
+    (cond
+      (>= grade 90) "A"
+      (>= grade 80) "B"
+      (>= grade 70) "C"
+      :else "F"))
+  ((. console log) result)
+
+  ;; single clause, no match → undefined
+  (let (r1) (cond (> 1 2) "nope"))
+  ((. console log) r1)
+
+  ;; single clause, match
+  (let (r2) (cond (< 1 2) "yes"))
+  ((. console log) r2)
+
+  ;; cond nested in expression
+  ((. console log) (+ "grade is " (cond (=== grade 85) "B" :else "other")))
+
+  ;; cond with numeric results
+  (let (x) 5)
+  ((. console log) (+ 1 (cond (> x 3) 10 (> x 1) 5 :else 0))))
+`);
+});

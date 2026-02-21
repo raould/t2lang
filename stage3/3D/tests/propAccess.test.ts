@@ -1,0 +1,19 @@
+import { it } from 'vitest';
+import { fromSourceEndToEnd } from './helpers';
+
+it('propAccess.test.t2 end-to-end', () => {
+  fromSourceEndToEnd(`(program
+  (let (obj) (object (x 10) (y 20) (z (lambda ((a)) a))))
+
+  ;; Invalid, should throw if uncommented.
+  ;; ((. console log) (obj.x))
+
+  ;; property access with identifier key
+  ((. console log) (. obj x))
+  ((. console log) (. obj y))
+
+  ;; chained property access
+  (let (nested) (object (inner (object (val 99)))))
+  ((. console log) (. (. nested inner) val)))
+`);
+});

@@ -1,9 +1,0 @@
-(program
-  (let (x) 0)
-
-  ;; begin block groups multiple statements
-  (begin
-    (set! x 1)
-    ((. console log) x)
-    (set! x 2)
-    ((. console log) x)))

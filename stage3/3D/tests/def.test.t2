@@ -1,8 +1,0 @@
-(program
-  ;; top-level constant definition
-  (def x 42)
-  (def greeting "hello")
-  (def pi 3.14)
-  ((. console log) x)
-  ((. console log) greeting)
-  ((. console log) pi))

@@ -1,7 +1,0 @@
-(program
-  (let (x) 42)
-  (let (myVar) "hello")
-
-  ;; identifier references
-  ((. console log) x)
-  ((. console log) myVar))

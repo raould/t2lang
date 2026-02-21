@@ -1,0 +1,19 @@
+import { it } from 'vitest';
+import { fromSourceEndToEnd } from './helpers';
+
+it('ternary.test.t2 end-to-end', () => {
+  fromSourceEndToEnd(`(program
+  (let (x) 10)
+
+  ;; ternary with three branches (test, then, else)
+  (let (result) (ternary (> x 5) "big" "small"))
+  ((. console log) result)
+
+  ;; ternary always requires else
+  (let (maybe) (ternary (> x 0) "positive" "non-positive"))
+  ((. console log) maybe)
+
+  ;; ternary nested in expression
+  ((. console log) (+ 1 (ternary true 10 20))))
+`);
+});

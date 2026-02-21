@@ -14,3 +14,10 @@
 * need sugar for fluid dotted access.
 * clean up explict vs. implicit "block"s.
 * spreading; destructuring.
+
+- example helper function we want to export/import.
+           (let (ass)
+                (lambda ((estr) (v))
+                (let (vstr) ((. v toString)))
+                ((. console log) vstr)
+                ((. console assert) (== estr vstr))))

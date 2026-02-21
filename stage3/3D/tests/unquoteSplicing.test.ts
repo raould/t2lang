@@ -1,0 +1,12 @@
+import { it } from 'vitest';
+import { fromSourceEndToEnd } from './helpers';
+
+it('unquoteSplicing.test.t2 end-to-end', () => {
+  fromSourceEndToEnd(`(program
+  (let (items) (array 1 2 3))
+
+  ;; unquote-splicing inside quasiquote
+  (let (tmpl) (quasi (object (vals (unquote-splicing items)))))
+  ((. console log) tmpl))
+`);
+});
