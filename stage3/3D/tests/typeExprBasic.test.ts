@@ -7,7 +7,7 @@ it('typeExprBasic.test.t2 end-to-end', () => {
   (let (nums : (array number)) (array 1 2 3))
   (let (obj : (obj (x number) (y string))) (object (x 1) (y "hi")))
   (let (obj2 : (obj (readonly id string) (name ? string))) (object (id "abc")))
-  (let (status : (lit "active")) "active")
+  (let (status : (tlit "active")) "active")
   ((. console log) x)
   ((. console log) nums)
   ((. console log) (. obj x))

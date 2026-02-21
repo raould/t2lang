@@ -157,10 +157,10 @@ export class Stage3DParser extends antlr.Parser {
         "'cond'", "'object'", "'array'", "'.?'", "'.'", "'index'", "'??'", 
         "'quasi'", "'quote'", "'unquote-splicing'", "'unquote'", "'new'", 
         "'import'", "'switch'", "'case'", "'default'", "'for-in'", "'for-of'", 
-        "'for'", "'union'", "'intersect'", "'tuple'", "'fn'", "'lit'", "'keyof'", 
-        "'typeof'", "'infer'", "'mapped'", "'template'", "'rest'", "'readonly'", 
-        "'type-params'", "'type-args'", "'extends'", "'returns'", "'type'", 
-        "'interface'", "'modifiers'", "'?'", null, "'null'", "'undefined'", 
+        "'for'", "'union'", "'intersect'", "'tuple'", "'fn'", "'tlit'", 
+        "'keyof'", "'typeof'", "'infer'", "'mapped'", "'template'", "'rest'", 
+        "'readonly'", "'type-params'", "'type-args'", "'extends'", "'returns'", 
+        "'type'", "'interface'", "'modifiers'", "'?'", null, "'null'", "'undefined'", 
         "':'", "'['", "']'"
     ];
 

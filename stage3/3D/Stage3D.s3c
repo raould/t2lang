@@ -653,7 +653,7 @@
           (return (object (tag 'type-array') (element (lowerTypeExpr (. node element))))))
         (if (=== (. node tag) 'type-app')
           (let* ((lowerCallee (lowerTypeExpr (. node callee)))
-                 (reserved (array "union" "intersect" "array" "tuple" "fn" "obj" "lit" "keyof" "typeof" "index" "cond" "infer" "mapped" "template" "rest" "readonly" "type-params" "type-args" "extends" "default" "modifiers")))
+                 (reserved (array "union" "intersect" "array" "tuple" "fn" "obj" "tlit" "keyof" "typeof" "index" "cond" "infer" "mapped" "template" "rest" "readonly" "type-params" "type-args" "extends" "default" "modifiers")))
             ;; enforce that the callee of a positional type application is not a reserved keyword
             (if (&& (=== (. lowerCallee tag) 'type-id') ((. reserved includes) (. lowerCallee name)))
               (throw (new Error (+ 'Invalid type application: reserved keyword used as constructor: ' (. lowerCallee name)))))

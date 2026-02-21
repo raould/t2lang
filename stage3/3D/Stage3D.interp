@@ -42,7 +42,7 @@ null
 'intersect'
 'tuple'
 'fn'
-'lit'
+'tlit'
 'keyof'
 'typeof'
 'infer'

@@ -924,7 +924,7 @@ import fs from "node:fs";
     if ((node.tag === "type-app")) {
       {
         let lowerCallee = lowerTypeExpr(node.callee);
-        let reserved = ["union", "intersect", "array", "tuple", "fn", "obj", "lit", "keyof", "typeof", "index", "cond", "infer", "mapped", "template", "rest", "readonly", "type-params", "type-args", "extends", "default", "modifiers"];
+        let reserved = ["union", "intersect", "array", "tuple", "fn", "obj", "tlit", "keyof", "typeof", "index", "cond", "infer", "mapped", "template", "rest", "readonly", "type-params", "type-args", "extends", "default", "modifiers"];
         if (((lowerCallee.tag === "type-id") && reserved.includes(lowerCallee.name))) {
           throw new Error(("Invalid type application: reserved keyword used as constructor: " + lowerCallee.name));
         }

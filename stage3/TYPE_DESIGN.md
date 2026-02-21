@@ -27,7 +27,7 @@ t2lang provides an S-expression syntax that compiles to TypeScript. The type sys
 (List number)
 ```
 
-**Proposed resolution:** Use **positional** form, but reserve all type-level keywords. Any parenthesized type expression whose head is not a reserved keyword is a type application. Reserved keywords: `union`, `intersect`, `array`, `tuple`, `fn`, `obj`, `keyof`, `typeof`, `infer`, `index`, `mapped`, `cond`, `lit`, `readonly`, `rest`.
+**Proposed resolution:** Use **positional** form, but reserve all type-level keywords. Any parenthesized type expression whose head is not a reserved keyword is a type application. Reserved keywords: `union`, `intersect`, `array`, `tuple`, `fn`, `obj`, `keyof`, `typeof`, `infer`, `index`, `mapped`, `cond`, `tlit`, `readonly`, `rest`.
 
 **Tradeoff:** Positional is more concise and idiomatic for S-expressions. The cost is a fixed reserved-word list that must be checked before adding new constructs.
 
@@ -221,22 +221,22 @@ propModifier
 
 ```
 typeLiteral
-    : LPAREN 'lit' (STRING | NUMBER | 'true' | 'false') RPAREN
+    : LPAREN 'tlit' (STRING | NUMBER | 'true' | 'false') RPAREN
     ;
 ```
 
 ```
 ;; "foo"
-(lit "foo")
+(tlit "foo")
 
 ;; 42
-(lit 42)
+(tlit 42)
 
 ;; true
-(lit true)
+(tlit true)
 ```
 
-**Note:** The `lit` keyword is required to distinguish `(lit "foo")` (the literal type `"foo"`) from a string value in expression context. This avoids ambiguity in the grammar.
+**Note:** The `tlit` keyword is required to distinguish `(tlit "foo")` (the literal type `"foo"`) from a string value in expression context. This avoids ambiguity in the grammar.
 
 ### `keyof`
 
@@ -282,10 +282,10 @@ typeIndexAccess
 (index T K)
 
 ;; T["key"]
-(index T (lit "key"))
+(index T (tlit "key"))
 
 ;; Parameters<typeof fn>[0]
-(index (Parameters (typeof fn)) (lit 0))
+(index (Parameters (typeof fn)) (tlit 0))
 ```
 
 ### Conditional types
@@ -300,7 +300,7 @@ Operands: `subject`, `constraint`, `true-branch`, `false-branch`.
 
 ```
 ;; T extends string ? "yes" : "no"
-(cond T string (lit "yes") (lit "no"))
+(cond T string (tlit "yes") (tlit "no"))
 
 ;; T extends Array<infer U> ? U : never
 (cond T (Array (infer U)) U never)
@@ -808,7 +808,7 @@ type EventName<T> = `${Lowercase<T>}Changed`;
 
 The following identifiers are reserved in type-expression head position and cannot be used as type application constructors:
 
-`union`, `intersect`, `array`, `tuple`, `fn`, `obj`, `lit`, `keyof`, `typeof`, `index`, `cond`, `infer`, `mapped`, `template`, `rest`, `readonly`, `type-params`, `type-args`, `extends`, `default`, `modifiers`
+`union`, `intersect`, `array`, `tuple`, `fn`, `obj`, `tlit`, `keyof`, `typeof`, `index`, `cond`, `infer`, `mapped`, `template`, `rest`, `readonly`, `type-params`, `type-args`, `extends`, `default`, `modifiers`
 
 ---
 
@@ -818,6 +818,6 @@ The following identifiers are reserved in type-expression head position and cann
 - **Type validation** — invalid types compile to invalid TS, which `tsc` rejects
 - **Overload signatures** — can be added later as `(overload ...)` forms
 - **Decorators** — orthogonal to the type system
-- **Namespace types** — `Foo.Bar` can be handled as `(index Foo (lit "Bar"))` or a dotted identifier extension
+- **Namespace types** — `Foo.Bar` can be handled as `(index Foo (tlit "Bar"))` or a dotted identifier extension
 - **`as` / `satisfies` casts** — expression-level, not type-level; belongs in expression grammar
 - **`is` type predicates** — can be added as a return-type modifier: `(returns (is x string))`

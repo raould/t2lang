@@ -415,7 +415,7 @@ INTERSECT   : 'intersect' ;
 TUPLE       : 'tuple' ;
 FN          : 'fn' ;
 // OBJ token removed so 'obj' is treated as an identifier
-LIT         : 'lit' ;
+LIT         : 'tlit' ;
 KEYOF       : 'keyof' ;
 TYPEOF      : 'typeof' ;
 INFER       : 'infer' ;

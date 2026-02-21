@@ -1,5 +1,6 @@
 * export & import, e.g. for test helper functions.
 * get `typeof` working.
+* resolve keyword problems e.g. `obj`.
 * does spread really work somehow already e.g. (dbg ((...msgs)))?
 * fix 'cond' vs. 'ternary' vs. 'if' all overa again.
 * what is up with all the extra ts parens for if-tests?
