@@ -39,8 +39,8 @@ function runJs(js: string) {
   }
 }
 
-export function compileAndRunT2(name: string, t2source: string) {
-  const t2path = path.join(__dirname, t2source);
+export function compileAndRunT2(t2file: string) {
+  const t2path = path.join(__dirname, t2file);
   const t2source = readFileSync(t2path, 'utf-8');
   const tsCode = compileT2(t2source);
   const jsCode = transpileTs(tsCode);
