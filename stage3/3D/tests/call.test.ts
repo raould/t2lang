@@ -17,6 +17,13 @@ it('call.test.t2 end-to-end', () => {
   ((. console log) (now))
 
   ;; nested calls
-  ((. console log) (+ (double 3) (double 4))))
+  ((. console log) (+ (double 3) (double 4)))
+
+  ;; call with explicit type arguments
+  (def id (lambda ((x)) (return x)))
+  ((. console log) (id (type-args number) 123))
+
+  ;; new expression with type arguments on built-in Map
+  ((. console log) (new Map (type-args string number)))
 `);
 });

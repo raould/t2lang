@@ -69,6 +69,7 @@ import { UnquoteSplicingContext } from "./Stage3DParser.js";
 import { OptChainContext } from "./Stage3DParser.js";
 import { NullCoalesceContext } from "./Stage3DParser.js";
 import { CallContext } from "./Stage3DParser.js";
+import { TypeArgsContext } from "./Stage3DParser.js";
 import { FnSignatureContext } from "./Stage3DParser.js";
 import { ParamContext } from "./Stage3DParser.js";
 import { LiteralContext } from "./Stage3DParser.js";
@@ -749,6 +750,16 @@ export class Stage3DListener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitCall?: (ctx: CallContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.typeArgs`.
+     * @param ctx the parse tree
+     */
+    enterTypeArgs?: (ctx: TypeArgsContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.typeArgs`.
+     * @param ctx the parse tree
+     */
+    exitTypeArgs?: (ctx: TypeArgsContext) => void;
     /**
      * Enter a parse tree produced by `Stage3DParser.fnSignature`.
      * @param ctx the parse tree

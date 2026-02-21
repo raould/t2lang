@@ -286,7 +286,7 @@ condExpr
     ;
 
 newForm
-    : LPAREN NEW IDENTIFIER expression* RPAREN
+    : LPAREN NEW IDENTIFIER typeArgs? expression* RPAREN
     ;
 
 // ─── data literals ───────────────────────────
@@ -339,8 +339,18 @@ nullCoalesce
 
 // ─── call ────────────────────────────────────
 
+// syntax for function invocation; optional type arguments may
+// appear immediately after the callee.  typeArgs is a separate
+// rule so that `(type-args ...)` doesn't accidentally parse as a
+// normal call expression.
 call
-    : LPAREN expression expression* RPAREN
+    : LPAREN expression typeArgs? expression* RPAREN
+    ;
+
+// a list of type expressions appearing at call sites or `new` forms
+// (see docs/TYPE_DESIGN.md for examples)
+typeArgs
+    : LPAREN TYPE_ARGS typeExpr+ RPAREN
     ;
 
 // ─── shared ──────────────────────────────────
