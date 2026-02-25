@@ -1,0 +1,46 @@
+(program
+  (import (object (:named (array (object (:name "CharStream")) (object (:name "CommonTokenStream"))))) "antlr4ng")
+  (import (object (:named (array (object (:name "Stage4Lexer"))))) "./Stage4Lexer")
+  (import (object (:named (array (object (:name "Stage4Parser"))))) "./Stage4Parser")
+  (import (object (:default "fs")) "node:fs")
+  (import (object (:named (array (object (:name "astProgram"))))) "./Stage4-ast")
+  (import (object (:named (array (object (:name "lowerProgram"))))) "./Stage4-lower")
+  (import (object (:named (array (object (:name "emitProgram"))))) "./Stage4-codegen")
+  (import (object (:named (array (object (:name "makeMacroEnv")) (object (:name "collectMacros"))))) "./Stage4-macro-env")
+  (import (object (:named (array (object (:name "expandAll")) (object (:name "formatExpansionErrors"))))) "./Stage4-macro-expand")
+  (import (object (:named (array (object (:name "resolveNames"))))) "./Stage4-scope-resolve")
+
+  ;; ========== main ==========
+  (def main
+    (lambda ()
+      (let* ((filePath (index (. process argv) 2))
+             (input ((. fs readFileSync) (ternary (=== filePath '-') 0 filePath) 'utf-8'))
+             (inputStream ((. CharStream fromString) input))
+             (lexer (new Stage4Lexer inputStream))
+             (tokenStream (new CommonTokenStream lexer))
+             (parser (new Stage4Parser tokenStream))
+             (tree ((. parser "program")))
+             ;; Phase A: CST → surface AST
+             (surfaceAst (astProgram tree))
+             ;; Phase B-pre: macro expansion
+             ;; Collect all defmacro definitions, then expand macro calls.
+             (macroEnv (makeMacroEnv))
+             (_ (collectMacros surfaceAst macroEnv))
+             (expandResult (expandAll surfaceAst macroEnv))
+             (expandErrors (. expandResult errors)))
+        ;; If there are expansion errors, report them to stderr and stop.
+        (if (> (. expandErrors length) 0)
+          (begin
+            ((. console error) (formatExpansionErrors expandErrors))
+            ((. process exit) 1)))
+        ;; Phase B-post: KFFD scope resolution — annotates identifiers with
+        ;; resolvedScopes using subset matching before lowering.
+        ;; Phase B: lowering → canonical AST
+        ;; Phase C: codegen → TypeScript
+        (let* ((expandedAst (. expandResult ast))
+               (resolvedAst (. (resolveNames expandedAst) ast))
+               (canonicalAst (lowerProgram resolvedAst)))
+          ((. console log) (emitProgram canonicalAst))))))
+
+  (main)
+)

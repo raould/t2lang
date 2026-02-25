@@ -9,6 +9,20 @@ import { DefContext } from "./Stage3DParser.js";
 import { TypeAliasContext } from "./Stage3DParser.js";
 import { InterfaceDefContext } from "./Stage3DParser.js";
 import { InterfaceExtendsContext } from "./Stage3DParser.js";
+import { ClassDefContext } from "./Stage3DParser.js";
+import { ClassExtendsContext } from "./Stage3DParser.js";
+import { ClassImplementsContext } from "./Stage3DParser.js";
+import { ClassBodyContext } from "./Stage3DParser.js";
+import { ClassElementContext } from "./Stage3DParser.js";
+import { FieldDefContext } from "./Stage3DParser.js";
+import { ConstructorDefContext } from "./Stage3DParser.js";
+import { ClassMethodDefContext } from "./Stage3DParser.js";
+import { AbstractMethodDefContext } from "./Stage3DParser.js";
+import { GetterDefContext } from "./Stage3DParser.js";
+import { SetterDefContext } from "./Stage3DParser.js";
+import { ModifierContext } from "./Stage3DParser.js";
+import { TypedParamContext } from "./Stage3DParser.js";
+import { FnSignatureTypedContext } from "./Stage3DParser.js";
 import { StatementContext } from "./Stage3DParser.js";
 import { LetStarContext } from "./Stage3DParser.js";
 import { LetStmtContext } from "./Stage3DParser.js";
@@ -65,6 +79,10 @@ import { ForInFormContext } from "./Stage3DParser.js";
 import { ForOfFormContext } from "./Stage3DParser.js";
 import { ExpressionContext } from "./Stage3DParser.js";
 import { TypeofExprContext } from "./Stage3DParser.js";
+import { TypeAssertContext } from "./Stage3DParser.js";
+import { ThisExprContext } from "./Stage3DParser.js";
+import { SuperConstructorCallContext } from "./Stage3DParser.js";
+import { SuperMethodCallContext } from "./Stage3DParser.js";
 import { LambdaContext } from "./Stage3DParser.js";
 import { FnContext } from "./Stage3DParser.js";
 import { BindExprContext } from "./Stage3DParser.js";
@@ -74,7 +92,7 @@ import { CondExprContext } from "./Stage3DParser.js";
 import { NewFormContext } from "./Stage3DParser.js";
 import { ObjectExprContext } from "./Stage3DParser.js";
 import { ObjectFieldContext } from "./Stage3DParser.js";
-import { MethodDefContext } from "./Stage3DParser.js";
+import { ObjectMethodDefContext } from "./Stage3DParser.js";
 import { ArrayExprContext } from "./Stage3DParser.js";
 import { PropKeyContext } from "./Stage3DParser.js";
 import { PropAccessContext } from "./Stage3DParser.js";
@@ -166,6 +184,146 @@ export class Stage3DListener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitInterfaceExtends?: (ctx: InterfaceExtendsContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.classDef`.
+     * @param ctx the parse tree
+     */
+    enterClassDef?: (ctx: ClassDefContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.classDef`.
+     * @param ctx the parse tree
+     */
+    exitClassDef?: (ctx: ClassDefContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.classExtends`.
+     * @param ctx the parse tree
+     */
+    enterClassExtends?: (ctx: ClassExtendsContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.classExtends`.
+     * @param ctx the parse tree
+     */
+    exitClassExtends?: (ctx: ClassExtendsContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.classImplements`.
+     * @param ctx the parse tree
+     */
+    enterClassImplements?: (ctx: ClassImplementsContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.classImplements`.
+     * @param ctx the parse tree
+     */
+    exitClassImplements?: (ctx: ClassImplementsContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.classBody`.
+     * @param ctx the parse tree
+     */
+    enterClassBody?: (ctx: ClassBodyContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.classBody`.
+     * @param ctx the parse tree
+     */
+    exitClassBody?: (ctx: ClassBodyContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.classElement`.
+     * @param ctx the parse tree
+     */
+    enterClassElement?: (ctx: ClassElementContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.classElement`.
+     * @param ctx the parse tree
+     */
+    exitClassElement?: (ctx: ClassElementContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.fieldDef`.
+     * @param ctx the parse tree
+     */
+    enterFieldDef?: (ctx: FieldDefContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.fieldDef`.
+     * @param ctx the parse tree
+     */
+    exitFieldDef?: (ctx: FieldDefContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.constructorDef`.
+     * @param ctx the parse tree
+     */
+    enterConstructorDef?: (ctx: ConstructorDefContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.constructorDef`.
+     * @param ctx the parse tree
+     */
+    exitConstructorDef?: (ctx: ConstructorDefContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.classMethodDef`.
+     * @param ctx the parse tree
+     */
+    enterClassMethodDef?: (ctx: ClassMethodDefContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.classMethodDef`.
+     * @param ctx the parse tree
+     */
+    exitClassMethodDef?: (ctx: ClassMethodDefContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.abstractMethodDef`.
+     * @param ctx the parse tree
+     */
+    enterAbstractMethodDef?: (ctx: AbstractMethodDefContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.abstractMethodDef`.
+     * @param ctx the parse tree
+     */
+    exitAbstractMethodDef?: (ctx: AbstractMethodDefContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.getterDef`.
+     * @param ctx the parse tree
+     */
+    enterGetterDef?: (ctx: GetterDefContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.getterDef`.
+     * @param ctx the parse tree
+     */
+    exitGetterDef?: (ctx: GetterDefContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.setterDef`.
+     * @param ctx the parse tree
+     */
+    enterSetterDef?: (ctx: SetterDefContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.setterDef`.
+     * @param ctx the parse tree
+     */
+    exitSetterDef?: (ctx: SetterDefContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.modifier`.
+     * @param ctx the parse tree
+     */
+    enterModifier?: (ctx: ModifierContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.modifier`.
+     * @param ctx the parse tree
+     */
+    exitModifier?: (ctx: ModifierContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.typedParam`.
+     * @param ctx the parse tree
+     */
+    enterTypedParam?: (ctx: TypedParamContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.typedParam`.
+     * @param ctx the parse tree
+     */
+    exitTypedParam?: (ctx: TypedParamContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.fnSignatureTyped`.
+     * @param ctx the parse tree
+     */
+    enterFnSignatureTyped?: (ctx: FnSignatureTypedContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.fnSignatureTyped`.
+     * @param ctx the parse tree
+     */
+    exitFnSignatureTyped?: (ctx: FnSignatureTypedContext) => void;
     /**
      * Enter a parse tree produced by `Stage3DParser.statement`.
      * @param ctx the parse tree
@@ -727,6 +885,46 @@ export class Stage3DListener implements ParseTreeListener {
      */
     exitTypeofExpr?: (ctx: TypeofExprContext) => void;
     /**
+     * Enter a parse tree produced by `Stage3DParser.typeAssert`.
+     * @param ctx the parse tree
+     */
+    enterTypeAssert?: (ctx: TypeAssertContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.typeAssert`.
+     * @param ctx the parse tree
+     */
+    exitTypeAssert?: (ctx: TypeAssertContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.thisExpr`.
+     * @param ctx the parse tree
+     */
+    enterThisExpr?: (ctx: ThisExprContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.thisExpr`.
+     * @param ctx the parse tree
+     */
+    exitThisExpr?: (ctx: ThisExprContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.superConstructorCall`.
+     * @param ctx the parse tree
+     */
+    enterSuperConstructorCall?: (ctx: SuperConstructorCallContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.superConstructorCall`.
+     * @param ctx the parse tree
+     */
+    exitSuperConstructorCall?: (ctx: SuperConstructorCallContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage3DParser.superMethodCall`.
+     * @param ctx the parse tree
+     */
+    enterSuperMethodCall?: (ctx: SuperMethodCallContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage3DParser.superMethodCall`.
+     * @param ctx the parse tree
+     */
+    exitSuperMethodCall?: (ctx: SuperMethodCallContext) => void;
+    /**
      * Enter a parse tree produced by `Stage3DParser.lambda`.
      * @param ctx the parse tree
      */
@@ -817,15 +1015,15 @@ export class Stage3DListener implements ParseTreeListener {
      */
     exitObjectField?: (ctx: ObjectFieldContext) => void;
     /**
-     * Enter a parse tree produced by `Stage3DParser.methodDef`.
+     * Enter a parse tree produced by `Stage3DParser.objectMethodDef`.
      * @param ctx the parse tree
      */
-    enterMethodDef?: (ctx: MethodDefContext) => void;
+    enterObjectMethodDef?: (ctx: ObjectMethodDefContext) => void;
     /**
-     * Exit a parse tree produced by `Stage3DParser.methodDef`.
+     * Exit a parse tree produced by `Stage3DParser.objectMethodDef`.
      * @param ctx the parse tree
      */
-    exitMethodDef?: (ctx: MethodDefContext) => void;
+    exitObjectMethodDef?: (ctx: ObjectMethodDefContext) => void;
     /**
      * Enter a parse tree produced by `Stage3DParser.arrayExpr`.
      * @param ctx the parse tree

@@ -8,7 +8,7 @@
   "main": "index.js",
   "scripts": {
     "build": "npm run build-grammar && npm run build-compiler",
-    "build-compiler": "npx tsx ../3C/index.ts Stage3D.s3c > index.ts",
+    "build-compiler": "npx tsx index.ts Stage3D-ast.s3c > /tmp/_s3d_ast.ts && mv /tmp/_s3d_ast.ts Stage3D-ast.ts && npx tsx index.ts Stage3D-lower.s3c > /tmp/_s3d_lower.ts && mv /tmp/_s3d_lower.ts Stage3D-lower.ts && npx tsx index.ts Stage3D-codegen.s3c > /tmp/_s3d_codegen.ts && mv /tmp/_s3d_codegen.ts Stage3D-codegen.ts && npx tsx ../3C/index.ts Stage3D.s3c > /tmp/_s3d_main.ts && mv /tmp/_s3d_main.ts index.ts",
     "build-grammar": "antlr-ng -Dlanguage=TypeScript Stage3D.g4",
     "test": "npm run build && npx vitest run",
     "lint": "echo 'disabled on purpose'"

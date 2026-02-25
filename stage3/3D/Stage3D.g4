@@ -17,6 +17,7 @@ topLevel
     | def
     | typeAlias
     | interfaceDef
+    | classDef
     | statement
     ;
 
@@ -41,6 +42,71 @@ interfaceDef
 
 interfaceExtends
     : LPAREN EXTENDS typeExpr+ RPAREN
+    ;
+
+// ─── class definition ────────────────────────
+
+classDef
+    : LPAREN CLASS modifier* IDENTIFIER typeParams? classExtends? classImplements? classBody RPAREN
+    ;
+
+classExtends
+    : LPAREN EXTENDS typeExpr RPAREN
+    ;
+
+classImplements
+    : LPAREN IMPLEMENTS typeExpr+ RPAREN
+    ;
+
+classBody
+    : LPAREN CLASS_BODY classElement* RPAREN
+    ;
+
+classElement
+    : fieldDef
+    | constructorDef
+    | classMethodDef
+    | abstractMethodDef
+    | getterDef
+    | setterDef
+    ;
+
+fieldDef
+    : LPAREN FIELD modifier* IDENTIFIER (COLON typeExpr)? expression? RPAREN
+    ;
+
+constructorDef
+    : LPAREN CONSTRUCTOR fnSignatureTyped statement* RPAREN
+    ;
+
+classMethodDef
+    : LPAREN METHOD modifier* IDENTIFIER fnSignatureTyped statement* RPAREN
+    ;
+
+abstractMethodDef
+    : LPAREN ABSTRACT_METHOD modifier* IDENTIFIER fnSignatureTyped RPAREN
+    ;
+
+getterDef
+    : LPAREN GET modifier* IDENTIFIER fnSignatureTyped statement* RPAREN
+    ;
+
+setterDef
+    : LPAREN SETPROP modifier* IDENTIFIER fnSignatureTyped statement* RPAREN
+    ;
+
+modifier
+    : KEYWORD
+    ;
+
+// ─── typed signature (for class elements) ────
+
+typedParam
+    : LPAREN IDENTIFIER OPTIONAL? (COLON typeExpr)? RPAREN
+    ;
+
+fnSignatureTyped
+    : LPAREN (typedParam (COMMA? typedParam)*)? RPAREN (LPAREN RETURNS typeExpr RPAREN)?
     ;
 
 // ─── statements ──────────────────────────────
@@ -340,11 +406,31 @@ expression
     | optChain
     | nullCoalesce
     | typeofExpr
+    | typeAssert
+    | thisExpr
+    | superConstructorCall
+    | superMethodCall
     | call // if no previous form matches, assume callable.
     ;
 
 typeofExpr
     : LPAREN TYPEOF expression RPAREN
+    ;
+
+typeAssert
+    : LPAREN TYPE_AS expression typeExpr RPAREN
+    ;
+
+thisExpr
+    : THIS
+    ;
+
+superConstructorCall
+    : LPAREN SUPER expression* RPAREN
+    ;
+
+superMethodCall
+    : LPAREN SUPER_METHOD IDENTIFIER expression* RPAREN
     ;
 
 lambda
@@ -383,11 +469,11 @@ objectExpr
 
 objectField
     : LPAREN propKey expression RPAREN
-    | LPAREN propKey methodDef RPAREN
+    | LPAREN propKey objectMethodDef RPAREN
     | LPAREN IDENTIFIER RPAREN
     ;
 
-methodDef
+objectMethodDef
     : LPAREN METHOD fnSignature statement* RPAREN
     ;
 
@@ -415,9 +501,11 @@ propKey
     | OBJECT | ARRAY | INDEX | QUASI | QUOTE | UNQUOTE_SPLICING | UNQUOTE
     | NEW | IMPORT | SWITCH | CASE | DEFAULT | FORIN | FOROF | FOR
     | UNION | INTERSECT | TUPLE | TYPEFN | LIT | KEYOF | TYPEOF | INFER | MAPPED | TEMPLATE
-    | REST | READONLY | TYPE_PARAMS | TYPE_ARGS | EXTENDS | RETURNS | TYPE | INTERFACE | MODIFIERS
+    | REST | READONLY | TYPE_AS | TYPE_PARAMS | TYPE_ARGS | EXTENDS | RETURNS | TYPE | INTERFACE | MODIFIERS
     | BOOLEAN | NULL | UNDEFINED
     | EXPORT | EXPORT_DEFAULT | EXPORT_NAMED | EXPORT_FROM | EXPORT_ALL_FROM
+    | CLASS | CLASS_BODY | FIELD | CONSTRUCTOR | THIS | SUPER | SUPER_METHOD
+    | GET | SETPROP | ABSTRACT_METHOD | IMPLEMENTS
     ;
 
 propAccess
@@ -539,6 +627,19 @@ FORIN       : 'for-in' ;
 FOROF       : 'for-of' ;
 FOR         : 'for' ;
 
+// class-system keywords (order matters: longer tokens before shorter prefixes)
+CLASS_BODY      : 'class-body' ;
+SUPER_METHOD    : 'super-method' ;
+ABSTRACT_METHOD : 'abstract-method' ;
+CLASS           : 'class' ;
+FIELD           : 'field' ;
+CONSTRUCTOR     : 'constructor' ;
+THIS            : 'this' ;
+SUPER           : 'super' ;
+GET             : 'get' ;
+SETPROP         : 'set' ;
+IMPLEMENTS      : 'implements' ;
+
 // type-system keywords
 UNION       : 'union' ;
 INTERSECT   : 'intersect' ;
@@ -547,6 +648,7 @@ TYPEFN      : 'tfn' ;
 LIT         : 'tlit' ;
 KEYOF       : 'keyof' ;
 TYPEOF      : 'typeof' ;
+TYPE_AS      : 'type-as' ;
 INFER       : 'infer' ;
 MAPPED      : 'mapped' ;
 TEMPLATE    : 'template' ;

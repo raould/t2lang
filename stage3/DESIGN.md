@@ -52,30 +52,31 @@ Meh:
 ## Stage 3D — Type System Foundations
 
 Add:
-    - [ ] type annotations: let, const, callable signatures.
-    - [ ] type aliases
-    - [ ] generics
-    - [ ] type assertions ("casting")
+    - [x] type annotations: let, const, callable signatures.
+    - [x] type aliases
+    - [x] generics
+    - [x] type assertions ("casting")
+    - [x] split the single compiler file into stages & categories.
 
 ## Stage 3E — Object System
 
-- [ ] split the single compiler file into stages & categories.
-
 Add:
-    - [ ] classes
-    - [ ] fields
-    - [ ] methods
-    - [ ] getters/setters
+    - [x] classes
+    - [x] fields
+    - [x] methods
+    - [x] getters/setters
     
 ## Stage 3F — Module System
 
 Add:
     - [x] import/export
-    - [ ] module boundaries
-    - [ ] runtime library organization
+    - [x] module boundaries
+    - [ ] runtime library organization: postponed!
 
 ## Stage 4: macros and sugar.
 Add:
-    - [ ] macros.
-    - [ ] object literals with arbitrary keys
-    - [ ] array literals
+    - [ ] macros!!!!!!!!!!!!!!!!!! my dude.
+    - [ ] reader macros!!!
+    - [ ] sugar!!!
+    - [ ] sugar for object literals with arbitrary keys
+    - [ ] sugar for array literals
