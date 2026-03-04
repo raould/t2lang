@@ -158,6 +158,7 @@ statement
     | forForm
     | forInForm
     | forOfForm
+    | forAwaitForm
     | assign
     | expression
     ;
@@ -467,6 +468,10 @@ forOfForm
     : LPAREN FOROF IDENTIFIER expression statement* RPAREN
     ;
 
+forAwaitForm
+    : LPAREN FORAWAIT IDENTIFIER expression statement* RPAREN
+    ;
+
 // ─── expressions ─────────────────────────────
 
 expression
@@ -632,6 +637,7 @@ propKey
     | OBJECT | ARRAY | INDEX | QUASI | QUOTE | UNQUOTE_SPLICING | UNQUOTE
     | TYPE_ARRAY
     | NEW | IMPORT | SWITCH | CASE | DEFAULT | FORIN | FOROF | FOR
+    | FORAWAIT
     | UNION | INTERSECT | TUPLE | TYPEFN | LIT | KEYOF | TYPEOF | INFER | MAPPED | TYPE_TEMPLATE
     | TEMPLATE
     | REST | READONLY | TYPE_AS | TYPE_PARAMS | TYPE_ARGS | EXTENDS | RETURNS | TYPE | INTERFACE | MODIFIERS
@@ -701,16 +707,16 @@ typeArgs
 // ─── shared ──────────────────────────────────
 
 fnSignature
-    : LPAREN (param (COMMA? param)* (COMMA? restParam)?)? RPAREN
-    | LPAREN restParam RPAREN
+    : LPAREN (param (COMMA? param)* (COMMA? restParam)?)? RPAREN (COLON typeExpr)?
+    | LPAREN restParam RPAREN (COLON typeExpr)?
     ;
 
 param
-    : LPAREN IDENTIFIER RPAREN
+    : LPAREN IDENTIFIER (COLON typeExpr)? RPAREN
     ;
 
 restParam
-    : LPAREN REST IDENTIFIER RPAREN
+    : LPAREN REST IDENTIFIER (COLON typeExpr)? RPAREN
     ;
 
 literal
@@ -773,6 +779,7 @@ CASE        : 'case' ;
 DEFAULT     : 'default' ;
 FORIN       : 'for-in' ;
 FOROF       : 'for-of' ;
+FORAWAIT    : 'for-await' ;
 FOR         : 'for' ;
 
 // class-system keywords (order matters: longer tokens before shorter prefixes)

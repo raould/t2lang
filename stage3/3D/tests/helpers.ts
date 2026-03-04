@@ -27,7 +27,7 @@ function compileT2(t2Source: string): string {
   if (res.status !== 0 || (res.stderr && res.stderr.toString().trim() !== '')) {
     console.error(prefixLineNumbers(t2Source));
     console.error(res.stderr);
-    throw new Error(`stage3 compiler failed:\n${res.stderr}`);
+    throw new Error(`compilation failed:\n${res.stderr}`);
   }
   const tsSource = res.stdout as string;
   return tsSource;

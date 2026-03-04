@@ -1,0 +1,96 @@
+(SourceFile
+(FunctionDeclaration
+ (Identifier ex1)
+ (Block
+  (VariableStatement
+   (VariableDeclarationList
+    (VariableDeclaration
+     (Identifier bigNumber)
+     (BigIntKeyword bigint)
+     (BigIntLiteral 9007199254740991n))))
+  (VariableStatement
+   (VariableDeclarationList
+    (VariableDeclaration
+     (Identifier hugeNumber)
+     (CallExpression
+      (Identifier BigInt)
+      (NumericLiteral 9007199254740991)))))
+  (VariableStatement
+   (VariableDeclarationList
+    (VariableDeclaration
+     (Identifier _id))))
+  (VariableStatement
+   (VariableDeclarationList
+    (VariableDeclaration
+     (Identifier fb_id)
+     (AnyKeyword any))))
+  (ExpressionStatement
+   (BinaryExpression
+    (Identifier fb_id)
+    (EqualsToken =)
+    (TrueKeyword true)))
+  (ExpressionStatement
+   (BinaryExpression
+    (Identifier fb_id)
+    (EqualsToken =)
+    (NumericLiteral 23423523)))
+  (VariableStatement
+   (VariableDeclarationList
+    (VariableDeclaration
+     (Identifier firstName)
+     (StringLiteral "Riyad"))))
+  (VariableStatement
+   (VariableDeclarationList
+    (VariableDeclaration
+     (Identifier lastName)
+     (StringKeyword string)
+     (StringLiteral "Hossain"))))
+  (VariableStatement
+   (VariableDeclarationList
+    (VariableDeclaration
+     (Identifier isLoading)
+     (BooleanKeyword boolean))))
+  (ExpressionStatement
+   (BinaryExpression
+    (Identifier isLoading)
+    (EqualsToken =)
+    (FalseKeyword false)))
+  (VariableStatement
+   (VariableDeclarationList
+    (VariableDeclaration
+     (Identifier roll)
+     (UnionType
+      (StringKeyword string)
+      (NumberKeyword number))
+     (NumericLiteral 423))))
+  (ExpressionStatement
+   (BinaryExpression
+    (Identifier roll)
+    (EqualsToken =)
+    (StringLiteral "423")))
+  (VariableStatement
+   (VariableDeclarationList
+    (VariableDeclaration
+     (Identifier device)
+     (UnionType
+      (StringKeyword string)
+      (NumberKeyword number)
+      (BooleanKeyword boolean)))))
+  (ExpressionStatement
+   (BinaryExpression
+    (Identifier device)
+    (EqualsToken =)
+    (StringLiteral "Mobile")))
+  (ExpressionStatement
+   (BinaryExpression
+    (Identifier device)
+    (EqualsToken =)
+    (NumericLiteral 4323523)))
+  (VariableStatement
+   (VariableDeclarationList
+    (VariableDeclaration
+     (Identifier re)
+     (TypeReference
+      (Identifier RegExp))
+     (RegularExpressionLiteral /\w+/g))))))
+(EndOfFileToken ))

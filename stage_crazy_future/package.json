@@ -1,0 +1,31 @@
+{
+  "name": "stage7",
+  "version": "0.0.1",
+  "description": "",
+  "license": "CC0-1.0",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "build": "npm run build-grammar && npm run build-compiler",
+    "build-compiler": "npx tsx ../stage6/index.ts Stage7-spans.s6 > /tmp/_s7_spans.ts && mv /tmp/_s7_spans.ts Stage7-spans.ts && npx tsx ../stage6/index.ts Stage7-ast.s6 > /tmp/_s7_ast.ts && mv /tmp/_s7_ast.ts Stage7-ast.ts && npx tsx ../stage6/index.ts Stage7-lower.s6 > /tmp/_s7_lower.ts && mv /tmp/_s7_lower.ts Stage7-lower.ts && npx tsx ../stage6/index.ts Stage7-codegen.s6 > /tmp/_s7_codegen.ts && mv /tmp/_s7_codegen.ts Stage7-codegen.ts && npx tsx ../stage6/index.ts Stage7-macro-env.s6 > /tmp/_s7_macro_env.ts && mv /tmp/_s7_macro_env.ts Stage7-macro-env.ts && npx tsx ../stage6/index.ts Stage7-macro-expand.s6 > /tmp/_s7_macro_expand.ts && mv /tmp/_s7_macro_expand.ts Stage7-macro-expand.ts && npx tsx ../stage6/index.ts Stage7-scope-resolve.s6 > /tmp/_s7_scope_resolve.ts && mv /tmp/_s7_scope_resolve.ts Stage7-scope-resolve.ts && npx tsx ../stage6/index.ts Stage7.s6 > /tmp/_s7_main.ts && mv /tmp/_s7_main.ts ./index.ts",
+    "build-grammar": "antlr-ng -Dlanguage=TypeScript Stage7.g4",
+    "test": "npm run build && npx vitest run",
+    "testnow": "npx vitest run",
+    "lint": "echo 'disabled on purpose'"
+  },
+  "dependencies": {
+    "antlr-ng": "^1.0.10"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.33",
+    "@vitest/ui": "^4.0.18",
+    "antlr4ng": "^3.0.16",
+    "eslint": "^10.0.1",
+    "lodash": "^4.17.23",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18",
+    "vitest-fail-on-console": "^0.10.1"
+  }
+}

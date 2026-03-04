@@ -289,7 +289,10 @@ const lowerExportDefaultDef  = (node) => {
         id: node.id,
         tag: "export-default-fn-decl",
         name: defNode.name,
-        params: init.params,
+        params: init.params.map(lowerTypedParam),
+        rest: init.rest,
+        restType: (init.restType ? lowerTypeExpr(init.restType) : undefined),
+        returnType: (init.returnType ? lowerTypeExpr(init.returnType) : undefined),
         body: body
       });
     }
@@ -612,6 +615,16 @@ const lowerStmt  = (node) => {
       body: node.body.map(lowerStmt)
     });
   }
+  if ((node.tag === "for-await")) {
+    return ({
+      node: node,
+      id: node.id,
+      tag: "for-await-stmt",
+      name: node.name,
+      iterable: lowerExpr(node.iterable),
+      body: node.body.map(lowerStmt)
+    });
+  }
   if ((node.tag === "expr-stmt")) {
     return ({
       node: node,
@@ -791,8 +804,10 @@ const lowerExpr  = (node) => {
       node: node,
       id: node.id,
       tag: "lambda",
-      params: node.params,
+      params: node.params.map(lowerTypedParam),
       rest: node.rest,
+      restType: (node.restType ? lowerTypeExpr(node.restType) : undefined),
+      returnType: (node.returnType ? lowerTypeExpr(node.returnType) : undefined),
       body: node.body.map(lowerStmt)
     });
   }
@@ -801,8 +816,10 @@ const lowerExpr  = (node) => {
       node: node,
       id: node.id,
       tag: "fn",
-      params: node.params,
+      params: node.params.map(lowerTypedParam),
       rest: node.rest,
+      restType: (node.restType ? lowerTypeExpr(node.restType) : undefined),
+      returnType: (node.returnType ? lowerTypeExpr(node.returnType) : undefined),
       body: node.body.map(lowerStmt)
     });
   }
@@ -811,8 +828,10 @@ const lowerExpr  = (node) => {
       node: node,
       id: node.id,
       tag: "async-lambda",
-      params: node.params,
+      params: node.params.map(lowerTypedParam),
       rest: node.rest,
+      restType: (node.restType ? lowerTypeExpr(node.restType) : undefined),
+      returnType: (node.returnType ? lowerTypeExpr(node.returnType) : undefined),
       body: node.body.map(lowerStmt)
     });
   }
@@ -821,8 +840,10 @@ const lowerExpr  = (node) => {
       node: node,
       id: node.id,
       tag: "async-fn",
-      params: node.params,
+      params: node.params.map(lowerTypedParam),
       rest: node.rest,
+      restType: (node.restType ? lowerTypeExpr(node.restType) : undefined),
+      returnType: (node.returnType ? lowerTypeExpr(node.returnType) : undefined),
       body: node.body.map(lowerStmt)
     });
   }
@@ -831,8 +852,10 @@ const lowerExpr  = (node) => {
       node: node,
       id: node.id,
       tag: "generator-fn",
-      params: node.params,
+      params: node.params.map(lowerTypedParam),
       rest: node.rest,
+      restType: (node.restType ? lowerTypeExpr(node.restType) : undefined),
+      returnType: (node.returnType ? lowerTypeExpr(node.returnType) : undefined),
       body: node.body.map(lowerStmt)
     });
   }
@@ -841,8 +864,10 @@ const lowerExpr  = (node) => {
       node: node,
       id: node.id,
       tag: "async-generator-fn",
-      params: node.params,
+      params: node.params.map(lowerTypedParam),
       rest: node.rest,
+      restType: (node.restType ? lowerTypeExpr(node.restType) : undefined),
+      returnType: (node.returnType ? lowerTypeExpr(node.returnType) : undefined),
       body: node.body.map(lowerStmt)
     });
   }

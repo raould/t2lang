@@ -90,6 +90,7 @@ import { DefaultClauseContext } from "./Stage6Parser.js";
 import { ForFormContext } from "./Stage6Parser.js";
 import { ForInFormContext } from "./Stage6Parser.js";
 import { ForOfFormContext } from "./Stage6Parser.js";
+import { ForAwaitFormContext } from "./Stage6Parser.js";
 import { ExpressionContext } from "./Stage6Parser.js";
 import { ThisExprContext } from "./Stage6Parser.js";
 import { SuperExprContext } from "./Stage6Parser.js";
@@ -1018,6 +1019,16 @@ export class Stage6Listener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitForOfForm?: (ctx: ForOfFormContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage6Parser.forAwaitForm`.
+     * @param ctx the parse tree
+     */
+    enterForAwaitForm?: (ctx: ForAwaitFormContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage6Parser.forAwaitForm`.
+     * @param ctx the parse tree
+     */
+    exitForAwaitForm?: (ctx: ForAwaitFormContext) => void;
     /**
      * Enter a parse tree produced by `Stage6Parser.expression`.
      * @param ctx the parse tree

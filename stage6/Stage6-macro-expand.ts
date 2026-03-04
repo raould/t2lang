@@ -171,6 +171,8 @@ const evalQuasi  = (node, bindings, env, depth) => {
       text: node.text,
       params: node.params,
       rest: node.rest,
+      restType: node.restType,
+      returnType: node.returnType,
       body: quasiArgs(node.body, bindings, env, depth)
     });
   }
@@ -640,6 +642,8 @@ const addScopeToNode  = (node, scope) => {
       text: node.text,
       params: node.params,
       rest: node.rest,
+      restType: node.restType,
+      returnType: node.returnType,
       body: node.body.map((s) => {
         return addScopeToNode(s, scope);
       })
@@ -844,6 +848,8 @@ const expandExpr  = (node, env) => {
       text: node.text,
       params: node.params,
       rest: node.rest,
+      restType: node.restType,
+      returnType: node.returnType,
       body: node.body.map((s) => {
         return expandStmt(s, env);
       })

@@ -132,6 +132,8 @@
         (return (emitForIn stmt)))
       (if (=== (. stmt tag) 'for-of-stmt')
         (return (emitForOf stmt)))
+      (if (=== (. stmt tag) 'for-await-stmt')
+        (return (emitForAwait stmt)))
       (if (=== (. stmt tag) 'expr-stmt')
         (return (+ (emitExpr (. stmt expr)) ';')))
       (throw (new Error (+ 'emitStmt: unexpected tag >' (. stmt tag) '< at ' (formatSpan (. stmt id)))))))
@@ -230,6 +232,15 @@
         ((. lines push) '}')
         (return ((. lines join) '\n')))))
 
+  (const emitForAwait
+    (lambda ((node))
+      (let* ((lines (array)))
+        ((. lines push) (+ 'for await (const ' (. node name) ' of ' (emitExpr (. node iterable)) ') {'))
+        ((. (. node body) forEach) (lambda ((s))
+          ((. lines push) (indent (emitStmt s)))))
+        ((. lines push) '}')
+        (return ((. lines join) '\n')))))
+
   (const emitExpr
     (lambda ((expr))
       (if (=== (. expr tag) 'prop-access-expr')
@@ -278,20 +289,24 @@
         (return (emitFn expr)))
       (if (=== (. expr tag) 'async-lambda')
         (let* ((params (emitParams expr))
+               (retStr (ternary (. expr returnType) (+ ': ' (emitTypeExpr (. expr returnType))) ''))
                (body ((. (. expr body) map) emitStmt)))
-          (return (+ 'async (' params ') => {\n' (indent ((. body join) '\n')) '\n}'))))
+          (return (+ 'async (' params ')' retStr ' => {\n' (indent ((. body join) '\n')) '\n}'))))
       (if (=== (. expr tag) 'async-fn')
         (let* ((params (emitParams expr))
+               (retStr (ternary (. expr returnType) (+ ': ' (emitTypeExpr (. expr returnType))) ''))
                (body ((. (. expr body) map) emitStmt)))
-          (return (+ 'async function(' params ') {\n' (indent ((. body join) '\n')) '\n}'))))
+          (return (+ 'async function(' params ')' retStr ' {\n' (indent ((. body join) '\n')) '\n}'))))
       (if (=== (. expr tag) 'generator-fn')
         (let* ((params (emitParams expr))
+               (retStr (ternary (. expr returnType) (+ ': ' (emitTypeExpr (. expr returnType))) ''))
                (body ((. (. expr body) map) emitStmt)))
-          (return (+ 'function*(' params ') {\n' (indent ((. body join) '\n')) '\n}'))))
+          (return (+ 'function*(' params ')' retStr ' {\n' (indent ((. body join) '\n')) '\n}'))))
       (if (=== (. expr tag) 'async-generator-fn')
         (let* ((params (emitParams expr))
+               (retStr (ternary (. expr returnType) (+ ': ' (emitTypeExpr (. expr returnType))) ''))
                (body ((. (. expr body) map) emitStmt)))
-          (return (+ 'async function*(' params ') {\n' (indent ((. body join) '\n')) '\n}'))))
+          (return (+ 'async function*(' params ')' retStr ' {\n' (indent ((. body join) '\n')) '\n}'))))
       (if (=== (. expr tag) 'await-expr')
         (return (+ '(await ' (emitExpr (. expr expr)) ')')))
       (if (=== (. expr tag) 'yield-expr')
@@ -335,27 +350,40 @@
       (throw (new Error (+ 'emitExpr: unexpected tag >' (. expr tag) '< at ' (formatSpan (. expr id)))))))
 
   ;; emitParams: build the parameter list string, including optional rest param.
+  ;; params may be plain strings (legacy/defmacro) or { name, optional, typeAnnotation } objects.
   (const emitParams
     (lambda ((node))
-      (let* ((base ((. (. node params) join) ', '))
-             (restN (. node rest)))
-        (if restN
+      (let* ((base ((. ((. (. node params) map) (lambda ((p))
+                        (if (=== (typeof p) 'string')
+                          (return p))
+                        (return (emitTypedParam p))))
+                     join) ', '))
+             (restN (. node rest))
+             (restType (. node restType))
+             (restStr (ternary restN
+                        (ternary restType
+                          (+ '...' restN ': ' (emitTypeExpr restType))
+                          (+ '...' restN))
+                        undefined)))
+        (if restStr
           (if (> (. (. node params) length) 0)
-            (return (+ base ', ...' restN))
-            (return (+ '...' restN)))
+            (return (+ base ', ' restStr))
+            (return restStr))
           (return base)))))
 
   (const emitLambda
     (lambda ((node))
       (let* ((params (emitParams node))
+             (retStr (ternary (. node returnType) (+ ': ' (emitTypeExpr (. node returnType))) ''))
              (body ((. (. node body) map) emitStmt)))
-        (return (+ '(' params ') => {\n' (indent ((. body join) '\n')) '\n}')))))
+        (return (+ '(' params ')' retStr ' => {\n' (indent ((. body join) '\n')) '\n}')))))
 
   (const emitFn
     (lambda ((node))
       (let* ((params (emitParams node))
+             (retStr (ternary (. node returnType) (+ ': ' (emitTypeExpr (. node returnType))) ''))
              (body ((. (. node body) map) emitStmt)))
-        (return (+ 'function(' params ') {\n' (indent ((. body join) '\n')) '\n}')))))
+        (return (+ 'function(' params ')' retStr ' {\n' (indent ((. body join) '\n')) '\n}')))))
 
   (const emitBindExpr
     (lambda ((node))
@@ -518,9 +546,10 @@
 
   (const emitExportDefaultFnDecl
     (lambda ((node))
-      (let* ((params ((. (. node params) join) ', '))
+      (let* ((params (emitParams node))
+             (retStr (ternary (. node returnType) (+ ': ' (emitTypeExpr (. node returnType))) ''))
              (body ((. (. node body) map) emitStmt)))
-        (return (+ 'export default function ' (. node name) '(' params ') {\n' (indent ((. body join) '\n')) '\n}')))))
+        (return (+ 'export default function ' (. node name) '(' params ')' retStr ' {\n' (indent ((. body join) '\n')) '\n}')))))
 
   ;; ========== Phase C: Type Expression Codegen ==========
   (const typePrecedence

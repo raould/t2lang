@@ -130,6 +130,8 @@
         (return (object (tag (. node tag)) (text (. node text))
           (params (. node params))
           (rest (. node rest))
+          (restType (. node restType))
+          (returnType (. node returnType))
           (body (quasiArgs (. node body) bindings env depth)))))
       ;; await / yield / yield*
       (if (|| (=== (. node tag) 'await')
@@ -480,6 +482,8 @@
         (return (object (tag (. node tag)) (text (. node text))
           (params (. node params))
           (rest (. node rest))
+          (restType (. node restType))
+          (returnType (. node returnType))
           (body ((. (. node body) map) (lambda ((s)) (return (addScopeToNode s scope))))))))
       ;; await / yield / yield*
       (if (|| (=== (. node tag) 'await')
@@ -609,6 +613,8 @@
         (return (object (tag (. node tag)) (text (. node text))
           (params (. node params))
           (rest (. node rest))
+          (restType (. node restType))
+          (returnType (. node returnType))
           (body ((. (. node body) map) (lambda ((s)) (return (expandStmt s env))))))))
       ;; await / yield / yield*
       (if (|| (=== (. node tag) 'await')

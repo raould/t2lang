@@ -196,6 +196,9 @@ const emitStmt  = (stmt) => {
   if ((stmt.tag === "for-of-stmt")) {
     return emitForOf(stmt);
   }
+  if ((stmt.tag === "for-await-stmt")) {
+    return emitForAwait(stmt);
+  }
   if ((stmt.tag === "expr-stmt")) {
     return (emitExpr(stmt.expr) + ";");
   }
@@ -325,6 +328,17 @@ const emitForOf  = (node) => {
     return lines.join("\n");
   }
 };
+const emitForAwait  = (node) => {
+  {
+    let lines  = [];
+    lines.push((((("for await (const " + node.name) + " of ") + emitExpr(node.iterable)) + ") {"));
+    node.body.forEach((s) => {
+      lines.push(indent(emitStmt(s)));
+    });
+    lines.push("}");
+    return lines.join("\n");
+  }
+};
 const emitExpr  = (expr) => {
   if ((expr.tag === "prop-access-expr")) {
     return (emitExpr(expr.object) + (isValidId(expr.key) ? ("." + expr.key) : (("[\"" + expr.key) + "\"]")));
@@ -393,29 +407,33 @@ const emitExpr  = (expr) => {
   if ((expr.tag === "async-lambda")) {
     {
       let params  = emitParams(expr);
+      let retStr  = (expr.returnType ? (": " + emitTypeExpr(expr.returnType)) : "");
       let body  = expr.body.map(emitStmt);
-      return (((("async (" + params) + ") => {\n") + indent(body.join("\n"))) + "\n}");
+      return (((((("async (" + params) + ")") + retStr) + " => {\n") + indent(body.join("\n"))) + "\n}");
     }
   }
   if ((expr.tag === "async-fn")) {
     {
       let params  = emitParams(expr);
+      let retStr  = (expr.returnType ? (": " + emitTypeExpr(expr.returnType)) : "");
       let body  = expr.body.map(emitStmt);
-      return (((("async function(" + params) + ") {\n") + indent(body.join("\n"))) + "\n}");
+      return (((((("async function(" + params) + ")") + retStr) + " {\n") + indent(body.join("\n"))) + "\n}");
     }
   }
   if ((expr.tag === "generator-fn")) {
     {
       let params  = emitParams(expr);
+      let retStr  = (expr.returnType ? (": " + emitTypeExpr(expr.returnType)) : "");
       let body  = expr.body.map(emitStmt);
-      return (((("function*(" + params) + ") {\n") + indent(body.join("\n"))) + "\n}");
+      return (((((("function*(" + params) + ")") + retStr) + " {\n") + indent(body.join("\n"))) + "\n}");
     }
   }
   if ((expr.tag === "async-generator-fn")) {
     {
       let params  = emitParams(expr);
+      let retStr  = (expr.returnType ? (": " + emitTypeExpr(expr.returnType)) : "");
       let body  = expr.body.map(emitStmt);
-      return (((("async function*(" + params) + ") {\n") + indent(body.join("\n"))) + "\n}");
+      return (((((("async function*(" + params) + ")") + retStr) + " {\n") + indent(body.join("\n"))) + "\n}");
     }
   }
   if ((expr.tag === "await-expr")) {
@@ -479,14 +497,21 @@ const emitExpr  = (expr) => {
 };
 const emitParams  = (node) => {
   {
-    let base  = node.params.join(", ");
+    let base  = node.params.map((p) => {
+      if ((typeof p === "string")) {
+        return p;
+      }
+      return emitTypedParam(p);
+    }).join(", ");
     let restN  = node.rest;
-    if (restN) {
+    let restType  = node.restType;
+    let restStr  = (restN ? (restType ? ((("..." + restN) + ": ") + emitTypeExpr(restType)) : ("..." + restN)) : undefined);
+    if (restStr) {
       if ((node.params.length > 0)) {
-        return ((base + ", ...") + restN);
+        return ((base + ", ") + restStr);
       }
       else {
-        return ("..." + restN);
+        return restStr;
       }
     }
     else {
@@ -497,15 +522,17 @@ const emitParams  = (node) => {
 const emitLambda  = (node) => {
   {
     let params  = emitParams(node);
+    let retStr  = (node.returnType ? (": " + emitTypeExpr(node.returnType)) : "");
     let body  = node.body.map(emitStmt);
-    return (((("(" + params) + ") => {\n") + indent(body.join("\n"))) + "\n}");
+    return (((((("(" + params) + ")") + retStr) + " => {\n") + indent(body.join("\n"))) + "\n}");
   }
 };
 const emitFn  = (node) => {
   {
     let params  = emitParams(node);
+    let retStr  = (node.returnType ? (": " + emitTypeExpr(node.returnType)) : "");
     let body  = node.body.map(emitStmt);
-    return (((("function(" + params) + ") {\n") + indent(body.join("\n"))) + "\n}");
+    return (((((("function(" + params) + ")") + retStr) + " {\n") + indent(body.join("\n"))) + "\n}");
   }
 };
 const emitBindExpr  = (node) => {
@@ -688,9 +715,10 @@ const emitExportDefaultClass  = (node) => {
 };
 const emitExportDefaultFnDecl  = (node) => {
   {
-    let params  = node.params.join(", ");
+    let params  = emitParams(node);
+    let retStr  = (node.returnType ? (": " + emitTypeExpr(node.returnType)) : "");
     let body  = node.body.map(emitStmt);
-    return (((((("export default function " + node.name) + "(") + params) + ") {\n") + indent(body.join("\n"))) + "\n}");
+    return (((((((("export default function " + node.name) + "(") + params) + ")") + retStr) + " {\n") + indent(body.join("\n"))) + "\n}");
   }
 };
 const typePrecedence  = (tag) => {

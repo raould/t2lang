@@ -1,0 +1,55 @@
+(program
+  ;; ========== Source Span Registry (Decision 6, Phase 1) ==========
+  ;;
+  ;; A global in-memory blackboard that maps NodeId → Span.
+  ;; Lives for the duration of one compilation unit; reset via resetSpans().
+  ;;
+  ;; Span:
+  ;;   { file: string, startLine: number, startCol: number,
+  ;;     endLine: number, endCol: number }
+  ;;
+  ;; NodeId: number — monotonic counter, assigned at reader (AST) time.
+  ;;
+  ;; API:
+  ;;   nextNodeId()          → fresh NodeId
+  ;;   registerSpan(id, ctx) → stores span from ANTLR ctx, returns id
+  ;;   formatSpan(id)        → "file:line:col" string (or "<unknown>")
+  ;;   resetSpans()          → clears table and resets counter (call between files)
+
+  (const spanTable (new Map))
+  (let nodeIdCounter_ 0)
+  (let currentFile_ '<stdin>')
+
+  (const nextNodeId
+    (lambda ()
+      (set! nodeIdCounter_ (+ nodeIdCounter_ 1))
+      (return nodeIdCounter_)))
+
+  (const registerSpan
+    (lambda ((id) (ctx))
+      (let* ((start (. ctx start))
+             (stop  (. ctx stop))
+             (endLine  (ternary stop (. stop line)   (. start line)))
+             (endCol   (ternary stop (. stop column) (. start column))))
+        ((. spanTable set) id (object
+          (file currentFile_)
+          (startLine (. start line))
+          (startCol  (. start column))
+          (endLine   endLine)
+          (endCol    endCol)))
+        (return id))))
+
+  (const formatSpan
+    (lambda ((id))
+      (let* ((span ((. spanTable get) id)))
+        (if (! span) (return '<unknown>'))
+        (return (+ (. span file) ':' (. span startLine) ':' (+ (. span startCol) 1))))))
+
+  (const resetSpans
+    (lambda ((file))
+      ((. spanTable clear))
+      (set! nodeIdCounter_ 0)
+      (set! currentFile_ (ternary (=== file undefined) '<stdin>' file))))
+
+  (export-named (spanTable) (nextNodeId) (registerSpan) (formatSpan) (resetSpans))
+)

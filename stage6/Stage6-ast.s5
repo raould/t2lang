@@ -1,5 +1,6 @@
 (program
   (import (object (:named (array (object (:name "nextNodeId")) (object (:name "registerSpan"))))) "./Stage6-spans")
+  (import (object (:named (array (object (:name "assertAstTag"))))) "./Stage6-tags")
 
   ;; ========== helpers (Phase A) ==========
   (const dbglog (lambda ((...msgs)) ((. console error) msgs)))
@@ -34,6 +35,32 @@
               (set! result (+ result ch))))
           (set! i (+ i 1)))
         (return result))))
+
+  (const makeIdentifierNode
+    (lambda ((name) (ctx) (textOverride))
+      (let* ((node (object (id (registerSpan (nextNodeId) ctx)) (text (ternary textOverride textOverride ((. ctx getText)))) (tag 'identifier') (name name))))
+        (assertAstTag (. node tag) ctx)
+        (return node))))
+
+  (const makePropAccessNode
+    (lambda ((obj) (key) (ctx) (textOverride))
+      (let* ((node (object (id (registerSpan (nextNodeId) ctx)) (text (ternary textOverride textOverride ((. ctx getText)))) (tag 'prop-access') ("object" obj) (key key))))
+        (assertAstTag (. node tag) ctx)
+        (return node))))
+
+  (const desugarDottedIdentifier
+    (lambda ((text) (ctx))
+      (let* ((parts ((. text split) '.')))
+        (if ((. parts some) (lambda ((p)) (return (=== (. p length) 0))))
+          (throw (new Error (+ "Invalid dotted identifier: " text " has an empty segment"))))
+        (let* ((current (makeIdentifierNode (index parts 0) ctx (index parts 0)))
+               (i 1))
+          (while (< i (. parts length))
+            (let* ((isOuter (=== i 1))
+                   (nodeText (ternary isOuter ((. ctx getText)) (index parts i))))
+              (set! current (makePropAccessNode current (index parts i) ctx nodeText)))
+            (set! i (+ i 1)))
+          (return current)))))
 
   ;; ========== Scope ID counter (KFFD: assigned at parse time) ==========
   (let macroScopeCounter_ 0)
@@ -316,6 +343,8 @@
         (return (astForIn ((. ctx forInForm)))))
       (if ((. ctx forOfForm))
         (return (astForOf ((. ctx forOfForm)))))
+      (if ((. ctx forAwaitForm))
+        (return (astForAwait ((. ctx forAwaitForm)))))
       (let* ((expr (astExpression ((. ctx expression)))))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'expr-stmt') (expr expr))))))
 
@@ -475,6 +504,13 @@
              (iterable (astExpression ((. ctx expression))))
              (body ((. ((. ctx statement)) map) astStatement)))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'for-of') (name name) (iterable iterable) (body body))))))
+
+  (const astForAwait
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (iterable (astExpression ((. ctx expression))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'for-await') (name name) (iterable iterable) (body body))))))
 
   (const astLetStar
     (lambda ((ctx))
@@ -662,7 +698,7 @@
       (if ((. ctx IDENTIFIER))
         (let* ((text ((. ((. ctx IDENTIFIER)) getText))))
           (if (&& ((. text includes) '.') (! ((. text startsWith) '...')))
-            (throw (new Error (+ "Invalid use of dotted identifier: " text ". Use (. obj prop) syntax instead."))))
+            (return (desugarDottedIdentifier text ctx)))
           (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'identifier') (name text)))))
       (if ((. ctx "lambda"))
         (return (astLambda ((. ctx "lambda")))))
@@ -768,48 +804,60 @@
              (idx (astExpression ((. ctx expression) 1))))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'index-access') ("object" obj) ("index" idx))))))
 
-  ;; Shared helper: parse fnSignature into { params, rest }
+  ;; Shared helper: parse fnSignature into { params, rest, restType, returnType }
+  ;; params: Array<{ name, optional: false, typeAnnotation }> (same shape as typedParam)
+  ;; rest: string | undefined
+  ;; restType: typeExpr | undefined
+  ;; returnType: typeExpr | undefined
   (const astParseFnSig
     (lambda ((sig))
-      (let* ((params ((. ((. sig param)) map) (lambda ((p)) (return ((. ((. p IDENTIFIER)) getText))))))
-             (restN (astParseRestParam sig)))
-        (return (object (params params) (rest restN))))))
+      (let* ((params ((. ((. sig param)) map) (lambda ((p))
+                      (let* ((name ((. ((. p IDENTIFIER)) getText)))
+                             (typeAnn (ternary ((. p typeExpr)) (astTypeExpr ((. p typeExpr))) undefined)))
+                        (return (object (name name) (optional false) (typeAnnotation typeAnn)))))))
+             (rp ((. sig restParam)))
+             (restName (ternary rp ((. ((. rp IDENTIFIER)) getText)) undefined))
+             (restType (ternary rp
+                         (ternary ((. rp typeExpr)) (astTypeExpr ((. rp typeExpr))) undefined)
+                         undefined))
+             (returnType (ternary ((. sig typeExpr)) (astTypeExpr ((. sig typeExpr))) undefined)))
+        (return (object (params params) (rest restName) (restType restType) (returnType returnType))))))
 
   (const astLambda
     (lambda ((ctx))
       (let* ((sig (astParseFnSig ((. ctx fnSignature))))
              (body ((. ((. ctx statement)) map) astStatement)))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'lambda') (params (. sig params)) (rest (. sig rest)) (body body))))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'lambda') (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body))))))
 
   (const astFn
     (lambda ((ctx))
       (let* ((sig (astParseFnSig ((. ctx fnSignature))))
              (body ((. ((. ctx statement)) map) astStatement)))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'fn') (params (. sig params)) (rest (. sig rest)) (body body))))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'fn') (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body))))))
 
   (const astAsyncLambda
     (lambda ((ctx))
       (let* ((sig (astParseFnSig ((. ctx fnSignature))))
              (body ((. ((. ctx statement)) map) astStatement)))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'async-lambda') (params (. sig params)) (rest (. sig rest)) (body body))))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'async-lambda') (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body))))))
 
   (const astAsyncFn
     (lambda ((ctx))
       (let* ((sig (astParseFnSig ((. ctx fnSignature))))
              (body ((. ((. ctx statement)) map) astStatement)))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'async-fn') (params (. sig params)) (rest (. sig rest)) (body body))))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'async-fn') (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body))))))
 
   (const astGeneratorFn
     (lambda ((ctx))
       (let* ((sig (astParseFnSig ((. ctx fnSignature))))
              (body ((. ((. ctx statement)) map) astStatement)))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'generator-fn') (params (. sig params)) (rest (. sig rest)) (body body))))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'generator-fn') (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body))))))
 
   (const astAsyncGeneratorFn
     (lambda ((ctx))
       (let* ((sig (astParseFnSig ((. ctx fnSignature))))
              (body ((. ((. ctx statement)) map) astStatement)))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'async-generator-fn') (params (. sig params)) (rest (. sig rest)) (body body))))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'async-generator-fn') (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body))))))
 
   (const astAwaitExpr
     (lambda ((ctx))

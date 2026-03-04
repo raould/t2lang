@@ -1,4 +1,5 @@
 import { nextNodeId, registerSpan } from "./Stage6-spans";
+import { assertAstTag } from "./Stage6-tags";
 const dbglog  = (...msgs) => {
   console.error(msgs);
 };
@@ -30,6 +31,54 @@ const parseString  = (tokenText) => {
       i = (i + 1);
     }
     return result;
+  }
+};
+const makeIdentifierNode  = (name, ctx, textOverride) => {
+  {
+    let node  = ({
+      id: registerSpan(nextNodeId(), ctx),
+      text: (textOverride ? textOverride : ctx.getText()),
+      tag: "identifier",
+      name: name
+    });
+    assertAstTag(node.tag, ctx);
+    return node;
+  }
+};
+const makePropAccessNode  = (obj, key, ctx, textOverride) => {
+  {
+    let node  = ({
+      id: registerSpan(nextNodeId(), ctx),
+      text: (textOverride ? textOverride : ctx.getText()),
+      tag: "prop-access",
+      object: obj,
+      key: key
+    });
+    assertAstTag(node.tag, ctx);
+    return node;
+  }
+};
+const desugarDottedIdentifier  = (text, ctx) => {
+  {
+    let parts  = text.split(".");
+    if (parts.some((p) => {
+      return (p.length === 0);
+    })) {
+      throw new Error((("Invalid dotted identifier: " + text) + " has an empty segment"));
+    }
+    {
+      let current  = makeIdentifierNode(parts[0], ctx, parts[0]);
+      let i  = 1;
+      while ((i < parts.length)) {
+        {
+          let isOuter  = (i === 1);
+          let nodeText  = (isOuter ? ctx.getText() : parts[i]);
+          current = makePropAccessNode(current, parts[i], ctx, nodeText);
+        }
+        i = (i + 1);
+      }
+      return current;
+    }
   }
 };
 let macroScopeCounter_  = 0;
@@ -466,6 +515,9 @@ const astStatement  = (ctx) => {
   if (ctx.forOfForm()) {
     return astForOf(ctx.forOfForm());
   }
+  if (ctx.forAwaitForm()) {
+    return astForAwait(ctx.forAwaitForm());
+  }
   {
     let expr  = astExpression(ctx.expression());
     return ({
@@ -820,6 +872,21 @@ const astForOf  = (ctx) => {
       id: registerSpan(nextNodeId(), ctx),
       text: ctx.getText(),
       tag: "for-of",
+      name: name,
+      iterable: iterable,
+      body: body
+    });
+  }
+};
+const astForAwait  = (ctx) => {
+  {
+    let name  = ctx.IDENTIFIER().getText();
+    let iterable  = astExpression(ctx.expression());
+    let body  = ctx.statement().map(astStatement);
+    return ({
+      id: registerSpan(nextNodeId(), ctx),
+      text: ctx.getText(),
+      tag: "for-await",
       name: name,
       iterable: iterable,
       body: body
@@ -1206,7 +1273,7 @@ const astExpression  = (ctx) => {
     {
       let text  = ctx.IDENTIFIER().getText();
       if ((text.includes(".") && (!text.startsWith("...")))) {
-        throw new Error((("Invalid use of dotted identifier: " + text) + ". Use (. obj prop) syntax instead."));
+        return desugarDottedIdentifier(text, ctx);
       }
       return ({
         id: registerSpan(nextNodeId(), ctx),
@@ -1391,12 +1458,25 @@ const astIndexAccess  = (ctx) => {
 const astParseFnSig  = (sig) => {
   {
     let params  = sig.param().map((p) => {
-      return p.IDENTIFIER().getText();
+      {
+        let name  = p.IDENTIFIER().getText();
+        let typeAnn  = (p.typeExpr() ? astTypeExpr(p.typeExpr()) : undefined);
+        return ({
+          name: name,
+          optional: false,
+          typeAnnotation: typeAnn
+        });
+      }
     });
-    let restN  = astParseRestParam(sig);
+    let rp  = sig.restParam();
+    let restName  = (rp ? rp.IDENTIFIER().getText() : undefined);
+    let restType  = (rp ? (rp.typeExpr() ? astTypeExpr(rp.typeExpr()) : undefined) : undefined);
+    let returnType  = (sig.typeExpr() ? astTypeExpr(sig.typeExpr()) : undefined);
     return ({
       params: params,
-      rest: restN
+      rest: restName,
+      restType: restType,
+      returnType: returnType
     });
   }
 };
@@ -1410,6 +1490,8 @@ const astLambda  = (ctx) => {
       tag: "lambda",
       params: sig.params,
       rest: sig.rest,
+      restType: sig.restType,
+      returnType: sig.returnType,
       body: body
     });
   }
@@ -1424,6 +1506,8 @@ const astFn  = (ctx) => {
       tag: "fn",
       params: sig.params,
       rest: sig.rest,
+      restType: sig.restType,
+      returnType: sig.returnType,
       body: body
     });
   }
@@ -1438,6 +1522,8 @@ const astAsyncLambda  = (ctx) => {
       tag: "async-lambda",
       params: sig.params,
       rest: sig.rest,
+      restType: sig.restType,
+      returnType: sig.returnType,
       body: body
     });
   }
@@ -1452,6 +1538,8 @@ const astAsyncFn  = (ctx) => {
       tag: "async-fn",
       params: sig.params,
       rest: sig.rest,
+      restType: sig.restType,
+      returnType: sig.returnType,
       body: body
     });
   }
@@ -1466,6 +1554,8 @@ const astGeneratorFn  = (ctx) => {
       tag: "generator-fn",
       params: sig.params,
       rest: sig.rest,
+      restType: sig.restType,
+      returnType: sig.returnType,
       body: body
     });
   }
@@ -1480,6 +1570,8 @@ const astAsyncGeneratorFn  = (ctx) => {
       tag: "async-generator-fn",
       params: sig.params,
       rest: sig.rest,
+      restType: sig.restType,
+      returnType: sig.returnType,
       body: body
     });
   }

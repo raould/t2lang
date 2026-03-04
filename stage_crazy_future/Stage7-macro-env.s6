@@ -1,0 +1,116 @@
+(program
+  ;; ========== Macro Environment (Step 2) ==========
+  ;;
+  ;; Types (informal — the runtime is untyped JS):
+  ;;
+  ;;   MacroDefinition:
+  ;;     { name: string, params: string[], body: ASTNode[], scopeId: number }
+  ;;
+  ;;   MacroTimeFnDefinition:
+  ;;     { name: string, params: string[], body: ASTNode[] }
+  ;;
+  ;;   MacroEnv:
+  ;;     { macros:            Map<string, MacroDefinition>
+  ;;       macroTimeFns:      Map<string, MacroTimeFnDefinition>
+  ;;       gensymCounter:     number
+  ;;       scopeCounter:      number
+  ;;       currentMacroName:  string | null
+  ;;       currentCallSite:   string | null   (source text of the call being expanded)
+  ;;       errors:            ExpansionError[] (accumulated during expandAll) }
+
+  ;; Create an empty MacroEnv.
+  (const makeMacroEnv
+    (lambda ()
+      (return (object
+        (macros (new Map))
+        (macroTimeFns (new Map))
+        (varRegistry (new Map))
+        (gensymCounter 0)
+        (scopeCounter 0)
+        (currentMacroName null)
+        (currentCallSite null)
+        (errors (array))))))
+
+  ;; freshScope: allocate a fresh KFFD scope label (unique integer).
+  ;; Used by the expander to stamp use-site scopes on expanded output.
+  (const freshScope
+    (lambda ((env))
+      (let* ((s (. env scopeCounter)))
+        (set! (. env scopeCounter) (+ (. env scopeCounter) 1))
+        (return s))))
+
+  ;; gensym: produce a fresh IdentifierNode guaranteed not to collide with
+  ;; any user-written identifier.  prefix defaults to "g".
+  ;; scopes starts empty; the expander (Step 5) stamps the KFFD labels.
+  (const gensym
+    (lambda ((env) (prefix))
+      (let* ((pfx (ternary (!== prefix undefined) prefix 'g'))
+             (id (. env gensymCounter)))
+        (set! (. env gensymCounter) (+ (. env gensymCounter) 1))
+        (return (object
+          (tag 'identifier')
+          (name (+ pfx '_' id))
+          (scopes (new Set))
+          (hygiene (object
+            (kind 'gensym')
+            (id id)
+            (macro (. env currentMacroName)))))))))
+
+  ;; collectMacros: walk a program AST (surface or lowered) and register
+  ;; every defmacro/macro-def, macro-time-fn-def, and annotated binding
+  ;; into env.  Returns env.
+  (const collectMacros
+    (lambda ((programNode) (env))
+      ((. (. programNode body) forEach)
+        (lambda ((node))
+          ;; surface tag ('defmacro') or lowered tag ('macro-def') — both accepted
+          (if (|| (=== (. node tag) 'defmacro') (=== (. node tag) 'macro-def'))
+            ((. (. env macros) set) (. node name)
+              (object
+                (name (. node name))
+                (params (. node params))
+                (rest (. node rest))
+                (body (. node body))
+                (scopeId (. node scopeId)))))
+          (if (=== (. node tag) 'macro-time-fn-def')
+            ((. (. env macroTimeFns) set) (. node name)
+              (object
+                (name (. node name))
+                (params (. (. node init) params))
+                (rest (. (. node init) rest))
+                (body (. (. node init) body)))))
+          ;; register var metadata for all top-level bindings
+          (if (|| (=== (. node tag) 'let-decl') (=== (. node tag) 'const-decl'))
+            ((. (. env varRegistry) set) (. node name)
+              (object
+                (name (. node name))
+                (meta (. node meta)))))))
+      (return env)))
+
+  ;; registerTopLevelNode: register a single top-level node into env.
+  ;; Used in the streaming pipeline instead of collectMacros.
+  (const registerTopLevelNode
+    (lambda ((node) (env))
+      (if (|| (=== (. node tag) 'defmacro') (=== (. node tag) 'macro-def'))
+        ((. (. env macros) set) (. node name)
+          (object
+            (name (. node name))
+            (params (. node params))
+            (rest (. node rest))
+            (body (. node body))
+            (scopeId (. node scopeId)))))
+      (if (=== (. node tag) 'macro-time-fn-def')
+        ((. (. env macroTimeFns) set) (. node name)
+          (object
+            (name (. node name))
+            (params (. (. node init) params))
+            (rest (. (. node init) rest))
+            (body (. (. node init) body)))))
+      (if (|| (=== (. node tag) 'let-decl') (=== (. node tag) 'const-decl'))
+        ((. (. env varRegistry) set) (. node name)
+          (object
+            (name (. node name))
+            (meta (. node meta)))))))
+
+  (export-named (makeMacroEnv) (gensym) (freshScope) (collectMacros) (registerTopLevelNode))
+)

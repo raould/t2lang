@@ -8,9 +8,10 @@
   "main": "index.js",
   "scripts": {
     "build": "npm run build-grammar && npm run build-compiler",
-    "build-compiler": "npx tsx ../stage5/index.ts Stage6-ast.s5 > /tmp/_s6_ast.ts && mv /tmp/_s6_ast.ts Stage6-ast.ts && npx tsx ../stage5/index.ts Stage6-lower.s5 > /tmp/_s6_lower.ts && mv /tmp/_s6_lower.ts Stage6-lower.ts && npx tsx ../stage5/index.ts Stage6-codegen.s5 > /tmp/_s6_codegen.ts && mv /tmp/_s6_codegen.ts Stage6-codegen.ts && npx tsx ../stage5/index.ts Stage6-macro-env.s5 > /tmp/_s6_macro_env.ts && mv /tmp/_s6_macro_env.ts Stage6-macro-env.ts && npx tsx ../stage5/index.ts Stage6-macro-expand.s5 > /tmp/_s6_macro_expand.ts && mv /tmp/_s6_macro_expand.ts Stage6-macro-expand.ts && npx tsx ../stage5/index.ts Stage6-scope-resolve.s5 > /tmp/_s6_scope_resolve.ts && mv /tmp/_s6_scope_resolve.ts Stage6-scope-resolve.ts && npx tsx ../stage5/index.ts Stage6.s5 > /tmp/_s6_main.ts && mv /tmp/_s6_main.ts ./index.ts",
+    "build-compiler": "npx tsx ../stage5/index.ts Stage6-spans.s5 > /tmp/_s6_spans.ts && mv /tmp/_s6_spans.ts Stage6-spans.ts && npx tsx ../stage5/index.ts Stage6-ast.s5 > /tmp/_s6_ast.ts && mv /tmp/_s6_ast.ts Stage6-ast.ts && npx tsx ../stage5/index.ts Stage6-lower.s5 > /tmp/_s6_lower.ts && mv /tmp/_s6_lower.ts Stage6-lower.ts && npx tsx ../stage5/index.ts Stage6-codegen.s5 > /tmp/_s6_codegen.ts && mv /tmp/_s6_codegen.ts Stage6-codegen.ts && npx tsx ../stage5/index.ts Stage6-macro-env.s5 > /tmp/_s6_macro_env.ts && mv /tmp/_s6_macro_env.ts Stage6-macro-env.ts && npx tsx ../stage5/index.ts Stage6-macro-expand.s5 > /tmp/_s6_macro_expand.ts && mv /tmp/_s6_macro_expand.ts Stage6-macro-expand.ts && npx tsx ../stage5/index.ts Stage6-scope-resolve.s5 > /tmp/_s6_scope_resolve.ts && mv /tmp/_s6_scope_resolve.ts Stage6-scope-resolve.ts && npx tsx ../stage5/index.ts Stage6.s5 > /tmp/_s6_main.ts && mv /tmp/_s6_main.ts ./index.ts",
     "build-grammar": "antlr-ng -Dlanguage=TypeScript Stage6.g4",
     "test": "npm run build && npx vitest run",
+    "testnow": "npx vitest run",
     "lint": "echo 'disabled on purpose'"
   },
   "dependencies": {
