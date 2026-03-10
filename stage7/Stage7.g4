@@ -680,7 +680,17 @@ indexAccess
 // ─── quasiquote ──────────────────────────────
 
 quasiquote
-    : LPAREN (QUASI | QUOTE) expression RPAREN
+    : LPAREN (QUASI | QUOTE) quasiForm RPAREN
+    ;
+
+quasiForm
+    : expression
+    | topLevelLet
+    | topLevelConst
+    | typeAlias
+    | interfaceDef
+    | classDef
+    | importForm
     ;
 
 unquote

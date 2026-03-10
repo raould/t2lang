@@ -1,5 +1,5 @@
-import { gensym, freshScope } from "./Stage7-macro-env";
-import { formatSpan } from "./Stage7-spans";
+import { gensym, freshScope, registerTopLevelNode } from "./Stage7-macro-env";
+import { formatSpan, nextNodeId } from "./Stage7-spans";
 const macroOperators  = new Set(["<", ">", "<=", ">=", "&&", "||", "!=", "!==", "==", "===", "+", "-", "*", "/", "%", "!"]);
 const isMacroOp  = (name) => {
   return macroOperators.has(name);
@@ -246,8 +246,7 @@ const evalQuasi  = (node, bindings, env, depth) => {
     return ({
       tag: "assign-prop",
       text: node.text,
-      object: evalQuasi(node.object, bindings, env, depth),
-      key: node.key,
+      target: evalQuasi(node.target, bindings, env, depth),
       value: evalQuasi(node.value, bindings, env, depth)
     });
   }
@@ -296,7 +295,81 @@ const evalQuasi  = (node, bindings, env, depth) => {
       expr: evalQuasi(node.expr, bindings, env, depth)
     });
   }
+  if (((node.tag === "let-decl") || (node.tag === "const-decl"))) {
+    return ({
+      tag: node.tag,
+      text: node.text,
+      name: node.name,
+      init: evalQuasi(node.init, bindings, env, depth),
+      meta: node.meta
+    });
+  }
+  if ((node.tag === "type-alias")) {
+    return ({
+      tag: "type-alias",
+      text: node.text,
+      name: node.name,
+      typeParams: node.typeParams,
+      type: node.type
+    });
+  }
+  if ((node.tag === "interface-def")) {
+    return ({
+      tag: "interface-def",
+      text: node.text,
+      name: node.name,
+      typeParams: node.typeParams,
+      extends: node.extends,
+      body: node.body
+    });
+  }
+  if ((node.tag === "class-def")) {
+    return ({
+      tag: "class-def",
+      text: node.text,
+      modifiers: node.modifiers,
+      name: node.name,
+      typeParams: node.typeParams,
+      extendsType: node.extendsType,
+      implementsTypes: node.implementsTypes,
+      body: ({
+        tag: "class-body",
+        text: node.body.text,
+        elements: quasiClassBody(node.body.elements, bindings, env, depth)
+      })
+    });
+  }
+  if ((node.tag === "import-decl")) {
+    return node;
+  }
   return node;
+};
+const quasiClassBody  = (elements, bindings, env, depth) => {
+  return elements.map((el) => {
+    if ((el.tag === "field-def")) {
+      return ({
+        tag: "field-def",
+        text: el.text,
+        modifiers: el.modifiers,
+        name: el.name,
+        typeAnnotation: el.typeAnnotation,
+        init: (el.init ? evalQuasi(el.init, bindings, env, depth) : undefined)
+      });
+    }
+    if (((el.tag === "constructor-def") || ((el.tag === "class-method-def") || ((el.tag === "getter-def") || (el.tag === "setter-def"))))) {
+      return ({
+        tag: el.tag,
+        text: el.text,
+        modifiers: el.modifiers,
+        computed: el.computed,
+        name: el.name,
+        key: (el.computed ? evalQuasi(el.key, bindings, env, depth) : el.key),
+        sig: el.sig,
+        body: quasiArgs(el.body, bindings, env, depth)
+      });
+    }
+    return el;
+  });
 };
 const evalMacroExpr  = (node, bindings, env) => {
   if ((node.tag === "literal")) {
@@ -824,7 +897,16 @@ const expandExpr  = (node, env) => {
       {
         let callee  = node.fn;
         if (((callee.tag === "identifier") && env.macros.has(callee.name))) {
-          return expandMacroCall(node, env);
+          {
+            let macroResult  = expandMacroCall(node, env);
+            if (Array.isArray(macroResult)) {
+              {
+                pushMacroError(env, "top-level macro expansion not allowed in this position", node.id);
+                return null;
+              }
+            }
+            return macroResult;
+          }
         }
         else {
           {
@@ -1149,20 +1231,147 @@ const formatExpansionErrors  = (errors) => {
     }
   }
 };
+const TOP_LEVEL_DECL_TAGS  = new Set(["let-decl", "const-decl", "type-alias", "interface-def", "class-def", "anon-class-def", "defmacro", "macro-time-fn-def"]);
+const TOP_LEVEL_STATEMENT_TAGS  = new Set(["expr-stmt", "let*", "let", "const*", "const", "if", "while", "block", "return", "throw", "assign", "switch", "try", "for", "for-in", "for-of", "for-await"]);
+const pushMacroError  = (env, message, nodeId) => {
+  env.errors.push(({
+    kind: "other",
+    message: message,
+    macroName: (env.currentMacroName || "<unknown>"),
+    callSite: (env.currentCallSite || "<unknown>"),
+    nodeId: ((nodeId === undefined) ? env.currentCallNodeId : nodeId)
+  }));
+  return null;
+};
+const ensureNodeHasId  = (node) => {
+  if ((node && (node.id === undefined))) {
+    node.id = nextNodeId();
+  }
+  return node;
+};
+const isAllowedTopLevelTag  = (tag) => {
+  return (TOP_LEVEL_DECL_TAGS.has(tag) || TOP_LEVEL_STATEMENT_TAGS.has(tag));
+};
+const getTopLevelMacroCall  = (node, env) => {
+  if ((node.tag === "expr-stmt")) {
+    {
+      let expr  = node.expr;
+      if ((expr.tag === "call")) {
+        {
+          let callee  = expr.fn;
+          if (((callee.tag === "identifier") && env.macros.has(callee.name))) {
+            return expr;
+          }
+        }
+      }
+    }
+  }
+  return undefined;
+};
+const expandTopLevelMacroCall  = (callNode, env) => {
+  return expandMacroCall(callNode, env);
+};
+const validateTopLevelNode  = (node, env) => {
+  if ((!node)) {
+    {
+      pushMacroError(env, "macro top-level expansion produced disallowed form", undefined);
+      return null;
+    }
+  }
+  {
+    let withId  = ensureNodeHasId(node);
+    let tag  = withId.tag;
+    if ((tag === undefined)) {
+      {
+        pushMacroError(env, "macro top-level expansion produced disallowed form", withId.id);
+        return null;
+      }
+    }
+    if ((!isAllowedTopLevelTag(tag))) {
+      {
+        pushMacroError(env, ("macro top-level expansion produced disallowed form: " + tag), withId.id);
+        return null;
+      }
+    }
+    return withId;
+  }
+};
 const expandAll  = (programNode, env) => {
   {
-    let expandedBody  = programNode.body.map((node) => {
-      return expandTopLevel(node, env);
-    });
-    let expanded  = ({
-      tag: "program",
-      text: programNode.text,
-      body: expandedBody
-    });
-    return ({
-      ast: expanded,
-      errors: env.errors
-    });
+    let worklist  = programNode.body.slice(0);
+    let expandedBody  = [];
+    while ((worklist.length > 0)) {
+      {
+        let node  = worklist.shift();
+        let _  = registerTopLevelNode(node, env);
+        let macroCall  = getTopLevelMacroCall(node, env);
+        if (macroCall) {
+          {
+            let result  = expandTopLevelMacroCall(macroCall, env);
+            if (Array.isArray(result)) {
+              {
+                let validated  = [];
+                result.forEach((spliced) => {
+                  {
+                    let validatedNode  = validateTopLevelNode(spliced, env);
+                    if (validatedNode) {
+                      {
+                        validated.push(validatedNode);
+                        registerTopLevelNode(validatedNode, env);
+                      }
+                    }
+                  }
+                });
+                {
+                  let idx  = (validated.length - 1);
+                  while ((idx >= 0)) {
+                    {
+                      {
+                        let spliced  = validated[idx];
+                        worklist.unshift(spliced);
+                      }
+                      idx = (idx - 1);
+                    }
+                  }
+                }
+              }
+            }
+            else {
+              {
+                let singleValidated  = ((result && TOP_LEVEL_DECL_TAGS.has(result.tag)) ? validateTopLevelNode(result, env) : null);
+                if (singleValidated) {
+                  {
+                    registerTopLevelNode(singleValidated, env);
+                    worklist.unshift(singleValidated);
+                  }
+                }
+                else {
+                  expandedBody.push(({
+                    tag: "expr-stmt",
+                    text: node.text,
+                    expr: result
+                  }));
+                }
+              }
+            }
+          }
+        }
+        else {
+          expandedBody.push(expandTopLevel(node, env));
+        }
+      }
+    }
+    {
+      let expanded  = ({
+        tag: "program",
+        text: programNode.text,
+        body: expandedBody
+      });
+      return ({
+        ast: expanded,
+        errors: env.errors
+      });
+    }
   }
 };
 export { expandAll, expandTopLevel, expandExpr, expandStmt, evalMacroExpr, evalQuasi, addScopeToNode, stampDefScope, extractBindingName, formatExpansionErrors };

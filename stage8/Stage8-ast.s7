@@ -1,0 +1,1163 @@
+(program
+  (import (object (:named (array (object (:name "nextNodeId")) (object (:name "registerSpan"))))) "./Stage8-spans")
+  (import (object (:named (array (object (:name "assertAstTag"))))) "./Stage8-tags")
+
+  ;; ========== helpers (Phase A) ==========
+  (const dbglog (lambda ((...msgs)) ((. console error) msgs)))
+
+  (const parseString
+    (lambda ((tokenText))
+      ;; Backtick strings are raw — strip delimiters, no escape processing.
+      (if ((. tokenText startsWith) '`')
+        (return ((. tokenText slice) 1 -1)))
+      ;; Triple-quoted strings are raw — strip delimiters, no escape processing.
+      (if ((. tokenText startsWith) '"""')
+        (return ((. tokenText slice) 3 -3)))
+      ;; Single- and double-quoted strings: process escape sequences
+      ;; character-by-character.  The old JSON.parse approach was broken for
+      ;; \' inside single-quoted strings (not a valid JSON escape) and for \"
+      ;; inside double-quoted strings (double-replacement before JSON.parse).
+      (let* ((inner ((. tokenText slice) 1 -1))
+             (result "")
+             (i 0))
+        (while (< i (. inner length))
+          (let* ((ch ((. inner charAt) i)))
+            (if (=== ch "\\")
+              (let* ((next ((. inner charAt) (+ i 1))))
+                (set! i (+ i 1))
+                (set! result (+ result
+                  (cond
+                    (=== next "n")  "\n"
+                    (=== next "r")  "\r"
+                    (=== next "t")  "\t"
+                    (=== next "0")  ((. String fromCharCode) 0)
+                    :else           next))))
+              (set! result (+ result ch))))
+          (set! i (+ i 1)))
+        (return result))))
+
+  (const ensureNoThisSuperInKey
+    (lambda ((node) (ctx))
+      (if (|| (=== node null) (=== node undefined))
+        (return undefined))
+      (if (=== (typeof node) 'object')
+        (begin
+          (if (&& (. node tag) (|| (=== (. node tag) 'this') (|| (=== (. node tag) 'super') (|| (=== (. node tag) 'super-constructor-call') (=== (. node tag) 'super-method-call')))))
+            (throw (new Error (+ "computed method key cannot reference this/super at " ((. ctx getText))))))
+          (if (Array.isArray node)
+            ((. node forEach) (lambda ((child)) (ensureNoThisSuperInKey child ctx)))
+            ((. (Object.values node) forEach) (lambda ((v)) (ensureNoThisSuperInKey v ctx))))))))
+
+  (const makeIdentifierNode
+    (lambda ((name) (ctx) (textOverride))
+      (let* ((node (object (id (registerSpan (nextNodeId) ctx)) (text (ternary textOverride textOverride ((. ctx getText)))) (tag 'identifier') (name name))))
+        (assertAstTag (. node tag) ctx)
+        (return node))))
+
+  (const makePropAccessNode
+    (lambda ((obj) (key) (ctx) (textOverride))
+      (let* ((node (object (id (registerSpan (nextNodeId) ctx)) (text (ternary textOverride textOverride ((. ctx getText)))) (tag 'prop-access') ("object" obj) (key key))))
+        (assertAstTag (. node tag) ctx)
+        (return node))))
+
+  (const desugarDottedIdentifier
+    (lambda ((text) (ctx))
+      (let* ((parts ((. text split) '.')))
+        (if ((. parts some) (lambda ((p)) (return (=== (. p length) 0))))
+          (throw (new Error (+ "Invalid dotted identifier: " text " has an empty segment"))))
+        (let* ((current (makeIdentifierNode (index parts 0) ctx (index parts 0)))
+               (i 1))
+          (while (< i (. parts length))
+            (let* ((isOuter (=== i 1))
+                   (nodeText (ternary isOuter ((. ctx getText)) (index parts i))))
+              (set! current (makePropAccessNode current (index parts i) ctx nodeText)))
+            (set! i (+ i 1)))
+          (return current)))))
+
+  ;; ========== Scope ID counter (KFFD: assigned at parse time) ==========
+  (let macroScopeCounter_ 0)
+
+  ;; ========== Phase A: CST → Surface AST ==========
+  (const astProgram
+    (lambda ((ctx))
+      (let* ((body ((. ((. ctx topLevel)) map) astTopLevel)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'program') (body body))))))
+
+  (const astTopLevel
+    (lambda ((ctx))
+      (if ((. ctx "defmacro"))
+        (return (astDefmacro ((. ctx "defmacro")))))
+      (if ((. ctx macroTimeFnDef))
+        (return (astMacroTimeFnDef ((. ctx macroTimeFnDef)))))
+      (if ((. ctx topLevelLet))
+        (return (astTopLevelLet ((. ctx topLevelLet)))))
+      (if ((. ctx topLevelConst))
+        (return (astTopLevelConst ((. ctx topLevelConst)))))
+      (if ((. ctx typeAlias))
+        (return (astTypeAlias ((. ctx typeAlias)))))
+      (if ((. ctx interfaceDef))
+        (return (astInterfaceDef ((. ctx interfaceDef)))))
+      (if ((. ctx classDef))
+        (return (astClassDef ((. ctx classDef)))))
+      (if ((. ctx exportDeclForm))
+        (return (astExportDecl ((. ctx exportDeclForm)))))
+      (return (astStatement ((. ctx statement))))))
+
+  ;; ─── helpers ────────────────────────────────────────────────────────────────
+
+  ;; Parse metaAnnotation* nodes into a plain JS object { key: true, ... }.
+  ;; Returns undefined when no annotations are present.
+  ;; Uses Object.fromEntries([[key,true],...]) to avoid dynamic property assignment.
+  (const astParseMeta
+    (lambda ((ctx))
+      (let* ((anns ((. ctx metaAnnotation))))
+        (if (=== (. anns length) 0)
+          (return undefined))
+        (let* ((entries ((. anns map)
+                          (lambda ((ann))
+                            (let* ((kw ((. ((. ann KEYWORD)) getText)))
+                                   (key ((. kw slice) 1)))
+                              (return (array key true)))))))
+          (return ((. Object fromEntries) entries))))))
+
+  ;; Extract rest param name from fnSignature context, or undefined.
+  (const astParseRestParam
+    (lambda ((sig))
+      (let* ((rp ((. sig restParam))))
+        (if rp
+          (return ((. ((. rp IDENTIFIER)) getText)))
+          (return undefined)))))
+
+  ;; ─── top-level / macro forms ────────────────────────────────────────────────
+
+  (const astDefmacro
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (sig ((. ctx fnSignature)))
+             (params ((. ((. sig param)) map) (lambda ((p)) (return ((. ((. p IDENTIFIER)) getText))))))
+             (restN (astParseRestParam sig))
+             (body ((. ((. ctx statement)) map) astStatement))
+             (scopeId macroScopeCounter_))
+        (set! macroScopeCounter_ (+ macroScopeCounter_ 1))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'defmacro') (name name) (params params) (rest restN) (body body) (scopeId scopeId))))))
+
+  (const astMacroTimeFnDef
+    (lambda ((ctx))
+      (let* ((inner (ternary ((. ctx topLevelLet))
+                     (astTopLevelLet ((. ctx topLevelLet)))
+                     (astTopLevelConst ((. ctx topLevelConst))))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'macro-time-fn-def') (name (. inner name)) (init (. inner init)))))))
+
+  (const astTopLevelLet
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (init (astExpression ((. ctx expression))))
+             (meta (astParseMeta ctx)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'let-decl') (name name) (init init) (meta meta))))))
+
+  (const astTopLevelConst
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (init (astExpression ((. ctx expression))))
+             (meta (astParseMeta ctx)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const-decl') (name name) (init init) (meta meta))))))
+
+  (const astTypeAlias
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (tparams (ternary ((. ctx typeParams))
+                        ((. ((. ((. ctx typeParams)) typeParamDecl)) map) astTypeParamDecl)
+                        (array)))
+             (ty (astTypeExpr ((. ctx typeExpr)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-alias') (name name) (typeParams tparams) ("type" ty))))))
+
+  (const astInterfaceDef
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (tparams (ternary ((. ctx typeParams))
+                        ((. ((. ((. ctx typeParams)) typeParamDecl)) map) astTypeParamDecl)
+                        (array)))
+             (extendsTypes (ternary ((. ctx interfaceExtends))
+                             ((. ((. ((. ctx interfaceExtends)) typeExpr)) map) astTypeExpr)
+                             (array)))
+             (body (astTypeObject ((. ctx typeObject)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'interface-def') (name name) (typeParams tparams) ("extends" extendsTypes) (body body))))))
+
+  ;; ─── class AST helpers ────────────────────────────────────────────────────
+
+  (const astModifiers
+    (lambda ((ctx))
+      (return ((. ((. ctx modifier)) map) (lambda ((m)) (return ((. ((. m KEYWORD)) getText))))))))
+
+  (const astTypedParam
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (optional (ternary ((. ctx OPTIONAL)) true false))
+             (typeAnn (ternary ((. ctx typeExpr)) (astTypeExpr ((. ctx typeExpr))) undefined)))
+        (return (object (name name) (optional optional) (typeAnnotation typeAnn))))))
+
+  (const astFnSignatureTyped
+    (lambda ((ctx))
+      (let* ((params ((. ((. ctx typedParam)) map) astTypedParam))
+             (returnType (ternary ((. ctx typeExpr)) (astTypeExpr ((. ctx typeExpr))) undefined)))
+        (return (object (params params) (returnType returnType))))))
+
+  (const astFieldDef
+    (lambda ((ctx))
+      (let* ((mods (astModifiers ctx))
+             (name ((. ((. ctx IDENTIFIER)) getText)))
+             (typeAnn (ternary ((. ctx typeExpr)) (astTypeExpr ((. ctx typeExpr))) undefined))
+             (init (ternary ((. ctx expression)) (astExpression ((. ctx expression))) undefined)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'field-def')
+                        (modifiers mods) (name name) (typeAnnotation typeAnn) (init init))))))
+
+  (const astMethodKey
+    (lambda ((ctx))
+      (if ((. ctx IDENTIFIER))
+        (return (object (computed false) (name ((. ((. ctx IDENTIFIER)) getText))))))
+      (let* ((expr (astExpression ((. ctx expression)))))
+        (ensureNoThisSuperInKey expr ctx)
+        (return (object (computed true) (key expr))))))
+
+  (const astConstructorDef
+    (lambda ((ctx))
+      (let* ((sig (astFnSignatureTyped ((. ctx fnSignatureTyped))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'constructor-def')
+                        (sig sig) (body body))))))
+
+  (const astClassMethodDef
+    (lambda ((ctx))
+      (let* ((mods (astModifiers ctx))
+             (keyInfo (astMethodKey ((. ctx methodKey))))
+             (sig (astFnSignatureTyped ((. ctx fnSignatureTyped))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'class-method-def')
+                        (modifiers mods)
+                        (computed (. keyInfo computed))
+                        (name (ternary (. keyInfo name) (. keyInfo name) undefined))
+                        (key (ternary (. keyInfo key) (. keyInfo key) undefined))
+                        (sig sig) (body body))))))
+
+  (const astAbstractMethodDef
+    (lambda ((ctx))
+      (let* ((mods (astModifiers ctx))
+             (keyInfo (astMethodKey ((. ctx methodKey))))
+             (sig (astFnSignatureTyped ((. ctx fnSignatureTyped)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'abstract-method-def')
+                        (modifiers mods)
+                        (computed (. keyInfo computed))
+                        (name (ternary (. keyInfo name) (. keyInfo name) undefined))
+                        (key (ternary (. keyInfo key) (. keyInfo key) undefined))
+                        (sig sig))))))
+
+  (const astGetterDef
+    (lambda ((ctx))
+      (let* ((mods (astModifiers ctx))
+             (keyInfo (astMethodKey ((. ctx methodKey))))
+             (sig (astFnSignatureTyped ((. ctx fnSignatureTyped))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'getter-def')
+                        (modifiers mods)
+                        (computed (. keyInfo computed))
+                        (name (ternary (. keyInfo name) (. keyInfo name) undefined))
+                        (key (ternary (. keyInfo key) (. keyInfo key) undefined))
+                        (sig sig) (body body))))))
+
+  (const astSetterDef
+    (lambda ((ctx))
+      (let* ((mods (astModifiers ctx))
+             (keyInfo (astMethodKey ((. ctx methodKey))))
+             (sig (astFnSignatureTyped ((. ctx fnSignatureTyped))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'setter-def')
+                        (modifiers mods)
+                        (computed (. keyInfo computed))
+                        (name (ternary (. keyInfo name) (. keyInfo name) undefined))
+                        (key (ternary (. keyInfo key) (. keyInfo key) undefined))
+                        (sig sig) (body body))))))
+
+  (const astClassElement
+    (lambda ((ctx))
+      (if ((. ctx fieldDef))
+        (return (astFieldDef ((. ctx fieldDef)))))
+      (if ((. ctx constructorDef))
+        (return (astConstructorDef ((. ctx constructorDef)))))
+      (if ((. ctx classMethodDef))
+        (return (astClassMethodDef ((. ctx classMethodDef)))))
+      (if ((. ctx abstractMethodDef))
+        (return (astAbstractMethodDef ((. ctx abstractMethodDef)))))
+      (if ((. ctx getterDef))
+        (return (astGetterDef ((. ctx getterDef)))))
+      (if ((. ctx setterDef))
+        (return (astSetterDef ((. ctx setterDef)))))
+      (throw (new Error 'Unknown classElement'))))
+
+  (const astClassBody
+    (lambda ((ctx))
+      (let* ((elements ((. ((. ctx classElement)) map) astClassElement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'class-body') (elements elements))))))
+
+  (const astClassDef
+    (lambda ((ctx))
+      (let* ((mods (astModifiers ctx))
+             (name ((. ((. ctx IDENTIFIER)) getText)))
+             (tparams (ternary ((. ctx typeParams))
+                        ((. ((. ((. ctx typeParams)) typeParamDecl)) map) astTypeParamDecl)
+                        (array)))
+             (extendsType (ternary ((. ctx classExtends))
+                            (astTypeExpr ((. ((. ctx classExtends)) typeExpr)))
+                            undefined))
+             (implementsTypes (ternary ((. ctx classImplements))
+                                ((. ((. ((. ctx classImplements)) typeExpr)) map) astTypeExpr)
+                                (array)))
+             (bodyNode (astClassBody ((. ctx classBody)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'class-def')
+                        (modifiers mods) (name name) (typeParams tparams)
+                        (extendsType extendsType) (implementsTypes implementsTypes)
+                        (body bodyNode))))))
+
+  (const astAnonClassDef
+    (lambda ((ctx))
+      (let* ((mods (astModifiers ctx))
+             (extendsType (ternary ((. ctx classExtends))
+                            (astTypeExpr ((. ((. ctx classExtends)) typeExpr)))
+                            undefined))
+             (implementsTypes (ternary ((. ctx classImplements))
+                                ((. ((. ((. ctx classImplements)) typeExpr)) map) astTypeExpr)
+                                (array)))
+             (bodyNode (astClassBody ((. ctx classBody)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'anon-class-def')
+                        (modifiers mods)
+                        (extendsType extendsType) (implementsTypes implementsTypes)
+                        (body bodyNode))))))
+
+  (const astSuperConstructorCall
+    (lambda ((ctx))
+      (let* ((args ((. ((. ctx expression)) map) astExpression)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'super-constructor-call') (args args))))))
+
+  (const astSuperMethodCall
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (args ((. ((. ctx expression)) map) astExpression)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'super-method-call') (name name) (args args))))))
+
+  (const astCatchClause
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (param name) (body body))))))
+
+  (const astTry
+    (lambda ((ctx))
+      (let* ((body ((. ((. ctx statement)) map) astStatement))
+             (catchCtx ((. ctx catchClause)))
+             (catchNode (ternary catchCtx (astCatchClause catchCtx) undefined))
+             (finallyCtx ((. ctx finallyClause)))
+             (finallyBody (ternary finallyCtx ((. ((. finallyCtx statement)) map) astStatement) undefined)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'try')
+                        (body body) (catchClause catchNode) (finallyBody finallyBody))))))
+
+  (const astStatement
+    (lambda ((ctx))
+      (if ((. ctx letStar))
+        (return (astLetStar ((. ctx letStar)))))
+      (if ((. ctx letStmt))
+        (return (astLetStmt ((. ctx letStmt)))))
+      (if ((. ctx constStar))
+        (return (astConstStar ((. ctx constStar)))))
+      (if ((. ctx constStmt))
+        (return (astConstStmt ((. ctx constStmt)))))
+      (if ((. ctx ifForm))
+        (return (astIf ((. ctx ifForm)))))
+      (if ((. ctx whileForm))
+        (return (astWhile ((. ctx whileForm)))))
+      (if ((. ctx tryForm))
+        (return (astTry ((. ctx tryForm)))))
+      (if ((. ctx block))
+        (return (astBlock ((. ctx block)))))
+      (if ((. ctx "assign"))
+        (return (astAssign ((. ctx "assign")))))
+      (if ((. ctx returnForm))
+        (return (astReturn ((. ctx returnForm)))))
+      (if ((. ctx throwForm))
+        (return (astThrow ((. ctx throwForm)))))
+      (if ((. ctx importForm))
+        (return (astImport ((. ctx importForm)))))
+      (if ((. ctx importTypeForm))
+        (return (astImportType ((. ctx importTypeForm)))))
+      (if ((. ctx exportForm))
+        (return (astExportForm ((. ctx exportForm)))))
+      (if ((. ctx switchForm))
+        (return (astSwitch ((. ctx switchForm)))))
+      (if ((. ctx forForm))
+        (return (astFor ((. ctx forForm)))))
+      (if ((. ctx forInForm))
+        (return (astForIn ((. ctx forInForm)))))
+      (if ((. ctx forOfForm))
+        (return (astForOf ((. ctx forOfForm)))))
+      (if ((. ctx forAwaitForm))
+        (return (astForAwait ((. ctx forAwaitForm)))))
+      (let* ((expr (astExpression ((. ctx expression)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'expr-stmt') (expr expr))))))
+
+  (const astThrow
+    (lambda ((ctx))
+      (let* ((expr (astExpression ((. ctx expression)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'throw') (expr expr))))))
+
+  (const astImport
+    (lambda ((ctx))
+      (let* ((spec (ternary ((. ctx objectExpr)) (astObjectExpr ((. ctx objectExpr))) undefined))
+             (source (parseString ((. ((. ctx STRING)) getText)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'import') (spec spec) (source source))))))
+
+  (const astImportTypeName
+    (lambda ((ctx))
+      ;; importTypeName: IDENTIFIER  |  LPAREN IDENTIFIER IDENTIFIER RPAREN
+      ;; Plain name:  IDENTIFIER(0) = name, IDENTIFIER(1) = undefined
+      ;; Alias pair:  IDENTIFIER(0) = name, IDENTIFIER(1) = alias
+      (let* ((name ((. ((. ctx IDENTIFIER) 0) getText)))
+             (aliasNode ((. ctx IDENTIFIER) 1))
+             (alias (ternary aliasNode ((. aliasNode getText)) undefined)))
+        (return (object (name name) ("alias" alias))))))
+
+  (const astImportType
+    (lambda ((ctx))
+      ;; importTypeForm: LPAREN IMPORT_TYPE importTypeSpec STRING RPAREN
+      ;; importTypeSpec: LPAREN IDENTIFIER importTypeName+ RPAREN
+      (let* ((spec ((. ctx importTypeSpec)))
+             (kind ((. ((. spec IDENTIFIER)) getText)))
+             (names ((. ((. spec importTypeName)) map) astImportTypeName))
+             (source (parseString ((. ((. ctx STRING)) getText)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'import-type') (kind kind) (names names) (source source))))))
+
+  (const astExportNamePair
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER) 0) getText)))
+             (aliasNode ((. ctx IDENTIFIER) 1))
+             (alias (ternary aliasNode ((. aliasNode getText)) undefined)))
+        (return (object (name name) ("alias" alias))))))
+
+  (const astExportType
+    (lambda ((ctx))
+      (let* ((pairs ((. ((. ctx exportNamePair)) map) astExportNamePair)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-type') (pairs pairs))))))
+
+  (const astExportTypeFrom
+    (lambda ((ctx))
+      (let* ((source (parseString ((. ((. ctx STRING)) getText))))
+             (pairs ((. ((. ctx exportNamePair)) map) astExportNamePair)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-type-from') (source source) (pairs pairs))))))
+
+  (const astExportTypeAllFrom
+    (lambda ((ctx))
+      (let* ((source (parseString ((. ((. ctx STRING)) getText)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-type-all-from') (source source))))))
+
+  (const astExportNsFrom
+    (lambda ((ctx))
+      ;; exportNsFromForm: LPAREN EXPORT_NS_FROM STRING STRING RPAREN
+      ;; STRING(0) = namespace name, STRING(1) = module source path
+      (let* ((ns (parseString ((. ((. ctx STRING) 0) getText))))
+             (source (parseString ((. ((. ctx STRING) 1) getText)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-ns-from') (ns ns) (source source))))))
+
+  (const astExportDecl
+    (lambda ((ctx))
+      (let* ((d ((. ctx decl))))
+        (if ((. d topLevelLet))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astTopLevelLet ((. d topLevelLet)))))))
+        (if ((. d topLevelConst))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astTopLevelConst ((. d topLevelConst)))))))
+        (if ((. d classDef))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astClassDef ((. d classDef)))))))
+        (if ((. d interfaceDef))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astInterfaceDef ((. d interfaceDef)))))))
+        (if ((. d typeAlias))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astTypeAlias ((. d typeAlias)))))))
+        (throw (new Error 'astExportDecl: unknown decl form')))))
+
+  (const astExportForm
+    (lambda ((ctx))
+      (if ((. ctx exportBinding))
+        (let* ((b ((. ctx exportBinding)))
+               (name ((. ((. b IDENTIFIER)) getText)))
+               (init (astExpression ((. b expression)))))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-binding') (name name) (init init)))))
+      (if ((. ctx exportDefault))
+        (let* ((d ((. ctx exportDefault))))
+          (if ((. d classDef))
+            (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-default-class') (classNode (astClassDef ((. d classDef)))))))
+          (if ((. d anonClassDef))
+            (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-default-class') (classNode (astAnonClassDef ((. d anonClassDef)))))))
+          (if ((. d topLevelLet))
+            (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-default-def') (defNode (astTopLevelLet ((. d topLevelLet)))))))
+          (if ((. d topLevelConst))
+            (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-default-def') (defNode (astTopLevelConst ((. d topLevelConst)))))))
+          (let* ((expr (astExpression ((. d expression)))))
+            (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-default') (expr expr))))))
+      (if ((. ctx exportNamed))
+        (let* ((n ((. ctx exportNamed)))
+               (pairs ((. ((. n exportNamePair)) map) astExportNamePair)))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-named') (pairs pairs)))))
+      (if ((. ctx exportFrom))
+        (let* ((f ((. ctx exportFrom)))
+               (source (parseString ((. ((. f STRING)) getText))))
+               (pairs ((. ((. f exportNamePair)) map) astExportNamePair)))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-from') (source source) (pairs pairs)))))
+      (if ((. ctx exportAllFrom))
+        (let* ((a ((. ctx exportAllFrom)))
+               (source (parseString ((. ((. a STRING)) getText)))))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-all-from') (source source)))))
+      (if ((. ctx exportTypeForm))
+        (return (astExportType ((. ctx exportTypeForm)))))
+      (if ((. ctx exportTypeFromForm))
+        (return (astExportTypeFrom ((. ctx exportTypeFromForm)))))
+      (if ((. ctx exportTypeAllFromForm))
+        (return (astExportTypeAllFrom ((. ctx exportTypeAllFromForm)))))
+      (if ((. ctx exportNsFromForm))
+        (return (astExportNsFrom ((. ctx exportNsFromForm)))))
+      (throw (new Error 'Unknown export form'))))
+
+  (const astSwitch
+    (lambda ((ctx))
+      (let* ((discriminant (astExpression ((. ctx expression))))
+             (cases ((. ((. ctx caseClause)) map) (lambda ((c))
+               (let* ((test (astExpression ((. c expression))))
+                      (body ((. ((. c statement)) map) astStatement)))
+                 (return (object (test test) (body body)))))))
+             (defCtx ((. ctx defaultClause)))
+             (defaultCase (ternary defCtx (object (body ((. ((. defCtx statement)) map) astStatement))) undefined)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'switch') (discriminant discriminant) (cases cases) (defaultCase defaultCase))))))
+
+  (const astFor
+    (lambda ((ctx))
+      (let* ((initCtx ((. ctx letStmt)))
+             (bindCtx ((. initCtx singleBinding)))
+             (initName ((. ((. bindCtx IDENTIFIER)) getText)))
+             (initExpr (astExpression ((. initCtx expression))))
+             (test (astExpression ((. ctx expression))))
+             (updateCtx ((. ctx "assign")))
+             (updateName ((. ((. updateCtx IDENTIFIER)) getText)))
+             (updateExpr (astExpression ((. updateCtx expression))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'for') (initName initName) (initExpr initExpr) (test test) (updateName updateName) (updateExpr updateExpr) (body body))))))
+
+  (const astForIn
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (obj (astExpression ((. ctx expression))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'for-in') (name name) ("object" obj) (body body))))))
+
+  (const astForOf
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (iterable (astExpression ((. ctx expression))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'for-of') (name name) (iterable iterable) (body body))))))
+
+  (const astForAwait
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (iterable (astExpression ((. ctx expression))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'for-await') (name name) (iterable iterable) (body body))))))
+
+  (const astLetStar
+    (lambda ((ctx))
+      (let* ((bindings ((. ((. ctx starBinding)) map) (lambda ((b))
+               (let* ((id ((. ((. b IDENTIFIER)) getText)))
+                      (init (astExpression ((. b expression))))
+                      (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
+                 (return (object (name id) (init init) (typeAnnotation typeAnnotation)))))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'let*') (bindings bindings) (body body))))))
+
+  (const astLetStmt
+    (lambda ((ctx))
+      (let* ((bindCtx ((. ctx singleBinding)))
+             (name ((. ((. bindCtx IDENTIFIER)) getText)))
+             (typeAnnotation (ternary ((. bindCtx typeExpr)) (astTypeExpr ((. bindCtx typeExpr))) undefined))
+             (init (astExpression ((. ctx expression)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'let') (name name) (typeAnnotation typeAnnotation) (init init))))))
+
+  (const astConstStar
+    (lambda ((ctx))
+      (let* ((bindings ((. ((. ctx starBinding)) map) (lambda ((b))
+               (let* ((id ((. ((. b IDENTIFIER)) getText)))
+                      (init (astExpression ((. b expression))))
+                      (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
+                 (return (object (name id) (init init) (typeAnnotation typeAnnotation)))))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const*') (bindings bindings) (body body))))))
+
+  (const astConstStmt
+    (lambda ((ctx))
+      (let* ((bindCtx ((. ctx singleBinding)))
+             (name ((. ((. bindCtx IDENTIFIER)) getText)))
+             (typeAnnotation (ternary ((. bindCtx typeExpr)) (astTypeExpr ((. bindCtx typeExpr))) undefined))
+             (init (astExpression ((. ctx expression)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const') (name name) (typeAnnotation typeAnnotation) (init init))))))
+
+  (const astIf
+    (lambda ((ctx))
+      (let* ((test (astExpression ((. ctx expression))))
+             (ifthen (astStatement ((. ctx statement) 0)))
+             (ctxElse ((. ctx statement) 1))
+             (ifelse (ternary ctxElse (astStatement ctxElse) undefined)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'if') (test test) (ifthen ifthen) (ifelse ifelse))))))
+
+  (const astWhile
+    (lambda ((ctx))
+      (let* ((test (astExpression ((. ctx expression))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'while') (test test) (body body))))))
+
+  (const astBlock
+    (lambda ((ctx))
+      (let* ((body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'block') (body body))))))
+
+  (const astReturn
+    (lambda ((ctx))
+      (let* ((expr (ternary ((. ctx expression)) (astExpression ((. ctx expression))) undefined)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'return') (expr expr))))))
+
+  (const astObjectExpr
+    (lambda ((ctx))
+      (let* ((fields ((. ((. ctx objectField)) map) (lambda ((f))
+               ;; Case (b): shorthand property — (IDENTIFIER) with no propKey and no expression
+               (if (&& ((. f IDENTIFIER)) (! ((. f propKey))))
+                 (let* ((name ((. ((. f IDENTIFIER)) getText))))
+                   (if ((. f expression))
+                     (throw (new Error (+ "shorthand property field must not have an expression: " name))))
+                   (return (object (key name) (isShorthand true)))))
+               ;; All other cases require propKey
+               (if (! ((. f propKey)))
+                 (throw (new Error "objectField: unexpected shape — no propKey and no standalone IDENTIFIER")))
+               (let* ((rawKey ((. ((. f propKey)) getText)))
+                      (key (ternary (|| ((. rawKey startsWith) '"') (|| ((. rawKey startsWith) "'") ((. rawKey startsWith) '`')))
+                             (parseString rawKey)
+                             rawKey)))
+                 ;; Case (a): method — (propKey methodDef), no expression
+                 (if ((. f methodDef))
+                   (let* ((md ((. f methodDef)))
+                          (params ((. ((. ((. md fnSignature)) param)) map) (lambda ((p)) (return ((. ((. p IDENTIFIER)) getText))))))
+                          (body ((. ((. md statement)) map) astStatement)))
+                     (if ((. f expression))
+                       (throw (new Error (+ "method field must not have an expression: " key))))
+                     (return (object (key key) (isMethod true) (params params) (body body)))))
+                 ;; Case (c): complete property — (propKey expression), no methodDef
+                 (if (! ((. f expression)))
+                   (throw (new Error (+ "complete property field must have an expression: " key))))
+                 (let* ((value (astExpression ((. f expression)))))
+                   (return (object (key key) (isMethod false) (isShorthand false) (value value)))))))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'object') (fields fields))))))
+
+  (const astArrayExpr
+    (lambda ((ctx))
+      (let* ((elements ((. ((. ctx expression)) map) astExpression)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'array') (elements elements))))))
+
+  ;; Value-level template literal: (template "Hello " name "!") → `Hello ${name}!`
+  ;; Grammar: templateExpr : LPAREN TEMPLATE (STRING | expression)+ RPAREN
+  ;; ctx.children: [LPAREN, TEMPLATE, ...content..., RPAREN]
+  ;; Content children are STRING TerminalNodes (have .symbol) or ExpressionContexts (no .symbol).
+  (const astTemplateExpr
+    (lambda ((ctx))
+      (let* ((children (. ctx children))
+             (contentChildren ((. children slice) 2 (- (. children length) 1)))
+             (parts ((. contentChildren map) (lambda ((child))
+               (if (. child symbol)
+                 (return (object (tag 'str') (value (parseString ((. child getText))))))
+                 (return (object (tag 'hole') (expr (astExpression child)))))))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'template-expr') (parts parts))))))
+
+  ;; ---- astSForm: build SFormNode tree from sForm parse context ----
+  (const astSForm
+    (lambda ((ctx))
+      ;; hole: (unquote expr)
+      (if ((. ctx UNQUOTE))
+        (let* ((expr (astExpression ((. ctx expression)))))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'sf-hole') (expr expr)))))
+      ;; splice hole: (unquote-splicing expr)
+      (if ((. ctx UNQUOTE_SPLICING))
+        (let* ((expr (astExpression ((. ctx expression)))))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'sf-splice') (expr expr)))))
+      ;; list: LPAREN sForm* RPAREN
+      (if ((. ctx LPAREN))
+        (let* ((items ((. ((. ctx sForm)) map) astSForm)))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'sf-list') (items items)))))
+      ;; atom: single token
+      (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'sf-atom') (value ((. ctx getText)))))))
+
+  (const astQuasiquote
+    (lambda ((ctx))
+      (let* ((sformCtx ((. ((. ctx quasiForm)) sForm)))
+             (sform (astSForm sformCtx)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'quasi') (sform sform))))))
+
+  (const astUnquote
+    (lambda ((ctx))
+      (let* ((expr (astExpression ((. ctx expression)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'unquote') (expr expr))))))
+
+  (const astUnquoteSplicing
+    (lambda ((ctx))
+      (let* ((expr (astExpression ((. ctx expression)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'unquote-splicing') (expr expr))))))
+
+  (const astTernary
+    (lambda ((ctx))
+      (let* ((test (astExpression ((. ctx expression) 0)))
+             (ifthen (astExpression ((. ctx expression) 1)))
+             (ifelse (astExpression ((. ctx expression) 2))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'ternary') (test test) (ifthen ifthen) (ifelse ifelse))))))
+
+  (const astCondExpr
+    (lambda ((ctx))
+      (let* ((exprs ((. ((. ctx expression)) map) astExpression))
+             (clauses (array))
+             (i 0))
+        (while (< i (. exprs length))
+          ((. clauses push) (object (test (index exprs i)) (expr (index exprs (+ i 1)))))
+          (set! i (+ i 2)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'cond') (clauses clauses))))))
+
+  (const astNewExpr
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (raw ((. ctx typeArgs)))
+             (typeArgs (ternary raw
+                           ((. ((. raw typeExpr)) map) astTypeExpr)
+                           (array)))
+             (args ((. ((. ctx expression)) map) astExpression)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'new') (name name) (typeArgs typeArgs) (args args))))))
+
+  (const astOptChain
+    (lambda ((ctx))
+      (let* ((obj (astExpression ((. ctx expression))))
+             (rawKey ((. ((. ctx propKey)) getText)))
+             (key (ternary (|| ((. rawKey startsWith) '"') (|| ((. rawKey startsWith) "'") ((. rawKey startsWith) '`')))
+                    (parseString rawKey)
+                    rawKey)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'opt-chain') ("object" obj) (key key))))))
+
+  (const astOptChainIndex
+    (lambda ((ctx))
+      (let* ((obj (astExpression ((. ctx expression) 0)))
+             (idx (astExpression ((. ctx expression) 1))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'opt-chain-index') ("object" obj) ("index" idx))))))
+
+  (const astNullCoalesce
+    (lambda ((ctx))
+      (let* ((left (astExpression ((. ctx expression) 0)))
+             (right (astExpression ((. ctx expression) 1))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'null-coalesce') (left left) (right right))))))
+
+  (const astExpression
+    (lambda ((ctx))
+      (if (== ctx undefined)
+        (begin
+          ((. console error) 'astExpression: ctx is undefined or null')
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'error') (reason 'ctx undefined')))))
+      (if ((. ctx literal))
+        (return (astLiteral ((. ctx literal)))))
+      (if ((. ctx KEYWORD))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'keyword') (value ((. ((. ctx KEYWORD)) getText))))))
+      (if ((. ctx IDENTIFIER))
+        (let* ((text ((. ((. ctx IDENTIFIER)) getText))))
+          (if (&& ((. text includes) '.') (! ((. text startsWith) '...')))
+            (return (desugarDottedIdentifier text ctx)))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'identifier') (name text)))))
+      (if ((. ctx "lambda"))
+        (return (astLambda ((. ctx "lambda")))))
+      (if ((. ctx "fn"))
+        (return (astFn ((. ctx "fn")))))
+      (if ((. ctx asyncLambda))
+        (return (astAsyncLambda ((. ctx asyncLambda)))))
+      (if ((. ctx asyncFn))
+        (return (astAsyncFn ((. ctx asyncFn)))))
+      (if ((. ctx generatorFn))
+        (return (astGeneratorFn ((. ctx generatorFn)))))
+      (if ((. ctx asyncGeneratorFn))
+        (return (astAsyncGeneratorFn ((. ctx asyncGeneratorFn)))))
+      (if ((. ctx awaitExpr))
+        (return (astAwaitExpr ((. ctx awaitExpr)))))
+      (if ((. ctx yieldExpr))
+        (return (astYieldExpr ((. ctx yieldExpr)))))
+      (if ((. ctx yieldStarExpr))
+        (return (astYieldStarExpr ((. ctx yieldStarExpr)))))
+      (if ((. ctx bindExpr))
+        (return (astBindExpr ((. ctx bindExpr)))))
+      (if ((. ctx methodCallExpr))
+        (return (astMethodCallExpr ((. ctx methodCallExpr)))))
+      (if ((. ctx objectExpr))
+        (return (astObjectExpr ((. ctx objectExpr)))))
+      (if ((. ctx arrayExpr))
+        (return (astArrayExpr ((. ctx arrayExpr)))))
+      (if ((. ctx propAccess))
+        (return (astPropAccess ((. ctx propAccess)))))
+      (if ((. ctx indexAccess))
+        (return (astIndexAccess ((. ctx indexAccess)))))
+      (if ((. ctx quasiquote))
+        (return (astQuasiquote ((. ctx quasiquote)))))
+      (if ((. ctx "unquote"))
+        (return (astUnquote ((. ctx "unquote")))))
+      (if ((. ctx unquoteSplicing))
+        (return (astUnquoteSplicing ((. ctx unquoteSplicing)))))
+      (if ((. ctx "ternary"))
+        (return (astTernary ((. ctx "ternary")))))
+      (if ((. ctx condExpr))
+        (return (astCondExpr ((. ctx condExpr)))))
+      (if ((. ctx newForm))
+        (return (astNewExpr ((. ctx newForm)))))
+      (if ((. ctx optChain))
+        (return (astOptChain ((. ctx optChain)))))
+      (if ((. ctx optChainIndex))
+        (return (astOptChainIndex ((. ctx optChainIndex)))))
+      (if ((. ctx nullCoalesce))
+        (return (astNullCoalesce ((. ctx nullCoalesce)))))
+      (if ((. ctx typeofExpr))
+        (return (astTypeofExpr ((. ctx typeofExpr)))))
+      (if ((. ctx typeAssert))
+        (return (astTypeAssert ((. ctx typeAssert)))))
+      (if ((. ctx templateExpr))
+        (return (astTemplateExpr ((. ctx templateExpr)))))
+      (if ((. ctx superConstructorCall))
+        (return (astSuperConstructorCall ((. ctx superConstructorCall)))))
+      (if ((. ctx superMethodCall))
+        (return (astSuperMethodCall ((. ctx superMethodCall)))))
+      (if ((. ctx thisExpr))
+        (return (object (id (registerSpan (nextNodeId) ((. ctx thisExpr)))) (text 'this') (tag 'this'))))
+      (if ((. ctx superExpr))
+        (return (object (id (registerSpan (nextNodeId) ((. ctx superExpr)))) (text 'super') (tag 'super'))))
+      (if ((. ctx call))
+          (return (astCall ((. ctx call)))))
+      (throw (new Error (+ 'Unknown expression: ' (ternary (. ctx getText) ((. ctx getText)) ctx))))))
+
+  (const astTypeofExpr
+    (lambda ((ctx))
+      (let* ((expr (astExpression ((. ctx expression)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'typeof-expr') (expr expr))))))
+
+  (const astTypeAssert
+    (lambda ((ctx))
+      (let* ((expr (astExpression ((. ctx expression))))
+             (ty (astTypeExpr ((. ctx typeExpr)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-assert') (expr expr) (ty ty))))))
+
+  (const astCall
+    (lambda ((ctx))
+      (let* ((exprs ((. ((. ctx expression)) map) astExpression))
+             (raw ((. ctx typeArgs)))
+             (typeArgs (ternary raw
+                           ((. ((. raw typeExpr)) map) astTypeExpr)
+                           (array))))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'call')
+                          (fn (index exprs 0))
+                          (args ((. exprs slice) 1))
+                          (typeArgs typeArgs))))))
+
+  (const astPropAccess
+    (lambda ((ctx))
+      (let* ((obj (astExpression ((. ctx expression))))
+             (rawKey ((. ((. ctx propKey)) getText)))
+             (key (ternary (|| ((. rawKey startsWith) '"') (|| ((. rawKey startsWith) "'") ((. rawKey startsWith) '`')))
+                    (parseString rawKey)
+                    rawKey)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'prop-access') ("object" obj) (key key))))))
+
+  (const astIndexAccess
+    (lambda ((ctx))
+      (let* ((obj (astExpression ((. ctx expression) 0)))
+             (idx (astExpression ((. ctx expression) 1))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'index-access') ("object" obj) ("index" idx))))))
+
+  ;; Shared helper: parse fnSignature into { params, rest, restType, returnType }
+  ;; params: Array<{ name, optional: false, typeAnnotation }> (same shape as typedParam)
+  ;; rest: string | undefined
+  ;; restType: typeExpr | undefined
+  ;; returnType: typeExpr | undefined
+  (const astParseFnSig
+    (lambda ((sig))
+      (let* ((params ((. ((. sig param)) map) (lambda ((p))
+                      (let* ((name ((. ((. p IDENTIFIER)) getText)))
+                             (typeAnn (ternary ((. p typeExpr)) (astTypeExpr ((. p typeExpr))) undefined)))
+                        (return (object (name name) (optional false) (typeAnnotation typeAnn)))))))
+             (rp ((. sig restParam)))
+             (restName (ternary rp ((. ((. rp IDENTIFIER)) getText)) undefined))
+             (restType (ternary rp
+                         (ternary ((. rp typeExpr)) (astTypeExpr ((. rp typeExpr))) undefined)
+                         undefined))
+             (returnType (ternary ((. sig typeExpr)) (astTypeExpr ((. sig typeExpr))) undefined)))
+        (return (object (params params) (rest restName) (restType restType) (returnType returnType))))))
+
+  (const astLambda
+    (lambda ((ctx))
+      (let* ((sig (astParseFnSig ((. ctx fnSignature))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'lambda') (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body))))))
+
+  (const astFn
+    (lambda ((ctx))
+      (let* ((sig (astParseFnSig ((. ctx fnSignature))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'fn') (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body))))))
+
+  (const astAsyncLambda
+    (lambda ((ctx))
+      (let* ((sig (astParseFnSig ((. ctx fnSignature))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'async-lambda') (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body))))))
+
+  (const astAsyncFn
+    (lambda ((ctx))
+      (let* ((sig (astParseFnSig ((. ctx fnSignature))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'async-fn') (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body))))))
+
+  (const astGeneratorFn
+    (lambda ((ctx))
+      (let* ((sig (astParseFnSig ((. ctx fnSignature))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'generator-fn') (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body))))))
+
+  (const astAsyncGeneratorFn
+    (lambda ((ctx))
+      (let* ((sig (astParseFnSig ((. ctx fnSignature))))
+             (body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'async-generator-fn') (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body))))))
+
+  (const astAwaitExpr
+    (lambda ((ctx))
+      (let* ((expr (astExpression ((. ctx expression)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'await') (expr expr))))))
+
+  (const astYieldExpr
+    (lambda ((ctx))
+      (let* ((expr (ternary ((. ctx expression)) (astExpression ((. ctx expression))) undefined)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'yield') (expr expr))))))
+
+  (const astYieldStarExpr
+    (lambda ((ctx))
+      (let* ((expr (astExpression ((. ctx expression)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'yield*') (expr expr))))))
+
+  (const astBindExpr
+    (lambda ((ctx))
+      (let* ((exprs ((. ((. ctx expression)) map) astExpression))
+             (fnExpr (index exprs 0))
+             (thisArg (index exprs 1))
+             (args ((. exprs slice) 2)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'bind-expr') (fn fnExpr) (thisArg thisArg) (args args))))))
+
+  (const astMethodCallExpr
+    (lambda ((ctx))
+      (let* ((exprs ((. ((. ctx expression)) map) astExpression))
+             (obj (index exprs 0))
+             (methodExpr (index exprs 1))
+             (args ((. exprs slice) 2)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'method-call-expr') ("object" obj) ("method" methodExpr) (args args))))))
+
+  (const astAssign
+    (lambda ((ctx))
+      (if ((. ctx IDENTIFIER))
+        (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+               (value (astExpression ((. ctx expression)))))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag "assign") (name name) (value value)))))
+      (let* ((target (astPropAccess ((. ctx propAccess))))
+             (value (astExpression ((. ctx expression)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag "assign-prop") (target target) (value value))))))
+
+  (const astLiteral
+    (lambda ((ctx))
+      (if ((. ctx NUMBER))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'literal') (value (Number ((. ((. ctx NUMBER)) getText)))))))
+      (if ((. ctx STRING))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'literal') (value (parseString ((. ((. ctx STRING)) getText)))))))
+      (if ((. ctx BOOLEAN))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'literal') (value (=== ((. ((. ctx BOOLEAN)) getText)) 'true')))))
+      (if ((. ctx NULL))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'literal') (value null))))
+      (if ((. ctx UNDEFINED))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'literal') (value undefined))))
+      (throw (new Error 'Unknown literal'))))
+
+  ;; ========== Phase A: Type Expressions ==========
+  (const astTypeExpr
+    (lambda ((ctx))
+      (if ((. ctx typeUnion))
+        (return (astTypeUnion ((. ctx typeUnion)))))
+      (if ((. ctx typeIntersection))
+        (return (astTypeIntersection ((. ctx typeIntersection)))))
+      (if ((. ctx typeArray))
+        (return (astTypeArray ((. ctx typeArray)))))
+      (if ((. ctx typeTuple))
+        (return (astTypeTuple ((. ctx typeTuple)))))
+      (if ((. ctx typeFunction))
+        (return (astTypeFunction ((. ctx typeFunction)))))
+      (if ((. ctx typeObject))
+        (return (astTypeObject ((. ctx typeObject)))))
+      (if ((. ctx typeLiteral))
+        (return (astTypeLiteral ((. ctx typeLiteral)))))
+      (if ((. ctx typeKeyof))
+        (return (astTypeKeyof ((. ctx typeKeyof)))))
+      (if ((. ctx typeTypeof))
+        (return (astTypeTypeof ((. ctx typeTypeof)))))
+      (if ((. ctx typeIndexAccess))
+        (return (astTypeIndexAccess ((. ctx typeIndexAccess)))))
+      (if ((. ctx typeConditional))
+        (return (astTypeConditional ((. ctx typeConditional)))))
+      (if ((. ctx typeInfer))
+        (return (astTypeInfer ((. ctx typeInfer)))))
+      (if ((. ctx typeMapped))
+        (return (astTypeMapped ((. ctx typeMapped)))))
+      (if ((. ctx typeTemplateLiteral))
+        (return (astTypeTemplateLiteral ((. ctx typeTemplateLiteral)))))
+      (if ((. ctx typeApplication))
+        (return (astTypeApplication ((. ctx typeApplication)))))
+      ;; bare IDENTIFIER
+      (if ((. ctx IDENTIFIER))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-id') (name ((. ((. ctx IDENTIFIER)) getText))))))
+      (throw (new Error (+ 'astTypeExpr: unknown type: ' ((. ctx getText)))))))
+
+  (const astTypeUnion
+    (lambda ((ctx))
+      (let* ((members ((. ((. ctx typeExpr)) map) astTypeExpr)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-union') (members members))))))
+
+  (const astTypeIntersection
+    (lambda ((ctx))
+      (let* ((members ((. ((. ctx typeExpr)) map) astTypeExpr)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-intersection') (members members))))))
+
+  (const astTypeArray
+    (lambda ((ctx))
+      (let* ((element (astTypeExpr ((. ctx typeExpr)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-array') (element element))))))
+
+  (const astTypeTuple
+    (lambda ((ctx))
+      (let* ((elements ((. ((. ctx typeTupleElement)) map) astTypeTupleElement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-tuple') (elements elements))))))
+
+  (const astTypeTupleElement
+    (lambda ((ctx))
+      (if ((. ctx REST))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'rest') ("type" (astTypeExpr ((. ctx typeExpr)))))))
+      (if (&& ((. ctx IDENTIFIER)) ((. ctx typeExpr)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'labeled') (name ((. ((. ctx IDENTIFIER)) getText))) ("type" (astTypeExpr ((. ctx typeExpr)))))))
+      (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'element') ("type" (astTypeExpr ((. ctx typeExpr))))))))
+
+  (const astTypeFunction
+    (lambda ((ctx))
+      (let* ((tparams (ternary ((. ctx typeParams))
+                        ((. ((. ((. ((. ctx typeParams)) typeParamDecl)) map)) astTypeParamDecl))
+                        (array)
+                      ))
+             (params ((. ((. ctx typeFnParam)) map) astTypeFnParam))
+             (result (astTypeExpr ((. ctx typeExpr)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-fn') (typeParams tparams) (params params) (result result))))))
+
+  (const astTypeFnParam
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (optional (!== ((. ctx OPTIONAL)) null))
+             (ty (astTypeExpr ((. ctx typeExpr)))))
+        (return (object (name name) ("optional" optional) ("type" ty))))))
+
+  (const astTypeObject
+    (lambda ((ctx))
+      (let* ((props ((. ((. ctx typeProp)) map) astTypeProp)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-obj') (props props))))))
+
+  (const astTypeProp
+    (lambda ((ctx))
+      (let* ((isReadonly (> (. ((. ctx propModifier)) length) 0))
+             (name ((. ((. ctx IDENTIFIER)) getText)))
+             (optional (!== ((. ctx OPTIONAL)) null))
+             (ty (astTypeExpr ((. ctx typeExpr)))))
+        (return (object ("readonly" isReadonly) (name name) ("optional" optional) ("type" ty))))))
+
+  (const astTypeLiteral
+    (lambda ((ctx))
+      (if ((. ctx STRING))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-literal') (value (parseString ((. ((. ctx STRING)) getText)))))))
+      (if ((. ctx NUMBER))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-literal') (value (Number ((. ((. ctx NUMBER)) getText)))))))
+      (if ((. ctx BOOLEAN))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-literal') (value (=== ((. ((. ctx BOOLEAN)) getText)) 'true')))))
+      (throw (new Error 'Unknown type literal'))))
+
+  (const astTypeKeyof
+    (lambda ((ctx))
+      (let* ((operand (astTypeExpr ((. ctx typeExpr)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-keyof') (operand operand))))))
+
+  (const astTypeTypeof
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-typeof') (name name))))))
+
+  (const astTypeIndexAccess
+    (lambda ((ctx))
+      (let* ((obj (astTypeExpr ((. ctx typeExpr) 0)))
+             (idx (astTypeExpr ((. ctx typeExpr) 1))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-index') ("object" obj) ("index" idx))))))
+
+  (const astTypeConditional
+    (lambda ((ctx))
+      (let* ((subject (astTypeExpr ((. ctx typeExpr) 0)))
+             (constraint (astTypeExpr ((. ctx typeExpr) 1)))
+             (trueBranch (astTypeExpr ((. ctx typeExpr) 2)))
+             (falseBranch (astTypeExpr ((. ctx typeExpr) 3))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-cond') (subject subject) (constraint constraint) (trueBranch trueBranch) (falseBranch falseBranch))))))
+
+  (const astTypeInfer
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-infer') (name name))))))
+
+  (const astTypeMapped
+    (lambda ((ctx))
+      (let* ((binding ((. ((. ctx IDENTIFIER)) getText)))
+             (constraint (astTypeExpr ((. ctx typeExpr) 0)))
+             (mapfn (lambda ((m)) (return ((. m getText)))))
+             (mods (ternary ((. ctx mappedModifiers))
+               ((. ((. ((. ctx mappedModifiers)) mappedModifier)) map) mapfn)
+               (array)))
+             (value (astTypeExpr ((. ctx typeExpr) 1))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-mapped') (binding binding) (constraint constraint) (modifiers mods) (value value))))))
+
+  (const astTypeTemplateLiteral
+    (lambda ((ctx))
+      (let* ((parts ((. ((. ctx templatePart)) map) (lambda ((p))
+               (if ((. p STRING))
+                 (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'str') (value (parseString ((. ((. p STRING)) getText))))))
+                 (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type') ("type" (astTypeExpr ((. p typeExpr)))))))))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-template') (parts parts))))))
+
+  (const astTypeApplication
+    (lambda ((ctx))
+      (let* ((allTypes ((. ((. ctx typeExpr)) map) astTypeExpr))
+             (callee (index allTypes 0))
+             (args ((. allTypes slice) 1)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-app') (callee callee) (args args))))))
+
+  (const astTypeParamDecl
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (constraint (ternary ((. ctx typeParamConstraint))
+               (astTypeExpr ((. ((. ctx typeParamConstraint)) typeExpr)))
+               undefined))
+             (defaultType (ternary ((. ctx typeParamDefault))
+               (astTypeExpr ((. ((. ctx typeParamDefault)) typeExpr)))
+               undefined)))
+        (return (object (name name) (constraint constraint) ("default" defaultType))))))
+
+  (export-named (astProgram) (astTopLevel))
+)

@@ -1,0 +1,3 @@
+(program
+  (defmacro greet ((x))
+    (return (quasi (+ "hello-" (unquote x))))))

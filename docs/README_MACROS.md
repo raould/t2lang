@@ -31,6 +31,26 @@ With t2lang's upcoming macro system (based on Clojure-style `defmacro` with quas
 
 The key insight is that macros operate at **compile time on code as data**, enabling transformations that are fundamentally impossible with runtime-only approaches. t2lang's homoiconic s-expression syntax makes these transformations natural and composable, bringing Lisp's legendary metaprogramming power to the TypeScript ecosystem.
 
+## Top-level macro expansions
+
+Macros can now return arrays of AST nodes in order to splice entire top-level declarations and statements into the program body. The expander relies on the runtime check `Array.isArray` to detect these array results instead of adding a new TypeScript union. When a macro yields an array, Stage7 validates each entry, registers it through `registerTopLevelNode` (so emitted `defmacro`/`macro-time-fn-def` forms become available to later nodes in the same splice), and reinserts the sequence via a worklist that preserves the order the macro returned.
+
+Only a tightly controlled set of tags is permitted in a splice: top-level declarations (`let-decl`, `const-decl`, `type-alias`, `interface-def`, `class-def`, `anon-class-def`, `defmacro`, `macro-time-fn-def`) and executable statements (`expr-stmt`, `let*`, `let`, `const*`, `const`, `if`, `while`, `block`, `return`, `throw`, `assign`, `switch`, `try`, `for`, `for-in`, `for-of`, `for-await`). Any import or export node in the array triggers the error `macro top-level expansion produced disallowed form`, and if a macro used inside an expression returns an array the compiler reports `top-level macro expansion not allowed in this position`.
+
+Here is a minimal illustration:
+
+```lisp
+(defmacro emit-platform ()
+  (return (array
+    (quasi (let (a) 5))
+    (quasi (const b 7))
+    (quasi (class Generated ()
+      (constructor ()
+        (set! (. this sum) (+ 5 7))))))))
+```
+
+The new `tests/macroIntegration.test.ts` entries demonstrate positive splices, emitted macro registration, and the corresponding runtime failures for misused arrays.
+
 ---
 
 ## 1. React & UI Framework Patterns

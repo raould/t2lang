@@ -1,0 +1,39 @@
+(program
+  (const expandAll
+    (lambda ((programNode) (env))
+      (let* ((worklist ((. (. programNode body) slice) 0))
+             (expandedBody (array)))
+        (while (> (. worklist length) 0)
+          (begin
+            (let* ((node ((. worklist shift)))
+                   (macroCall (getTopLevelMacroCall node env)))
+              (if macroCall
+                (begin
+                  (let* ((result (expandTopLevelMacroCall macroCall env)))
+                    (if ((. Array isArray) result)
+                      (begin
+                        (let* ((validated (array)))
+                          ((. result forEach)
+                            (lambda ((spliced))
+                              (let* ((validatedNode (validateTopLevelNode spliced env)))
+                                (if validatedNode
+                                  (begin
+                                    ((. validated push) validatedNode)
+                                    (registerTopLevelNode validatedNode env)))))))
+                        (let* ((idx (- (. validated length) 1)))
+                          (while (>= idx 0)
+                            (begin
+                              (let* ((spliced (index validated idx)))
+                                ((. worklist unshift) spliced))
+                              (set! idx (- idx 1))))))
+                      (begin
+                        ((. expandedBody push)
+                          (object (tag 'expr-stmt') (text (. node text))
+                            (expr result)))))))
+                ((. expandedBody push) (expandTopLevel node env))))))
+              )
+            )
+        (let* ((expanded (object (tag 'program') (text (. programNode text))
+                       (body expandedBody))))
+          (return (object (ast expanded) (errors (. env errors)))))))
+  (export-named (expandAll)))

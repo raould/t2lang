@@ -125,6 +125,7 @@ import { PropKeyContext } from "./Stage7Parser.js";
 import { PropAccessContext } from "./Stage7Parser.js";
 import { IndexAccessContext } from "./Stage7Parser.js";
 import { QuasiquoteContext } from "./Stage7Parser.js";
+import { QuasiFormContext } from "./Stage7Parser.js";
 import { UnquoteContext } from "./Stage7Parser.js";
 import { UnquoteSplicingContext } from "./Stage7Parser.js";
 import { OptChainContext } from "./Stage7Parser.js";
@@ -1373,6 +1374,16 @@ export class Stage7Listener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitQuasiquote?: (ctx: QuasiquoteContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage7Parser.quasiForm`.
+     * @param ctx the parse tree
+     */
+    enterQuasiForm?: (ctx: QuasiFormContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage7Parser.quasiForm`.
+     * @param ctx the parse tree
+     */
+    exitQuasiForm?: (ctx: QuasiFormContext) => void;
     /**
      * Enter a parse tree produced by `Stage7Parser.unquote`.
      * @param ctx the parse tree

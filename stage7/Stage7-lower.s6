@@ -197,8 +197,10 @@
 
   (const lowerDefmacro
     (lambda ((node))
-      (let* ((body ((. (. node body) map) lowerStmt)))
-        (return (object (node node) (id (. node id)) (tag 'macro-def') (name (. node name)) (params (. node params)) (body body) (scopeId (. node scopeId)))))))
+      ;; The codegen for macro-def emits only "// macro: name" and ignores the body.
+      ;; Do not lower the body: it may contain quasi nodes wrapping top-level forms
+      ;; (let-decl, const-decl, class-def, etc.) that are not valid in expression position.
+      (return (object (node node) (id (. node id)) (tag 'macro-def') (name (. node name)) (params (. node params)) (body (array)) (scopeId (. node scopeId))))))
 
   (const lowerMacroTimeFnDef
     (lambda ((node))

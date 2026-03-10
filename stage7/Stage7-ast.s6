@@ -676,9 +676,26 @@
                  (return (object (tag 'hole') (expr (astExpression child)))))))))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'template-expr') (parts parts))))))
 
+  (const astQuasiquoteForm
+    (lambda ((formCtx))
+      (if ((. formCtx topLevelLet))
+        (return (astTopLevelLet ((. formCtx topLevelLet)))))
+      (if ((. formCtx topLevelConst))
+        (return (astTopLevelConst ((. formCtx topLevelConst)))))
+      (if ((. formCtx typeAlias))
+        (return (astTypeAlias ((. formCtx typeAlias)))))
+      (if ((. formCtx interfaceDef))
+        (return (astInterfaceDef ((. formCtx interfaceDef)))))
+      (if ((. formCtx classDef))
+        (return (astClassDef ((. formCtx classDef)))))
+      (if ((. formCtx importForm))
+        (return (astImport ((. formCtx importForm)))))
+      (return (astExpression ((. formCtx expression))))))
+
   (const astQuasiquote
     (lambda ((ctx))
-      (let* ((expr (astExpression ((. ctx expression)))))
+      (let* ((formCtx ((. ctx quasiForm)))
+             (expr (astQuasiquoteForm formCtx)))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'quasi') (expr expr))))))
 
   (const astUnquote

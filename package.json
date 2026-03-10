@@ -18,9 +18,10 @@
     "doc": "docs"
   },
   "scripts": {
-    "build": "npm --prefix stage7 build",
-    "test": "npm --prefix stage7 test",
-    "testnow": "npm --prefix stage7 testnow"
+    "modules": "for ME in `find . -maxdepth 1 -type d -name stage\\* | grep -v crazy`; do (cd $ME; npm i); done",
+    "build": "npm rum modules && npm --prefix stage8 run build",
+    "test": "npm run modules && npm --prefix stage8 test",
+    "testnow": "npm --prefix stage8 testnow"
   },
   "bin": {
     "t2tc": "bin/t2tc.js",

@@ -6,8 +6,8 @@
   ;;
   ;; ExpansionError: { kind, message, macroName, callSite, nodeId?, expandedFrom? }
 
-  (import (object (:named (array (object (:name "gensym")) (object (:name "freshScope"))))) "./Stage7-macro-env")
-  (import (object (:named (array (object (:name "formatSpan"))))) "./Stage7-spans")
+  (import (object (:named (array (object (:name "gensym")) (object (:name "freshScope")) (object (:name "registerTopLevelNode"))))) "./Stage7-macro-env")
+  (import (object (:named (array (object (:name "formatSpan")) (object (:name "nextNodeId"))))) "./Stage7-spans")
 
   ;; ---- Operator table (mirrors lowerCall) ----
   (const macroOperators
@@ -181,11 +181,10 @@
             (return (object (tag 'assign') (text (. node text))
               (name rawName)
               (value (evalQuasi (. node value) bindings env depth)))))))
-      ;; assign-prop: recurse into object, key, and value
+      ;; assign-prop: recurse into target and value
       (if (=== (. node tag) 'assign-prop')
         (return (object (tag 'assign-prop') (text (. node text))
-          (object (evalQuasi (. node object) bindings env depth))
-          (key (. node key))
+          (target (evalQuasi (. node target) bindings env depth))
           (value (evalQuasi (. node value) bindings env depth)))))
       ;; return
       (if (=== (. node tag) 'return')
@@ -215,7 +214,74 @@
         (return (object (tag 'expr-stmt') (text (. node text))
           (expr (evalQuasi (. node expr) bindings env depth)))))
       ;; identifier, literal, keyword, this, super: return as-is
+      ;; let-decl / const-decl
+      (if (|| (=== (. node tag) 'let-decl') (=== (. node tag) 'const-decl'))
+        (return (object
+          (tag (. node tag))
+          (text (. node text))
+          (name (. node name))
+          (init (evalQuasi (. node init) bindings env depth))
+          (meta (. node meta)))))
+      ;; type-alias: type expressions are opaque — return unchanged
+      (if (=== (. node tag) 'type-alias')
+        (return (object
+          (tag 'type-alias')
+          (text (. node text))
+          (name (. node name))
+          (typeParams (. node typeParams))
+          (type (. node type)))))
+      ;; interface-def: body is a type object — return unchanged
+      (if (=== (. node tag) 'interface-def')
+        (return (object
+          (tag 'interface-def')
+          (text (. node text))
+          (name (. node name))
+          (typeParams (. node typeParams))
+          (extends (. node extends))
+          (body (. node body)))))
+      ;; class-def: recurse into expression-bearing sub-nodes
+      (if (=== (. node tag) 'class-def')
+        (return (object
+          (tag 'class-def')
+          (text (. node text))
+          (modifiers (. node modifiers))
+          (name (. node name))
+          (typeParams (. node typeParams))
+          (extendsType (. node extendsType))
+          (implementsTypes (. node implementsTypes))
+          (body (object
+            (tag 'class-body')
+            (text (. (. node body) text))
+            (elements (quasiClassBody (. (. node body) elements) bindings env depth)))))))
+      ;; import-decl: no unquote positions — return unchanged
+      (if (=== (. node tag) 'import-decl')
+        (return node))
       (return node)))
+
+  ;; ---- quasiClassBody: recurse into class elements substituting unquotes ----
+  (const quasiClassBody
+    (lambda ((elements) (bindings) (env) (depth))
+      (return ((. elements map)
+        (lambda ((el))
+          (if (=== (. el tag) 'field-def')
+            (return (object
+              (tag 'field-def') (text (. el text))
+              (modifiers (. el modifiers)) (name (. el name))
+              (typeAnnotation (. el typeAnnotation))
+              (init (ternary (. el init) (evalQuasi (. el init) bindings env depth) undefined)))))
+          (if (|| (=== (. el tag) 'constructor-def')
+                  (|| (=== (. el tag) 'class-method-def')
+                      (|| (=== (. el tag) 'getter-def')
+                          (=== (. el tag) 'setter-def'))))
+            (return (object
+              (tag (. el tag)) (text (. el text))
+              (modifiers (. el modifiers))
+              (computed (. el computed))
+              (name (. el name))
+              (key (ternary (. el computed) (evalQuasi (. el key) bindings env depth) (. el key)))
+              (sig (. el sig))
+              (body (quasiArgs (. el body) bindings env depth)))))
+          (return el))))))
 
   ;; ---- Macro-time expression evaluator ----
   ;; Returns a JavaScript value (primitive, array, or AST node).
@@ -595,8 +661,13 @@
         (begin
           (let* ((callee (. node fn)))
             (if (&& (=== (. callee tag) 'identifier') ((. (. env macros) has) (. callee name)))
-              ;; macro call: expand
-              (return (expandMacroCall node env))
+              ;; macro call: expand — reject if returns array (top-level splicing not allowed in expr position)
+              (let* ((macroResult (expandMacroCall node env)))
+                (if ((. Array isArray) macroResult)
+                  (begin
+                    (pushMacroError env 'top-level macro expansion not allowed in this position' (. node id))
+                    (return null)))
+                (return macroResult))
               ;; non-macro call: expand fn and args recursively
               (begin
                 (return (object (tag 'call') (text (. node text))
@@ -856,18 +927,109 @@
                     ((. lines push) (+ "  [" (. err kind) "] " (. err message) loc from)))))))
           (return ((. lines join) '\n'))))))
 
+
+  (const TOP_LEVEL_DECL_TAGS
+    (new Set (array 'let-decl' 'const-decl' 'type-alias' 'interface-def'
+                    'class-def' 'anon-class-def' 'defmacro' 'macro-time-fn-def')))
+  (const TOP_LEVEL_STATEMENT_TAGS
+    (new Set (array 'expr-stmt' 'let*' 'let' 'const*' 'const'
+                    'if' 'while' 'block' 'return' 'throw' 'assign'
+                    'switch' 'try' 'for' 'for-in' 'for-of' 'for-await')))
+
+  (const pushMacroError
+    (lambda ((env) (message) (nodeId))
+      ((. (. env errors) push) (object
+        (kind 'other')
+        (message message)
+        (macroName (|| (. env currentMacroName) '<unknown>'))
+        (callSite (|| (. env currentCallSite) '<unknown>'))
+        (nodeId (ternary (=== nodeId undefined) (. env currentCallNodeId) nodeId))))
+      (return null)))
+
+  (const ensureNodeHasId
+    (lambda ((node))
+      (if (&& node (=== (. node id) undefined))
+        (set! (. node id) (nextNodeId)))
+      (return node)))
+
+  (const isAllowedTopLevelTag
+    (lambda ((tag))
+      (return (|| ((. TOP_LEVEL_DECL_TAGS has) tag)
+                 ((. TOP_LEVEL_STATEMENT_TAGS has) tag)))))
+
+  (const getTopLevelMacroCall
+    (lambda ((node) (env))
+      (if (=== (. node tag) 'expr-stmt')
+        (let* ((expr (. node expr)))
+          (if (=== (. expr tag) 'call')
+            (let* ((callee (. expr fn)))
+              (if (&& (=== (. callee tag) 'identifier') ((. (. env macros) has) (. callee name)))
+                (return expr))))))
+      (return undefined)))
+
+  (const expandTopLevelMacroCall
+    (lambda ((callNode) (env))
+      (return (expandMacroCall callNode env))))
+
+  (const validateTopLevelNode
+    (lambda ((node) (env))
+      (if (! node)
+        (begin
+          (pushMacroError env 'macro top-level expansion produced disallowed form' undefined)
+          (return null)))
+      (let* ((withId (ensureNodeHasId node)) (tag (. withId tag)))
+        (if (=== tag undefined)
+          (begin
+            (pushMacroError env 'macro top-level expansion produced disallowed form' (. withId id))
+            (return null)))
+        (if (! (isAllowedTopLevelTag tag))
+          (begin
+            (pushMacroError env (+ 'macro top-level expansion produced disallowed form: ' tag) (. withId id))
+            (return null)))
+        (return withId))))
+
   ;; ---- Main entry point ----
   ;; Returns { ast: ProgramNode, errors: ExpansionError[] }
   ;; Errors are accumulated in env.errors during expansion.
   (const expandAll
     (lambda ((programNode) (env))
-      (let* ((expandedBody ((. (. programNode body) map) (lambda ((node))
-               (return (expandTopLevel node env)))))
-             (expanded (object
-               (tag 'program')
-               (text (. programNode text))
-               (body expandedBody))))
-        (return (object (ast expanded) (errors (. env errors)))))))
+      (let* ((worklist ((. (. programNode body) slice) 0))
+             (expandedBody (array)))
+        (while (> (. worklist length) 0)
+          (let* ((node ((. worklist shift)))
+                 (_ (registerTopLevelNode node env))
+                 (macroCall (getTopLevelMacroCall node env)))
+            (if macroCall
+              (let* ((result (expandTopLevelMacroCall macroCall env)))
+                (if ((. Array isArray) result)
+                  (let* ((validated (array)))
+                    ((. result forEach)
+                      (lambda ((spliced))
+                        (let* ((validatedNode (validateTopLevelNode spliced env)))
+                          (if validatedNode
+                            (begin
+                              ((. validated push) validatedNode)
+                              (registerTopLevelNode validatedNode env))))))
+                    (let* ((idx (- (. validated length) 1)))
+                      (while (>= idx 0)
+                        (begin
+                          (let* ((spliced (index validated idx)))
+                            ((. worklist unshift) spliced))
+                          (set! idx (- idx 1))))))
+                  ;; single result: if it's a top-level form, splice it; else wrap in expr-stmt
+                  (let* ((singleValidated (ternary (&& result ((. TOP_LEVEL_DECL_TAGS has) (. result tag)))
+                                            (validateTopLevelNode result env)
+                                            null)))
+                    (if singleValidated
+                      (begin
+                        (registerTopLevelNode singleValidated env)
+                        ((. worklist unshift) singleValidated))
+                      ((. expandedBody push)
+                        (object (tag 'expr-stmt') (text (. node text)) (expr result)))))))
+              ((. expandedBody push) (expandTopLevel node env)))))
+        (let* ((expanded (object (tag 'program') (text (. programNode text))
+                 (body expandedBody))))
+          (return (object (ast expanded) (errors (. env errors))))))))
 
   (export-named (expandAll) (expandTopLevel) (expandExpr) (expandStmt) (evalMacroExpr) (evalQuasi) (addScopeToNode) (stampDefScope) (extractBindingName) (formatExpansionErrors))
 )

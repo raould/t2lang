@@ -1,0 +1,3 @@
+(program
+  (defmacro double ((x))
+    (return (quasi (* 2 (unquote x))))))

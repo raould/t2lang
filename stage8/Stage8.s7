@@ -1,0 +1,93 @@
+(program
+  (import (object (:named (array (object (:name "CharStream")) (object (:name "CommonTokenStream"))))) "antlr4ng")
+  (import (object (:named (array (object (:name "Stage8Lexer"))))) "./Stage8Lexer")
+  (import (object (:named (array (object (:name "Stage8Parser"))))) "./Stage8Parser")
+  (import (object (:default "fs")) "node:fs")
+  (import (object (:named (array (object (:name "astTopLevel"))))) "./Stage8-ast")
+  (import (object (:named (array (object (:name "lowerTopLevel"))))) "./Stage8-lower")
+  (import (object (:named (array (object (:name "emitTopLevel"))))) "./Stage8-codegen")
+  (import (object (:named (array (object (:name "makeMacroEnv"))))) "./Stage8-macro-env")
+  (import (object (:named (array (object (:name "expandAll")) (object (:name "formatExpansionErrors"))))) "./Stage8-macro-expand")
+  (import (object (:named (array (object (:name "resolveTopLevel")) (object (:name "addBinding"))))) "./Stage8-scope-resolve")
+  (import (object (:named (array (object (:name "resetSpans"))))) "./Stage8-spans")
+
+  ;; ========== parseFile: parse a .t2 source, return AST program node ==========
+  (const parseFile
+    (lambda ((filePath))
+      (let* ((input ((. fs readFileSync) (ternary (=== filePath '-') 0 filePath) 'utf-8'))
+             (inputStream ((. CharStream fromString) input))
+             (lexer (new Stage8Lexer inputStream))
+             (tokenStream (new CommonTokenStream lexer))
+             (parser (new Stage8Parser tokenStream))
+             (tree ((. parser "program")))
+             (body ((. ((. tree topLevel)) map) astTopLevel)))
+        (return (object (tag 'program') (text ((. tree getText))) (body body))))))
+
+  ;; ========== processPrelude: load a prelude file, register its macros ==========
+  ;; Parses and expands a .t2 prelude file, registering any macros into macroEnv.
+  ;; Does NOT emit any output. Exits with an error if the file cannot be loaded
+  ;; or if expansion errors occur.
+  (const processPrelude
+    (lambda ((preludePath) (macroEnv))
+      (if (! ((. preludePath endsWith) '.t2'))
+        (begin
+          ((. console error) (+ 'error: prelude file must have .t2 extension: ' preludePath))
+          ((. process exit) 1)))
+      (if (! ((. fs existsSync) preludePath))
+        (begin
+          ((. console error) (+ 'error: prelude file not found: ' preludePath))
+          ((. process exit) 1)))
+      (let* ((_spans (resetSpans preludePath))
+             (programNode (parseFile preludePath))
+             (_expanded (expandAll programNode macroEnv)))
+        (if (> (. (. macroEnv errors) length) 0)
+          (begin
+            ((. console error) (+ 'error in macro prelude ' preludePath ':'))
+            ((. console error) (formatExpansionErrors (. macroEnv errors)))
+            ((. process exit) 1))))))
+
+  ;; ========== main ==========
+  (const main
+    (lambda ()
+      (let* ((argv ((. (. process argv) slice) 2))
+             (preludePaths (array))
+             (filePath '-')
+             (i 0))
+        (while (< i (. argv length))
+          (if (=== (index argv i) '--macro-prelude')
+            (begin
+              (set! i (+ i 1))
+              (if (< i (. argv length))
+                ((. preludePaths push) (index argv i))
+                (begin
+                  ((. console error) 'error: --macro-prelude requires a file path argument')
+                  ((. process exit) 1))))
+            (set! filePath (index argv i)))
+          (set! i (+ i 1)))
+        (let* ((macroEnv (makeMacroEnv)))
+          ;; Process preludes in order, registering macros into macroEnv
+          ((. preludePaths forEach)
+            (lambda ((preludePath))
+              (processPrelude preludePath macroEnv)))
+          ;; Reset spans for main compilation unit
+          (let* ((_spans (resetSpans (ternary (=== filePath '-') '<stdin>' filePath)))
+                 (programNode (parseFile filePath))
+                 ;; Expand all forms using worklist (handles macro splicing)
+                 (expandResult (expandAll programNode macroEnv)))
+            (if (> (. (. macroEnv errors) length) 0)
+              (begin
+                ((. console error) (formatExpansionErrors (. macroEnv errors)))
+                ((. process exit) 1)))
+            ;; Process each expanded node through resolve/lower/emit
+            (let* ((chain (array)))
+              ((. (. (. expandResult ast) body) forEach)
+                (lambda ((expandedNode))
+                  (let* ((resolvedNode (resolveTopLevel expandedNode chain)))
+                    (if (|| (=== (. resolvedNode tag) 'let-decl') (=== (. resolvedNode tag) 'const-decl'))
+                      (set! chain (addBinding chain (. resolvedNode name) (new Set))))
+                    (let* ((loweredNode (lowerTopLevel resolvedNode))
+                           (emittedStr (emitTopLevel loweredNode)))
+                      ((. (. process stdout) write) (+ emittedStr '\n'))))))))))))
+
+  (main)
+)

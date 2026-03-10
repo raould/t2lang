@@ -1198,9 +1198,31 @@ const astTemplateExpr  = (ctx) => {
     });
   }
 };
+const astQuasiquoteForm  = (formCtx) => {
+  if (formCtx.topLevelLet()) {
+    return astTopLevelLet(formCtx.topLevelLet());
+  }
+  if (formCtx.topLevelConst()) {
+    return astTopLevelConst(formCtx.topLevelConst());
+  }
+  if (formCtx.typeAlias()) {
+    return astTypeAlias(formCtx.typeAlias());
+  }
+  if (formCtx.interfaceDef()) {
+    return astInterfaceDef(formCtx.interfaceDef());
+  }
+  if (formCtx.classDef()) {
+    return astClassDef(formCtx.classDef());
+  }
+  if (formCtx.importForm()) {
+    return astImport(formCtx.importForm());
+  }
+  return astExpression(formCtx.expression());
+};
 const astQuasiquote  = (ctx) => {
   {
-    let expr  = astExpression(ctx.expression());
+    let formCtx  = ctx.quasiForm();
+    let expr  = astQuasiquoteForm(formCtx);
     return ({
       id: registerSpan(nextNodeId(), ctx),
       text: ctx.getText(),

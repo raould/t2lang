@@ -1,4 +1,3 @@
-* read agent-guardrails.md.
 * when writing TypeScript code, keep it simple.
 * note that "npm test" already runs "npm build" first, so you do not have to run "npm build" separately.
 * if you make edits to files in directory X, then "cd X; npm test" and fix any errors.

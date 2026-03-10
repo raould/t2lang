@@ -6,8 +6,8 @@
   (import (object (:named (array (object (:name "astTopLevel"))))) "./Stage7-ast")
   (import (object (:named (array (object (:name "lowerTopLevel"))))) "./Stage7-lower")
   (import (object (:named (array (object (:name "emitTopLevel"))))) "./Stage7-codegen")
-  (import (object (:named (array (object (:name "makeMacroEnv")) (object (:name "registerTopLevelNode"))))) "./Stage7-macro-env")
-  (import (object (:named (array (object (:name "expandTopLevel")) (object (:name "formatExpansionErrors"))))) "./Stage7-macro-expand")
+  (import (object (:named (array (object (:name "makeMacroEnv"))))) "./Stage7-macro-env")
+  (import (object (:named (array (object (:name "expandAll")) (object (:name "formatExpansionErrors"))))) "./Stage7-macro-expand")
   (import (object (:named (array (object (:name "resolveTopLevel")) (object (:name "addBinding"))))) "./Stage7-scope-resolve")
   (import (object (:named (array (object (:name "resetSpans"))))) "./Stage7-spans")
 
@@ -23,28 +23,26 @@
              (tree ((. parser "program")))
              ;; Reset span table before each compilation unit
              (_spans (resetSpans (ternary (=== filePath '-') '<stdin>' filePath)))
-             (macroEnv (makeMacroEnv)))
-        ;; Streaming loop: process one top-level form at a time.
-        ;; chain threads accumulated binding state across forms.
+             (macroEnv (makeMacroEnv))
+             ;; Build program body from all parsed top-level forms
+             (body ((. ((. tree topLevel)) map) astTopLevel))
+             (programNode (object (tag 'program') (text ((. tree getText))) (body body)))
+             ;; Expand all forms using worklist (handles macro splicing)
+             (expandResult (expandAll programNode macroEnv)))
+        (if (> (. (. macroEnv errors) length) 0)
+          (begin
+            ((. console error) (formatExpansionErrors (. macroEnv errors)))
+            ((. process exit) 1)))
+        ;; Process each expanded node through resolve/lower/emit
         (let* ((chain (array)))
-          ((. ((. tree topLevel)) forEach)
-            (lambda ((ctx))
-              ;; Phase 0+1: parse and desugar one form at a time
-              (let* ((surfaceNode (astTopLevel ctx)))
-                ;; Phase 2: register then expand against incrementally-built macroEnv
-                (registerTopLevelNode surfaceNode macroEnv)
-                (let* ((expandedNode (expandTopLevel surfaceNode macroEnv)))
-                  (if (> (. (. macroEnv errors) length) 0)
-                    (begin
-                      ((. console error) (formatExpansionErrors (. macroEnv errors)))
-                      ((. process exit) 1)))
-                  ;; Phase 3: resolve, lower, emit — one form at a time
-                  (let* ((resolvedNode (resolveTopLevel expandedNode chain)))
-                    (if (|| (=== (. resolvedNode tag) 'let-decl') (=== (. resolvedNode tag) 'const-decl'))
-                      (set! chain (addBinding chain (. resolvedNode name) (new Set))))
-                    (let* ((loweredNode (lowerTopLevel resolvedNode))
-                           (emittedStr (emitTopLevel loweredNode)))
-                      ((. (. process stdout) write) (+ emittedStr '\n'))))))))))))
+          ((. (. (. expandResult ast) body) forEach)
+            (lambda ((expandedNode))
+              (let* ((resolvedNode (resolveTopLevel expandedNode chain)))
+                (if (|| (=== (. resolvedNode tag) 'let-decl') (=== (. resolvedNode tag) 'const-decl'))
+                  (set! chain (addBinding chain (. resolvedNode name) (new Set))))
+                (let* ((loweredNode (lowerTopLevel resolvedNode))
+                       (emittedStr (emitTopLevel loweredNode)))
+                  ((. (. process stdout) write) (+ emittedStr '\n'))))))))))
 
   (main)
 )

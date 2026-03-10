@@ -20,7 +20,7 @@ if (!filePath) {
 
 const src = readFileSync(filePath, 'utf8');
 
-const match = src.match(/\`(\(program[\s\S]*)\`/m);
+const match = src.match(/\`\s*(\(program[\s\S]*)\s*\`/m);
 if (!match) {
   console.error(`No backtick string found in file ${filePath}`);
   process.exit(1);

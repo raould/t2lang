@@ -307,18 +307,15 @@ const lowerExportDefaultDef  = (node) => {
   }
 };
 const lowerDefmacro  = (node) => {
-  {
-    let body  = node.body.map(lowerStmt);
-    return ({
-      node: node,
-      id: node.id,
-      tag: "macro-def",
-      name: node.name,
-      params: node.params,
-      body: body,
-      scopeId: node.scopeId
-    });
-  }
+  return ({
+    node: node,
+    id: node.id,
+    tag: "macro-def",
+    name: node.name,
+    params: node.params,
+    body: [],
+    scopeId: node.scopeId
+  });
 };
 const lowerMacroTimeFnDef  = (node) => {
   {

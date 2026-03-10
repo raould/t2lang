@@ -5,8 +5,8 @@ import fs from "node:fs";
 import { astTopLevel } from "./Stage7-ast";
 import { lowerTopLevel } from "./Stage7-lower";
 import { emitTopLevel } from "./Stage7-codegen";
-import { makeMacroEnv, registerTopLevelNode } from "./Stage7-macro-env";
-import { expandTopLevel, formatExpansionErrors } from "./Stage7-macro-expand";
+import { makeMacroEnv } from "./Stage7-macro-env";
+import { expandAll, formatExpansionErrors } from "./Stage7-macro-expand";
 import { resolveTopLevel, addBinding } from "./Stage7-scope-resolve";
 import { resetSpans } from "./Stage7-spans";
 const main  = () => {
@@ -20,31 +20,31 @@ const main  = () => {
     let tree  = parser.program();
     let _spans  = resetSpans(((filePath === "-") ? "<stdin>" : filePath));
     let macroEnv  = makeMacroEnv();
+    let body  = tree.topLevel().map(astTopLevel);
+    let programNode  = ({
+      tag: "program",
+      text: tree.getText(),
+      body: body
+    });
+    let expandResult  = expandAll(programNode, macroEnv);
+    if ((macroEnv.errors.length > 0)) {
+      {
+        console.error(formatExpansionErrors(macroEnv.errors));
+        process.exit(1);
+      }
+    }
     {
       let chain  = [];
-      tree.topLevel().forEach((ctx) => {
+      expandResult.ast.body.forEach((expandedNode) => {
         {
-          let surfaceNode  = astTopLevel(ctx);
-          registerTopLevelNode(surfaceNode, macroEnv);
+          let resolvedNode  = resolveTopLevel(expandedNode, chain);
+          if (((resolvedNode.tag === "let-decl") || (resolvedNode.tag === "const-decl"))) {
+            chain = addBinding(chain, resolvedNode.name, new Set());
+          }
           {
-            let expandedNode  = expandTopLevel(surfaceNode, macroEnv);
-            if ((macroEnv.errors.length > 0)) {
-              {
-                console.error(formatExpansionErrors(macroEnv.errors));
-                process.exit(1);
-              }
-            }
-            {
-              let resolvedNode  = resolveTopLevel(expandedNode, chain);
-              if (((resolvedNode.tag === "let-decl") || (resolvedNode.tag === "const-decl"))) {
-                chain = addBinding(chain, resolvedNode.name, new Set());
-              }
-              {
-                let loweredNode  = lowerTopLevel(resolvedNode);
-                let emittedStr  = emitTopLevel(loweredNode);
-                process.stdout.write((emittedStr + "\n"));
-              }
-            }
+            let loweredNode  = lowerTopLevel(resolvedNode);
+            let emittedStr  = emitTopLevel(loweredNode);
+            process.stdout.write((emittedStr + "\n"));
           }
         }
       });
