@@ -18,9 +18,9 @@
     "doc": "docs"
   },
   "scripts": {
-    "build": "npm --prefix stage6 build",
-    "test": "npm --prefix stage6 test",
-    "testnow": "npm --prefix stage6 testnow"
+    "build": "npm --prefix stage7 build",
+    "test": "npm --prefix stage7 test",
+    "testnow": "npm --prefix stage7 testnow"
   },
   "bin": {
     "t2tc": "bin/t2tc.js",
