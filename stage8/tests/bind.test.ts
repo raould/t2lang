@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('bind end-to-end', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; bind fixes this to a specific object
         (const greet (fn ((msg)) (return (+ msg ", " (. this name)))))
         (let (obj) (object (name "Alice")))

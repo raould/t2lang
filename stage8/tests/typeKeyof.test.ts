@@ -3,10 +3,10 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('typeKeyof end-to-end', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; Keys<T> = keyof T
-        (type Keys (type-params T) (keyof T))
-        ;; Keys<{a:number,b:string}> = "a" | "b"
+        (type Keys (type-params (T)) (keyof T))
+        ;; Keys<{a~number,b~string}> = "a" | "b"
         ;; annotate a variable with that key type and check the value
         (let (k : (Keys (obj (a number) (b string)))) "a")
         (asrt k "a")

@@ -25,14 +25,12 @@ const formatSpan  = (id) => {
   {
     let span  = spanTable.get(id);
     if ((!span)) {
-      return "<unknown>";
+      return undefined;
     }
     return ((((span.file + ":") + span.startLine) + ":") + (span.startCol + 1));
   }
 };
 const resetSpans  = (file) => {
-  spanTable.clear();
-  nodeIdCounter_ = 0;
   currentFile_ = ((file === undefined) ? "<stdin>" : file);
 };
 export { spanTable, nextNodeId, registerSpan, formatSpan, resetSpans };

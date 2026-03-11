@@ -1,0 +1,521 @@
+(program
+  ;; ========== Name Resolution (KFFD subset rule) ==========
+  ;;
+  ;; This pass walks the expanded AST and resolves identifier references to
+  ;; their binding sites using the KFFD subset rule:
+  ;;
+  ;;   A binding B (with scope set SB) is visible to a reference R (with scope
+  ;;   set SR, same name) if and only if  SB ⊆ SR.
+  ;;
+  ;;   Among all visible bindings for the same name, the one with the largest
+  ;;   |SB| wins (most specific / innermost macro scope).
+  ;;
+  ;; Practical note: let/const/param binding names are currently stored as
+  ;; plain strings in the AST (not identifier nodes), so their implicit scope
+  ;; set is treated as ∅.  With ∅ ⊆ anything, all such bindings match any
+  ;; reference — the tie-breaking rule (innermost first) then produces standard
+  ;; lexical scoping.  When binding names are eventually represented as
+  ;; identifier nodes carrying KFFD scope sets, the subset filter will be able
+  ;; to prevent template bindings from being visible to user references.
+  ;;
+  ;; Resolved identifiers gain a `resolvedScopes` field (the winning binding's
+  ;; scope set) for downstream tooling; unresolved identifiers (free variables)
+  ;; are returned unchanged.
+  ;;
+  ;; ScopeChain entry: { name: string, scopes: Set<number> }
+  ;; Maintained innermost-last (appended, so the last entry is innermost).
+
+  ;; isSubsetOf(a, b): returns true if every element of Set a is in Set b.
+  (const isSubsetOf
+    (lambda ((a) (b))
+      (let ((result true))
+        ((. a forEach) (lambda ((x))
+          (if (! ((. b has) x))
+            (then (set! result false)))))
+        (return result))))
+
+  ;; addBinding: append a binding to the chain (non-mutating).
+  (const addBinding
+    (lambda ((chain) (name) (scopes))
+      (return ((. chain concat) (array (object (name name) (scopes scopes)))))))
+
+  ;; resolveIdent: find the most-specific visible binding for `ident` in `chain`.
+  ;; Iterates the chain (which is ordered outermost-to-innermost) and returns
+  ;; the matching binding whose scope set has the highest cardinality.
+  ;; In a flat user program (all binding scopes = ∅), ties are broken in favour
+  ;; of the LAST matched entry (innermost), because we iterate the whole chain
+  ;; and overwrite `best` when |SB| >= |best.SB|.
+  (const resolveIdent
+    (lambda ((ident) (chain))
+      (let ((identScopes (. ident scopes))
+             (name (. ident name))
+             (best null))
+        ((. chain forEach)
+          (lambda ((b))
+            (if (=== (. b name) name)
+              (then (if (isSubsetOf (. b scopes) identScopes)
+                ;; >= so that equal-size bindings keep the later (innermost) one
+                (then (if (|| (=== best null) (>= (. (. b scopes) size) (. (. best scopes) size)))
+                  (then (set! best b)))))))))
+        (return best))))
+
+  ;; resolveExpr: walk an expression, resolving identifiers.
+  (const resolveExpr
+    (lambda ((node) (chain))
+      (if (|| (=== node null) (=== node undefined))
+        (then (return node)))
+      ;; identifier: annotate with resolvedScopes if a binding is found
+      (if (=== (. node tag) 'identifier')
+        (then (let ((binding (resolveIdent node chain)))
+            (if binding
+              (then (return (object
+                (tag 'identifier')
+                (name (. node name))
+                (text (. node text))
+                (scopes (. node scopes))
+                (hygiene (. node hygiene))
+                (resolvedScopes (. binding scopes)))))
+              (else (return node))))))
+      ;; call
+      (if (=== (. node tag) 'call')
+        (then (return (object (tag 'call') (text (. node text))
+          (fn (resolveExpr (. node fn) chain))
+          (args ((. (. node args) map) (lambda ((a)) (return (resolveExpr a chain)))))
+          (typeArgs (. node typeArgs))))))
+      ;; array
+      (if (=== (. node tag) 'array')
+        (then (return (object (tag 'array') (text (. node text))
+          (elements ((. (. node elements) map) (lambda ((e)) (return (resolveExpr e chain)))))))))
+      ;; object expr
+      (if (=== (. node tag) 'object')
+        (then (return (object (tag 'object') (text (. node text))
+          (fields ((. (. node fields) map) (lambda ((f))
+            (if (. f isShorthand) (then (return f)))
+            (if (&& (. f computed) (. f isMethod))
+              (then (let ((extChain chain))
+                ((. (. f params) forEach) (lambda ((p))
+                  (set! extChain (addBinding extChain p (new Set)))))
+                (return (object
+                  (computed true)
+                  (keyExpr (resolveExpr (. f keyExpr) chain))
+                  (isMethod true)
+                  (params (. f params))
+                  (body ((. (. f body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
+            (if (. f computed)
+              (then (return (object
+                (computed true)
+                (keyExpr (resolveExpr (. f keyExpr) chain))
+                (isMethod false)
+                (isShorthand false)
+                (value (resolveExpr (. f value) chain))))))
+            (if (. f isMethod)
+              (then (let ((extChain chain))
+                ((. (. f params) forEach) (lambda ((p))
+                  (set! extChain (addBinding extChain p (new Set)))))
+                (return (object
+                  (key (. f key))
+                  (isMethod true)
+                  (params (. f params))
+                  (body ((. (. f body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
+            (return (object
+              (key (. f key))
+              (isMethod (. f isMethod))
+              (isShorthand (. f isShorthand))
+              (value (resolveExpr (. f value) chain)))))))))))
+      ;; lambda / fn / async-lambda / async-fn / generator-fn / async-generator-fn:
+      ;; extend chain with params (and optional rest param)
+      (if (|| (=== (. node tag) 'lambda')
+          (|| (=== (. node tag) 'fn')
+          (|| (=== (. node tag) 'async-lambda')
+          (|| (=== (. node tag) 'async-fn')
+          (|| (=== (. node tag) 'generator-fn')
+              (=== (. node tag) 'async-generator-fn'))))))
+        (then (let ((extChain chain))
+            ((. (. node params) forEach) (lambda ((p))
+              (let ((pName (ternary (=== (typeof p) 'string') p
+                              (ternary (. p name) (. p name) (+ p ''))))
+                     (pScopes (ternary (&& (!== (typeof p) 'string') (. p scopes))
+                                 (. p scopes) (new Set))))
+                (set! extChain (addBinding extChain pName pScopes)))))
+            (if (. node rest)
+              (then (set! extChain (addBinding extChain (. node rest) (new Set)))))
+            (return (object (tag (. node tag)) (text (. node text))
+              (params (. node params))
+              (rest (. node rest))
+              (restType (. node restType))
+              (returnType (. node returnType))
+              (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
+      ;; fn-o / lambda-o / async-fn-o / async-lambda-o / generator-fn-o / async-generator-fn-o:
+      ;; extend chain with fno param names
+      (if (|| (=== (. node tag) 'fn-o')
+          (|| (=== (. node tag) 'lambda-o')
+          (|| (=== (. node tag) 'async-fn-o')
+          (|| (=== (. node tag) 'async-lambda-o')
+          (|| (=== (. node tag) 'generator-fn-o')
+              (=== (. node tag) 'async-generator-fn-o'))))))
+        (then (let ((extChain chain))
+            ((. (. node params) forEach) (lambda ((p))
+              (set! extChain (addBinding extChain (. p name) (new Set)))))
+            (if (. node rest)
+              (then (set! extChain (addBinding extChain (. node rest) (new Set)))))
+            (return (object (tag (. node tag)) (text (. node text))
+              (params (. node params))
+              (rest (. node rest))
+              (restType (. node restType))
+              (returnType (. node returnType))
+              (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
+      ;; await / yield / yield*
+      (if (|| (=== (. node tag) 'await')
+          (|| (=== (. node tag) 'yield')
+              (=== (. node tag) 'yield*')))
+        (then (return (object (tag (. node tag)) (text (. node text))
+          (expr (ternary (. node expr) (resolveExpr (. node expr) chain) undefined))))))
+      ;; ternary
+      (if (=== (. node tag) 'ternary')
+        (then (return (object (tag 'ternary') (text (. node text))
+          (test (resolveExpr (. node test) chain))
+          (ifthen (resolveExpr (. node ifthen) chain))
+          (ifelse (resolveExpr (. node ifelse) chain))))))
+      ;; prop-access
+      (if (=== (. node tag) 'prop-access')
+        (then (return (object (tag 'prop-access') (text (. node text))
+          (object (resolveExpr (. node object) chain))
+          (key (. node key))))))
+      ;; index-access
+      (if (=== (. node tag) 'index-access')
+        (then (return (object (tag 'index-access') (text (. node text))
+          (object (resolveExpr (. node object) chain))
+          (index (resolveExpr (. node index) chain))))))
+      ;; cond
+      (if (=== (. node tag) 'cond')
+        (then (return (object (tag 'cond') (text (. node text))
+          (clauses ((. (. node clauses) map) (lambda ((c))
+            (return (object
+              (test (resolveExpr (. c test) chain))
+              (expr (resolveExpr (. c expr) chain)))))))
+          (elseExpr (ternary (!== (. node elseExpr) undefined) (resolveExpr (. node elseExpr) chain) undefined))))))
+      ;; macro block call — expression form: resolve header args; body is data (not resolved here)
+      (if (=== (. node tag) 'macro-expr-call')
+        (then (return (object (tag 'macro-expr-call') (id (. node id))
+          (fn (. node fn))
+          (headerArgs ((. (. node headerArgs) map) (lambda ((a)) (return (resolveExpr a chain)))))
+          (body (. node body))))))
+      ;; leaf nodes (literal, keyword, this, super, quasi, etc.)
+      (return node)))
+
+  (const resolveClassElement
+    (lambda ((node) (chain))
+      (if (=== (. node tag) 'field-def')
+        (then (return (object (tag 'field-def') (text (. node text))
+          (modifiers (. node modifiers))
+          (name (. node name))
+          (typeAnnotation (. node typeAnnotation))
+          (init (ternary (. node init) (resolveExpr (. node init) chain) undefined))))))
+      (if (=== (. node tag) 'constructor-def')
+        (then (let ((extChain chain))
+            ((. (. (. node sig) params) forEach) (lambda ((p))
+              (set! extChain (addBinding extChain (. p name) (new Set)))))
+            (return (object (tag 'constructor-def') (text (. node text))
+              (sig (. node sig))
+              (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
+      (if (=== (. node tag) 'class-method-def')
+        (then (let ((extChain chain))
+            ((. (. (. node sig) params) forEach) (lambda ((p))
+              (set! extChain (addBinding extChain (. p name) (new Set)))))
+            (return (object (tag 'class-method-def') (text (. node text))
+              (modifiers (. node modifiers))
+              (computed (. node computed))
+              (name (. node name))
+              (key (ternary (. node key) (resolveExpr (. node key) chain) undefined))
+              (sig (. node sig))
+              (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
+      (if (=== (. node tag) 'abstract-method-def')
+        (then (return (object (tag 'abstract-method-def') (text (. node text))
+          (modifiers (. node modifiers))
+          (computed (. node computed))
+          (name (. node name))
+          (key (ternary (. node key) (resolveExpr (. node key) chain) undefined))
+          (sig (. node sig))))))
+      (if (=== (. node tag) 'getter-def')
+        (then (return (object (tag 'getter-def') (text (. node text))
+          (modifiers (. node modifiers))
+          (computed (. node computed))
+          (name (. node name))
+          (key (ternary (. node key) (resolveExpr (. node key) chain) undefined))
+          (sig (. node sig))
+          (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s chain)))))))))
+      (if (=== (. node tag) 'setter-def')
+        (then (let ((extChain chain))
+            ((. (. (. node sig) params) forEach) (lambda ((p))
+              (set! extChain (addBinding extChain (. p name) (new Set)))))
+            (return (object (tag 'setter-def') (text (. node text))
+              (modifiers (. node modifiers))
+              (computed (. node computed))
+              (name (. node name))
+              (key (ternary (. node key) (resolveExpr (. node key) chain) undefined))
+              (sig (. node sig))
+              (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
+      ;; method-o / abstract-method-o / constructor-o: extend chain with fno param names
+      (if (=== (. node tag) 'method-o-def')
+        (then (let ((extChain chain))
+            ((. (. node params) forEach) (lambda ((p))
+              (set! extChain (addBinding extChain (. p name) (new Set)))))
+            (if (. node rest)
+              (then (set! extChain (addBinding extChain (. node rest) (new Set)))))
+            (return (object (tag 'method-o-def') (text (. node text))
+              (modifiers (. node modifiers))
+              (computed (. node computed))
+              (name (. node name))
+              (key (ternary (. node key) (resolveExpr (. node key) chain) undefined))
+              (params (. node params))
+              (rest (. node rest))
+              (restType (. node restType))
+              (returnType (. node returnType))
+              (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
+      (if (=== (. node tag) 'abstract-method-o-def')
+        (then (return (object (tag 'abstract-method-o-def') (text (. node text))
+          (modifiers (. node modifiers))
+          (computed (. node computed))
+          (name (. node name))
+          (key (ternary (. node key) (resolveExpr (. node key) chain) undefined))
+          (params (. node params))
+          (rest (. node rest))
+          (restType (. node restType))
+          (returnType (. node returnType))))))
+      (if (=== (. node tag) 'constructor-o-def')
+        (then (let ((extChain chain))
+            ((. (. node params) forEach) (lambda ((p))
+              (set! extChain (addBinding extChain (. p name) (new Set)))))
+            (if (. node rest)
+              (then (set! extChain (addBinding extChain (. node rest) (new Set)))))
+            (return (object (tag 'constructor-o-def') (text (. node text))
+              (params (. node params))
+              (rest (. node rest))
+              (restType (. node restType))
+              (returnType (. node returnType))
+              (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
+      (throw (new Error (+ 'resolveClassElement: unexpected tag >' (. node tag) '<')))))
+
+  (const resolveClassBody
+    (lambda ((node) (chain))
+      (return (object (tag 'class-body') (text (. node text))
+        (elements ((. (. node elements) map) (lambda ((el)) (return (resolveClassElement el chain)))))))))
+
+  (const resolveClassDef
+    (lambda ((node) (chain))
+      (return (object (tag 'class-def') (text (. node text))
+        (modifiers (. node modifiers))
+        (name (. node name))
+        (typeParams (. node typeParams))
+        (extendsType (. node extendsType))
+        (implementsTypes (. node implementsTypes))
+        (body (resolveClassBody (. node body) chain))))))
+
+  (const resolveAnonClassDef
+    (lambda ((node) (chain))
+      (return (object (tag 'anon-class-def') (text (. node text))
+        (modifiers (. node modifiers))
+        (extendsType (. node extendsType))
+        (implementsTypes (. node implementsTypes))
+        (body (resolveClassBody (. node body) chain))))))
+
+  ;; resolveStmt: walk a statement, resolving identifiers.
+  (const resolveStmt
+    (lambda ((node) (chain))
+      (if (|| (=== node null) (=== node undefined))
+        (then (return node)))
+      ;; expr-stmt
+      (if (=== (. node tag) 'expr-stmt')
+        (then (return (object (tag 'expr-stmt') (text (. node text))
+          (expr (resolveExpr (. node expr) chain))))))
+      ;; return
+      (if (=== (. node tag) 'return')
+        (then (return (object (tag 'return') (text (. node text))
+          (expr (ternary (. node expr) (resolveExpr (. node expr) chain) undefined))))))
+      ;; throw
+      (if (=== (. node tag) 'throw')
+        (then (return (object (tag 'throw') (text (. node text))
+          (expr (resolveExpr (. node expr) chain))))))
+      ;; let: sequential bindings, each extends the chain
+      (if (=== (. node tag) 'let')
+        (then (let ((extChain chain)
+                 (resolvedBindings (array)))
+            ((. (. node bindings) forEach)
+              (lambda ((b))
+                (let ((resolvedInit (resolveExpr (. b init) extChain))
+                       ;; binding name scope: empty set for user code
+                       (bindScopes (ternary (. b scopes) (. b scopes) (new Set))))
+                  ((. resolvedBindings push) (object
+                    (name (. b name))
+                    (init resolvedInit)
+                    (typeAnnotation (. b typeAnnotation))))
+                  (set! extChain (addBinding extChain (. b name) bindScopes)))))
+            (return (object (tag 'let') (text (. node text))
+              (bindings resolvedBindings)
+              (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
+      ;; const*: same pattern as let
+      (if (=== (. node tag) 'const*')
+        (then (let ((extChain chain)
+                 (resolvedBindings (array)))
+            ((. (. node bindings) forEach)
+              (lambda ((b))
+                (let ((resolvedInit (resolveExpr (. b init) extChain))
+                       (bindScopes (ternary (. b scopes) (. b scopes) (new Set))))
+                  ((. resolvedBindings push) (object
+                    (name (. b name))
+                    (init resolvedInit)
+                    (typeAnnotation (. b typeAnnotation))))
+                  (set! extChain (addBinding extChain (. b name) bindScopes)))))
+            (return (object (tag 'const*') (text (. node text))
+              (bindings resolvedBindings)
+              (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
+      ;; if
+      (if (=== (. node tag) 'if')
+        (then (return (object (tag 'if') (text (. node text))
+          (test (resolveExpr (. node test) chain))
+          (ifthen ((. (. node ifthen) map) (lambda ((s)) (return (resolveStmt s chain)))))
+          (ifelse (ternary (. node ifelse) ((. (. node ifelse) map) (lambda ((s)) (return (resolveStmt s chain)))) undefined))))))
+      ;; while
+      (if (=== (. node tag) 'while')
+        (then (return (object (tag 'while') (text (. node text))
+          (test (resolveExpr (. node test) chain))
+          (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s chain)))))))))
+      ;; try/catch/finally
+      (if (=== (. node tag) 'try')
+        (then (return (object (tag 'try') (text (. node text))
+          (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s chain)))))
+          (catchClause (ternary (. node catchClause)
+                          (object (param (. (. node catchClause) param))
+                                  (body ((. (. (. node catchClause) body) map)
+                                    (lambda ((s))
+                                      (return (resolveStmt s (addBinding chain (. (. node catchClause) param) (new Set))))))))
+                          undefined))
+          (finallyBody (ternary (. node finallyBody)
+                           ((. (. node finallyBody) map) (lambda ((s)) (return (resolveStmt s chain))))
+                           undefined))))))
+      ;; assign
+      (if (=== (. node tag) 'assign')
+        (then (return (object (tag 'assign') (text (. node text))
+          (name (. node name))
+          (value (resolveExpr (. node value) chain))))))
+      ;; let
+      (if (=== (. node tag) 'let')
+        (then (return (object (tag 'let') (text (. node text))
+          (name (. node name))
+          (typeAnnotation (. node typeAnnotation))
+          (init (resolveExpr (. node init) chain))))))
+      ;; const
+      (if (=== (. node tag) 'const')
+        (then (if (. node pattern)
+          (then (return (object (tag 'const') (text (. node text))
+            (pattern (. node pattern))
+            (init (resolveExpr (. node init) chain)))))
+          (else (return (object (tag 'const') (text (. node text))
+            (name (. node name))
+            (typeAnnotation (. node typeAnnotation))
+            (init (resolveExpr (. node init) chain))))))))
+      ;; class definitions
+      (if (=== (. node tag) 'class-def')
+        (then (return (resolveClassDef node chain))))
+      (if (=== (. node tag) 'anon-class-def')
+        (then (return (resolveAnonClassDef node chain))))
+      ;; macro block call — statement form: resolve header args; body is data
+      (if (=== (. node tag) 'macro-body-call')
+        (then (return (object (tag 'macro-body-call') (id (. node id))
+          (fn (. node fn))
+          (headerArgs ((. (. node headerArgs) map) (lambda ((a)) (return (resolveExpr a chain)))))
+          (body (. node body))))))
+      ;; infix binary/unary ops
+      (if (=== (. node tag) 'binary-op')
+        (then (return (object (tag 'binary-op') (id (. node id)) (op (. node op))
+          (left (resolveExpr (. node left) chain))
+          (right (resolveExpr (. node right) chain))))))
+      (if (=== (. node tag) 'unary-op')
+        (then (return (object (tag 'unary-op') (id (. node id)) (op (. node op))
+          (operand (resolveExpr (. node operand) chain))))))
+      ;; macro block call — expression form: resolve header args; body is data (not resolved here)
+      (if (=== (. node tag) 'macro-expr-call')
+        (then (return (object (tag 'macro-expr-call') (id (. node id))
+          (fn (. node fn))
+          (headerArgs ((. (. node headerArgs) map) (lambda ((a)) (return (resolveExpr a chain)))))
+          (body (. node body))))))
+      ;; block: macro-emitted statement block — recurse body with current chain
+      (if (=== (. node tag) 'block')
+        (then (return (object (tag 'block') (id (. node id)) (text (. node text))
+          (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s chain)))))))))
+      ;; fallthrough: return as-is
+      (return node)))
+
+  ;; resolveTopLevel: walk a top-level node.
+  (const resolveTopLevel
+    (lambda ((node) (chain))
+      ;; macro defs: skip (they are compile-time only)
+      (if (|| (=== (. node tag) 'defmacro') (=== (. node tag) 'macro-time-fn-def'))
+        (then (return node)))
+      ;; let-decl / const-decl: resolve the init expression, preserve meta and typeAnnotation
+      (if (=== (. node tag) 'let-decl')
+        (then (return (object (tag 'let-decl') (id (. node id)) (text (. node text))
+          (name (. node name))
+          (meta (. node meta))
+          (typeAnnotation (. node typeAnnotation))
+          (init (resolveExpr (. node init) chain))))))
+      (if (=== (. node tag) 'const-decl')
+        (then (return (object (tag 'const-decl') (id (. node id)) (text (. node text))
+          (name (. node name))
+          (meta (. node meta))
+          (typeAnnotation (. node typeAnnotation))
+          (init (resolveExpr (. node init) chain))))))
+      (if (=== (. node tag) 'fn-decl')
+        (then (let ((extChain chain))
+            ((. (. node params) forEach) (lambda ((p))
+              (set! extChain (addBinding extChain (. p name) (new Set)))))
+            (if (. node rest)
+              (then (set! extChain (addBinding extChain (. node rest) (new Set)))))
+            (return (object (tag 'fn-decl') (text (. node text))
+              (name (. node name))
+              (meta (. node meta))
+              (params (. node params))
+              (rest (. node rest))
+              (restType (. node restType))
+              (returnType (. node returnType))
+              (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
+      (if (=== (. node tag) 'fn-o-decl')
+        (then (let ((extChain chain))
+            ((. (. node params) forEach) (lambda ((p))
+              (set! extChain (addBinding extChain (. p name) (new Set)))))
+            (if (. node rest)
+              (then (set! extChain (addBinding extChain (. node rest) (new Set)))))
+            (return (object (tag 'fn-o-decl') (text (. node text))
+              (name (. node name))
+              (params (. node params))
+              (rest (. node rest))
+              (restType (. node restType))
+              (returnType (. node returnType))
+              (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
+      ;; mixin-form: no variable references to resolve
+      (if (=== (. node tag) 'mixin-form')
+        (then (return node)))
+      ;; everything else: treat as statement
+      (return (resolveStmt node chain))))
+
+  ;; resolveNames: main entry point.
+  ;; Walks the entire program AST, resolving identifiers using the KFFD
+  ;; subset rule.  Returns { ast: ProgramNode, errors: [] }.
+  ;; (errors are reserved for future hygiene-violation reporting)
+  (const resolveNames
+    (lambda ((programNode))
+      (let ((chain (array))
+             (resolvedBody (array)))
+        ((. (. programNode body) forEach) (lambda ((node))
+          ((. resolvedBody push) (resolveTopLevel node chain))
+          ;; top-level defs extend the chain for subsequent nodes
+          (if (|| (=== (. node tag) 'let-decl') (|| (=== (. node tag) 'const-decl') (|| (=== (. node tag) 'fn-decl') (=== (. node tag) 'fn-o-decl'))))
+            (then (set! chain (addBinding chain (. node name) (new Set)))))))
+        (let ((resolved (object
+                 (tag 'program')
+                 (text (. programNode text))
+                 (body resolvedBody))))
+          (return (object (ast resolved) (errors (array))))))))
+
+  (export-named (resolveNames) (resolveTopLevel) (resolveIdent) (resolveExpr) (resolveStmt) (isSubsetOf) (addBinding))
+)

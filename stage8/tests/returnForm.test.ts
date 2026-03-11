@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('returnForm.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     ;; return with expression
     (const getVal
       (lambda ()

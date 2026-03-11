@@ -7,12 +7,17 @@ import { TopLevelContext } from "./Stage8Parser.js";
 import { DeclContext } from "./Stage8Parser.js";
 import { DefmacroContext } from "./Stage8Parser.js";
 import { MacroTimeFnDefContext } from "./Stage8Parser.js";
+import { MacroImportContext } from "./Stage8Parser.js";
+import { MacroExportContext } from "./Stage8Parser.js";
+import { MacroExportSpecContext } from "./Stage8Parser.js";
 import { TopLevelLetContext } from "./Stage8Parser.js";
 import { TopLevelConstContext } from "./Stage8Parser.js";
 import { MetaAnnotationContext } from "./Stage8Parser.js";
 import { TypeAliasContext } from "./Stage8Parser.js";
 import { InterfaceDefContext } from "./Stage8Parser.js";
 import { InterfaceExtendsContext } from "./Stage8Parser.js";
+import { EnumDefContext } from "./Stage8Parser.js";
+import { EnumMemberContext } from "./Stage8Parser.js";
 import { ClassDefContext } from "./Stage8Parser.js";
 import { AnonClassDefContext } from "./Stage8Parser.js";
 import { ClassExtendsContext } from "./Stage8Parser.js";
@@ -115,6 +120,8 @@ import { BindExprContext } from "./Stage8Parser.js";
 import { MethodCallExprContext } from "./Stage8Parser.js";
 import { TernaryContext } from "./Stage8Parser.js";
 import { CondExprContext } from "./Stage8Parser.js";
+import { CondClauseContext } from "./Stage8Parser.js";
+import { CondElseClauseContext } from "./Stage8Parser.js";
 import { NewFormContext } from "./Stage8Parser.js";
 import { ObjectExprContext } from "./Stage8Parser.js";
 import { ObjectFieldContext } from "./Stage8Parser.js";
@@ -196,6 +203,36 @@ export class Stage8Listener implements ParseTreeListener {
      */
     exitMacroTimeFnDef?: (ctx: MacroTimeFnDefContext) => void;
     /**
+     * Enter a parse tree produced by `Stage8Parser.macroImport`.
+     * @param ctx the parse tree
+     */
+    enterMacroImport?: (ctx: MacroImportContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage8Parser.macroImport`.
+     * @param ctx the parse tree
+     */
+    exitMacroImport?: (ctx: MacroImportContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage8Parser.macroExport`.
+     * @param ctx the parse tree
+     */
+    enterMacroExport?: (ctx: MacroExportContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage8Parser.macroExport`.
+     * @param ctx the parse tree
+     */
+    exitMacroExport?: (ctx: MacroExportContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage8Parser.macroExportSpec`.
+     * @param ctx the parse tree
+     */
+    enterMacroExportSpec?: (ctx: MacroExportSpecContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage8Parser.macroExportSpec`.
+     * @param ctx the parse tree
+     */
+    exitMacroExportSpec?: (ctx: MacroExportSpecContext) => void;
+    /**
      * Enter a parse tree produced by `Stage8Parser.topLevelLet`.
      * @param ctx the parse tree
      */
@@ -255,6 +292,26 @@ export class Stage8Listener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitInterfaceExtends?: (ctx: InterfaceExtendsContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage8Parser.enumDef`.
+     * @param ctx the parse tree
+     */
+    enterEnumDef?: (ctx: EnumDefContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage8Parser.enumDef`.
+     * @param ctx the parse tree
+     */
+    exitEnumDef?: (ctx: EnumDefContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage8Parser.enumMember`.
+     * @param ctx the parse tree
+     */
+    enterEnumMember?: (ctx: EnumMemberContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage8Parser.enumMember`.
+     * @param ctx the parse tree
+     */
+    exitEnumMember?: (ctx: EnumMemberContext) => void;
     /**
      * Enter a parse tree produced by `Stage8Parser.classDef`.
      * @param ctx the parse tree
@@ -1275,6 +1332,26 @@ export class Stage8Listener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitCondExpr?: (ctx: CondExprContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage8Parser.condClause`.
+     * @param ctx the parse tree
+     */
+    enterCondClause?: (ctx: CondClauseContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage8Parser.condClause`.
+     * @param ctx the parse tree
+     */
+    exitCondClause?: (ctx: CondClauseContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage8Parser.condElseClause`.
+     * @param ctx the parse tree
+     */
+    enterCondElseClause?: (ctx: CondElseClauseContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage8Parser.condElseClause`.
+     * @param ctx the parse tree
+     */
+    exitCondElseClause?: (ctx: CondElseClauseContext) => void;
     /**
      * Enter a parse tree produced by `Stage8Parser.newForm`.
      * @param ctx the parse tree

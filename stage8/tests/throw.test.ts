@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('throw form end-to-end', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
 
     ;; (throw expr) compiles to a throw statement.
     ;; This tests that throw is correctly emitted by placing it on a branch that

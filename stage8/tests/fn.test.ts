@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('fn end-to-end', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; fn: regular function expression — has own this, is constructible
         (const add (fn ((a) (b)) (return (+ a b))))
         (asrt (add 2 3) 5)
@@ -21,7 +21,7 @@ it('fn end-to-end', () => {
 
 it('fn with types end-to-end', () => {
         fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (let* ((add (fn ((a : number) (b : number)) : string
                     (return (+ (String a) (String b))))))
             (asrt (add 2 3) "23")

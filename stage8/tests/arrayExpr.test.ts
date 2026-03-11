@@ -5,7 +5,7 @@ import { fromSourceEndToEnd } from './helpers';
 it('arrayExpr.t2 end-to-end', () => {
   fromSourceEndToEnd(`
     (program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; array with elements
         (let (arr) (array 1 2 3))
         (let (astr) ((. arr toString)))

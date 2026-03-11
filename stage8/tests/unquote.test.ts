@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('unquote.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrtDeep"))))) "./helpers")
+      (import (object (named (array (object (name "asrtDeep"))))) "./helpers")
       (let (x) 42)
       ;; unquote inside quasiquote
       (let (tmpl) (quasi (object (val (unquote x)))))

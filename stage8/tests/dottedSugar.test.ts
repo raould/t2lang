@@ -20,7 +20,7 @@ const compile = (t2Source: string) => {
 
 it('dotted sugar emits nested prop-access', () => {
   const result = compile(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (const arr1 (array 1))
     (const arr2 (array 2))
     (const merged (Array.prototype.concat.call arr1 arr2))
@@ -45,7 +45,7 @@ it('dotted sugar folds multiple segments and numeric keys', () => {
 
 it('macro expansion sees prop-access from dotted sugar', () => {
   const result = compile(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (defmacro identity ((x)) (return x))
     (const obj (object (x 41)))
     (asrt (identity obj.x) 41)

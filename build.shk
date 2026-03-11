@@ -1,0 +1,43 @@
+(program
+  ;; build.shk — t2lang build file for MiniShake.
+
+  (import { readdirSync writeFileSync renameSync } "node:fs")
+  (import path "node:path")
+
+  (export-default (fn ((shk : any))
+
+    ;; Rule 1: ANTLR grammar → TypeScript lexer/parser
+    ((. shk rule) {
+      name: "build-grammar"
+      output: "stage10/Stage10Lexer.ts"
+      deps: [{ kind: "file" path: "stage10/Stage10.g4" }]
+      action: (async-fn ((ctx : any))
+        (const (antlrBin : string) ((. path join) (. ctx projectRoot) "stage10" "node_modules" ".bin" "antlr-ng"))
+        (await ((. ctx run) antlrBin
+          ["-Dlanguage=TypeScript" ((. path join) (. ctx projectRoot) "stage10" "Stage10.g4")])))})
+
+    ;; Rule 2: .s8 sources → compiled .ts via stage8 compiler
+    ((. shk rule) {
+      name: "build-compiler"
+      output: "stage10/index.ts"
+      deps: [{ kind: "rule" name: "build-grammar" }
+             { kind: "glob" pattern: "stage10/Stage10*.s8" }
+             { kind: "file" path: "stage10/Stage10-tags.ts" }
+             { kind: "file" path: "stage10/Stage10-debug.ts" }
+             { kind: "file" path: "stage10/Stage10-parse-form.ts" }]
+      action: (async-fn ((ctx : any))
+        (const (stage10Dir : string) ((. path join) (. ctx projectRoot) "stage10"))
+        (const (tsxBin : string) ((. path join) stage10Dir "node_modules" ".bin" "tsx"))
+        (const (compilerPath : string) ((. path join) (. ctx projectRoot) "stage8" "index.ts"))
+        (const (s8Files : (type-array string))
+          ((. (readdirSync stage10Dir) filter) (fn ((f : string)) (return ((. f endsWith) ".s8")))))
+        (for-of f s8Files
+          ;; Stage10.s8 → index.ts, everything else Stage10-foo.s8 → Stage10-foo.ts
+          (const (outName : string)
+            (ternary (=== f "Stage10.s8") "index.ts" ((. f replace) ".s8" ".ts")))
+          (const (srcPath : string) ((. path join) stage10Dir f))
+          (const (tmpPath : string) ((. path join) "/tmp" (+ "_s9_" outName)))
+          (const (outPath : string) ((. path join) stage10Dir outName))
+          (const (result : any) (await ((. ctx run) tsxBin [compilerPath srcPath])))
+          (writeFileSync tmpPath (. result stdout))
+          (renameSync tmpPath outPath)))}))))

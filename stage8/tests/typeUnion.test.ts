@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('typeUnion end-to-end', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; union type: number | string — holds either kind of value
         (let (x : (union number string)) 42)
         (asrt x 42)

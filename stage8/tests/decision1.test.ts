@@ -62,28 +62,28 @@ describe('Decision 1: BACKTICK_STRING removed — no raw-template output', () =>
 describe('Decision 1: regular strings work in all positions', () => {
   it('single-quoted string is a valid literal', () => {
     fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
       (asrt 'hello' "hello")
     )`);
   }, T);
 
   it('double-quoted string is a valid literal', () => {
     fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
       (asrt "hello" 'hello')
     )`);
   }, T);
 
   it('string with single quotes inside double-quoted string works', () => {
     fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
       (asrt "it's fine" "it's fine")
     )`);
   }, T);
 
   it('string is a valid propKey for an object field', () => {
     fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
       (let (obj) (object ("myKey" 42)))
       (asrt (. obj myKey) 42)
     )`);
@@ -91,7 +91,7 @@ describe('Decision 1: regular strings work in all positions', () => {
 
   it('hyphenated string key is accessible via index', () => {
     fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
       (let (obj) (object ("has-hyphen" 99)))
       (asrt (index obj "has-hyphen") 99)
     )`);

@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('method end-to-end', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; method shorthand in object literal — dynamic this binding
         (let (counter)
             (object

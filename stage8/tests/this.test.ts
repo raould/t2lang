@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('this — passed as argument to a helper fn', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     ;; this passed explicitly to a plain fn — the fn receives the object
     (const getName (fn ((obj)) (return (. obj name))))
     (let (person)
@@ -16,7 +16,7 @@ it('this — passed as argument to a helper fn', () => {
 
 it('this — in ternary inside method body', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     ;; ternary that reads this.value — typical in a guarded getter
     (let (box)
       (object
@@ -32,7 +32,7 @@ it('this — in ternary inside method body', () => {
 
 it('this — method calling another method on this', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     ;; quadruple calls double via (. this double) — this is preserved in property-call position
     (let (obj)
       (object
@@ -45,7 +45,7 @@ it('this — method calling another method on this', () => {
 
 it('this — fn constructor with multiple this assignments', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     ;; fn with two set! statements — exercises multi-statement fn body
     (const Point (fn ((x) (y))
       (set! (. this x) x)
@@ -58,7 +58,7 @@ it('this — fn constructor with multiple this assignments', () => {
 
 it('this — fn constructor with computed method on prototype', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     ;; attach a method to fn prototype via assignment
     (const Counter (fn ()
       (set! (. this count) 0)))
@@ -76,7 +76,7 @@ it('this — fn constructor with computed method on prototype', () => {
 
 it('this — bind fixes this for a method extracted from object', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     ;; extracting a method loses this; bind restores it
     (let (obj) (object (val 42) (get (method () (return (. this val))))))
     (let (extracted) (. obj get))

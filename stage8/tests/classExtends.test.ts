@@ -3,11 +3,11 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('class — extends with super constructor call', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; Animal: base class with constructor and method
         (class Animal
             (class-body
-                (field name : string)
+                (field (name : string))
                 (constructor ((name : string))
                     (set! (. this name) name))
                 (method speak () (returns string)
@@ -26,9 +26,9 @@ it('class — extends with super constructor call', () => {
     )`);
 }, 30_000);
 
-it('class — :override method with super-method call', () => {
+it('class — override method with super-method call', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; Base: plain method
         (class Base
             (class-body
@@ -38,7 +38,7 @@ it('class — :override method with super-method call', () => {
         (class Child
             (extends Base)
             (class-body
-                (method :override describe () (returns string)
+                (method override describe () (returns string)
                     (return (+ (super-method describe) "+child")))))
         (let (c) (new Child))
         (asrt ((. c describe)) "base+child")
@@ -47,7 +47,7 @@ it('class — :override method with super-method call', () => {
 
 it('class — super method call with arguments', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; Calculator base
         (class Calculator
             (class-body
@@ -57,7 +57,7 @@ it('class — super method call with arguments', () => {
         (class LoggingCalculator
             (extends Calculator)
             (class-body
-                (method :override add ((a : number) (b : number)) (returns number)
+                (method override add ((a : number) (b : number)) (returns number)
                     (return (* 2 (super-method add a b))))))
         (let (lc) (new LoggingCalculator))
         (asrt ((. lc add) 3 4) 14)
@@ -66,10 +66,10 @@ it('class — super method call with arguments', () => {
 
 it('class — two-level inheritance chain', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (class A
             (class-body
-                (field x : number)
+                (field (x : number))
                 (constructor ((x : number))
                     (set! (. this x) x))
                 (method val () (returns number)

@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('type-as end-to-end', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
 
     ;; basic type assertion: number as unknown then back
     (let (x : number) 42)

@@ -1,0 +1,155 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "t2",
+	"scopeName": "source.t2",
+	"patterns": [
+		{ "include": "#triple-string" },
+		{ "include": "#backtick-template" },
+		{ "include": "#single-string" },
+		{ "include": "#double-string" },
+		{ "include": "#comment" },
+		{ "include": "#constant" },
+		{ "include": "#keyword" },
+		{ "include": "#bracket" },
+		{ "include": "#paren" }
+	],
+	"repository": {
+
+		"comment": {
+			"name": "comment.line.semicolon.t2",
+			"match": ";+.*$"
+		},
+
+		"triple-string": {
+			"name": "string.quoted.triple.t2",
+			"begin": "\"\"\"",
+			"end": "\"\"\"",
+			"patterns": [
+				{ "name": "constant.character.escape.t2", "match": "\\\\." }
+			]
+		},
+
+		"double-string": {
+			"name": "string.quoted.double.t2",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{ "name": "constant.character.escape.t2", "match": "\\\\." }
+			]
+		},
+
+		"single-string": {
+			"name": "string.quoted.single.t2",
+			"begin": "'",
+			"end": "'",
+			"patterns": [
+				{ "name": "constant.character.escape.t2", "match": "\\\\." }
+			]
+		},
+
+		"backtick-template": {
+			"name": "string.template.t2",
+			"begin": "`",
+			"end": "`",
+			"patterns": [
+				{ "name": "constant.character.escape.t2", "match": "\\\\." },
+				{
+					"name": "meta.template.expression.t2",
+					"begin": "\\$\\{",
+					"beginCaptures": { "0": { "name": "punctuation.definition.template-expression.begin.t2" } },
+					"end": "\\}",
+					"endCaptures": { "0": { "name": "punctuation.definition.template-expression.end.t2" } },
+					"patterns": [
+						{ "include": "#triple-string" },
+						{ "include": "#double-string" },
+						{ "include": "#single-string" },
+						{ "include": "#comment" },
+						{ "include": "#constant" },
+						{ "include": "#keyword" },
+						{ "include": "#paren" }
+					]
+				}
+			]
+		},
+
+		"constant": {
+			"patterns": [
+				{
+					"name": "constant.numeric.t2",
+					"match": "-?\\b\\d+(\\.\\d+)?\\b"
+				},
+				{
+					"name": "constant.language.t2",
+					"match": "\\b(true|false|null|undefined)\\b"
+				}
+			]
+		},
+
+		"keyword": {
+			"patterns": [
+				{
+					"comment": "t2 control-flow and declaration keywords (must appear as s-expr heads)",
+					"name": "keyword.control.t2",
+					"match": "(?<=\\()(?:program|let|let\\*|const|const\\*|var|if|while|for|for-of|for-in|for-await|return|break|continue|throw|try|catch|finally|except|switch|case|default|set!|begin|cond|then|else)(?=[\\s)])"
+				},
+				{
+					"comment": "function / class definition forms",
+					"name": "keyword.declaration.t2",
+					"match": "(?<=\\()(?:lambda|lambda-o|fn|fn-o|async-fn|async-fn-o|generator-fn|generator-fn-o|async-generator-fn|async-generator-fn-o|async-lambda|async-lambda-o|class|class-body|constructor|constructor-o|method|method-o|abstract-method|abstract-method-o|getter-def|setter-def|field|defmacro|interface|enum|type)(?=[\\s)])"
+				},
+				{
+					"comment": "module / export forms",
+					"name": "keyword.other.module.t2",
+					"match": "(?<=\\()(?:import|import-type|export|export-named|export-default|export-from|export-all-from|export-ns-from|export-type|export-type-from|export-type-all-from|macro-import|macro-export|macro-reexport)(?=[\\s)])"
+				},
+				{
+					"comment": "expression-level operators and special forms",
+					"name": "keyword.operator.t2",
+					"match": "(?<=\\()(?:new|await|yield|yield\\*|typeof|instanceof|void|delete|ternary|index|subscript|array|object|method-call|bind|quasi|quote|unquote|unquote-splicing|template|super|super-method)(?=[\\s)])"
+				},
+				{
+					"comment": "TypeScript / JS keywords usable as identifiers or modifiers",
+					"name": "keyword.other.ts.t2",
+					"match": "\\b(?:async|static|override|abstract|readonly|private|protected|public|implements|extends|infer|keyof|typeof|generator|get|set|modifiers)\\b"
+				},
+				{
+					"comment": "type-level forms",
+					"name": "support.type.t2",
+					"match": "(?<=\\()(?:type-app|type-array|type-as|type-params|type-args|type-template|tfn|union|intersect|mapped|tuple|infer|keyof|returns|tlit)(?=[\\s)])"
+				},
+				{
+					"comment": "macro-time attribute: #[macro-time]",
+					"name": "storage.modifier.macro.t2",
+					"match": "#\\[macro-time\\]"
+				},
+				{
+					"comment": "class / constructor names — PascalCase",
+					"name": "entity.name.type.t2",
+					"match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
+				}
+			]
+		},
+
+		"bracket": {
+			"patterns": [
+				{
+					"name": "punctuation.definition.bracket.t2",
+					"match": "[\\[\\]{}]"
+				}
+			]
+		},
+
+		"paren": {
+			"patterns": [
+				{
+					"name": "punctuation.section.parens.begin.t2",
+					"match": "\\("
+				},
+				{
+					"name": "punctuation.section.parens.end.t2",
+					"match": "\\)"
+				}
+			]
+		}
+	}
+}

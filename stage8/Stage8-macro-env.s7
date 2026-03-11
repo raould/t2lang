@@ -20,13 +20,16 @@
 
   ;; Create an empty MacroEnv.
   (const makeMacroEnv
-    (lambda ()
+    (lambda ((isMacroCompilation))
       (return (object
         (macros (new Map))
+        (macroNamespaces (new Map))
         (macroTimeFns (new Map))
         (varRegistry (new Map))
+        (moduleVars (new Map))
         (gensymCounter 0)
         (scopeCounter 0)
+        (isMacroCompilation (ternary isMacroCompilation true false))
         (currentMacroName null)
         (currentCallSite null)
         (errors (array))))))

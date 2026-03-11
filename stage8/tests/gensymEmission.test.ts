@@ -30,27 +30,27 @@ describe('Section 2 Step 3: gensym identifier emission', () => {
     // via (quasi (unquote s)).  After expansion the call site becomes the
     // raw identifier g_0, which the emitter must write as exactly "g_0".
     const result = callCompiler(`(program
-  (defmacro make-sym ()
+  (defmacro makeSym ()
     (let* ((s (gensym "g")))
       (return (quasi (unquote s)))))
-  (const x (make-sym))
+  (const x (makeSym))
 )`);
     expect(result.status).toBe(0);
     // The TypeScript output must contain the gensym name in the form g_<digits>
     expect(result.stdout).toMatch(/g_\d+/);
     // The raw call form must not appear — the macro call is fully erased
-    expect(result.stdout).not.toContain('make-sym(');
+    expect(result.stdout).not.toContain('makeSym(');
   }, T);
 
   it('two gensym calls in one compilation produce distinct names', () => {
-    // Each expansion of make-sym generates a fresh counter value, so two
+    // Each expansion of makeSym generates a fresh counter value, so two
     // invocations produce g_0 and g_1 (different suffixes).
     const result = callCompiler(`(program
-  (defmacro make-sym ()
+  (defmacro makeSym ()
     (let* ((s (gensym "g")))
       (return (quasi (unquote s)))))
-  (const a (make-sym))
-  (const b (make-sym))
+  (const a (makeSym))
+  (const b (makeSym))
 )`);
     expect(result.status).toBe(0);
     // Both distinct gensym names must appear
@@ -61,10 +61,10 @@ describe('Section 2 Step 3: gensym identifier emission', () => {
 
   it('gensym prefix is preserved verbatim in the emitted name', () => {
     const result = callCompiler(`(program
-  (defmacro use-tmp ()
+  (defmacro useTmp ()
     (let* ((s (gensym "myprefix")))
       (return (quasi (unquote s)))))
-  (const x (use-tmp))
+  (const x (useTmp))
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).toMatch(/myprefix_\d+/);

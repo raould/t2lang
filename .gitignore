@@ -16,6 +16,10 @@ tmp_*
 # Keep bin
 !/bin
 !/bin/*.js
+!/bin/*.ts
+!**/bin
+!**/bin/*.js
+!**/bin/*.ts
 
 # Keep source files
 !jest.config.js

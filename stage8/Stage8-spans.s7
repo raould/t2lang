@@ -14,7 +14,8 @@
   ;;   nextNodeId()          → fresh NodeId
   ;;   registerSpan(id, ctx) → stores span from ANTLR ctx, returns id
   ;;   formatSpan(id)        → "file:line:col" string (or "<unknown>")
-  ;;   resetSpans()          → clears table and resets counter (call between files)
+  ;;   resetSpans(file)      → switches current file; does NOT clear table or reset counter
+  ;;                           so spans from preludes remain visible for error reporting
 
   (const spanTable (new Map))
   (let nodeIdCounter_ 0)
@@ -42,13 +43,11 @@
   (const formatSpan
     (lambda ((id))
       (let* ((span ((. spanTable get) id)))
-        (if (! span) (return '<unknown>'))
+        (if (! span) (return undefined))
         (return (+ (. span file) ':' (. span startLine) ':' (+ (. span startCol) 1))))))
 
   (const resetSpans
     (lambda ((file))
-      ((. spanTable clear))
-      (set! nodeIdCounter_ 0)
       (set! currentFile_ (ternary (=== file undefined) '<stdin>' file))))
 
   (export-named (spanTable) (nextNodeId) (registerSpan) (formatSpan) (resetSpans))
