@@ -3,6 +3,7 @@ import { spawnSync } from 'child_process';
 import { readFileSync, writeFileSync, unlinkSync, existsSync, mkdirSync } from 'fs';
 import { resolve, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
+import { Command } from 'commander';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const stage8Dir = resolve(__dirname, '../stage8');
@@ -10,31 +11,21 @@ const compilerPath = resolve(stage8Dir, 'index.ts');
 const tsxBin = resolve(stage8Dir, 'node_modules/.bin/tsx');
 const tscBin = resolve(stage8Dir, 'node_modules/.bin/tsc');
 
-const args = process.argv.slice(2);
-let outDir;
-const inputs = [];
+const program = new Command();
+program
+  .name('t2run')
+  .description('Compile and run .t2 source files')
+  .argument('[files...]', '.t2 input files, or - for stdin')
+  .option('-o, --outDir <path>', 'output directory for intermediate files (default: same directory as input file)');
 
-for (let i = 0; i < args.length; i += 1) {
-  const arg = args[i];
-  const equalsForm = arg.startsWith('--outDir=');
-  if (arg === '--outDir' || equalsForm) {
-    const next = equalsForm ? arg.slice('--outDir='.length) : args[i + 1];
-    if (!next) {
-      console.error('Error: --outDir requires a path');
-      process.exit(1);
-    }
-    outDir = resolve(next);
-    if (!equalsForm) {
-      i += 1;
-    }
-    continue;
-  }
-  inputs.push(arg);
-}
+program.parse();
+
+const opts = program.opts();
+const inputs = program.args;
+const outDir = opts.outDir ? resolve(opts.outDir) : undefined;
 
 if (inputs.length === 0) {
-  console.error('Usage: t2run [--outDir <path>] - | file1.t2 [file2.t2 ...]');
-  process.exit(1);
+  program.help();
 }
 
 function ensureOutDir(dirPath) {

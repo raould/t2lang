@@ -3,48 +3,31 @@ import { spawnSync } from 'child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { resolve, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
+import { Command } from 'commander';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const stage8Dir = resolve(__dirname, '../stage8');
 const compilerPath = resolve(stage8Dir, 'index.ts');
 const tsxBin = resolve(stage8Dir, 'node_modules/.bin/tsx');
 
-const args = process.argv.slice(2);
-let outDir;
-const inputs = [];
-const preludePaths = [];
+const program = new Command();
+program
+  .name('t2tc')
+  .description('Compile .t2 source files to TypeScript')
+  .argument('[files...]', '.t2 input files, or - for stdin')
+  .option('-o, --outDir <path>', 'output directory (default: same directory as input file)')
+  .option('-m, --macro-prelude <path>', 'load a .t2 macro prelude file (may be repeated)',
+    (v, prev) => [...prev, resolve(v)], []);
 
-for (let i = 0; i < args.length; i += 1) {
-  const arg = args[i];
-  const equalsForm = arg.startsWith('--outDir=');
-  if (arg === '--outDir' || equalsForm) {
-    const next = equalsForm ? arg.slice('--outDir='.length) : args[i + 1];
-    if (!next) {
-      console.error('Error: --outDir requires a path');
-      process.exit(1);
-    }
-    outDir = resolve(next);
-    if (!equalsForm) {
-      i += 1;
-    }
-    continue;
-  }
-  if (arg === '--macro-prelude') {
-    const next = args[i + 1];
-    if (!next) {
-      console.error('Error: --macro-prelude requires a file path argument');
-      process.exit(1);
-    }
-    preludePaths.push(resolve(next));
-    i += 1;
-    continue;
-  }
-  inputs.push(arg);
-}
+program.parse();
+
+const opts = program.opts();
+const inputs = program.args;
+const outDir = opts.outDir ? resolve(opts.outDir) : undefined;
+const preludePaths = opts.macroPrelude;
 
 if (inputs.length === 0) {
-  console.error('Usage: t2tc [--outDir <path>] - | file1.t2 [file2.t2 ...]');
-  process.exit(1);
+  program.help();
 }
 
 function ensureOutDir(dirPath) {
