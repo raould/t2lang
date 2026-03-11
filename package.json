@@ -19,8 +19,8 @@
   },
   "scripts": {
     "modules": "for ME in `find . -maxdepth 1 -type d -name stage\\* | grep -v crazy`; do (cd $ME; npm i); done",
-    "build": "npm rum modules && npm --prefix stage8 run build",
-    "test": "npm run modules && npm --prefix stage8 test",
+    "build": "npm --prefix stage8 run build",
+    "test": "npm run modules && npm run build && npm --prefix stage8 test",
     "testnow": "npm --prefix stage8 testnow"
   },
   "bin": {

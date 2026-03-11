@@ -652,6 +652,13 @@ const lowerStmt  = (node) => {
       expr: lowerExpr(node.expr)
     });
   }
+  if ((node.tag === "quasi")) {
+    {
+      let formatted  = formatSpan(node.id);
+      let check  = ((undefined == formatted) ? "" : (" — check macro that generates this form at " + formatted));
+      throw new Error(("unevaluated quasi template in statement position" + check));
+    }
+  }
   throw new Error(((("lowerStmt: unexpected tag >" + node.tag) + "< at ") + formatSpan(node.id)));
 };
 const lowerLetStar  = (node) => {

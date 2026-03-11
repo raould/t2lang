@@ -37,12 +37,12 @@ const T = 30_000;
 
 describe('Step 7: macro expansion in the compiler pipeline', () => {
   it('a zero-arg macro is expanded and its result executes correctly', () => {
-    // (defmacro const-42 () (return (quasi 42)))  →  the call site becomes the literal 42
+    // (defmacro const42 () (return (quasi 42)))  →  the call site becomes the literal 42
     fromSourceEndToEnd(`(program
   (import (object (:named (array (object (:name "asrt"))))) "./helpers")
-  (defmacro const-42 ()
+  (defmacro const42 ()
     (return (quasi 42)))
-  (const result (const-42))
+  (const result (const42))
   (asrt result 42)
 )`);
   }, T);
@@ -73,27 +73,27 @@ describe('Step 7: macro expansion in the compiler pipeline', () => {
 
   it('defmacro node appears as a comment in the TypeScript output, not runtime code', () => {
     const result = callCompiler(`(program
-  (defmacro my-macro ((x))
+  (defmacro myMacro ((x))
     (return (quasi (unquote x))))
-  (const y (my-macro 99))
+  (const y (myMacro 99))
 )`);
     expect(result.status).toBe(0);
-    // The defmacro should appear as a comment like "// macro: my-macro"
-    expect(result.stdout).toContain('// macro: my-macro');
-    // It should NOT define a function or variable named my-macro
-    expect(result.stdout).not.toMatch(/let my.macro|const my.macro|function my.macro/);
+    // The defmacro should appear as a comment like "// macro: myMacro"
+    expect(result.stdout).toContain('// macro: myMacro');
+    // It should NOT define a function or variable named myMacro
+    expect(result.stdout).not.toMatch(/let myMacro|const myMacro|function myMacro/);
   }, T);
 
   it('macro call is completely removed from output — only expansion result remains', () => {
     const result = callCompiler(`(program
-  (defmacro identity-macro ((x))
+  (defmacro identityMacro ((x))
     (return (quasi (unquote x))))
-  (const val (identity-macro 77))
+  (const val (identityMacro 77))
 )`);
     expect(result.status).toBe(0);
     // The macro call form should be gone; the number literal should appear
     expect(result.stdout).toContain('77');
-    expect(result.stdout).not.toContain('identity-macro(');
+    expect(result.stdout).not.toContain('identityMacro(');
   }, T);
 
   it('macro using gensym avoids capture of user variable with same prefix', () => {
@@ -106,11 +106,11 @@ describe('Step 7: macro expansion in the compiler pipeline', () => {
     //  3. a user variable named "tmp" (same prefix as the gensym) is unaffected.
     fromSourceEndToEnd(`(program
   (import (object (:named (array (object (:name "asrt"))))) "./helpers")
-  (defmacro negate-fresh ((x))
+  (defmacro negateFresh ((x))
     (let* ((tmp (gensym "tmp")))
       (return (quasi (- 0 (unquote x))))))
   (const tmp 5)
-  (const result (negate-fresh tmp))
+  (const result (negateFresh tmp))
   (asrt result -5)
   (asrt tmp 5)
 )`);
@@ -122,21 +122,21 @@ describe('Step 7: macro expansion in the compiler pipeline', () => {
 describe('Step 7: compiler pipeline error handling', () => {
   it('arity error causes compiler to exit with code 1', () => {
     const result = callCompiler(`(program
-  (defmacro takes-one ((x))
+  (defmacro takesOne ((x))
     (return (quasi (unquote x))))
-  (const v (takes-one 1 2))
+  (const v (takesOne 1 2))
 )`);
     expect(result.status).toBe(1);
   }, T);
 
   it('arity error message is written to stderr', () => {
     const result = callCompiler(`(program
-  (defmacro needs-two ((a) (b))
+  (defmacro needsTwo ((a) (b))
     (return (quasi (+ (unquote a) (unquote b)))))
-  (const v (needs-two 1))
+  (const v (needsTwo 1))
 )`);
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('needs-two');
+    expect(result.stderr).toContain('needsTwo');
     expect(result.stderr).toMatch(/arity|expects/i);
   }, T);
 
@@ -155,9 +155,9 @@ describe('Step 7: compiler pipeline error handling', () => {
 
   it('macro-error causes compiler to exit with code 1', () => {
     const result = callCompiler(`(program
-  (defmacro always-bad ()
+  (defmacro alwaysBad ()
     (macro-error "deliberate error from macro"))
-  (const v (always-bad))
+  (const v (alwaysBad))
 )`);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('deliberate error from macro');
@@ -185,7 +185,7 @@ describe('Step 7: macro top-level splicing', () => {
   it('macro can splice multiple let/const/class forms', () => {
     fromSourceEndToEnd(`(program
   (import (object (:named (array (object (:name "asrt"))))) "./helpers")
-  (defmacro emit-mixed ()
+  (defmacro emitMixed ()
     (return (array
       (quasi (let fromMacro 5))
       (quasi (const constFromMacro 17))
@@ -194,7 +194,7 @@ describe('Step 7: macro top-level splicing', () => {
           (field total : number)
           (constructor ()
             (set! (. this total) (+ 5 17)))))))))
-  (emit-mixed)
+  (emitMixed)
   (const instance (new Generated))
   (asrt fromMacro 5)
   (asrt constFromMacro 17)
@@ -206,11 +206,11 @@ describe('Step 7: macro top-level splicing', () => {
   it.skip('macro-emitted defmacro registers for later calls', () => {
     fromSourceEndToEnd(`(program
   (import (object (:named (array (object (:name "asrt"))))) "./helpers")
-  (defmacro produce-macro ()
+  (defmacro produceMacro ()
     (return (array
       (quasi (defmacro emitted ((x))
         (return (quasi (+ (unquote x) 100))))))))
-  (produce-macro)
+  (produceMacro)
   (const value (emitted 1))
   (asrt value 101)
 )
@@ -219,9 +219,9 @@ describe('Step 7: macro top-level splicing', () => {
 
   it('array results in expression position emit macro error', () => {
     const result = callCompiler(`(program
-  (defmacro emit-top ()
+  (defmacro emitTop ()
     (return (array (quasi (const fromMacro 1)))))
-  (const value (+ (emit-top) 1))
+  (const value (+ (emitTop) 1))
 )
 `);
     expect(result.status).toBe(1);
@@ -230,9 +230,9 @@ describe('Step 7: macro top-level splicing', () => {
 
   it('macro emitting import is rejected', () => {
     const result = callCompiler(`(program
-  (defmacro bring-import ()
+  (defmacro bringImport ()
     (return (array (quasi (import (object (:named (array (object (:name "asrt"))))) "./helpers")))))
-  (bring-import)
+  (bringImport)
 )
 `);
     expect(result.status).toBe(1);

@@ -3,10 +3,10 @@
       (let* ((node
           (quasi
             (const stage_placeholder
-              (async-lambda (((unquote ctx) : (unquote cap)))
-                (async-generator-fn
+              (async_lambda (((unquote ctx) : (unquote cap)))
+                (async_generator_fn
                   ((upstream : (AsyncGenerator (unquote in_t))) : (AsyncGenerator (unquote out_t)))
-                  (unquote-splicing body)))))))
+                  (unquote_splicing body)))))))
         (set! (. node name) (. name name))
         (return node)))
 
@@ -24,7 +24,7 @@
             (const pipeline_placeholder
               (createPipeline
                 (array
-                  (unquote-splicing
+                  (unquote_splicing
                     (map slots (lambda ((slot))
                       (quasi (object
                         (name (unquote (. (. slot fn) name)))
@@ -39,17 +39,18 @@
              (field_nodes
                (map slot_clauses (lambda ((s))
                  (let* ((field_node
-                     (quasi (field context_slot_placeholder))))
+                     (quasi (field context_slot_placeholder
+                              (unquote (index (. s args) 1))))))
                    (set! (. field_node name) (. (index (. s args) 0) name))
                    (return field_node)))))
              (node
                (quasi
                  (class context_placeholder
                    (implements AsyncDisposable)
-                   (class-body
-                     (unquote-splicing field_nodes)
+                   (class_body
+                     (unquote_splicing field_nodes)
                      (method [(. Symbol asyncDispose)] ()
-                       (unquote-splicing dispose_body)))))))
+                       (unquote_splicing dispose_body)))))))
         (set! (. node name) (. name name))
         (return node)))
 
@@ -57,7 +58,7 @@
       (let* ((node
           (quasi
             (interface cap_placeholder
-              ((unquote-splicing methods))))))
+              ((unquote_splicing methods))))))
         (set! (. node name) (. name name))
         (return node)))
 

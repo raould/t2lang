@@ -11,10 +11,40 @@
       (return (!== val undefined))))
 
   ;; isValidId: true when key can be used as a bare JS property name (dot notation / shorthand).
+  ;; Accepts regular identifiers AND private-field names (#foo) — both use dot notation in JS.
   ;; Non-identifier keys need bracket access and quoted keys in object literals.
   (const isValidId
     (lambda ((key))
-      (return ((. (new RegExp "^[a-zA-Z_$][a-zA-Z0-9_$]*$") test) key))))
+      (return ((. (new RegExp "^#?[a-zA-Z_$][a-zA-Z0-9_$]*$") test) key))))
+
+  ;; JS reserved words that must not appear as identifiers in emitted TypeScript output.
+  ;; TS contextual keywords (from, of, get, set, type, declare, out, …) are intentionally
+  ;; omitted — TypeScript allows them as regular identifier names.
+  (const JS_RESERVED
+    (new Set (array
+      'break' 'case' 'catch' 'class' 'const' 'continue' 'debugger' 'default'
+      'delete' 'do' 'else' 'enum' 'export' 'extends' 'false' 'finally'
+      'for' 'function' 'if' 'import' 'in' 'instanceof' 'let' 'new'
+      'null' 'return' 'static' 'super' 'switch' 'this' 'throw' 'true'
+      'try' 'typeof' 'var' 'void' 'while' 'with' 'yield'
+      'implements' 'interface' 'package' 'private' 'protected' 'public')))
+
+  ;; isValidBindingId: like isValidId but rejects private-field names (#foo).
+  ;; Used by checkId — #foo is a valid property name but NOT a valid binding name.
+  (const isValidBindingId
+    (lambda ((name))
+      (return ((. (new RegExp "^[a-zA-Z_$][a-zA-Z0-9_$]*$") test) name))))
+
+  ;; checkId: validate that name is a legal JS/TS binding identifier (not a reserved word,
+  ;; not a private-field name). Returns name unchanged on success; throws on failure.
+  ;; Applied at codegen time so it catches macro-generated and desugared identifiers.
+  (const checkId
+    (lambda ((name) (spanId))
+      (if (! (isValidBindingId name))
+        (throw (new Error (+ "Invalid identifier '" name "' at " (formatSpan spanId)))))
+      (if ((. JS_RESERVED has) name)
+        (throw (new Error (+ "Invalid identifier '" name "' at " (formatSpan spanId)))))
+      (return name)))
 
   ;; ========== Phase C: Codegen ==========
   (const emitProgram
@@ -53,13 +83,13 @@
       (if (=== (. stmt tag) 'let-stmt')
         (let* ((typeStr (ternary (. stmt typeAnnotation) (+ ': ' (emitTypeExpr (. stmt typeAnnotation))) ' ')))
           (if (isDefined (. stmt init))
-            (return (+ 'let ' (. stmt name) typeStr ' = ' (emitExpr (. stmt init)) ';'))
-            (return (+ 'let ' (. stmt name) typeStr ';')))))
+            (return (+ 'let ' (checkId (. stmt name) (. stmt id)) typeStr ' = ' (emitExpr (. stmt init)) ';'))
+            (return (+ 'let ' (checkId (. stmt name) (. stmt id)) typeStr ';')))))
       (if (=== (. stmt tag) 'const-stmt')
         (let* ((typeStr (ternary (. stmt typeAnnotation) (+ ': ' (emitTypeExpr (. stmt typeAnnotation))) ' ')))
           (if (isDefined (. stmt init))
-            (return (+ 'const ' (. stmt name) typeStr ' = ' (emitExpr (. stmt init)) ';'))
-            (return (+ 'const ' (. stmt name) typeStr ';')))))
+            (return (+ 'const ' (checkId (. stmt name) (. stmt id)) typeStr ' = ' (emitExpr (. stmt init)) ';'))
+            (return (+ 'const ' (checkId (. stmt name) (. stmt id)) typeStr ';')))))
       (if (=== (. stmt tag) 'if-stmt')
         (return (emitIf stmt)))
       (if (=== (. stmt tag) 'while-stmt')
@@ -74,7 +104,7 @@
           ((. lines push) '}')
           (if (. stmt catchClause)
             (begin
-              ((. lines push) (+ 'catch (' (. (. stmt catchClause) param) ') {'))
+              ((. lines push) (+ 'catch (' (checkId (. (. stmt catchClause) param) (. (. stmt catchClause) id)) ') {'))
               ((. (. (. stmt catchClause) body) forEach) (lambda ((s))
                 ((. lines push) (indent (emitStmt s)))))
               ((. lines push) '}')))
@@ -86,7 +116,7 @@
               ((. lines push) '}')))
           (return ((. lines join) '\n'))))
       (if (=== (. stmt tag) 'assign-stmt')
-        (return (+ (. stmt name) " = " (emitExpr (. stmt value)) ';')))
+        (return (+ (checkId (. stmt name) (. stmt id)) " = " (emitExpr (. stmt value)) ';')))
       (if (=== (. stmt tag) 'assign-prop-stmt')
         (return (+ (emitExpr (. stmt target)) ' = ' (emitExpr (. stmt value)) ';')))
       (if (=== (. stmt tag) 'return-stmt')
@@ -98,7 +128,7 @@
       (if (=== (. stmt tag) 'import-stmt')
         (return (emitImport stmt)))
       (if (=== (. stmt tag) 'export-binding-stmt')
-        (return (+ 'export const ' (. stmt name) ' = ' (emitExpr (. stmt init)) ';')))
+        (return (+ 'export const ' (checkId (. stmt name) (. stmt id)) ' = ' (emitExpr (. stmt init)) ';')))
       (if (=== (. stmt tag) 'export-default-stmt')
         (return (+ 'export default ' (emitExpr (. stmt expr)) ';')))
       (if (=== (. stmt tag) 'export-default-class-stmt')
@@ -224,9 +254,9 @@
   (const emitFor
     (lambda ((node))
       (let* ((lines (array))
-             (init (+ 'let ' (. node initName) ' = ' (emitExpr (. node initExpr))))
+             (init (+ 'let ' (checkId (. node initName) (. node id)) ' = ' (emitExpr (. node initExpr))))
              (test (emitExpr (. node test)))
-             (update (+ (. node updateName) ' = ' (emitExpr (. node updateExpr)))))
+             (update (+ (checkId (. node updateName) (. node id)) ' = ' (emitExpr (. node updateExpr)))))
         ((. lines push) (+ 'for (' init '; ' test '; ' update ') {'))
         ((. (. node body) forEach) (lambda ((s))
           ((. lines push) (indent (emitStmt s)))))
@@ -236,7 +266,7 @@
   (const emitForIn
     (lambda ((node))
       (let* ((lines (array)))
-        ((. lines push) (+ 'for (const ' (. node name) ' in ' (emitExpr (. node "object")) ') {'))
+        ((. lines push) (+ 'for (const ' (checkId (. node name) (. node id)) ' in ' (emitExpr (. node "object")) ') {'))
         ((. (. node body) forEach) (lambda ((s))
           ((. lines push) (indent (emitStmt s)))))
         ((. lines push) '}')
@@ -245,7 +275,7 @@
   (const emitForOf
     (lambda ((node))
       (let* ((lines (array)))
-        ((. lines push) (+ 'for (const ' (. node name) ' of ' (emitExpr (. node iterable)) ') {'))
+        ((. lines push) (+ 'for (const ' (checkId (. node name) (. node id)) ' of ' (emitExpr (. node iterable)) ') {'))
         ((. (. node body) forEach) (lambda ((s))
           ((. lines push) (indent (emitStmt s)))))
         ((. lines push) '}')
@@ -254,7 +284,7 @@
   (const emitForAwait
     (lambda ((node))
       (let* ((lines (array)))
-        ((. lines push) (+ 'for await (const ' (. node name) ' of ' (emitExpr (. node iterable)) ') {'))
+        ((. lines push) (+ 'for await (const ' (checkId (. node name) (. node id)) ' of ' (emitExpr (. node iterable)) ') {'))
         ((. (. node body) forEach) (lambda ((s))
           ((. lines push) (indent (emitStmt s)))))
         ((. lines push) '}')
@@ -278,7 +308,7 @@
       (if (=== (. expr tag) 'keyword')
         (return ((. JSON stringify) (. expr value))))
       (if (=== (. expr tag) 'identifier')
-        (return (. expr name)))
+        (return (ternary ((. (. expr name) startsWith) '...') (. expr name) (checkId (. expr name) (. expr id)))))
       (if (=== (. expr tag) 'object-expr')
         (return (+ '({\n' (indent ((. ((. (. expr fields) map) (lambda ((f))
           (if (. f isMethod)
@@ -349,7 +379,7 @@
                     ''
                 ))
                (argsStr ((. ((. (. expr args) map) emitExpr) join) ', ')))
-          (return (+ 'new ' (. expr name) tstr '(' argsStr ')'))))
+          (return (+ 'new ' (checkId (. expr name) (. expr id)) tstr '(' argsStr ')'))))
       (if (=== (. expr tag) 'opt-chain-expr')
         (return (+ (emitExpr (. expr "object")) '?.' (. expr key))))
       (if (=== (. expr tag) 'opt-chain-index-expr')
@@ -374,7 +404,7 @@
     (lambda ((node))
       (let* ((base ((. ((. (. node params) map) (lambda ((p))
                         (if (=== (typeof p) 'string')
-                          (return p))
+                          (return (ternary ((. p startsWith) '...') p (checkId p undefined))))
                         (return (emitTypedParam p))))
                      join) ', '))
              (restN (. node rest))
@@ -447,8 +477,10 @@
   (const emitTypedParam
     (lambda ((param))
       (let* ((opt (ternary (. param optional) '?' ''))
-             (typeStr (ternary (. param typeAnnotation) (+ ': ' (emitTypeExpr (. param typeAnnotation))) '')))
-        (return (+ (. param name) opt typeStr)))))
+             (typeStr (ternary (. param typeAnnotation) (+ ': ' (emitTypeExpr (. param typeAnnotation))) ''))
+             (nm (. param name))
+             (validNm (ternary ((. nm startsWith) '...') nm (checkId nm (. param id)))))
+        (return (+ validNm opt typeStr)))))
 
   (const emitFieldDef
     (lambda ((node))

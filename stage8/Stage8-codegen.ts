@@ -8,7 +8,20 @@ const isDefined  = (val) => {
   return (val !== undefined);
 };
 const isValidId  = (key) => {
-  return new RegExp("^[a-zA-Z_$][a-zA-Z0-9_$]*$").test(key);
+  return new RegExp("^#?[a-zA-Z_$][a-zA-Z0-9_$]*$").test(key);
+};
+const JS_RESERVED  = new Set(["break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally", "for", "function", "if", "import", "in", "instanceof", "let", "new", "null", "return", "static", "super", "switch", "this", "throw", "true", "try", "typeof", "var", "void", "while", "with", "yield", "implements", "interface", "package", "private", "protected", "public"]);
+const isValidBindingId  = (name) => {
+  return new RegExp("^[a-zA-Z_$][a-zA-Z0-9_$]*$").test(name);
+};
+const checkId  = (name, spanId) => {
+  if ((!isValidBindingId(name))) {
+    throw new Error(((("Invalid identifier '" + name) + "' at ") + formatSpan(spanId)));
+  }
+  if (JS_RESERVED.has(name)) {
+    throw new Error(((("Invalid identifier '" + name) + "' at ") + formatSpan(spanId)));
+  }
+  return name;
 };
 const emitProgram  = (node) => {
   return node.body.map(emitTopLevel).join("\n");
@@ -48,10 +61,10 @@ const emitStmt  = (stmt) => {
     {
       let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : " ");
       if (isDefined(stmt.init)) {
-        return ((((("let " + stmt.name) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
+        return ((((("let " + checkId(stmt.name, stmt.id)) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
       }
       else {
-        return ((("let " + stmt.name) + typeStr) + ";");
+        return ((("let " + checkId(stmt.name, stmt.id)) + typeStr) + ";");
       }
     }
   }
@@ -59,10 +72,10 @@ const emitStmt  = (stmt) => {
     {
       let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : " ");
       if (isDefined(stmt.init)) {
-        return ((((("const " + stmt.name) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
+        return ((((("const " + checkId(stmt.name, stmt.id)) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
       }
       else {
-        return ((("const " + stmt.name) + typeStr) + ";");
+        return ((("const " + checkId(stmt.name, stmt.id)) + typeStr) + ";");
       }
     }
   }
@@ -85,7 +98,7 @@ const emitStmt  = (stmt) => {
       lines.push("}");
       if (stmt.catchClause) {
         {
-          lines.push((("catch (" + stmt.catchClause.param) + ") {"));
+          lines.push((("catch (" + checkId(stmt.catchClause.param, stmt.catchClause.id)) + ") {"));
           stmt.catchClause.body.forEach((s) => {
             lines.push(indent(emitStmt(s)));
           });
@@ -105,7 +118,7 @@ const emitStmt  = (stmt) => {
     }
   }
   if ((stmt.tag === "assign-stmt")) {
-    return (((stmt.name + " = ") + emitExpr(stmt.value)) + ";");
+    return (((checkId(stmt.name, stmt.id) + " = ") + emitExpr(stmt.value)) + ";");
   }
   if ((stmt.tag === "assign-prop-stmt")) {
     return (((emitExpr(stmt.target) + " = ") + emitExpr(stmt.value)) + ";");
@@ -125,7 +138,7 @@ const emitStmt  = (stmt) => {
     return emitImport(stmt);
   }
   if ((stmt.tag === "export-binding-stmt")) {
-    return (((("export const " + stmt.name) + " = ") + emitExpr(stmt.init)) + ";");
+    return (((("export const " + checkId(stmt.name, stmt.id)) + " = ") + emitExpr(stmt.init)) + ";");
   }
   if ((stmt.tag === "export-default-stmt")) {
     return (("export default " + emitExpr(stmt.expr)) + ";");
@@ -324,9 +337,9 @@ const emitSwitch  = (node) => {
 const emitFor  = (node) => {
   {
     let lines  = [];
-    let init  = ((("let " + node.initName) + " = ") + emitExpr(node.initExpr));
+    let init  = ((("let " + checkId(node.initName, node.id)) + " = ") + emitExpr(node.initExpr));
     let test  = emitExpr(node.test);
-    let update  = ((node.updateName + " = ") + emitExpr(node.updateExpr));
+    let update  = ((checkId(node.updateName, node.id) + " = ") + emitExpr(node.updateExpr));
     lines.push((((((("for (" + init) + "; ") + test) + "; ") + update) + ") {"));
     node.body.forEach((s) => {
       lines.push(indent(emitStmt(s)));
@@ -338,7 +351,7 @@ const emitFor  = (node) => {
 const emitForIn  = (node) => {
   {
     let lines  = [];
-    lines.push((((("for (const " + node.name) + " in ") + emitExpr(node.object)) + ") {"));
+    lines.push((((("for (const " + checkId(node.name, node.id)) + " in ") + emitExpr(node.object)) + ") {"));
     node.body.forEach((s) => {
       lines.push(indent(emitStmt(s)));
     });
@@ -349,7 +362,7 @@ const emitForIn  = (node) => {
 const emitForOf  = (node) => {
   {
     let lines  = [];
-    lines.push((((("for (const " + node.name) + " of ") + emitExpr(node.iterable)) + ") {"));
+    lines.push((((("for (const " + checkId(node.name, node.id)) + " of ") + emitExpr(node.iterable)) + ") {"));
     node.body.forEach((s) => {
       lines.push(indent(emitStmt(s)));
     });
@@ -360,7 +373,7 @@ const emitForOf  = (node) => {
 const emitForAwait  = (node) => {
   {
     let lines  = [];
-    lines.push((((("for await (const " + node.name) + " of ") + emitExpr(node.iterable)) + ") {"));
+    lines.push((((("for await (const " + checkId(node.name, node.id)) + " of ") + emitExpr(node.iterable)) + ") {"));
     node.body.forEach((s) => {
       lines.push(indent(emitStmt(s)));
     });
@@ -388,7 +401,7 @@ const emitExpr  = (expr) => {
     return JSON.stringify(expr.value);
   }
   if ((expr.tag === "identifier")) {
-    return expr.name;
+    return (expr.name.startsWith("...") ? expr.name : checkId(expr.name, expr.id));
   }
   if ((expr.tag === "object-expr")) {
     return (("({\n" + indent(expr.fields.map((f) => {
@@ -495,7 +508,7 @@ const emitExpr  = (expr) => {
     {
       let tstr  = ((expr.typeArgs && (expr.typeArgs.length > 0)) ? (("<" + expr.typeArgs.map(emitTypeExpr).join(", ")) + ">") : "");
       let argsStr  = expr.args.map(emitExpr).join(", ");
-      return ((((("new " + expr.name) + tstr) + "(") + argsStr) + ")");
+      return ((((("new " + checkId(expr.name, expr.id)) + tstr) + "(") + argsStr) + ")");
     }
   }
   if ((expr.tag === "opt-chain-expr")) {
@@ -528,7 +541,7 @@ const emitParams  = (node) => {
   {
     let base  = node.params.map((p) => {
       if ((typeof p === "string")) {
-        return p;
+        return (p.startsWith("...") ? p : checkId(p, undefined));
       }
       return emitTypedParam(p);
     }).join(", ");
@@ -611,7 +624,9 @@ const emitTypedParam  = (param) => {
   {
     let opt  = (param.optional ? "?" : "");
     let typeStr  = (param.typeAnnotation ? (": " + emitTypeExpr(param.typeAnnotation)) : "");
-    return ((param.name + opt) + typeStr);
+    let nm  = param.name;
+    let validNm  = (nm.startsWith("...") ? nm : checkId(nm, param.id));
+    return ((validNm + opt) + typeStr);
   }
 };
 const emitFieldDef  = (node) => {

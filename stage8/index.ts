@@ -8,7 +8,7 @@ import { emitTopLevel } from "./Stage8-codegen";
 import { makeMacroEnv } from "./Stage8-macro-env";
 import { expandAll, formatExpansionErrors } from "./Stage8-macro-expand";
 import { resolveTopLevel, addBinding } from "./Stage8-scope-resolve";
-import { resetSpans } from "./Stage8-spans";
+import { resetSpans, formatSpan } from "./Stage8-spans";
 const parseFile  = (filePath) => {
   {
     let input  = fs.readFileSync(((filePath === "-") ? 0 : filePath), "utf-8");
@@ -95,16 +95,22 @@ const main  = () => {
         {
           let chain  = [];
           expandResult.ast.body.forEach((expandedNode) => {
-            {
-              let resolvedNode  = resolveTopLevel(expandedNode, chain);
-              if (((resolvedNode.tag === "let-decl") || (resolvedNode.tag === "const-decl"))) {
-                chain = addBinding(chain, resolvedNode.name, new Set());
-              }
+            try {
               {
-                let loweredNode  = lowerTopLevel(resolvedNode);
-                let emittedStr  = emitTopLevel(loweredNode);
-                process.stdout.write((emittedStr + "\n"));
+                let resolvedNode  = resolveTopLevel(expandedNode, chain);
+                if (((resolvedNode.tag === "let-decl") || (resolvedNode.tag === "const-decl"))) {
+                  chain = addBinding(chain, resolvedNode.name, new Set());
+                }
+                {
+                  let loweredNode  = lowerTopLevel(resolvedNode);
+                  let emittedStr  = emitTopLevel(loweredNode);
+                  process.stdout.write((emittedStr + "\n"));
+                }
               }
+            }
+            catch (e) {
+              console.error(((("error at " + formatSpan((expandedNode.callSiteId || expandedNode.id))) + ": ") + e.message));
+              process.exit(1);
             }
           });
         }

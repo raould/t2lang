@@ -1,1 +1,5 @@
+- [ ] omfg version numbers.
 - [ ] use esbuild for crying out loud.
+- [ ] (method-call console log) sure is ugly.
+- [ ] error reporting unification, and the error glossary.
+- [ ] --macro-prelude seems to be modifying the supplied argument, breaking absolute paths?

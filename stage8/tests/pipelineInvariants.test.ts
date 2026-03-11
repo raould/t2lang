@@ -29,12 +29,12 @@ function callCompiler(source: string) {
 describe('Invariant 1: macro calls are fully erased from TypeScript output', () => {
   it('a macro call site is replaced by its expansion — no call form in output', () => {
     const result = callCompiler(`(program
-  (defmacro inc-by-one ((x))
+  (defmacro incByOne ((x))
     (return (quasi (+ (unquote x) 1))))
-  (const v (inc-by-one 41))
+  (const v (incByOne 41))
 )`);
     expect(result.status).toBe(0);
-    expect(result.stdout).not.toContain('inc-by-one(');
+    expect(result.stdout).not.toContain('incByOne(');
     expect(result.stdout).toContain('41');
   }, T);
 
@@ -81,13 +81,13 @@ describe('Invariant 2: #[macro-time] fn defs emit as comments, not runtime code'
     // A #[macro-time] fn that is also used by a macro.
     // The final TypeScript output has only the macro's expansion result.
     const result = callCompiler(`(program
-  (#[macro-time] (const double-val (lambda ((n)) (+ n n))))
-  (defmacro use-helper ((x))
+  (#[macro-time] (const doubleVal (lambda ((n)) (+ n n))))
+  (defmacro useHelper ((x))
     (return (quasi (unquote x))))
-  (const r (use-helper 7))
+  (const r (useHelper 7))
 )`);
     expect(result.status).toBe(0);
-    expect(result.stdout).not.toMatch(/let double-val|function double-val/);
+    expect(result.stdout).not.toMatch(/let doubleVal|function doubleVal/);
     expect(result.stdout).toContain('7');
   }, T);
 });
@@ -123,10 +123,10 @@ describe('Invariant 3: resolveNames is called in the pipeline (no regression)', 
 
   it('pipeline with gensym works correctly after resolveNames', () => {
     const result = callCompiler(`(program
-  (defmacro with-fresh ((x))
+  (defmacro withFresh ((x))
     (let* ((s (gensym "k")))
       (return (quasi (unquote x)))))
-  (const v (with-fresh 99))
+  (const v (withFresh 99))
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('99');
@@ -138,10 +138,10 @@ describe('Invariant 3: resolveNames is called in the pipeline (no regression)', 
 describe('Invariant 4: gensym counter is not persisted across compilations', () => {
   it('two independent compilations both start gensym counter at 0', () => {
     const src = `(program
-  (defmacro first-sym ()
+  (defmacro firstSym ()
     (let* ((s (gensym "c")))
       (return (quasi (unquote s)))))
-  (const x (first-sym))
+  (const x (firstSym))
 )`;
     const r1 = callCompiler(src);
     const r2 = callCompiler(src);

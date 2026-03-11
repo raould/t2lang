@@ -9,7 +9,7 @@
   (import (object (:named (array (object (:name "makeMacroEnv"))))) "./Stage8-macro-env")
   (import (object (:named (array (object (:name "expandAll")) (object (:name "formatExpansionErrors"))))) "./Stage8-macro-expand")
   (import (object (:named (array (object (:name "resolveTopLevel")) (object (:name "addBinding"))))) "./Stage8-scope-resolve")
-  (import (object (:named (array (object (:name "resetSpans"))))) "./Stage8-spans")
+  (import (object (:named (array (object (:name "resetSpans")) (object (:name "formatSpan"))))) "./Stage8-spans")
 
   ;; ========== parseFile: parse a .t2 source, return AST program node ==========
   (const parseFile
@@ -82,12 +82,16 @@
             (let* ((chain (array)))
               ((. (. (. expandResult ast) body) forEach)
                 (lambda ((expandedNode))
-                  (let* ((resolvedNode (resolveTopLevel expandedNode chain)))
-                    (if (|| (=== (. resolvedNode tag) 'let-decl') (=== (. resolvedNode tag) 'const-decl'))
-                      (set! chain (addBinding chain (. resolvedNode name) (new Set))))
-                    (let* ((loweredNode (lowerTopLevel resolvedNode))
-                           (emittedStr (emitTopLevel loweredNode)))
-                      ((. (. process stdout) write) (+ emittedStr '\n'))))))))))))
+                  (try
+                    (let* ((resolvedNode (resolveTopLevel expandedNode chain)))
+                      (if (|| (=== (. resolvedNode tag) 'let-decl') (=== (. resolvedNode tag) 'const-decl'))
+                        (set! chain (addBinding chain (. resolvedNode name) (new Set))))
+                      (let* ((loweredNode (lowerTopLevel resolvedNode))
+                             (emittedStr (emitTopLevel loweredNode)))
+                        ((. (. process stdout) write) (+ emittedStr '\n'))))
+                    (catch e
+                      ((. console error) (+ 'error at ' (formatSpan (|| (. expandedNode callSiteId) (. expandedNode id))) ': ' (. e message)))
+                      ((. process exit) 1)))))))))))
 
   (main)
 )

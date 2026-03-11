@@ -496,6 +496,8 @@ expression
     : literal
     | KEYWORD
     | IDENTIFIER
+    | MACRO_ERROR
+    | MINUS
     | lambda
     | fn
     | asyncLambda
@@ -652,7 +654,7 @@ propKey
     | STRING
     | NUMBER
     | PROGRAM | LETSTAR | LET | CONSTSTAR | CONST | LAMBDA | FN | METHOD | BIND | METHOD_CALL
-    | DEFMACRO | MACRO_TIME_ATTR | IF | WHILE | BEGIN | RETURN | THROW | SET | TERNARY | COND
+    | DEFMACRO | MACRO_TIME_ATTR | MACRO_ERROR | IF | WHILE | BEGIN | RETURN | THROW | SET | TERNARY | COND
     | OBJECT | ARRAY | INDEX | QUASI | QUOTE | UNQUOTE_SPLICING | UNQUOTE
     | TYPE_ARRAY
     | NEW | IMPORT | SWITCH | CASE | DEFAULT | FORIN | FOROF | FOR
@@ -751,6 +753,7 @@ restParam
 
 literal
     : NUMBER
+    | NEG_NUMBER
     | STRING
     | BOOLEAN
     | NULL
@@ -782,6 +785,7 @@ BIND        : 'bind' ;
 METHOD_CALL : 'method-call' ;
 DEFMACRO        : 'defmacro' ;
 MACRO_TIME_ATTR : '#[macro-time]' ;
+MACRO_ERROR     : 'macro-error' ;
 IF          : 'if' ;
 WHILE       : 'while' ;
 BEGIN       : 'begin' ;
@@ -904,8 +908,16 @@ MULTILINE_STRING
     : '"""' (.)*? '"""'
     ;
 
+NEG_NUMBER
+    : '-' [0-9]+ ('.' [0-9]+)?
+    ;
+
+MINUS
+    : '-'
+    ;
+
 IDENTIFIER
-    : ~[() \n\t\r:;]+
+    : ~[() \n\t\r:;\-]+
     ;
 
 WS

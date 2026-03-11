@@ -445,7 +445,7 @@ const evalQuasiToSForm  = (sfNode, bindings, env, depth) => {
           {
             let v  = evalMacroExpr(item.expr, bindings, env);
             if (Array.isArray(v)) {
-              result = result.concat(v);
+              v.forEach((elem) => { result.push(nodeToSForm(elem)); });
             }
             else {
               result.push(nodeToSForm(v));
@@ -507,6 +507,17 @@ const evalMacroExpr  = (node, bindings, env) => {
             return undefined;
           }
         }
+      }
+    }
+  }
+  if ((node.tag === "ternary")) {
+    {
+      let test  = evalMacroExpr(node.test, bindings, env);
+      if (test) {
+        return evalMacroExpr(node.ifthen, bindings, env);
+      }
+      else {
+        return evalMacroExpr(node.ifelse, bindings, env);
       }
     }
   }
@@ -1327,7 +1338,14 @@ const expandMacroCall  = (callNode, env) => {
             env.currentCallNodeId = callNode.id;
             env.currentMacroName = macroName;
             {
-              let result  = evalMacroBody(scopedBody, bindings, env);
+              let result  = undefined;
+              try {
+                result = evalMacroBody(scopedBody, bindings, env);
+              }
+              catch (e) {
+                pushMacroError(env, ("internal error in macro body: " + e.message), callNode.id);
+                return callNode;
+              }
               env.currentMacroName = null;
               {
                 let scopedResult  = addScopeToNode(result, useScope);
@@ -1361,6 +1379,7 @@ const expandStmt  = (node, env) => {
   if ((node.tag === "expr-stmt")) {
     return ({
       tag: "expr-stmt",
+      id: node.id,
       text: node.text,
       expr: expandExpr(node.expr, env)
     });
@@ -1368,6 +1387,7 @@ const expandStmt  = (node, env) => {
   if ((node.tag === "let*")) {
     return ({
       tag: "let*",
+      id: node.id,
       text: node.text,
       bindings: node.bindings.map((b) => {
         return ({
@@ -1384,6 +1404,7 @@ const expandStmt  = (node, env) => {
   if ((node.tag === "const*")) {
     return ({
       tag: "const*",
+      id: node.id,
       text: node.text,
       bindings: node.bindings.map((b) => {
         return ({
@@ -1400,6 +1421,7 @@ const expandStmt  = (node, env) => {
   if ((node.tag === "if")) {
     return ({
       tag: "if",
+      id: node.id,
       text: node.text,
       test: expandExpr(node.test, env),
       ifthen: expandStmt(node.ifthen, env),
@@ -1409,6 +1431,7 @@ const expandStmt  = (node, env) => {
   if ((node.tag === "while")) {
     return ({
       tag: "while",
+      id: node.id,
       text: node.text,
       test: expandExpr(node.test, env),
       body: node.body.map((s) => {
@@ -1419,6 +1442,7 @@ const expandStmt  = (node, env) => {
   if ((node.tag === "block")) {
     return ({
       tag: "block",
+      id: node.id,
       text: node.text,
       body: node.body.map((s) => {
         return expandStmt(s, env);
@@ -1428,6 +1452,7 @@ const expandStmt  = (node, env) => {
   if ((node.tag === "return")) {
     return ({
       tag: "return",
+      id: node.id,
       text: node.text,
       expr: (node.expr ? expandExpr(node.expr, env) : undefined)
     });
@@ -1435,6 +1460,7 @@ const expandStmt  = (node, env) => {
   if ((node.tag === "throw")) {
     return ({
       tag: "throw",
+      id: node.id,
       text: node.text,
       expr: expandExpr(node.expr, env)
     });
@@ -1442,6 +1468,7 @@ const expandStmt  = (node, env) => {
   if ((node.tag === "assign")) {
     return ({
       tag: "assign",
+      id: node.id,
       text: node.text,
       name: node.name,
       value: expandExpr(node.value, env)
@@ -1456,6 +1483,8 @@ const expandTopLevel  = (node, env) => {
   if ((node.tag === "let-decl")) {
     return ({
       tag: "let-decl",
+      id: node.id,
+      callSiteId: node.callSiteId,
       text: node.text,
       name: node.name,
       init: expandExpr(node.init, env)
@@ -1464,6 +1493,8 @@ const expandTopLevel  = (node, env) => {
   if ((node.tag === "const-decl")) {
     return ({
       tag: "const-decl",
+      id: node.id,
+      callSiteId: node.callSiteId,
       text: node.text,
       name: node.name,
       init: expandExpr(node.init, env)
@@ -1587,6 +1618,7 @@ const expandAll  = (programNode, env) => {
                     let validatedNode  = validateTopLevelNode(spliced, env);
                     if (validatedNode) {
                       {
+                        validatedNode.callSiteId = node.id;
                         validated.push(validatedNode);
                         registerTopLevelNode(validatedNode, env);
                       }
@@ -1612,6 +1644,7 @@ const expandAll  = (programNode, env) => {
                 let singleValidated  = ((result && TOP_LEVEL_DECL_TAGS.has(result.tag)) ? validateTopLevelNode(result, env) : null);
                 if (singleValidated) {
                   {
+                    singleValidated.callSiteId = node.id;
                     registerTopLevelNode(singleValidated, env);
                     worklist.unshift(singleValidated);
                   }
@@ -1619,6 +1652,7 @@ const expandAll  = (programNode, env) => {
                 else {
                   expandedBody.push(({
                     tag: "expr-stmt",
+                    id: node.id,
                     text: node.text,
                     expr: result
                   }));

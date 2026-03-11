@@ -279,6 +279,7 @@ const astTypedParam  = (ctx) => {
     let optional  = (ctx.OPTIONAL() ? true : false);
     let typeAnn  = (ctx.typeExpr() ? astTypeExpr(ctx.typeExpr()) : undefined);
     return ({
+      id: registerSpan(nextNodeId(), ctx),
       name: name,
       optional: optional,
       typeAnnotation: typeAnn
@@ -514,6 +515,7 @@ const astCatchClause  = (ctx) => {
     let name  = ctx.IDENTIFIER().getText();
     let body  = ctx.statement().map(astStatement);
     return ({
+      id: registerSpan(nextNodeId(), ctx),
       param: name,
       body: body
     });
@@ -1401,6 +1403,22 @@ const astExpression  = (ctx) => {
       });
     }
   }
+  if (ctx.MACRO_ERROR()) {
+    return ({
+      id: registerSpan(nextNodeId(), ctx),
+      text: ctx.getText(),
+      tag: "identifier",
+      name: "macro-error"
+    });
+  }
+  if (ctx.MINUS()) {
+    return ({
+      id: registerSpan(nextNodeId(), ctx),
+      text: ctx.getText(),
+      tag: "identifier",
+      name: "-"
+    });
+  }
   if (ctx.lambda()) {
     return astLambda(ctx.lambda());
   }
@@ -1786,6 +1804,14 @@ const astAssign  = (ctx) => {
   }
 };
 const astLiteral  = (ctx) => {
+  if (ctx.NEG_NUMBER()) {
+    return ({
+      id: registerSpan(nextNodeId(), ctx),
+      text: ctx.getText(),
+      tag: "literal",
+      value: Number(ctx.NEG_NUMBER().getText())
+    });
+  }
   if (ctx.NUMBER()) {
     return ({
       id: registerSpan(nextNodeId(), ctx),

@@ -305,6 +305,10 @@
         (return (object (node node) (id (. node id)) (tag 'for-await-stmt') (name (. node name)) (iterable (lowerExpr (. node iterable))) (body ((. (. node body) map) lowerStmt)))))
       (if (=== (. node tag) 'expr-stmt')
         (return (object (node node) (id (. node id)) (tag 'expr-stmt') (expr (lowerExpr (. node expr))))))
+      (if (=== (. node tag) 'quasi')
+        (let* ((formatted (formatSpan (. node id)))
+               (check (cond (== undefined formatted) '' :else (+ ' — check macro that generates this form at ' formatted))))
+          (throw (new Error (+ 'unevaluated quasi template in statement position' check)))))
       (throw (new Error (+ 'lowerStmt: unexpected tag >' (. node tag) '< at ' (formatSpan (. node id)))))))
 
   (const lowerLetStar

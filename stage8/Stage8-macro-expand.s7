@@ -352,7 +352,7 @@
               (if (&& (=== (. item tag) 'sf-splice') (=== innerDepth 1))
                 (let* ((v (evalMacroExpr (. item expr) bindings env)))
                   (if ((. Array isArray) v)
-                    (set! result ((. result concat) v))
+                    ((. v forEach) (lambda ((elem)) ((. result push) (nodeToSForm elem))))
                     ((. result push) (nodeToSForm v))))
                 (begin
                   ((. result push) (evalQuasiToSForm item bindings env innerDepth))))))
@@ -396,6 +396,12 @@
                 (if (. node ifelse)
                   (return (evalMacroStmt (. node ifelse) bindings env)))
                 (return undefined))))))
+      ;; ternary: (ternary test then else) → evaluate like if/else
+      (if (=== (. node tag) 'ternary')
+        (let* ((test (evalMacroExpr (. node test) bindings env)))
+          (if test
+            (return (evalMacroExpr (. node ifthen) bindings env))
+            (return (evalMacroExpr (. node ifelse) bindings env)))))
       ;; cond expression
       (if (=== (. node tag) 'cond')
         (return (evalMacroCond (. node clauses) bindings env)))
@@ -983,7 +989,14 @@
                 ;; Set currentMacroName for gensym hygiene metadata.
                 (set! (. env currentMacroName) macroName)
                 ;; Evaluate the macro body using the scope-stamped template.
-                (let* ((result (evalMacroBody scopedBody bindings env)))
+                ;; Wrap in try/catch to route runtime errors through pushMacroError
+                ;; so they include macro name and call site in the error output.
+                (let* ((result undefined))
+                  (try
+                    (set! result (evalMacroBody scopedBody bindings env))
+                    (catch e
+                      (pushMacroError env (+ 'internal error in macro body: ' (. e message)) (. callNode id))
+                      (return callNode)))
                   (set! (. env currentMacroName) null)
                   ;; Stamp use-site scope onto the expanded result:
                   ;; template identifiers → {defScope, useScope}
@@ -1013,11 +1026,11 @@
         (return node))
       ;; expression statement
       (if (=== (. node tag) 'expr-stmt')
-        (return (object (tag 'expr-stmt') (text (. node text))
+        (return (object (tag 'expr-stmt') (id (. node id)) (text (. node text))
           (expr (expandExpr (. node expr) env)))))
       ;; let*
       (if (=== (. node tag) 'let*')
-        (return (object (tag 'let*') (text (. node text))
+        (return (object (tag 'let*') (id (. node id)) (text (. node text))
           (bindings ((. (. node bindings) map) (lambda ((b))
             (return (object
               (name (. b name))
@@ -1026,7 +1039,7 @@
           (body ((. (. node body) map) (lambda ((s)) (return (expandStmt s env))))))))
       ;; const*
       (if (=== (. node tag) 'const*')
-        (return (object (tag 'const*') (text (. node text))
+        (return (object (tag 'const*') (id (. node id)) (text (. node text))
           (bindings ((. (. node bindings) map) (lambda ((b))
             (return (object
               (name (. b name))
@@ -1035,30 +1048,30 @@
           (body ((. (. node body) map) (lambda ((s)) (return (expandStmt s env))))))))
       ;; if
       (if (=== (. node tag) 'if')
-        (return (object (tag 'if') (text (. node text))
+        (return (object (tag 'if') (id (. node id)) (text (. node text))
           (test (expandExpr (. node test) env))
           (ifthen (expandStmt (. node ifthen) env))
           (ifelse (ternary (. node ifelse) (expandStmt (. node ifelse) env) undefined)))))
       ;; while
       (if (=== (. node tag) 'while')
-        (return (object (tag 'while') (text (. node text))
+        (return (object (tag 'while') (id (. node id)) (text (. node text))
           (test (expandExpr (. node test) env))
           (body ((. (. node body) map) (lambda ((s)) (return (expandStmt s env))))))))
       ;; block (begin)
       (if (=== (. node tag) 'block')
-        (return (object (tag 'block') (text (. node text))
+        (return (object (tag 'block') (id (. node id)) (text (. node text))
           (body ((. (. node body) map) (lambda ((s)) (return (expandStmt s env))))))))
       ;; return
       (if (=== (. node tag) 'return')
-        (return (object (tag 'return') (text (. node text))
+        (return (object (tag 'return') (id (. node id)) (text (. node text))
           (expr (ternary (. node expr) (expandExpr (. node expr) env) undefined)))))
       ;; throw
       (if (=== (. node tag) 'throw')
-        (return (object (tag 'throw') (text (. node text))
+        (return (object (tag 'throw') (id (. node id)) (text (. node text))
           (expr (expandExpr (. node expr) env)))))
       ;; assign
       (if (=== (. node tag) 'assign')
-        (return (object (tag 'assign') (text (. node text))
+        (return (object (tag 'assign') (id (. node id)) (text (. node text))
           (name (. node name))
           (value (expandExpr (. node value) env)))))
       ;; fallthrough: return as-is
@@ -1072,11 +1085,11 @@
         (return node))
       ;; let-decl / const-decl: expand the init expression
       (if (=== (. node tag) 'let-decl')
-        (return (object (tag 'let-decl') (text (. node text))
+        (return (object (tag 'let-decl') (id (. node id)) (callSiteId (. node callSiteId)) (text (. node text))
           (name (. node name))
           (init (expandExpr (. node init) env)))))
       (if (=== (. node tag) 'const-decl')
-        (return (object (tag 'const-decl') (text (. node text))
+        (return (object (tag 'const-decl') (id (. node id)) (callSiteId (. node callSiteId)) (text (. node text))
           (name (. node name))
           (init (expandExpr (. node init) env)))))
       ;; everything else: treat as a statement
@@ -1195,6 +1208,7 @@
                         (let* ((validatedNode (validateTopLevelNode spliced env)))
                           (if validatedNode
                             (begin
+                              (set! (. validatedNode callSiteId) (. node id))
                               ((. validated push) validatedNode)
                               (registerTopLevelNode validatedNode env))))))
                     (let* ((idx (- (. validated length) 1)))
@@ -1209,10 +1223,11 @@
                                             null)))
                     (if singleValidated
                       (begin
+                        (set! (. singleValidated callSiteId) (. node id))
                         (registerTopLevelNode singleValidated env)
                         ((. worklist unshift) singleValidated))
                       ((. expandedBody push)
-                        (object (tag 'expr-stmt') (text (. node text)) (expr result)))))))
+                        (object (tag 'expr-stmt') (id (. node id)) (text (. node text)) (expr result)))))))
               ((. expandedBody push) (expandTopLevel node env)))))
         (let* ((expanded (object (tag 'program') (text (. programNode text))
                  (body expandedBody))))

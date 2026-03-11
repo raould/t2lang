@@ -129,8 +129,8 @@ describe('Decision 6 Phase 3D: nodeId on expansion errors', () => {
 
 describe('Decision 6 Phase 3D: CLI error location smoke tests', () => {
   it('arity mismatch error contains file:line:col', () => {
-    // (defmacro inc-x ((x)) x) called with 2 args
-    const result = callCompiler('(program (defmacro inc-x ((x)) x) (inc-x 1 2))');
+    // (defmacro incX ((x)) x) called with 2 args
+    const result = callCompiler('(program (defmacro incX ((x)) x) (incX 1 2))');
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/<stdin>:\d+:\d+/);
   }, T);
@@ -146,8 +146,8 @@ describe('Decision 6 Phase 3D: CLI error location smoke tests', () => {
   it('arity mismatch on line 3 reports line 3', () => {
     const src = [
       '(program',
-      '  (defmacro inc-x ((x)) x)',
-      '  (inc-x 1 2)',
+      '  (defmacro incX ((x)) x)',
+      '  (incX 1 2)',
       ')',
     ].join('\n');
     const result = callCompiler(src);

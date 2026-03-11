@@ -160,14 +160,15 @@ describe('Decision 6: spans infrastructure', () => {
     resetSpans();
   });
 
-  it('resetSpans clears the span table', () => {
-    resetSpans();
+  it('resetSpans switches current file without clearing the span table', () => {
     const id = nextNodeId();
     const fakeCtx = { start: { line: 1, column: 0 }, stop: { line: 1, column: 5 } };
     registerSpan(id, fakeCtx as any);
-    expect(spanTable.size).toBeGreaterThan(0);
-    resetSpans();
-    expect(spanTable.size).toBe(0);
+    const sizeBefore = spanTable.size;
+    expect(sizeBefore).toBeGreaterThan(0);
+    resetSpans('other.t2');
+    // spans from prior file are preserved so prelude locations remain visible
+    expect(spanTable.size).toBe(sizeBefore);
   });
 
   // ── 3. Error messages include location ────────────────────────────────────

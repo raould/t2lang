@@ -194,7 +194,7 @@
       (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
              (optional (ternary ((. ctx OPTIONAL)) true false))
              (typeAnn (ternary ((. ctx typeExpr)) (astTypeExpr ((. ctx typeExpr))) undefined)))
-        (return (object (name name) (optional optional) (typeAnnotation typeAnn))))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (name name) (optional optional) (typeAnnotation typeAnn))))))
 
   (const astFnSignatureTyped
     (lambda ((ctx))
@@ -347,7 +347,7 @@
     (lambda ((ctx))
       (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
              (body ((. ((. ctx statement)) map) astStatement)))
-        (return (object (param name) (body body))))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (param name) (body body))))))
 
   (const astTry
     (lambda ((ctx))
@@ -773,6 +773,10 @@
           (if (&& ((. text includes) '.') (! ((. text startsWith) '...')))
             (return (desugarDottedIdentifier text ctx)))
           (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'identifier') (name text)))))
+      (if ((. ctx MACRO_ERROR))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'identifier') (name 'macro-error'))))
+      (if ((. ctx MINUS))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'identifier') (name '-'))))
       (if ((. ctx "lambda"))
         (return (astLambda ((. ctx "lambda")))))
       (if ((. ctx "fn"))
@@ -975,6 +979,8 @@
 
   (const astLiteral
     (lambda ((ctx))
+      (if ((. ctx NEG_NUMBER))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'literal') (value (Number ((. ((. ctx NEG_NUMBER)) getText)))))))
       (if ((. ctx NUMBER))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'literal') (value (Number ((. ((. ctx NUMBER)) getText)))))))
       (if ((. ctx STRING))
