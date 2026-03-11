@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('literal.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
       ;; number literals
       (asrt 42 42)
       (asrt 3.14 3.14)

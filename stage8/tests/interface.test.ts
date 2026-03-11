@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('interface definition end-to-end', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
 
     ;; basic interface — fields are type-checked by TypeScript, values verified at runtime
     (interface Point (Object (x number) (y number)))
@@ -22,7 +22,7 @@ it('interface definition end-to-end', () => {
     (asrt (. c retries) 3)
 
     ;; interface with generic type parameter
-    (interface Box (type-params T) (Object (value T)))
+    (interface Box (type-params (T)) (Object (value T)))
     (let (b : (Box number)) (object (value 99)))
     (asrt (. b value) 99)
 

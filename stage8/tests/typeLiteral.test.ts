@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('typeLiteral end-to-end', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; literal string type "foo"
         (let (x : (tlit "foo")) "foo")
         (asrt x "foo")

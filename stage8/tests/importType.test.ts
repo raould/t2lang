@@ -13,7 +13,7 @@ it('import-type — named type import alongside value import', () => {
     //   import type { T } from "./mod";
     // The type is erased at runtime; the value import (asrt) is still usable.
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (import-type (named asrtDeep) "./helpers")
         (asrt 1 1)
     )`);
@@ -23,7 +23,7 @@ it('import-type — named type import with alias', () => {
     // (import-type (named (asrt AsrtFn)) "./helpers") should emit:
     //   import type { asrt as AsrtFn } from "./helpers";
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (import-type (named (asrt AsrtFn)) "./helpers")
         (asrt 2 2)
     )`);
@@ -34,7 +34,7 @@ it('import-type — multiple named type imports', () => {
     //   import type { asrt as AsrtFn, asrtDeep } from "./helpers";
     // Uses an alias for 'asrt' to avoid conflict with the value import.
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (import-type (named (asrt AsrtFn) asrtDeep) "./helpers")
         (asrt 3 3)
     )`);

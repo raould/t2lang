@@ -3,8 +3,8 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('typeAnnotation.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
-      (import (object (:named (array (object (:name "asrtDeep"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrtDeep"))))) "./helpers")
       (let (x : number) 42)
       (let (name : string) "hello")
       (const (pi : number) 3.14)

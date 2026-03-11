@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('typeFunction end-to-end', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; function type: (a: number) => string
         (let (x : (tfn ((a number)) string)) (lambda ((a)) (return (+ "result " a))))
         (asrt (x 42) "result 42")

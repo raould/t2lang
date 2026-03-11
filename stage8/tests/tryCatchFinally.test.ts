@@ -18,7 +18,7 @@ function callCompiler(source: string) {
 
 it('try/catch/finally runs expected blocks', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (let (events) (array))
     (try
       ((. events push) "try")
@@ -33,7 +33,7 @@ it('try/catch/finally runs expected blocks', () => {
 
 it('try/finally without catch still runs finally', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (let (events) (array))
     (try
       ((. events push) "start")
@@ -45,7 +45,7 @@ it('try/finally without catch still runs finally', () => {
 
 it('try/catch without finally runs catch path only', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (let (events) (array))
     (try
       ((. events push) "start")
@@ -58,7 +58,7 @@ it('try/catch without finally runs catch path only', () => {
 
 it('finally runs even when returning from try', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (let (events) (array))
     (const run (lambda ()
       (try
@@ -73,7 +73,7 @@ it('finally runs even when returning from try', () => {
 
 it('finally throwing overrides earlier throw', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (let (events) (array))
     (try
       (try
@@ -96,7 +96,7 @@ it('rejects try with neither catch nor finally', () => {
 
 it('catch binding is scoped only to the catch body', () => {
   const result = callCompiler(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (try
       (throw "boom")
       (catch err

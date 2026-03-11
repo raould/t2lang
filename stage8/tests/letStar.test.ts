@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('letStar.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
       ;; let* with multiple bindings and body
       (let* ((x 10)
             (y 20)

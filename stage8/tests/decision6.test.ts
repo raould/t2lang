@@ -64,10 +64,10 @@ describe('Decision 6 Phase 2: error location smoke tests', () => {
   // Trigger: (export-default (const name non-fn)) fires lowerExportDefaultDef.
   // The error is thrown with the source location of the offending initializer.
 
-  it('lower error includes file:line:col in "file:line:col" format', () => {
+  it('lower error includes file~line~col in "file:line:col" format', () => {
     const result = callCompiler('(program (export-default (const myFn 42)))');
     expect(result.status).not.toBe(0);
-    // Error message must match file:line:col — e.g. "<stdin>:1:36"
+    // Error message must match file~line~col — e.g. "<stdin>:1:36"
     expect(result.stderr).toMatch(/<stdin>:\d+:\d+/);
   }, T);
 
@@ -160,14 +160,15 @@ describe('Decision 6: spans infrastructure', () => {
     resetSpans();
   });
 
-  it('resetSpans clears the span table', () => {
-    resetSpans();
+  it('resetSpans switches current file without clearing the span table', () => {
     const id = nextNodeId();
     const fakeCtx = { start: { line: 1, column: 0 }, stop: { line: 1, column: 5 } };
     registerSpan(id, fakeCtx as any);
-    expect(spanTable.size).toBeGreaterThan(0);
-    resetSpans();
-    expect(spanTable.size).toBe(0);
+    const sizeBefore = spanTable.size;
+    expect(sizeBefore).toBeGreaterThan(0);
+    resetSpans('other.t2');
+    // spans from prior file are preserved so prelude locations remain visible
+    expect(spanTable.size).toBe(sizeBefore);
   });
 
   // ── 3. Error messages include location ────────────────────────────────────

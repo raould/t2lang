@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('typeTypeof end-to-end', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; typeof foo captures the type of foo (number in this case)
         (let (foo) 42)
         (let (x : (typeof foo)) 99)

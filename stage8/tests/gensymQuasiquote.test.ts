@@ -45,10 +45,10 @@ describe('Section 2 Step 4: gensym bound outside quasi template', () => {
     // inside the quasi template.  Both uses must resolve to the same name
     // (e.g., "v_0 + v_0"), not two different names ("v_0 + v_1").
     const result = callCompiler(`(program
-  (defmacro ref-twice ((x))
+  (defmacro refTwice ((x))
     (let* ((s (gensym "v")))
       (return (quasi (+ (unquote s) (unquote s))))))
-  (const r (ref-twice 0))
+  (const r (refTwice 0))
 )`);
     expect(result.status).toBe(0);
     const matches = result.stdout.match(/v_\d+/g) ?? [];
@@ -60,10 +60,10 @@ describe('Section 2 Step 4: gensym bound outside quasi template', () => {
 
   it('same gensym binding unquoted three times still produces one unique name', () => {
     const result = callCompiler(`(program
-  (defmacro ref-three ((x))
+  (defmacro refThree ((x))
     (let* ((s (gensym "k")))
       (return (quasi (+ (unquote s) (+ (unquote s) (unquote s)))))))
-  (const r (ref-three 0))
+  (const r (refThree 0))
 )`);
     expect(result.status).toBe(0);
     const matches = result.stdout.match(/k_\d+/g) ?? [];
@@ -75,11 +75,11 @@ describe('Section 2 Step 4: gensym bound outside quasi template', () => {
     // Each call to the macro re-enters the macro body, calling (gensym "v")
     // afresh.  The counter advances, so each expansion gets a distinct name.
     const result = callCompiler(`(program
-  (defmacro one-sym ()
+  (defmacro oneSym ()
     (let* ((s (gensym "v")))
       (return (quasi (unquote s)))))
-  (const a (one-sym))
-  (const b (one-sym))
+  (const a (oneSym))
+  (const b (oneSym))
 )`);
     expect(result.status).toBe(0);
     const matches = result.stdout.match(/v_\d+/g) ?? [];
@@ -92,9 +92,9 @@ describe('Section 2 Step 4: gensym bound outside quasi template', () => {
     // Contrast with Test 1: here gensym is NOT bound outside; each unquote
     // calls gensym independently → two different fresh names in the output.
     const result = callCompiler(`(program
-  (defmacro two-syms ()
+  (defmacro twoSyms ()
     (return (quasi (+ (unquote (gensym "w")) (unquote (gensym "w"))))))
-  (const r (two-syms))
+  (const r (twoSyms))
 )`);
     expect(result.status).toBe(0);
     const matches = result.stdout.match(/w_\d+/g) ?? [];

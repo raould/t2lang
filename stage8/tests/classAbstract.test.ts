@@ -3,22 +3,22 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('class — abstract class with concrete subclass', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; Abstract base: declares abstract area() and concrete describe()
-        (class :abstract Shape
+        (class abstract Shape
             (class-body
-                (abstract-method :public area () (returns number))
-                (method :public describe () (returns string)
+                (abstract-method public area () (returns number))
+                (method public describe () (returns string)
                     (return (+ "area=" (+ ((. this area)) ""))))))
         ;; Concrete subclass: implements area
         (class Circle
             (extends Shape)
             (class-body
-                (field :private r : number)
+                (field private (r : number))
                 (constructor ((r : number))
                     (super)
                     (set! (. this r) r))
-                (method :public :override area () (returns number)
+                (method public override area () (returns number)
                     (return (* (. this r) (. this r))))))
         (let (c) (new Circle 5))
         (asrt ((. c area)) 25)
@@ -28,21 +28,21 @@ it('class — abstract class with concrete subclass', () => {
 
 it('class — abstract class with multiple concrete subclasses', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
-        (class :abstract Animal
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
+        (class abstract Animal
             (class-body
-                (abstract-method :public sound () (returns string))
-                (method :public greet () (returns string)
+                (abstract-method public sound () (returns string))
+                (method public greet () (returns string)
                     (return (+ "I say: " ((. this sound)))))))
         (class Dog
             (extends Animal)
             (class-body
-                (method :public :override sound () (returns string)
+                (method public override sound () (returns string)
                     (return "woof"))))
         (class Cat
             (extends Animal)
             (class-body
-                (method :public :override sound () (returns string)
+                (method public override sound () (returns string)
                     (return "meow"))))
         (let (d) (new Dog))
         (let (c) (new Cat))
@@ -55,16 +55,16 @@ it('class — abstract class with multiple concrete subclasses', () => {
 
 it('class — abstract method with parameters', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
-        (class :abstract Transformer
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
+        (class abstract Transformer
             (class-body
-                (abstract-method :public transform ((n : number)) (returns number))
-                (method :public applyTwice ((n : number)) (returns number)
+                (abstract-method public transform ((n : number)) (returns number))
+                (method public applyTwice ((n : number)) (returns number)
                     (return ((. this transform) ((. this transform) n))))))
         (class Doubler
             (extends Transformer)
             (class-body
-                (method :public :override transform ((n : number)) (returns number)
+                (method public override transform ((n : number)) (returns number)
                     (return (* n 2)))))
         (let (d) (new Doubler))
         (asrt ((. d transform) 5) 10)

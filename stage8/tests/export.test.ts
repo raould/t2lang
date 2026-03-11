@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('export forms end-to-end', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
 
     ;; (export name expr) — declares and immediately exports a constant.
     ;; The name remains accessible in the same program scope.

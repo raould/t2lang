@@ -18,7 +18,7 @@ it('export-type — named type export of a locally defined alias', () => {
     // Defines a type alias and exports it as a type-only export.
     // TypeScript should accept this; at runtime the export is erased.
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (type Score number)
         (export-type (Score))
         (let (s : Score) 100)
@@ -29,7 +29,7 @@ it('export-type — named type export of a locally defined alias', () => {
 it('export-type — named type export with alias', () => {
     // (export-type (Score Points)) emits: export type { Score as Points };
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (type Score number)
         (export-type (Score Points))
         (let (s : Score) 99)
@@ -40,7 +40,7 @@ it('export-type — named type export with alias', () => {
 it('export-type — multiple names in one export-type form', () => {
     // (export-type (A) (B)) emits: export type { A, B };
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (type Width number)
         (type Height number)
         (export-type (Width) (Height))
@@ -54,7 +54,7 @@ it('export-type-from — re-export named types from another module', () => {
     //   export type { asrt } from "./helpers";
     // Verifies compilation; no runtime assertion needed.
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (export-type-from "./helpers" (asrt))
         (asrt 1 1)
     )`);
@@ -64,7 +64,7 @@ it('export-type-all-from — re-export all types from another module', () => {
     // (export-type-all-from "./helpers") emits:
     //   export type * from "./helpers";
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (export-type-all-from "./helpers")
         (asrt 1 1)
     )`);
