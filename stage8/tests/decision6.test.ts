@@ -64,10 +64,10 @@ describe('Decision 6 Phase 2: error location smoke tests', () => {
   // Trigger: (export-default (const name non-fn)) fires lowerExportDefaultDef.
   // The error is thrown with the source location of the offending initializer.
 
-  it('lower error includes file:line:col in "file:line:col" format', () => {
+  it('lower error includes file~line~col in "file:line:col" format', () => {
     const result = callCompiler('(program (export-default (const myFn 42)))');
     expect(result.status).not.toBe(0);
-    // Error message must match file:line:col — e.g. "<stdin>:1:36"
+    // Error message must match file~line~col — e.g. "<stdin>:1:36"
     expect(result.stderr).toMatch(/<stdin>:\d+:\d+/);
   }, T);
 

@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('def.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     ;; top-level constant definition
     (const x 42)
     (const greeting "hello")

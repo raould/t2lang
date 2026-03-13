@@ -2,7 +2,7 @@ import { formatSpan } from "./Stage8-spans";
 import { parseForm } from "./Stage8-parse-form";
 const isOperator  = (name) => {
   {
-    let ops  = ["<", ">", "<=", ">=", "&&", "||", "!=", "!==", "==", "===", "+", "-", "*", "/", "%", "^", "!"];
+    let ops  = ["<", ">", "<=", ">=", "&&", "||", "!=", "!==", "==", "===", "+", "-", "*", "/", "%", "^", "!", "or", "and"];
     return ops.includes(name);
   }
 };
@@ -17,12 +17,18 @@ const lowerProgram  = (node) => {
     });
   }
 };
-const lowerTopLevel  = (node) => {
+const lowerTopLevel  = (node, isMacroMode) => {
   if ((node.tag === "defmacro")) {
-    return lowerDefmacro(node);
+    return lowerDefmacro(node, isMacroMode);
   }
   if ((node.tag === "macro-time-fn-def")) {
     return lowerMacroTimeFnDef(node);
+  }
+  if ((node.tag === "macro-import")) {
+    return lowerMacroImport(node);
+  }
+  if ((node.tag === "macro-export")) {
+    return lowerMacroExport(node);
   }
   if ((node.tag === "let-decl")) {
     return lowerLetDecl(node);
@@ -30,11 +36,17 @@ const lowerTopLevel  = (node) => {
   if ((node.tag === "const-decl")) {
     return lowerConstDecl(node);
   }
+  if ((node.tag === "fn-decl")) {
+    return lowerFnDecl(node);
+  }
   if ((node.tag === "type-alias")) {
     return lowerTypeAlias(node);
   }
   if ((node.tag === "interface-def")) {
     return lowerInterfaceDef(node);
+  }
+  if ((node.tag === "enum-def")) {
+    return lowerEnumDef(node);
   }
   if ((node.tag === "class-def")) {
     return lowerClassDef(node);
@@ -75,6 +87,15 @@ const lowerInterfaceDef  = (node) => {
     }) : []),
     extends: node.extends.map(lowerTypeExpr),
     body: lowerTypeExpr(node.body)
+  });
+};
+const lowerEnumDef  = (node) => {
+  return ({
+    node: node,
+    id: node.id,
+    tag: "enum-def",
+    name: node.name,
+    members: node.members
   });
 };
 const lowerTypedParam  = (node) => {
@@ -307,15 +328,44 @@ const lowerExportDefaultDef  = (node) => {
     }
   }
 };
-const lowerDefmacro  = (node) => {
+const lowerMacroImport  = (node) => {
+  return ({
+    node: node,
+    id: node.id,
+    tag: "macro-import-decl",
+    path: node.path
+  });
+};
+const lowerMacroExport  = (node) => {
+  return ({
+    node: node,
+    id: node.id,
+    tag: "macro-export-decl",
+    specs: node.specs
+  });
+};
+const lowerDefmacro  = (node, isMacroMode) => {
+  if (isMacroMode) {
+    return ({
+      node: node,
+      id: node.id,
+      tag: "macro-def",
+      name: node.name,
+      params: node.params,
+      rest: node.rest,
+      scopeId: node.scopeId,
+      body: node.body.map(lowerStmt)
+    });
+  }
   return ({
     node: node,
     id: node.id,
     tag: "macro-def",
     name: node.name,
     params: node.params,
-    body: [],
-    scopeId: node.scopeId
+    rest: node.rest,
+    scopeId: node.scopeId,
+    body: []
   });
 };
 const lowerMacroTimeFnDef  = (node) => {
@@ -356,6 +406,26 @@ const lowerConstDecl  = (node) => {
     });
   }
 };
+const lowerFnDecl  = (node) => {
+  {
+    let params  = node.params.map(lowerTypedParam);
+    let restType  = (node.restType ? lowerTypeExpr(node.restType) : undefined);
+    let returnType  = (node.returnType ? lowerTypeExpr(node.returnType) : undefined);
+    let body  = node.body.map(lowerStmt);
+    return ({
+      node: node,
+      id: node.id,
+      tag: "fn-decl-stmt",
+      name: node.name,
+      meta: node.meta,
+      params: params,
+      rest: node.rest,
+      restType: restType,
+      returnType: returnType,
+      body: body
+    });
+  }
+};
 const lowerExportDecl  = (node) => {
   {
     let inner  = node.decl;
@@ -375,6 +445,14 @@ const lowerExportDecl  = (node) => {
         decl: lowerConstDecl(inner)
       });
     }
+    if ((inner.tag === "fn-decl")) {
+      return ({
+        node: node,
+        id: node.id,
+        tag: "export-decl-stmt",
+        decl: lowerFnDecl(inner)
+      });
+    }
     if ((inner.tag === "class-def")) {
       return ({
         node: node,
@@ -389,6 +467,14 @@ const lowerExportDecl  = (node) => {
         id: node.id,
         tag: "export-decl-stmt",
         decl: lowerInterfaceDef(inner)
+      });
+    }
+    if ((inner.tag === "enum-def")) {
+      return ({
+        node: node,
+        id: node.id,
+        tag: "export-decl-stmt",
+        decl: lowerEnumDef(inner)
       });
     }
     if ((inner.tag === "type-alias")) {
@@ -715,22 +801,22 @@ const lowerImport  = (node) => {
     let named  = undefined;
     if (spec) {
       spec.fields.forEach((f) => {
-        if ((f.key === ":default")) {
+        if ((f.key === "default")) {
           defaultName = f.value.value;
         }
-        if ((f.key === ":namespace")) {
+        if ((f.key === "namespace")) {
           namespaceName = f.value.value;
         }
-        if ((f.key === ":named")) {
+        if ((f.key === "named")) {
           named = f.value.elements.map((el) => {
             {
               let nm  = undefined;
               let al  = undefined;
               el.fields.forEach((ff) => {
-                if ((ff.key === ":name")) {
+                if ((ff.key === "name")) {
                   nm = ff.value.value;
                 }
-                if ((ff.key === ":as")) {
+                if ((ff.key === "as")) {
                   al = ff.value.value;
                 }
               });
@@ -818,9 +904,6 @@ const lowerExpr  = (node) => {
         });
       })
     });
-  }
-  if ((node.tag === "keyword")) {
-    return node;
   }
   if ((node.tag === "identifier")) {
     return node;
@@ -1107,7 +1190,8 @@ const lowerExpr  = (node) => {
 const lowerCall  = (node) => {
   if (((node.fn.tag === "identifier") && isOperator(node.fn.name))) {
     {
-      let op  = node.fn.name;
+      let rawOp  = node.fn.name;
+      let op  = ((rawOp === "or") ? "||" : ((rawOp === "and") ? "&&" : rawOp));
       let args  = node.args.map(lowerExpr);
       if ((args.length === 1)) {
         return ({
@@ -1139,6 +1223,21 @@ const lowerCall  = (node) => {
       }
     }
   }
+  if (((node.fn.tag === "identifier") && (node.fn.name === "regex"))) {
+    {
+      let patternArg  = node.args[0];
+      let flagsArg  = ((node.args.length > 1) ? node.args[1] : null);
+      let pattern  = ((patternArg && (patternArg.tag === "literal")) ? patternArg.value : "");
+      let flags  = ((flagsArg && (flagsArg.tag === "literal")) ? flagsArg.value : "");
+      return ({
+        node: node,
+        id: node.id,
+        tag: "regex-literal-expr",
+        pattern: pattern,
+        flags: flags
+      });
+    }
+  }
   {
     let typeArgs  = (node.typeArgs ? node.typeArgs.map(lowerTypeExpr) : []);
     let args  = node.args.map(lowerExpr);
@@ -1156,19 +1255,10 @@ const lowerCond  = (node) => {
   {
     let clauses  = node.clauses;
     let i  = (clauses.length - 1);
-    let last  = clauses[i];
-    let isElse  = ((last.test.tag === "keyword") && (last.test.value === ":else"));
-    let result  = (isElse ? lowerExpr(last.expr) : ({
-      node: node,
-      tag: "ternary-expr",
-      test: lowerExpr(last.test),
-      ifthen: lowerExpr(last.expr),
-      ifelse: ({
-        tag: "literal",
-        value: undefined
-      })
+    let result  = ((node.elseExpr !== undefined) ? lowerExpr(node.elseExpr) : ({
+      tag: "literal",
+      value: undefined
     }));
-    i = (i - 1);
     while ((i >= 0)) {
       {
         let c  = clauses[i];

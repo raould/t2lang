@@ -10,13 +10,13 @@ def(add, (a, b) => {
 });
 let y  = add(x, 1);
 if ((y > 40)) {
-  {
-    x = 100;
-    console.log(x);
-  }
+  begin;
+  x = 100;
+  console.log(x);
 }
 else {
-  console.log("nope");
+  console.log;
+  "nope";
 }
 while ((x > 0)) {
   x = (x - 1);

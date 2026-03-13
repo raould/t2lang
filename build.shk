@@ -1,0 +1,43 @@
+(program
+  ;; build.shk — t2lang build file for MiniShake.
+
+  (import { readdirSync writeFileSync renameSync } "node:fs")
+  (import path "node:path")
+
+  (export-default (fn ((shk : any))
+
+    ;; Rule 1: ANTLR grammar → TypeScript lexer/parser
+    ((. shk rule) {
+      name: "build-grammar"
+      output: "stage9/Stage9Lexer.ts"
+      deps: [{ kind: "file" path: "stage9/Stage9.g4" }]
+      action: (async-fn ((ctx : any))
+        (const (antlrBin : string) ((. path join) (. ctx projectRoot) "stage9" "node_modules" ".bin" "antlr-ng"))
+        (await ((. ctx run) antlrBin
+          ["-Dlanguage=TypeScript" ((. path join) (. ctx projectRoot) "stage9" "Stage9.g4")])))})
+
+    ;; Rule 2: .s8 sources → compiled .ts via stage8 compiler
+    ((. shk rule) {
+      name: "build-compiler"
+      output: "stage9/index.ts"
+      deps: [{ kind: "rule" name: "build-grammar" }
+             { kind: "glob" pattern: "stage9/Stage9*.s8" }
+             { kind: "file" path: "stage9/Stage9-tags.ts" }
+             { kind: "file" path: "stage9/Stage9-debug.ts" }
+             { kind: "file" path: "stage9/Stage9-parse-form.ts" }]
+      action: (async-fn ((ctx : any))
+        (const (stage9Dir : string) ((. path join) (. ctx projectRoot) "stage9"))
+        (const (tsxBin : string) ((. path join) stage9Dir "node_modules" ".bin" "tsx"))
+        (const (compilerPath : string) ((. path join) (. ctx projectRoot) "stage8" "index.ts"))
+        (const (s8Files : (type-array string))
+          ((. (readdirSync stage9Dir) filter) (fn ((f : string)) (return ((. f endsWith) ".s8")))))
+        (for-of f s8Files
+          ;; Stage9.s8 → index.ts, everything else Stage9-foo.s8 → Stage9-foo.ts
+          (const (outName : string)
+            (ternary (=== f "Stage9.s8") "index.ts" ((. f replace) ".s8" ".ts")))
+          (const (srcPath : string) ((. path join) stage9Dir f))
+          (const (tmpPath : string) ((. path join) "/tmp" (+ "_s9_" outName)))
+          (const (outPath : string) ((. path join) stage9Dir outName))
+          (const (result : any) (await ((. ctx run) tsxBin [compilerPath srcPath])))
+          (writeFileSync tmpPath (. result stdout))
+          (renameSync tmpPath outPath)))}))))

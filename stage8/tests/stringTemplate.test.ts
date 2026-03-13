@@ -8,7 +8,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('stringTemplate end-to-end', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
 
     ;; strings that were formerly backtick-strings work as regular strings
     (asrt "hello world" "hello world")

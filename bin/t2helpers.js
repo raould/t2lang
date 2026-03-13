@@ -1,15 +1,27 @@
-// Hyphenated keywords in the Stage8 grammar. Users familiar with TypeScript
-// often write these with underscores instead of hyphens, which silently
-// produces wrong behaviour (the lexer sees a plain identifier, not a keyword).
-const HYPHENATED_KEYWORDS = [
-  'abstract-method', 'async-fn', 'async-generator-fn', 'async-lambda',
-  'class-body', 'export-all-from', 'export-default', 'export-from',
-  'export-named', 'export-ns-from', 'export-type', 'export-type-all-from',
-  'export-type-from', 'for-await', 'for-in', 'for-of', 'generator-fn',
-  'import-type', 'macro-error', 'method-call', 'optchain-index',
-  'super-method', 'type-args', 'type-array', 'type-as', 'type-params',
-  'type-template', 'unquote-splicing',
-];
+import { readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+export function checkSource(source, label) {
+  const errors = findUnderscoredKeywords(source);
+  if (errors.length === 0) return;
+  for (const e of errors) {
+    process.stderr.write(
+      `${label}:${e.line}:${e.col}: keyword error: ` +
+      `'${e.found}' should be '${e.keyword}' (use hyphens, not underscores)\n`
+    );
+  }
+  process.exit(1);
+}
+
+// Derive the keyword list from Stage9-tags.ts: any AST tag that contains a
+// hyphen could be accidentally written with underscores by TypeScript users.
+// We read the file as text so we don't need tsx to import it.
+const tagsSource = readFileSync(resolve(__dirname, '../stage9/Stage9-tags.ts'), 'utf-8');
+const HYPHENATED_KEYWORDS = [...tagsSource.matchAll(/"([a-z][a-z0-9]*(?:-[a-z0-9]+)+)"/g)]
+  .map(m => m[1]);
 
 // Replace the contents of strings and ;; comments with spaces, preserving
 // newlines so that line numbers stay correct.
@@ -65,7 +77,7 @@ function findUnderscoredKeywords(source) {
   for (const kw of HYPHENATED_KEYWORDS) {
     const underscored = kw.replace(/-/g, '_');
     // Match the underscore form only when surrounded by non-identifier chars
-    // (identifiers are [a-zA-Z0-9_$?] in Stage8).
+    // (identifiers are [a-zA-Z0-9_$?] in Stage9).
     const re = new RegExp(`(?<![\\w$?])${underscored}(?![\\w$?])`, 'g');
     let m;
     while ((m = re.exec(stripped)) !== null) {
@@ -77,16 +89,4 @@ function findUnderscoredKeywords(source) {
     }
   }
   return errors;
-}
-
-export function checkSource(source, label) {
-  const errors = findUnderscoredKeywords(source);
-  if (errors.length === 0) return;
-  for (const e of errors) {
-    process.stderr.write(
-      `${label}:${e.line}:${e.col}: keyword error: ` +
-      `'${e.found}' should be '${e.keyword}' (use hyphens, not underscores)\n`
-    );
-  }
-  process.exit(1);
 }

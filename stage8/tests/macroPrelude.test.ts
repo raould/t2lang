@@ -93,7 +93,7 @@ describe('--macro-prelude: basic usage', () => {
   it('main file macros still work when no prelude is given', () => {
     // Ensure existing behaviour is unaffected
     fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
       (defmacro inc ((n)) (return (quasi (+ 1 (unquote n)))))
       (let r (inc 41))
       (asrt r 42)

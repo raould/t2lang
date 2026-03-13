@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('call.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     ;; call with operator (lowered to operator-expr)
     ((. console log) (+ 1 2))
     ((. console log) (- 10 3))

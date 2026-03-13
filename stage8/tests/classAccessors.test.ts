@@ -3,10 +3,10 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('class — basic getter and setter', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (class Box
             (class-body
-                (field _v : number)
+                (field (_v : number))
                 (constructor ((v : number))
                     (set! (. this _v) v))
                 (get value () (returns number)
@@ -22,11 +22,11 @@ it('class — basic getter and setter', () => {
 
 it('class — getter derived from multiple fields', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (class Rect
             (class-body
-                (field width : number)
-                (field height : number)
+                (field (width : number))
+                (field (height : number))
                 (constructor ((w : number) (h : number))
                     (set! (. this width) w)
                     (set! (. this height) h))
@@ -44,10 +44,10 @@ it('class — getter derived from multiple fields', () => {
 
 it('class — setter with clamping logic', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (class Clamp
             (class-body
-                (field _pct : number 0)
+                (field (_pct : number) 0)
                 (get pct () (returns number)
                     (return (. this _pct)))
                 (set pct ((v : number))
@@ -66,7 +66,7 @@ it('class — setter with clamping logic', () => {
 
 it('class — getter override calling super getter via (. super prop)', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; (. super label) emits super.label — pure property access, no call parens
         (class Base
             (class-body
@@ -75,7 +75,7 @@ it('class — getter override calling super getter via (. super prop)', () => {
         (class Child
             (extends Base)
             (class-body
-                (get :override label () (returns string)
+                (get override label () (returns string)
                     (return (+ (. super label) "+child")))))
         (let (b) (new Base))
         (let (c) (new Child))
@@ -86,11 +86,11 @@ it('class — getter override calling super getter via (. super prop)', () => {
 
 it('class — getter and setter with inheritance', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; Base stores a number; subclass overrides getter to double it
         (class Base
             (class-body
-                (field _n : number)
+                (field (_n : number))
                 (constructor ((n : number))
                     (set! (. this _n) n))
                 (get value () (returns number)
@@ -102,7 +102,7 @@ it('class — getter and setter with inheritance', () => {
             (class-body
                 (constructor ((n : number))
                     (super n))
-                (get :override value () (returns number)
+                (get override value () (returns number)
                     (return (* 2 (. this _n))))))
         (let (b) (new Base 5))
         (let (d) (new Doubled 5))

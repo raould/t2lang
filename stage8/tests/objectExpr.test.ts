@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('objectExpr.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
       ;; object with identifier keys
       (let (obj) (object (x 1) (y 2) (z 3)))
       (asrt ((. JSON stringify) obj) '{"x":1,"y":2,"z":3}')

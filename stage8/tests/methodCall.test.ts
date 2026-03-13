@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('methodCall end-to-end', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; method-call: explicit receiver-bound invocation
         (let (arr) (array 1 2 3))
         (method-call arr push 4)

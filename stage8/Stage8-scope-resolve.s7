@@ -92,6 +92,15 @@
         (return (object (tag 'object') (text (. node text))
           (fields ((. (. node fields) map) (lambda ((f))
             (if (. f isShorthand) (return f))
+            (if (. f isMethod)
+              (let* ((extChain chain))
+                ((. (. f params) forEach) (lambda ((p))
+                  (set! extChain (addBinding extChain p (new Set)))))
+                (return (object
+                  (key (. f key))
+                  (isMethod true)
+                  (params (. f params))
+                  (body ((. (. f body) map) (lambda ((s)) (return (resolveStmt s extChain)))))))))
             (return (object
               (key (. f key))
               (isMethod (. f isMethod))
@@ -318,6 +327,18 @@
         (return (object (tag 'assign') (text (. node text))
           (name (. node name))
           (value (resolveExpr (. node value) chain)))))
+      ;; let
+      (if (=== (. node tag) 'let')
+        (return (object (tag 'let') (text (. node text))
+          (name (. node name))
+          (typeAnnotation (. node typeAnnotation))
+          (init (resolveExpr (. node init) chain)))))
+      ;; const
+      (if (=== (. node tag) 'const')
+        (return (object (tag 'const') (text (. node text))
+          (name (. node name))
+          (typeAnnotation (. node typeAnnotation))
+          (init (resolveExpr (. node init) chain)))))
       ;; class definitions
       (if (=== (. node tag) 'class-def')
         (return (resolveClassDef node chain)))
@@ -343,6 +364,21 @@
           (name (. node name))
           (meta (. node meta))
           (init (resolveExpr (. node init) chain)))))
+      (if (=== (. node tag) 'fn-decl')
+        (begin
+          (let* ((extChain chain))
+            ((. (. node params) forEach) (lambda ((p))
+              (set! extChain (addBinding extChain (. p name) (new Set)))))
+            (if (. node rest)
+              (set! extChain (addBinding extChain (. node rest) (new Set))))
+            (return (object (tag 'fn-decl') (text (. node text))
+              (name (. node name))
+              (meta (. node meta))
+              (params (. node params))
+              (rest (. node rest))
+              (restType (. node restType))
+              (returnType (. node returnType))
+              (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
       ;; everything else: treat as statement
       (return (resolveStmt node chain))))
 
@@ -357,7 +393,7 @@
         ((. (. programNode body) forEach) (lambda ((node))
           ((. resolvedBody push) (resolveTopLevel node chain))
           ;; top-level defs extend the chain for subsequent nodes
-          (if (|| (=== (. node tag) 'let-decl') (=== (. node tag) 'const-decl'))
+          (if (|| (=== (. node tag) 'let-decl') (|| (=== (. node tag) 'const-decl') (=== (. node tag) 'fn-decl')))
             (set! chain (addBinding chain (. node name) (new Set))))))
         (let* ((resolved (object
                  (tag 'program')

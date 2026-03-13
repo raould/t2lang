@@ -3,7 +3,7 @@ import {fromSourceEndToEnd} from './helpers';
 
 it('forIn.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (let* ((obj (object (a 1) (b 2) (c 3)))
           (keys (array)))
       (for-in k obj

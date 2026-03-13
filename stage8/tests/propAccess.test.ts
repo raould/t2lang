@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('propAccess.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (let (obj) (object (x 10) (y 20) (z (lambda ((a)) a))))
 
     ;; Invalid, should throw if uncommented.

@@ -8,7 +8,7 @@ it('stringEscapes end-to-end', () => {
   //    \\'  → \'  in T2 source (escaped single quote inside single-quoted string).
   //    \\"  → \"  in T2 source (escaped double quote inside double-quoted string).
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
 
     ;; Bug 1 fix: \\'  in template → \\' in T2 → single-quoted string with escaped '
     (asrt 'it\\'s fine' "it's fine")

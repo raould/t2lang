@@ -39,7 +39,7 @@ describe('Step 7: macro expansion in the compiler pipeline', () => {
   it('a zero-arg macro is expanded and its result executes correctly', () => {
     // (defmacro const42 () (return (quasi 42)))  →  the call site becomes the literal 42
     fromSourceEndToEnd(`(program
-  (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+  (import (object (named (array (object (name "asrt"))))) "./helpers")
   (defmacro const42 ()
     (return (quasi 42)))
   (const result (const42))
@@ -51,7 +51,7 @@ describe('Step 7: macro expansion in the compiler pipeline', () => {
     // (defmacro double ((x)) (return (quasi (+ (unquote x) (unquote x)))))
     // (double 21)  →  (+ 21 21)  →  42
     fromSourceEndToEnd(`(program
-  (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+  (import (object (named (array (object (name "asrt"))))) "./helpers")
   (defmacro double ((x))
     (return (quasi (+ (unquote x) (unquote x)))))
   (const result (double 21))
@@ -61,7 +61,7 @@ describe('Step 7: macro expansion in the compiler pipeline', () => {
 
   it('a macro can be called multiple times independently', () => {
     fromSourceEndToEnd(`(program
-  (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+  (import (object (named (array (object (name "asrt"))))) "./helpers")
   (defmacro negate ((x))
     (return (quasi (- 0 (unquote x)))))
   (const a (negate 5))
@@ -105,7 +105,7 @@ describe('Step 7: macro expansion in the compiler pipeline', () => {
     //  2. the macro expands and executes correctly,
     //  3. a user variable named "tmp" (same prefix as the gensym) is unaffected.
     fromSourceEndToEnd(`(program
-  (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+  (import (object (named (array (object (name "asrt"))))) "./helpers")
   (defmacro negateFresh ((x))
     (let* ((tmp (gensym "tmp")))
       (return (quasi (- 0 (unquote x))))))
@@ -163,6 +163,15 @@ describe('Step 7: compiler pipeline error handling', () => {
     expect(result.stderr).toContain('deliberate error from macro');
   }, T);
 
+  it('macro-export in a .t2 file causes compiler to exit with code 1', () => {
+    const result = callCompiler(`(program
+  (const x 1)
+  (macro-export x)
+)`);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('macro-export is not allowed in .t2 files');
+  }, T);
+
   it('multiple expansion errors are all reported together', () => {
     const result = callCompiler(`(program
   (defmacro m ((x))
@@ -184,14 +193,14 @@ describe('Step 7: compiler pipeline error handling', () => {
 describe('Step 7: macro top-level splicing', () => {
   it('macro can splice multiple let/const/class forms', () => {
     fromSourceEndToEnd(`(program
-  (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+  (import (object (named (array (object (name "asrt"))))) "./helpers")
   (defmacro emitMixed ()
     (return (array
       (quasi (let fromMacro 5))
       (quasi (const constFromMacro 17))
       (quasi (class Generated
         (class-body
-          (field total : number)
+          (field (total : number))
           (constructor ()
             (set! (. this total) (+ 5 17)))))))))
   (emitMixed)
@@ -203,9 +212,9 @@ describe('Step 7: macro top-level splicing', () => {
 `);
   }, T);
 
-  it.skip('macro-emitted defmacro registers for later calls', () => {
+  it('macro-emitted defmacro registers for later calls', () => {
     fromSourceEndToEnd(`(program
-  (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+  (import (object (named (array (object (name "asrt"))))) "./helpers")
   (defmacro produceMacro ()
     (return (array
       (quasi (defmacro emitted ((x))
@@ -231,7 +240,7 @@ describe('Step 7: macro top-level splicing', () => {
   it('macro emitting import is rejected', () => {
     const result = callCompiler(`(program
   (defmacro bringImport ()
-    (return (array (quasi (import (object (:named (array (object (:name "asrt"))))) "./helpers")))))
+    (return (array (quasi (import (object (named (array (object (name "asrt"))))) "./helpers")))))
   (bringImport)
 )
 `);

@@ -204,7 +204,7 @@ describe('swap! full integration', () => {
     const { ast, errors } = expandAll(program, env);
 
     expect(errors).toHaveLength(0);
-    const expanded = (ast.body[1] as any).expr as any;
+    const expanded = ast.body[1] as any;
     expect(expanded.tag).toBe('let*');
   });
 
@@ -218,7 +218,7 @@ describe('swap! full integration', () => {
     const { ast, errors } = expandAll(program, env);
 
     expect(errors).toHaveLength(0);
-    const expanded = (ast.body[1] as any).expr as any;
+    const expanded = ast.body[1] as any;
     const bindingName = expanded.bindings[0].name;
     expect(typeof bindingName).toBe('string');
     expect(bindingName).toMatch(/^tmp_\d+$/);   // gensym'd name
@@ -235,7 +235,7 @@ describe('swap! full integration', () => {
     const { ast, errors } = expandAll(program, env);
 
     expect(errors).toHaveLength(0);
-    const expanded = (ast.body[1] as any).expr as any;
+    const expanded = ast.body[1] as any;
     const bindingInit = expanded.bindings[0].init;
     expect(bindingInit.tag).toBe('identifier');
     expect(bindingInit.name).toBe('tmp');   // user's 'tmp' arg
@@ -251,7 +251,7 @@ describe('swap! full integration', () => {
     const { ast, errors } = expandAll(program, env);
 
     expect(errors).toHaveLength(0);
-    const expanded = (ast.body[1] as any).expr as any;
+    const expanded = ast.body[1] as any;
     expect(expanded.body).toHaveLength(2);
     expect(expanded.body[0].tag).toBe('assign');
     expect(expanded.body[1].tag).toBe('assign');
@@ -268,7 +268,7 @@ describe('swap! full integration', () => {
     const { ast, errors } = expandAll(program, env);
 
     expect(errors).toHaveLength(0);
-    const expanded = (ast.body[1] as any).expr as any;
+    const expanded = ast.body[1] as any;
     const stmt0 = expanded.body[0];
     expect(stmt0.name).toBe('tmp');             // target is user's 'tmp'
     expect(stmt0.value.name).toBe('y');         // value is user's 'y'
@@ -285,7 +285,7 @@ describe('swap! full integration', () => {
     const { ast, errors } = expandAll(program, env);
 
     expect(errors).toHaveLength(0);
-    const expanded = (ast.body[1] as any).expr as any;
+    const expanded = ast.body[1] as any;
     const bindingName = expanded.bindings[0].name;  // the gensym'd name, e.g. 'tmp_0'
     const stmt1 = expanded.body[1];
     expect(stmt1.name).toBe('y');                      // target is 'y'
@@ -304,7 +304,7 @@ describe('swap! full integration', () => {
     const { ast, errors } = expandAll(program, env);
 
     expect(errors).toHaveLength(0);
-    const expanded = (ast.body[1] as any).expr as any;
+    const expanded = ast.body[1] as any;
     const gensymName = expanded.bindings[0].name;
     expect(gensymName).not.toBe('tmp');   // gensym'd name ≠ user arg name
     expect(gensymName).toMatch(/^tmp_/);  // but shares the user-readable prefix
@@ -322,7 +322,7 @@ describe('swap! full integration', () => {
     const { ast, errors } = expandAll(program, env);
 
     expect(errors).toHaveLength(0);
-    const expanded = (ast.body[1] as any).expr as any;
+    const expanded = ast.body[1] as any;
     const gensymName  = expanded.bindings[0].name;         // 'tmp_0'
     const initName    = expanded.bindings[0].init.name;    // 'tmp'
     expect(gensymName).not.toBe(initName);

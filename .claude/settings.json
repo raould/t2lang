@@ -11,7 +11,7 @@
       "Bash(xxd)"
     ],
     "additionalDirectories": [
-      "/tmp",
+      "/tmp"
     ]
   }
 }

@@ -15,7 +15,7 @@ it('export-ns-from — namespace re-export of a module', () => {
     // (export-ns-from "utils" "./helpers") emits:
     //   export * as utils from "./helpers";
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (export-ns-from "utils" "./helpers")
         (asrt 1 1)
     )`);
