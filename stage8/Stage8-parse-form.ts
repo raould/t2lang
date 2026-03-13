@@ -302,6 +302,11 @@ function parseFormImpl(sform: any, spanId: number, env: any): any {
     });
   }
 
+  if (headStr === "=") {
+    return pushError(env, spanId,
+      "syntax error: '=' is not a valid operator; use '==' for equality or 'set!' for assignment");
+  }
+
   // ---- Top-level / statement forms ----
 
   if (headStr === "let" || headStr === "const") {

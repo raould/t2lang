@@ -445,7 +445,9 @@ const evalQuasiToSForm  = (sfNode, bindings, env, depth) => {
           {
             let v  = evalMacroExpr(item.expr, bindings, env);
             if (Array.isArray(v)) {
-              v.forEach((elem) => { result.push(nodeToSForm(elem)); });
+              v.forEach((elem) => {
+                result.push(nodeToSForm(elem));
+              });
             }
             else {
               result.push(nodeToSForm(v));

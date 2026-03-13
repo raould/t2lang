@@ -857,14 +857,17 @@
   (const astCall
     (lambda ((ctx))
       (let* ((exprs ((. ((. ctx expression)) map) astExpression))
+             (callee (index exprs 0))
              (raw ((. ctx typeArgs)))
              (typeArgs (ternary raw
                            ((. ((. raw typeExpr)) map) astTypeExpr)
                            (array))))
-          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'call')
-                          (fn (index exprs 0))
-                          (args ((. exprs slice) 1))
-                          (typeArgs typeArgs))))))
+        (if (&& (== (. callee tag) 'identifier') (== (. callee name) '='))
+          (throw (new Error (+ "syntax error: '=' is not a valid operator at " ((. ctx getText)) "; use '==' for equality or 'set!' for assignment"))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'call')
+                        (fn callee)
+                        (args ((. exprs slice) 1))
+                        (typeArgs typeArgs))))))
 
   (const astPropAccess
     (lambda ((ctx))

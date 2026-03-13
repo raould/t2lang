@@ -1552,13 +1552,17 @@ const astTypeAssert  = (ctx) => {
 const astCall  = (ctx) => {
   {
     let exprs  = ctx.expression().map(astExpression);
+    let callee  = exprs[0];
     let raw  = ctx.typeArgs();
     let typeArgs  = (raw ? raw.typeExpr().map(astTypeExpr) : []);
+    if (((callee.tag == "identifier") && (callee.name == "="))) {
+      throw new Error((("syntax error: '=' is not a valid operator at " + ctx.getText()) + "; use '==' for equality or 'set!' for assignment"));
+    }
     return ({
       id: registerSpan(nextNodeId(), ctx),
       text: ctx.getText(),
       tag: "call",
-      fn: exprs[0],
+      fn: callee,
       args: exprs.slice(1),
       typeArgs: typeArgs
     });
