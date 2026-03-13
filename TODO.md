@@ -3,3 +3,4 @@
 - [ ] (method-call console log) sure is ugly.
 - [ ] error reporting unification, and the error glossary.
 - [ ] --macro-prelude seems to be modifying the supplied argument, breaking absolute paths?
+- [ ] (too) many things are hard-coded to use the highest stageN.

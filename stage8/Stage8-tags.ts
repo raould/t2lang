@@ -1,4 +1,4 @@
-export const AST_TAGS = [
+export const AST_TAGS = [ /*warning: this must also be successfully parsed by bin/t2helpers.js*/
   "program",
   "defmacro",
   "macro-time-fn-def",
