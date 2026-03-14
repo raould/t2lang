@@ -17,6 +17,7 @@ topLevel
     | macroTimeFnDef
     | topLevelLet
     | topLevelConst
+    | fnDecl
     | typeAlias
     | interfaceDef
     | classDef
@@ -32,6 +33,7 @@ topLevel
 decl
     : topLevelLet
     | topLevelConst
+    | fnDecl
     | classDef
     | interfaceDef
     | typeAlias
@@ -52,6 +54,10 @@ topLevelLet
 
 topLevelConst
     : LPAREN CONST metaAnnotation* IDENTIFIER expression RPAREN
+    ;
+
+fnDecl
+    : LPAREN DEFN metaAnnotation* IDENTIFIER fnSignature statement* RPAREN
     ;
 
 // metadata annotation: ^:keyword  (e.g. ^:pure, ^:async)
@@ -780,6 +786,7 @@ CONSTSTAR   : 'const*' ;
 CONST       : 'const' ;
 LAMBDA      : 'lambda' ;
 FN          : 'fn' ;
+DEFN        : 'defn' ;
 METHOD      : 'method' ;
 BIND        : 'bind' ;
 METHOD_CALL : 'method-call' ;

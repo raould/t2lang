@@ -128,6 +128,9 @@ const astTopLevel  = (ctx) => {
   if (ctx.topLevelConst()) {
     return astTopLevelConst(ctx.topLevelConst());
   }
+  if (ctx.fnDecl()) {
+    return astFnDecl(ctx.fnDecl());
+  }
   if (ctx.typeAlias()) {
     return astTypeAlias(ctx.typeAlias());
   }
@@ -232,6 +235,26 @@ const astTopLevelConst  = (ctx) => {
       tag: "const-decl",
       name: name,
       init: init,
+      meta: meta
+    });
+  }
+};
+const astFnDecl  = (ctx) => {
+  {
+    let name  = ctx.IDENTIFIER().getText();
+    let sig  = astParseFnSig(ctx.fnSignature());
+    let body  = ctx.statement().map(astStatement);
+    let meta  = astParseMeta(ctx);
+    return ({
+      id: registerSpan(nextNodeId(), ctx),
+      text: ctx.getText(),
+      tag: "fn-decl",
+      name: name,
+      params: sig.params,
+      rest: sig.rest,
+      restType: sig.restType,
+      returnType: sig.returnType,
+      body: body,
       meta: meta
     });
   }
@@ -733,6 +756,14 @@ const astExportDecl  = (ctx) => {
         text: ctx.getText(),
         tag: "export-decl",
         decl: astTopLevelConst(d.topLevelConst())
+      });
+    }
+    if (d.fnDecl()) {
+      return ({
+        id: registerSpan(nextNodeId(), ctx),
+        text: ctx.getText(),
+        tag: "export-decl",
+        decl: astFnDecl(d.fnDecl())
       });
     }
     if (d.classDef()) {

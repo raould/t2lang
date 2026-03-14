@@ -93,6 +93,8 @@
         (return (astTopLevelLet ((. ctx topLevelLet)))))
       (if ((. ctx topLevelConst))
         (return (astTopLevelConst ((. ctx topLevelConst)))))
+      (if ((. ctx fnDecl))
+        (return (astFnDecl ((. ctx fnDecl)))))
       (if ((. ctx typeAlias))
         (return (astTypeAlias ((. ctx typeAlias)))))
       (if ((. ctx interfaceDef))
@@ -161,6 +163,14 @@
              (init (astExpression ((. ctx expression))))
              (meta (astParseMeta ctx)))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const-decl') (name name) (init init) (meta meta))))))
+
+  (const astFnDecl
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (sig (astParseFnSig ((. ctx fnSignature))))
+             (body ((. ((. ctx statement)) map) astStatement))
+             (meta (astParseMeta ctx)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'fn-decl') (name name) (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body) (meta meta))))))
 
   (const astTypeAlias
     (lambda ((ctx))
@@ -471,6 +481,8 @@
           (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astTopLevelLet ((. d topLevelLet)))))))
         (if ((. d topLevelConst))
           (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astTopLevelConst ((. d topLevelConst)))))))
+        (if ((. d fnDecl))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astFnDecl ((. d fnDecl)))))))
         (if ((. d classDef))
           (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astClassDef ((. d classDef)))))))
         (if ((. d interfaceDef))

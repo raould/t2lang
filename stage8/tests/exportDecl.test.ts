@@ -73,3 +73,32 @@ it('export decl — export a type alias', () => {
         (asrt d 42)
     )`);
 }, 30_000);
+
+it('export decl — export a function declaration (defn)', () => {
+    // (export (defn double ((x)) (return (* x 2)))) emits:
+    //   export function double(x) { return x * 2; }
+    // The function is still callable in the same file.
+    fromSourceEndToEnd(`(program
+        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (export (defn double ((x)) (return (* x 2))))
+        (asrt (double 7) 14)
+    )`);
+}, 30_000);
+
+it('export decl — exported defn with multiple params', () => {
+    fromSourceEndToEnd(`(program
+        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (export (defn add ((a) (b)) (return (+ a b))))
+        (asrt (add 3 4) 7)
+        (asrt (add "foo" "bar") "foobar")
+    )`);
+}, 30_000);
+
+it('export decl — exported defn with return type annotation', () => {
+    fromSourceEndToEnd(`(program
+        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (export (defn greet ((name : string)) : string
+            (return (+ "Hello, " name "!"))))
+        (asrt (greet "world") "Hello, world!")
+    )`);
+}, 30_000);

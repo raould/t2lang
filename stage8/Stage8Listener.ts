@@ -9,6 +9,7 @@ import { DefmacroContext } from "./Stage8Parser.js";
 import { MacroTimeFnDefContext } from "./Stage8Parser.js";
 import { TopLevelLetContext } from "./Stage8Parser.js";
 import { TopLevelConstContext } from "./Stage8Parser.js";
+import { FnDeclContext } from "./Stage8Parser.js";
 import { MetaAnnotationContext } from "./Stage8Parser.js";
 import { TypeAliasContext } from "./Stage8Parser.js";
 import { InterfaceDefContext } from "./Stage8Parser.js";
@@ -215,6 +216,16 @@ export class Stage8Listener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitTopLevelConst?: (ctx: TopLevelConstContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage8Parser.fnDecl`.
+     * @param ctx the parse tree
+     */
+    enterFnDecl?: (ctx: FnDeclContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage8Parser.fnDecl`.
+     * @param ctx the parse tree
+     */
+    exitFnDecl?: (ctx: FnDeclContext) => void;
     /**
      * Enter a parse tree produced by `Stage8Parser.metaAnnotation`.
      * @param ctx the parse tree

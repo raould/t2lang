@@ -4,6 +4,7 @@ export const AST_TAGS = [ /*warning: this must also be successfully parsed by bi
   "macro-time-fn-def",
   "let-decl",
   "const-decl",
+  "fn-decl",
   "type-alias",
   "interface-def",
   "field-def",

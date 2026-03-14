@@ -30,6 +30,9 @@ const lowerTopLevel  = (node) => {
   if ((node.tag === "const-decl")) {
     return lowerConstDecl(node);
   }
+  if ((node.tag === "fn-decl")) {
+    return lowerFnDecl(node);
+  }
   if ((node.tag === "type-alias")) {
     return lowerTypeAlias(node);
   }
@@ -356,6 +359,26 @@ const lowerConstDecl  = (node) => {
     });
   }
 };
+const lowerFnDecl  = (node) => {
+  {
+    let params  = node.params.map(lowerTypedParam);
+    let restType  = (node.restType ? lowerTypeExpr(node.restType) : undefined);
+    let returnType  = (node.returnType ? lowerTypeExpr(node.returnType) : undefined);
+    let body  = node.body.map(lowerStmt);
+    return ({
+      node: node,
+      id: node.id,
+      tag: "fn-decl-stmt",
+      name: node.name,
+      meta: node.meta,
+      params: params,
+      rest: node.rest,
+      restType: restType,
+      returnType: returnType,
+      body: body
+    });
+  }
+};
 const lowerExportDecl  = (node) => {
   {
     let inner  = node.decl;
@@ -373,6 +396,14 @@ const lowerExportDecl  = (node) => {
         id: node.id,
         tag: "export-decl-stmt",
         decl: lowerConstDecl(inner)
+      });
+    }
+    if ((inner.tag === "fn-decl")) {
+      return ({
+        node: node,
+        id: node.id,
+        tag: "export-decl-stmt",
+        decl: lowerFnDecl(inner)
       });
     }
     if ((inner.tag === "class-def")) {

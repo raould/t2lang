@@ -421,6 +421,36 @@ function parseFormImpl(sform: any, spanId: number, env: any): any {
     return mk("expr-stmt", { expr: parseFormImpl(tail[0], spanId, env) });
   }
 
+  // ---- Top-level function declaration: (defn name (params...) body...) ----
+  if (headStr === "defn") {
+    const nameForm = tail[0];
+    const name =
+      isOpaque(nameForm)
+        ? nameForm.node.name ?? String(nameForm.node.value ?? "?")
+        : typeof nameForm === "string"
+        ? nameForm
+        : "?";
+    const sigForm = tail[1];
+    let bodyStart = 2;
+    let returnTypeSform: any = null;
+    if (
+      tail[2] != null &&
+      Array.isArray(tail[2]) &&
+      (tail[2] as any[])[0] === "returns"
+    ) {
+      returnTypeSform = (tail[2] as any[])[1];
+      bodyStart = 3;
+    }
+    const { params, rest, restType, returnType } = parseFnSig(
+      sigForm,
+      returnTypeSform,
+      spanId,
+      env
+    );
+    const body = tail.slice(bodyStart).map((s: any) => parseFormImpl(s, spanId, env));
+    return mk("fn-decl", { name, params, rest, restType, returnType, body, meta: undefined });
+  }
+
   // ---- Function-like expression forms ----
   if (
     headStr === "lambda" ||

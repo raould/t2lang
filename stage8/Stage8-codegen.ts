@@ -79,6 +79,14 @@ const emitStmt  = (stmt) => {
       }
     }
   }
+  if ((stmt.tag === "fn-decl-stmt")) {
+    {
+      let params  = emitParams(stmt);
+      let retStr  = (stmt.returnType ? (": " + emitTypeExpr(stmt.returnType)) : "");
+      let body  = stmt.body.map(emitStmt);
+      return (((((((("function " + checkId(stmt.name, stmt.id)) + "(") + params) + ")") + retStr) + " {\n") + indent(body.join("\n"))) + "\n}");
+    }
+  }
   if ((stmt.tag === "if-stmt")) {
     return emitIf(stmt);
   }
