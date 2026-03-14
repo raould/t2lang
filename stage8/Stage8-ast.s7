@@ -89,21 +89,40 @@
         (return (astDefmacro ((. ctx "defmacro")))))
       (if ((. ctx macroTimeFnDef))
         (return (astMacroTimeFnDef ((. ctx macroTimeFnDef)))))
+      (if ((. ctx macroImport))
+        (return (astMacroImport ((. ctx macroImport)))))
+      (if ((. ctx macroExport))
+        (return (astMacroExport ((. ctx macroExport)))))
       (if ((. ctx topLevelLet))
         (return (astTopLevelLet ((. ctx topLevelLet)))))
       (if ((. ctx topLevelConst))
         (return (astTopLevelConst ((. ctx topLevelConst)))))
-      (if ((. ctx fnDecl))
-        (return (astFnDecl ((. ctx fnDecl)))))
+      (if ((. ctx "fn"))
+        (return (astFn ((. ctx "fn")))))
       (if ((. ctx typeAlias))
         (return (astTypeAlias ((. ctx typeAlias)))))
       (if ((. ctx interfaceDef))
         (return (astInterfaceDef ((. ctx interfaceDef)))))
+      (if ((. ctx enumDef))
+        (return (astEnumDef ((. ctx enumDef)))))
       (if ((. ctx classDef))
         (return (astClassDef ((. ctx classDef)))))
       (if ((. ctx exportDeclForm))
         (return (astExportDecl ((. ctx exportDeclForm)))))
       (return (astStatement ((. ctx statement))))))
+
+  (const astMacroImport
+    (lambda ((ctx))
+      (let* ((nsNode ((. ctx IDENTIFIER)))
+             (namespace ((. nsNode getText)))
+             (stringNode ((. ctx STRING)))
+             (path (parseString ((. stringNode getText)))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'macro-import') (namespace namespace) (path path))))))
+
+  (const astMacroExport
+    (lambda ((ctx))
+      (let* ((specs ((. ((. ctx macroExportSpec)) map) (lambda ((s)) (return ((. s getText)))))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'macro-export') (specs specs))))))
 
   ;; ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -117,8 +136,7 @@
           (return undefined))
         (let* ((entries ((. anns map)
                           (lambda ((ann))
-                            (let* ((kw ((. ((. ann KEYWORD)) getText)))
-                                   (key ((. kw slice) 1)))
+                            (let* ((key ((. ((. ann IDENTIFIER)) getText))))
                               (return (array key true)))))))
           (return ((. Object fromEntries) entries))))))
 
@@ -164,13 +182,6 @@
              (meta (astParseMeta ctx)))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const-decl') (name name) (init init) (meta meta))))))
 
-  (const astFnDecl
-    (lambda ((ctx))
-      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
-             (sig (astParseFnSig ((. ctx fnSignature))))
-             (body ((. ((. ctx statement)) map) astStatement))
-             (meta (astParseMeta ctx)))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'fn-decl') (name name) (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body) (meta meta))))))
 
   (const astTypeAlias
     (lambda ((ctx))
@@ -193,11 +204,27 @@
              (body (astTypeObject ((. ctx typeObject)))))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'interface-def') (name name) (typeParams tparams) ("extends" extendsTypes) (body body))))))
 
+  (const astEnumMember
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (valueCtx (ternary ((. ctx NUMBER)) ((. ctx NUMBER))
+                          (ternary ((. ctx NEG_NUMBER)) ((. ctx NEG_NUMBER))
+                            (ternary ((. ctx STRING)) ((. ctx STRING))
+                              undefined))))
+             (value (ternary valueCtx ((. valueCtx getText)) undefined)))
+        (return (object (name name) (value value))))))
+
+  (const astEnumDef
+    (lambda ((ctx))
+      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+             (members ((. ((. ctx enumMember)) map) astEnumMember)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'enum-def') (name name) (members members))))))
+
   ;; ─── class AST helpers ────────────────────────────────────────────────────
 
   (const astModifiers
     (lambda ((ctx))
-      (return ((. ((. ctx modifier)) map) (lambda ((m)) (return ((. ((. m KEYWORD)) getText))))))))
+      (return ((. ((. ctx modifier)) map) (lambda ((m)) (return (. (. m start) text)))))))
 
   (const astTypedParam
     (lambda ((ctx))
@@ -225,6 +252,10 @@
     (lambda ((ctx))
       (if ((. ctx IDENTIFIER))
         (return (object (computed false) (name ((. ((. ctx IDENTIFIER)) getText))))))
+      (if ((. ctx GET))
+        (return (object (computed false) (name "get"))))
+      (if ((. ctx SETPROP))
+        (return (object (computed false) (name "set"))))
       (let* ((expr (astExpression ((. ctx expression)))))
         (ensureNoThisSuperInKey expr ctx)
         (return (object (computed true) (key expr))))))
@@ -481,12 +512,14 @@
           (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astTopLevelLet ((. d topLevelLet)))))))
         (if ((. d topLevelConst))
           (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astTopLevelConst ((. d topLevelConst)))))))
-        (if ((. d fnDecl))
-          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astFnDecl ((. d fnDecl)))))))
+        (if ((. d "fn"))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astFn ((. d "fn")))))))
         (if ((. d classDef))
           (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astClassDef ((. d classDef)))))))
         (if ((. d interfaceDef))
           (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astInterfaceDef ((. d interfaceDef)))))))
+        (if ((. d enumDef))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astEnumDef ((. d enumDef)))))))
         (if ((. d typeAlias))
           (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'export-decl') (decl (astTypeAlias ((. d typeAlias)))))))
         (throw (new Error 'astExportDecl: unknown decl form')))))
@@ -731,13 +764,14 @@
 
   (const astCondExpr
     (lambda ((ctx))
-      (let* ((exprs ((. ((. ctx expression)) map) astExpression))
-             (clauses (array))
-             (i 0))
-        (while (< i (. exprs length))
-          ((. clauses push) (object (test (index exprs i)) (expr (index exprs (+ i 1)))))
-          (set! i (+ i 2)))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'cond') (clauses clauses))))))
+      (let* ((clauses ((. ((. ctx condClause)) map)
+                        (lambda ((c))
+                          (return (object (test (astExpression (index ((. c expression)) 0)))
+                                         (expr (astExpression (index ((. c expression)) 1))))))))
+             (elseExpr (ternary ((. ctx condElseClause))
+                          (astExpression ((. ((. ctx condElseClause)) expression)))
+                          undefined)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'cond') (clauses clauses) (elseExpr elseExpr))))))
 
   (const astNewExpr
     (lambda ((ctx))
@@ -778,8 +812,6 @@
           (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'error') (reason 'ctx undefined')))))
       (if ((. ctx literal))
         (return (astLiteral ((. ctx literal)))))
-      (if ((. ctx KEYWORD))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'keyword') (value ((. ((. ctx KEYWORD)) getText))))))
       (if ((. ctx IDENTIFIER))
         (let* ((text ((. ((. ctx IDENTIFIER)) getText))))
           (if (&& ((. text includes) '.') (! ((. text startsWith) '...')))
@@ -925,6 +957,9 @@
     (lambda ((ctx))
       (let* ((sig (astParseFnSig ((. ctx fnSignature))))
              (body ((. ((. ctx statement)) map) astStatement)))
+        (if ((. ctx IDENTIFIER))
+          (let* ((name ((. ((. ctx IDENTIFIER)) getText))))
+            (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'fn-decl') (name name) (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body) (meta undefined)))))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'fn') (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body))))))
 
   (const astAsyncLambda

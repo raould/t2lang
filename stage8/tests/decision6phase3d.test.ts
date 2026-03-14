@@ -6,8 +6,8 @@
  *  1. Arity errors pushed by expandMacroCall carry nodeId = callNode.id.
  *  2. macro-error errors carry nodeId = env.currentCallNodeId.
  *  3. formatExpansionErrors uses formatSpan(err.nodeId) when nodeId is present.
- *  4. CLI: arity mismatch error message contains file:line:col.
- *  5. CLI: macro-error message contains file:line:col.
+ *  4. CLI: arity mismatch error message contains file~line~col.
+ *  5. CLI: macro-error message contains file~line~col.
  *  6. CLI: line number is accurate for multi-line source.
  */
 
@@ -105,7 +105,7 @@ describe('Decision 6 Phase 3D: nodeId on expansion errors', () => {
     expandAll(prog, env);
 
     const msg = formatExpansionErrors(env.errors);
-    // Should contain the file:line:col from formatSpan, not raw callSite text
+    // Should contain the file~line~col from formatSpan, not raw callSite text
     expect(msg).toContain('<stdin>:3:8');  // col is 1-indexed: 7+1=8
   });
 
@@ -128,14 +128,14 @@ describe('Decision 6 Phase 3D: nodeId on expansion errors', () => {
 // ── CLI smoke tests ───────────────────────────────────────────────────────────
 
 describe('Decision 6 Phase 3D: CLI error location smoke tests', () => {
-  it('arity mismatch error contains file:line:col', () => {
+  it('arity mismatch error contains file~line~col', () => {
     // (defmacro incX ((x)) x) called with 2 args
     const result = callCompiler('(program (defmacro incX ((x)) x) (incX 1 2))');
     expect(result.status).not.toBe(0);
     expect(result.stderr).toMatch(/<stdin>:\d+:\d+/);
   }, T);
 
-  it('macro-error contains file:line:col', () => {
+  it('macro-error contains file~line~col', () => {
     const result = callCompiler(
       '(program (defmacro boom ((x)) (macro-error "oops")) (boom 1))'
     );

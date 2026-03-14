@@ -122,20 +122,29 @@ const astTopLevel  = (ctx) => {
   if (ctx.macroTimeFnDef()) {
     return astMacroTimeFnDef(ctx.macroTimeFnDef());
   }
+  if (ctx.macroImport()) {
+    return astMacroImport(ctx.macroImport());
+  }
+  if (ctx.macroExport()) {
+    return astMacroExport(ctx.macroExport());
+  }
   if (ctx.topLevelLet()) {
     return astTopLevelLet(ctx.topLevelLet());
   }
   if (ctx.topLevelConst()) {
     return astTopLevelConst(ctx.topLevelConst());
   }
-  if (ctx.fnDecl()) {
-    return astFnDecl(ctx.fnDecl());
+  if (ctx.fn()) {
+    return astFn(ctx.fn());
   }
   if (ctx.typeAlias()) {
     return astTypeAlias(ctx.typeAlias());
   }
   if (ctx.interfaceDef()) {
     return astInterfaceDef(ctx.interfaceDef());
+  }
+  if (ctx.enumDef()) {
+    return astEnumDef(ctx.enumDef());
   }
   if (ctx.classDef()) {
     return astClassDef(ctx.classDef());
@@ -144,6 +153,34 @@ const astTopLevel  = (ctx) => {
     return astExportDecl(ctx.exportDeclForm());
   }
   return astStatement(ctx.statement());
+};
+const astMacroImport  = (ctx) => {
+  {
+    let nsNode  = ctx.IDENTIFIER();
+    let namespace  = nsNode.getText();
+    let stringNode  = ctx.STRING();
+    let path  = parseString(stringNode.getText());
+    return ({
+      id: registerSpan(nextNodeId(), ctx),
+      text: ctx.getText(),
+      tag: "macro-import",
+      namespace: namespace,
+      path: path
+    });
+  }
+};
+const astMacroExport  = (ctx) => {
+  {
+    let specs  = ctx.macroExportSpec().map((s) => {
+      return s.getText();
+    });
+    return ({
+      id: registerSpan(nextNodeId(), ctx),
+      text: ctx.getText(),
+      tag: "macro-export",
+      specs: specs
+    });
+  }
 };
 const astParseMeta  = (ctx) => {
   {
@@ -154,8 +191,7 @@ const astParseMeta  = (ctx) => {
     {
       let entries  = anns.map((ann) => {
         {
-          let kw  = ann.KEYWORD().getText();
-          let key  = kw.slice(1);
+          let key  = ann.IDENTIFIER().getText();
           return [key, true];
         }
       });
@@ -239,26 +275,6 @@ const astTopLevelConst  = (ctx) => {
     });
   }
 };
-const astFnDecl  = (ctx) => {
-  {
-    let name  = ctx.IDENTIFIER().getText();
-    let sig  = astParseFnSig(ctx.fnSignature());
-    let body  = ctx.statement().map(astStatement);
-    let meta  = astParseMeta(ctx);
-    return ({
-      id: registerSpan(nextNodeId(), ctx),
-      text: ctx.getText(),
-      tag: "fn-decl",
-      name: name,
-      params: sig.params,
-      rest: sig.rest,
-      restType: sig.restType,
-      returnType: sig.returnType,
-      body: body,
-      meta: meta
-    });
-  }
-};
 const astTypeAlias  = (ctx) => {
   {
     let name  = ctx.IDENTIFIER().getText();
@@ -291,9 +307,33 @@ const astInterfaceDef  = (ctx) => {
     });
   }
 };
+const astEnumMember  = (ctx) => {
+  {
+    let name  = ctx.IDENTIFIER().getText();
+    let valueCtx  = (ctx.NUMBER() ? ctx.NUMBER() : (ctx.NEG_NUMBER() ? ctx.NEG_NUMBER() : (ctx.STRING() ? ctx.STRING() : undefined)));
+    let value  = (valueCtx ? valueCtx.getText() : undefined);
+    return ({
+      name: name,
+      value: value
+    });
+  }
+};
+const astEnumDef  = (ctx) => {
+  {
+    let name  = ctx.IDENTIFIER().getText();
+    let members  = ctx.enumMember().map(astEnumMember);
+    return ({
+      id: registerSpan(nextNodeId(), ctx),
+      text: ctx.getText(),
+      tag: "enum-def",
+      name: name,
+      members: members
+    });
+  }
+};
 const astModifiers  = (ctx) => {
   return ctx.modifier().map((m) => {
-    return m.KEYWORD().getText();
+    return m.start.text;
   });
 };
 const astTypedParam  = (ctx) => {
@@ -341,6 +381,18 @@ const astMethodKey  = (ctx) => {
     return ({
       computed: false,
       name: ctx.IDENTIFIER().getText()
+    });
+  }
+  if (ctx.GET()) {
+    return ({
+      computed: false,
+      name: "get"
+    });
+  }
+  if (ctx.SETPROP()) {
+    return ({
+      computed: false,
+      name: "set"
     });
   }
   {
@@ -758,12 +810,12 @@ const astExportDecl  = (ctx) => {
         decl: astTopLevelConst(d.topLevelConst())
       });
     }
-    if (d.fnDecl()) {
+    if (d.fn()) {
       return ({
         id: registerSpan(nextNodeId(), ctx),
         text: ctx.getText(),
         tag: "export-decl",
-        decl: astFnDecl(d.fnDecl())
+        decl: astFn(d.fn())
       });
     }
     if (d.classDef()) {
@@ -780,6 +832,14 @@ const astExportDecl  = (ctx) => {
         text: ctx.getText(),
         tag: "export-decl",
         decl: astInterfaceDef(d.interfaceDef())
+      });
+    }
+    if (d.enumDef()) {
+      return ({
+        id: registerSpan(nextNodeId(), ctx),
+        text: ctx.getText(),
+        tag: "export-decl",
+        decl: astEnumDef(d.enumDef())
       });
     }
     if (d.typeAlias()) {
@@ -1323,21 +1383,19 @@ const astTernary  = (ctx) => {
 };
 const astCondExpr  = (ctx) => {
   {
-    let exprs  = ctx.expression().map(astExpression);
-    let clauses  = [];
-    let i  = 0;
-    while ((i < exprs.length)) {
-      clauses.push(({
-        test: exprs[i],
-        expr: exprs[(i + 1)]
-      }));
-      i = (i + 2);
-    }
+    let clauses  = ctx.condClause().map((c) => {
+      return ({
+        test: astExpression(c.expression()[0]),
+        expr: astExpression(c.expression()[1])
+      });
+    });
+    let elseExpr  = (ctx.condElseClause() ? astExpression(ctx.condElseClause().expression()) : undefined);
     return ({
       id: registerSpan(nextNodeId(), ctx),
       text: ctx.getText(),
       tag: "cond",
-      clauses: clauses
+      clauses: clauses,
+      elseExpr: elseExpr
     });
   }
 };
@@ -1411,14 +1469,6 @@ const astExpression  = (ctx) => {
   }
   if (ctx.literal()) {
     return astLiteral(ctx.literal());
-  }
-  if (ctx.KEYWORD()) {
-    return ({
-      id: registerSpan(nextNodeId(), ctx),
-      text: ctx.getText(),
-      tag: "keyword",
-      value: ctx.KEYWORD().getText()
-    });
   }
   if (ctx.IDENTIFIER()) {
     {
@@ -1671,6 +1721,23 @@ const astFn  = (ctx) => {
   {
     let sig  = astParseFnSig(ctx.fnSignature());
     let body  = ctx.statement().map(astStatement);
+    if (ctx.IDENTIFIER()) {
+      {
+        let name  = ctx.IDENTIFIER().getText();
+        return ({
+          id: registerSpan(nextNodeId(), ctx),
+          text: ctx.getText(),
+          tag: "fn-decl",
+          name: name,
+          params: sig.params,
+          rest: sig.rest,
+          restType: sig.restType,
+          returnType: sig.returnType,
+          body: body,
+          meta: undefined
+        });
+      }
+    }
     return ({
       id: registerSpan(nextNodeId(), ctx),
       text: ctx.getText(),

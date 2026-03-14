@@ -1,7 +1,7 @@
 import { gensym, freshScope, registerTopLevelNode } from "./Stage8-macro-env";
 import { formatSpan, nextNodeId } from "./Stage8-spans";
 import { parseForm } from "./Stage8-parse-form";
-const macroOperators  = new Set(["<", ">", "<=", ">=", "&&", "||", "!=", "!==", "==", "===", "+", "-", "*", "/", "%", "!"]);
+const macroOperators  = new Set(["<", ">", "<=", ">=", "&&", "||", "!=", "!==", "==", "===", "+", "-", "*", "/", "%", "!", "or", "and"]);
 const isMacroOp  = (name) => {
   return macroOperators.has(name);
 };
@@ -54,6 +54,12 @@ const applyMacroOp  = (op, args) => {
     if ((op === "||")) {
       return (l || r);
     }
+    if ((op === "or")) {
+      return (l || r);
+    }
+    if ((op === "and")) {
+      return (l && r);
+    }
     if ((op === "!")) {
       return (!l);
     }
@@ -80,6 +86,57 @@ const quasiArgs  = (nodes, bindings, env, depth) => {
       else {
         {
           result.push(evalQuasi(n, bindings, env, depth));
+        }
+      }
+    });
+    return result;
+  }
+};
+const quasiObjectFields  = (fields, bindings, env, depth) => {
+  {
+    let result  = [];
+    fields.forEach((f) => {
+      if ((f.tag === "unquote-splicing")) {
+        if ((depth === 1)) {
+          {
+            let spliced  = evalMacroExpr(f.expr, bindings, env);
+            if (Array.isArray(spliced)) {
+              spliced.forEach((item) => {
+                if ((item && (item.tag === "object"))) {
+                  result = result.concat(item.fields);
+                }
+                else {
+                  result.push(item);
+                }
+              });
+            }
+            else {
+              if ((spliced && (spliced.tag === "object"))) {
+                result = result.concat(spliced.fields);
+              }
+              else {
+                result.push(spliced);
+              }
+            }
+          }
+        }
+        else {
+          result.push(f);
+        }
+      }
+      else {
+        {
+          if ((f.isShorthand || f.isMethod)) {
+            result.push(f);
+          }
+          else {
+            result.push(({
+              key: f.key,
+              isMethod: f.isMethod,
+              isShorthand: f.isShorthand,
+              value: evalQuasi(f.value, bindings, env, depth)
+            }));
+          }
         }
       }
     });
@@ -132,17 +189,7 @@ const evalQuasi  = (node, bindings, env, depth) => {
     return ({
       tag: "object",
       text: node.text,
-      fields: node.fields.map((f) => {
-        if (f.isShorthand) {
-          return f;
-        }
-        return ({
-          key: f.key,
-          isMethod: f.isMethod,
-          isShorthand: f.isShorthand,
-          value: evalQuasi(f.value, bindings, env, depth)
-        });
-      })
+      fields: quasiObjectFields(node.fields, bindings, env, depth)
     });
   }
   if ((node.tag === "prop-access")) {
@@ -342,31 +389,61 @@ const evalQuasi  = (node, bindings, env, depth) => {
   return node;
 };
 const quasiClassBody  = (elements, bindings, env, depth) => {
-  return elements.map((el) => {
-    if ((el.tag === "field-def")) {
-      return ({
-        tag: "field-def",
-        text: el.text,
-        modifiers: el.modifiers,
-        name: el.name,
-        typeAnnotation: el.typeAnnotation,
-        init: (el.init ? evalQuasi(el.init, bindings, env, depth) : undefined)
-      });
-    }
-    if (((el.tag === "constructor-def") || ((el.tag === "class-method-def") || ((el.tag === "getter-def") || (el.tag === "setter-def"))))) {
-      return ({
-        tag: el.tag,
-        text: el.text,
-        modifiers: el.modifiers,
-        computed: el.computed,
-        name: el.name,
-        key: (el.computed ? evalQuasi(el.key, bindings, env, depth) : el.key),
-        sig: el.sig,
-        body: quasiArgs(el.body, bindings, env, depth)
-      });
-    }
-    return el;
-  });
+  {
+    let result  = [];
+    elements.forEach((el) => {
+      if ((el.tag === "unquote-splicing")) {
+        if ((depth === 1)) {
+          {
+            let spliced  = evalMacroExpr(el.expr, bindings, env);
+            if (Array.isArray(spliced)) {
+              result = result.concat(spliced);
+            }
+            else {
+              result.push(spliced);
+            }
+          }
+        }
+        else {
+          result.push(el);
+        }
+      }
+      else {
+        {
+          if ((el.tag === "field-def")) {
+            {
+              result.push(({
+                tag: "field-def",
+                text: el.text,
+                modifiers: el.modifiers,
+                name: el.name,
+                typeAnnotation: el.typeAnnotation,
+                init: (el.init ? evalQuasi(el.init, bindings, env, depth) : undefined)
+              }));
+              return undefined;
+            }
+          }
+          if (((el.tag === "constructor-def") || ((el.tag === "class-method-def") || ((el.tag === "getter-def") || (el.tag === "setter-def"))))) {
+            {
+              result.push(({
+                tag: el.tag,
+                text: el.text,
+                modifiers: el.modifiers,
+                computed: el.computed,
+                name: el.name,
+                key: (el.computed ? evalQuasi(el.key, bindings, env, depth) : el.key),
+                sig: el.sig,
+                body: quasiArgs(el.body, bindings, env, depth)
+              }));
+              return undefined;
+            }
+          }
+          result.push(el);
+        }
+      }
+    });
+    return result;
+  }
 };
 const nodeToSForm  = (v) => {
   if ((typeof v === "string")) {
@@ -393,8 +470,13 @@ const nodeToSForm  = (v) => {
   if (((typeof v === "object") && (v.tag === "literal"))) {
     return ("" + v.value);
   }
-  if (((typeof v === "object") && (v.tag === "keyword"))) {
-    return v.value;
+  if (((((typeof v === "object") && (v !== null)) && (!Array.isArray(v))) && (v.tag === undefined))) {
+    {
+      let keys  = Object.keys(v);
+      if ((keys.length === 1)) {
+        return [keys[0], nodeToSForm(v[keys[0]])];
+      }
+    }
   }
   return ({
     __opaque: true,
@@ -412,28 +494,22 @@ const evalQuasiToSForm  = (sfNode, bindings, env, depth) => {
     }
   }
   if (((sfNode.tag === "sf-hole") && (depth > 1))) {
-    {
-      let innerSForm  = evalQuasiToSForm(sfNode.expr, bindings, env, (depth - 1));
-      return ({
-        __opaque: true,
-        node: ({
-          tag: "sf-hole",
-          expr: innerSForm
-        })
-      });
-    }
+    return ({
+      __opaque: true,
+      node: ({
+        tag: "sf-hole",
+        expr: sfNode.expr
+      })
+    });
   }
   if (((sfNode.tag === "sf-splice") && (depth > 1))) {
-    {
-      let innerSForm  = evalQuasiToSForm(sfNode.expr, bindings, env, (depth - 1));
-      return ({
-        __opaque: true,
-        node: ({
-          tag: "sf-splice",
-          expr: innerSForm
-        })
-      });
-    }
+    return ({
+      __opaque: true,
+      node: ({
+        tag: "sf-splice",
+        expr: sfNode.expr
+      })
+    });
   }
   if ((sfNode.tag === "sf-list")) {
     {
@@ -474,11 +550,11 @@ const evalMacroExpr  = (node, bindings, env) => {
       if (bindings.has(node.name)) {
         return bindings.get(node.name);
       }
+      if ((env.moduleVars && env.moduleVars.has(node.name))) {
+        return env.moduleVars.get(node.name);
+      }
       return node;
     }
-  }
-  if ((node.tag === "keyword")) {
-    return node.value;
   }
   if ((node.tag === "quasi")) {
     if (node.sform) {
@@ -524,7 +600,7 @@ const evalMacroExpr  = (node, bindings, env) => {
     }
   }
   if ((node.tag === "cond")) {
-    return evalMacroCond(node.clauses, bindings, env);
+    return evalMacroCond(node.clauses, node.elseExpr, bindings, env);
   }
   if ((node.tag === "call")) {
     return evalMacroCall(node, bindings, env);
@@ -549,6 +625,27 @@ const evalMacroExpr  = (node, bindings, env) => {
       return undefined;
     }
   }
+  if ((node.tag === "object")) {
+    {
+      let result  = ({
+        
+      });
+      node.fields.forEach((f) => {
+        if ((!f.isMethod)) {
+          {
+            let val  = (f.isShorthand ? evalMacroExpr(({
+              tag: "identifier",
+              name: f.key,
+              text: f.key,
+              scopes: new Set()
+            }), bindings, env) : evalMacroExpr(f.value, bindings, env));
+            Reflect.set(result, f.key, val);
+          }
+        }
+      });
+      return result;
+    }
+  }
   if ((node.tag === "array")) {
     return node.elements.map((e) => {
       return evalMacroExpr(e, bindings, env);
@@ -559,19 +656,18 @@ const evalMacroExpr  = (node, bindings, env) => {
   }
   return node;
 };
-const evalMacroCond  = (clauses, bindings, env) => {
+const evalMacroCond  = (clauses, elseExpr, bindings, env) => {
   if ((clauses.length === 0)) {
-    return undefined;
+    return ((elseExpr !== undefined) ? evalMacroExpr(elseExpr, bindings, env) : undefined);
   }
   {
     let clause  = clauses[0];
-    let test  = clause.test;
-    let testVal  = ((test.tag === "keyword") ? (test.value === ":else") : evalMacroExpr(test, bindings, env));
+    let testVal  = evalMacroExpr(clause.test, bindings, env);
     if (testVal) {
       return evalMacroExpr(clause.expr, bindings, env);
     }
     else {
-      return evalMacroCond(clauses.slice(1), bindings, env);
+      return evalMacroCond(clauses.slice(1), elseExpr, bindings, env);
     }
   }
 };
@@ -939,6 +1035,16 @@ const addScopeToNode  = (node, scope) => {
         if (f.isShorthand) {
           return f;
         }
+        if (f.isMethod) {
+          return ({
+            key: f.key,
+            isMethod: true,
+            params: f.params,
+            body: f.body.map((s) => {
+              return addScopeToNode(s, scope);
+            })
+          });
+        }
         return ({
           key: f.key,
           isMethod: f.isMethod,
@@ -1180,7 +1286,7 @@ const expandExpr  = (node, env) => {
     {
       {
         let callee  = node.fn;
-        if (((callee.tag === "identifier") && env.macros.has(callee.name))) {
+        if (((callee.tag === "identifier") && lookupMacro(callee.name, env))) {
           {
             let macroResult  = expandMacroCall(node, env);
             if (Array.isArray(macroResult)) {
@@ -1245,6 +1351,16 @@ const expandExpr  = (node, env) => {
         if (f.isShorthand) {
           return f;
         }
+        if (f.isMethod) {
+          return ({
+            key: f.key,
+            isMethod: true,
+            params: f.params,
+            body: f.body.map((s) => {
+              return expandStmt(s, env);
+            })
+          });
+        }
         return ({
           key: f.key,
           isMethod: f.isMethod,
@@ -1304,9 +1420,34 @@ const stampDefScope  = (body, defScope) => {
 const expandMacroCall  = (callNode, env) => {
   {
     let macroName  = callNode.fn.name;
-    let macroDef  = env.macros.get(macroName);
+    let macroDef  = lookupMacro(macroName, env);
     let argNodes  = callNode.args;
     let callSite  = (callNode.text ? callNode.text : "<unknown>");
+    if ((macroDef && macroDef.isCompiled)) {
+      {
+        env.currentCallSite = callSite;
+        env.currentCallNodeId = callNode.id;
+        env.currentMacroName = macroName;
+        try {
+          {
+            let result  = macroDef.fn(argNodes, env);
+            env.currentMacroName = null;
+            return result;
+          }
+        }
+        catch (e) {
+          env.errors.push(({
+            kind: "runtime",
+            message: e.message,
+            macroName: macroName,
+            callSite: callSite,
+            nodeId: callNode.id
+          }));
+          env.currentMacroName = null;
+          return null;
+        }
+      }
+    }
     if ((macroDef.rest ? (argNodes.length < macroDef.params.length) : (argNodes.length !== macroDef.params.length))) {
       {
         env.errors.push(({
@@ -1479,8 +1620,41 @@ const expandStmt  = (node, env) => {
   return node;
 };
 const expandTopLevel  = (node, env) => {
-  if (((node.tag === "defmacro") || (node.tag === "macro-time-fn-def"))) {
-    return node;
+  if ((node.tag === "defmacro")) {
+    if (env.isMacroCompilation) {
+      return ({
+        tag: "defmacro",
+        id: node.id,
+        text: node.text,
+        name: node.name,
+        params: node.params,
+        rest: node.rest,
+        scopeId: node.scopeId,
+        body: node.body.map((s) => {
+          return expandStmt(s, env);
+        })
+      });
+    }
+    else {
+      return node;
+    }
+  }
+  if ((node.tag === "macro-time-fn-def")) {
+    if (env.isMacroCompilation) {
+      {
+        let init  = expandExpr(node.init, env);
+        return ({
+          tag: "macro-time-fn-def",
+          id: node.id,
+          text: node.text,
+          name: node.name,
+          init: init
+        });
+      }
+    }
+    else {
+      return node;
+    }
   }
   if ((node.tag === "let-decl")) {
     return ({
@@ -1535,7 +1709,7 @@ const formatExpansionErrors  = (errors) => {
     }
   }
 };
-const TOP_LEVEL_DECL_TAGS  = new Set(["let-decl", "const-decl", "type-alias", "interface-def", "class-def", "anon-class-def", "defmacro", "macro-time-fn-def"]);
+const TOP_LEVEL_DECL_TAGS  = new Set(["let-decl", "const-decl", "type-alias", "interface-def", "enum-def", "class-def", "anon-class-def", "defmacro", "macro-time-fn-def"]);
 const TOP_LEVEL_STATEMENT_TAGS  = new Set(["expr-stmt", "let*", "let", "const*", "const", "if", "while", "block", "return", "throw", "assign", "switch", "try", "for", "for-in", "for-of", "for-await"]);
 const pushMacroError  = (env, message, nodeId) => {
   env.errors.push(({
@@ -1556,6 +1730,23 @@ const ensureNodeHasId  = (node) => {
 const isAllowedTopLevelTag  = (tag) => {
   return (TOP_LEVEL_DECL_TAGS.has(tag) || TOP_LEVEL_STATEMENT_TAGS.has(tag));
 };
+const lookupMacro  = (name, env) => {
+  {
+    let slashIdx  = name.indexOf("/");
+    if ((slashIdx === -1)) {
+      return env.macros.get(name);
+    }
+    {
+      let ns  = name.slice(0, slashIdx);
+      let localName  = name.slice((slashIdx + 1));
+      let nsMap  = (env.macroNamespaces && env.macroNamespaces.get(ns));
+      if (nsMap) {
+        return nsMap.get(localName);
+      }
+      return undefined;
+    }
+  }
+};
 const getTopLevelMacroCall  = (node, env) => {
   if ((node.tag === "expr-stmt")) {
     {
@@ -1563,7 +1754,7 @@ const getTopLevelMacroCall  = (node, env) => {
       if ((expr.tag === "call")) {
         {
           let callee  = expr.fn;
-          if (((callee.tag === "identifier") && env.macros.has(callee.name))) {
+          if (((callee.tag === "identifier") && lookupMacro(callee.name, env))) {
             return expr;
           }
         }
@@ -1600,7 +1791,7 @@ const validateTopLevelNode  = (node, env) => {
     return withId;
   }
 };
-const expandAll  = (programNode, env) => {
+const expandAll  = (programNode, env, macroLoader) => {
   {
     let worklist  = programNode.body.slice(0);
     let expandedBody  = [];
@@ -1609,6 +1800,12 @@ const expandAll  = (programNode, env) => {
         let node  = worklist.shift();
         let _  = registerTopLevelNode(node, env);
         let macroCall  = getTopLevelMacroCall(node, env);
+        if (((node.tag === "macro-import") && macroLoader)) {
+          macroLoader(node.path, node.namespace, env);
+        }
+        if (((node.tag === "macro-export") && (!env.isMacroCompilation))) {
+          pushMacroError(env, "macro-export is not allowed in .t2 files", node.id);
+        }
         if (macroCall) {
           {
             let result  = expandTopLevelMacroCall(macroCall, env);
@@ -1643,7 +1840,7 @@ const expandAll  = (programNode, env) => {
             }
             else {
               {
-                let singleValidated  = ((result && TOP_LEVEL_DECL_TAGS.has(result.tag)) ? validateTopLevelNode(result, env) : null);
+                let singleValidated  = ((result && isAllowedTopLevelTag(result.tag)) ? validateTopLevelNode(result, env) : null);
                 if (singleValidated) {
                   {
                     singleValidated.callSiteId = node.id;

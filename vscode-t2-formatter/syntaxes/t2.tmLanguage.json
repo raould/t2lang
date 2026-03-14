@@ -1,0 +1,91 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "t2",
+	"patterns": [
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#constants"
+		},
+		{
+			"include": "#expression"
+		},
+		{
+			"include": "#keywords"
+		}
+	],
+	"repository": {
+		"comments": {
+			"patterns": [
+				{
+					"name": "comment.line.semicolon.t2",
+					"match": ";.*$"
+				}
+			]
+		},
+		"strings": {
+			"name": "string.quoted.double.t2",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.t2",
+					"match": "\\\\."
+				}
+			]
+		},
+		"constants": {
+			"patterns": [
+				{
+					"name": "constant.numeric.t2",
+					"match": "\\b\\d+\\b"
+				},
+				{
+					"name": "constant.language.boolean.t2",
+					"match": "\\b(true|false|null)\\b"
+				}
+			]
+		},
+		"keywords": {
+			"patterns": [
+				{
+					"name": "keyword.control.t2",
+					"match": "\\b(program|import|let|new|if|throw|try|catch|generator-fn|method-call|array|object|named|asrt)\\b"
+				},
+				{
+					"name": "support.class.t2",
+					"match": "\\b[A-Z][a-zA-Z0-9]*\\b"
+				},
+				{
+					"name": "variable.other.property.t2",
+					"match": "\\.[a-zA-Z_][a-zA-Z0-9_]*"
+				}
+			]
+		},
+		"expression": {
+			"patterns": [
+				{
+					"match": "(\\()",
+					"captures": {
+						"1": {
+							"name": "punctuation.section.parens.begin.t2"
+						}
+					}
+				},
+				{
+					"match": "(\\))",
+					"captures": {
+						"1": {
+							"name": "punctuation.section.parens.end.t2"
+						}
+					}
+				}
+			]
+		}
+	},
+	"scopeName": "source.t2"
+}

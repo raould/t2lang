@@ -47,6 +47,14 @@ function reconstructSFormNode(sform: any): any {
     return { tag: "sf-atom", value: "?", id: nextNodeId(), text: "" };
   }
   if (Array.isArray(sform)) {
+    // ["unquote", expr] and ["unquote-splicing", expr] must become sf-hole/sf-splice
+    // so that evalQuasiToSForm recognizes them as substitution points.
+    if (sform[0] === "unquote" && sform.length === 2) {
+      return { tag: "sf-hole", expr: parseFormImpl(sform[1], nextNodeId(), null), id: nextNodeId(), text: "" };
+    }
+    if (sform[0] === "unquote-splicing" && sform.length === 2) {
+      return { tag: "sf-splice", expr: parseFormImpl(sform[1], nextNodeId(), null), id: nextNodeId(), text: "" };
+    }
     return {
       tag: "sf-list",
       items: sform.map(reconstructSFormNode),
@@ -216,17 +224,30 @@ function parseClassBody(sform: any, spanId: number, env: any): any {
     if (!Array.isArray(ef)) continue;
     const efArr = ef as any[];
     const etag = efArr[0];
+
+    if (etag === "unquote-splicing" && efArr.length === 2) {
+      elements.push(mk("unquote-splicing", { expr: parseFormImpl(efArr[1], spanId, env) }));
+      continue;
+    }
+
     if (etag === "field") {
-      // (field name) or (field name : TypeExpr) or (field name : TypeExpr initExpr)
-      const fname = typeof efArr[1] === "string" ? efArr[1] : "";
-      let fi = 2;
+      // (field [~mod]* (name [: TypeExpr]?) [initExpr])
+      let fi = 1;
+      const modifiers: string[] = [];
+      while (fi < efArr.length && typeof efArr[fi] === "string" && (efArr[fi] as string).startsWith("~")) {
+        modifiers.push(efArr[fi++] as string);
+      }
+      const nameGroup = efArr[fi++];
+      let fname = "";
       let typeAnnotation: any = null;
-      if (fi < efArr.length && efArr[fi] === ":") {
-        fi++;
-        typeAnnotation = parseTypeExpr(efArr[fi++], spanId, env);
+      if (Array.isArray(nameGroup)) {
+        fname = typeof nameGroup[0] === "string" ? nameGroup[0] : "";
+        if (nameGroup.length >= 3 && nameGroup[1] === ":") {
+          typeAnnotation = parseTypeExpr(nameGroup[2], spanId, env);
+        }
       }
       const fval = fi < efArr.length ? parseFormImpl(efArr[fi], spanId, env) : undefined;
-      elements.push(mk("field-def", { modifiers: [], name: fname, typeAnnotation, init: fval }));
+      elements.push(mk("field-def", { modifiers, name: fname, typeAnnotation, init: fval }));
     } else if (etag === "constructor") {
       const sigF = efArr[1];
       const body = efArr.slice(2).map((s: any) => parseFormImpl(s, spanId, env));
@@ -421,36 +442,6 @@ function parseFormImpl(sform: any, spanId: number, env: any): any {
     return mk("expr-stmt", { expr: parseFormImpl(tail[0], spanId, env) });
   }
 
-  // ---- Top-level function declaration: (defn name (params...) body...) ----
-  if (headStr === "defn") {
-    const nameForm = tail[0];
-    const name =
-      isOpaque(nameForm)
-        ? nameForm.node.name ?? String(nameForm.node.value ?? "?")
-        : typeof nameForm === "string"
-        ? nameForm
-        : "?";
-    const sigForm = tail[1];
-    let bodyStart = 2;
-    let returnTypeSform: any = null;
-    if (
-      tail[2] != null &&
-      Array.isArray(tail[2]) &&
-      (tail[2] as any[])[0] === "returns"
-    ) {
-      returnTypeSform = (tail[2] as any[])[1];
-      bodyStart = 3;
-    }
-    const { params, rest, restType, returnType } = parseFnSig(
-      sigForm,
-      returnTypeSform,
-      spanId,
-      env
-    );
-    const body = tail.slice(bodyStart).map((s: any) => parseFormImpl(s, spanId, env));
-    return mk("fn-decl", { name, params, rest, restType, returnType, body, meta: undefined });
-  }
-
   // ---- Function-like expression forms ----
   if (
     headStr === "lambda" ||
@@ -490,7 +481,13 @@ function parseFormImpl(sform: any, spanId: number, env: any): any {
     const fields: any[] = [];
     for (const f of tail) {
       if (isOpaque(f)) {
-        fields.push(f.node);
+        if (f.node.tag === "sf-splice") {
+          fields.push(mk("unquote-splicing", { expr: f.node.expr }));
+        } else if (f.node.tag === "object") {
+          f.node.fields.forEach((field: any) => fields.push(field));
+        } else {
+          fields.push(f.node);
+        }
         continue;
       }
       if (!Array.isArray(f)) {
@@ -499,6 +496,10 @@ function parseFormImpl(sform: any, spanId: number, env: any): any {
         continue;
       }
       const fArr = f as any[];
+      if (fArr.length === 2 && fArr[0] === "unquote-splicing") {
+        fields.push(mk("unquote-splicing", { expr: parseFormImpl(fArr[1], spanId, env) }));
+        continue;
+      }
       const key = isOpaque(fArr[0])
         ? fArr[0].node.name ?? String(fArr[0].node.value ?? "?")
         : typeof fArr[0] === "string"
@@ -650,11 +651,20 @@ function parseFormImpl(sform: any, spanId: number, env: any): any {
 
   // ---- Standalone field-def (e.g. from a quasi producing a field node) ----
   if (headStr === "field") {
-    const fname = isOpaque(tail[0]) ? (tail[0].node.name ?? "?") : typeof tail[0] === "string" ? tail[0] : "?";
-    let fi = 1;
+    // (field [~mod]* (name [: TypeExpr]?))
+    let fi = 0;
+    while (fi < tail.length && typeof tail[fi] === "string" && (tail[fi] as string).startsWith("~")) fi++;
+    const nameGroup = tail[fi];
+    let fname = "";
     let typeAnnotation: any = null;
-    if (fi < tail.length && tail[fi] === ":") fi++;
-    if (fi < tail.length) typeAnnotation = parseTypeExpr(tail[fi], spanId, env);
+    if (isOpaque(nameGroup)) {
+      fname = nameGroup.node.name ?? "?";
+    } else if (Array.isArray(nameGroup)) {
+      fname = typeof nameGroup[0] === "string" ? nameGroup[0] : "?";
+      if (nameGroup.length >= 3 && nameGroup[1] === ":") {
+        typeAnnotation = parseTypeExpr(nameGroup[2], spanId, env);
+      }
+    }
     return mk("field-def", { modifiers: [], name: fname, typeAnnotation, init: undefined });
   }
 

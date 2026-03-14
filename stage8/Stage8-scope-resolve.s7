@@ -92,6 +92,15 @@
         (return (object (tag 'object') (text (. node text))
           (fields ((. (. node fields) map) (lambda ((f))
             (if (. f isShorthand) (return f))
+            (if (. f isMethod)
+              (let* ((extChain chain))
+                ((. (. f params) forEach) (lambda ((p))
+                  (set! extChain (addBinding extChain p (new Set)))))
+                (return (object
+                  (key (. f key))
+                  (isMethod true)
+                  (params (. f params))
+                  (body ((. (. f body) map) (lambda ((s)) (return (resolveStmt s extChain)))))))))
             (return (object
               (key (. f key))
               (isMethod (. f isMethod))
@@ -318,6 +327,18 @@
         (return (object (tag 'assign') (text (. node text))
           (name (. node name))
           (value (resolveExpr (. node value) chain)))))
+      ;; let
+      (if (=== (. node tag) 'let')
+        (return (object (tag 'let') (text (. node text))
+          (name (. node name))
+          (typeAnnotation (. node typeAnnotation))
+          (init (resolveExpr (. node init) chain)))))
+      ;; const
+      (if (=== (. node tag) 'const')
+        (return (object (tag 'const') (text (. node text))
+          (name (. node name))
+          (typeAnnotation (. node typeAnnotation))
+          (init (resolveExpr (. node init) chain)))))
       ;; class definitions
       (if (=== (. node tag) 'class-def')
         (return (resolveClassDef node chain)))

@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('async-lambda returns a Promise', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (const asyncAdd (async-lambda ((a) (b))
       (return (+ a b))))
     (asrt (typeof asyncAdd) "function")
@@ -14,7 +14,7 @@ it('async-lambda returns a Promise', () => {
 
 it('async-fn returns a Promise', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (const asyncDouble (async-fn ((n))
       (return (* n 2))))
     (asrt (typeof asyncDouble) "function")
@@ -24,7 +24,7 @@ it('async-fn returns a Promise', () => {
 
 it('generator-fn with yield', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (const counter (generator-fn ()
       (yield 10)
       (yield 20)
@@ -39,7 +39,7 @@ it('generator-fn with yield', () => {
 
 it('generator-fn with yield* (delegation)', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (const inner (generator-fn ()
       (yield 1)
       (yield 2)))
@@ -56,7 +56,7 @@ it('generator-fn with yield* (delegation)', () => {
 
 it('async-generator-fn is iterable', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (const asyncGen (async-generator-fn ()
       (yield 100)
       (yield 200)))
@@ -68,7 +68,7 @@ it('async-generator-fn is iterable', () => {
 
 it('rest param in lambda collects extra args', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (const sum (lambda ((first) (rest args))
       (let* ((total first))
         ((. args forEach) (lambda ((n))
@@ -82,7 +82,7 @@ it('rest param in lambda collects extra args', () => {
 
 it('rest param in fn collects extra args', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (const join (fn ((sep) (rest parts))
       (return ((. parts join) sep))))
     (asrt (join "-" "a" "b" "c") "a-b-c")
@@ -93,7 +93,7 @@ it('rest param in fn collects extra args', () => {
 
 it('rest-only param in async-lambda', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (const asyncAll (async-lambda ((rest args))
       (return (. args length))))
     (asrt (typeof asyncAll) "function")

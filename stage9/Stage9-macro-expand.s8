@@ -1,0 +1,1783 @@
+(program
+  ;; ========== Macro Expansion (Step 3) ==========
+  ;;
+  ;; Works on the SURFACE AST (before lowering).
+  ;; Pipeline: parse → collectMacros → expandAll → lower → codegen
+  ;;
+  ;; ExpansionError: { kind, message, macroName, callSite, nodeId?, expandedFrom? }
+
+  (import (object (named (array (object (name "gensym")) (object (name "freshScope")) (object (name "registerTopLevelNode"))))) "./Stage9-macro-env")
+  (import (object (named (array (object (name "formatSpan")) (object (name "nextNodeId"))))) "./Stage9-spans")
+  (import (object (named (array (object (name "parseForm"))))) "./Stage9-parse-form")
+
+  ;; ---- Operator table (mirrors lowerCall) ----
+  (const macroOperators
+    (new Set (array "<" ">" "<=" ">=" "&&" "||" "!=" "!==" "==" "===" "+" "-" "*" "/" "%" "!")))
+
+  (const isMacroOp
+    (lambda ((name))
+      (return ((. macroOperators has) name))))
+
+  ;; ---- Apply a binary/unary operator to evaluated JS values ----
+  (const applyMacroOp
+    (lambda ((op) (args))
+      (let* ((l (index args 0))
+             (r (index args 1)))
+        (if (=== op '+')   (return ((. args reduce) (lambda ((acc) (v)) (return (+ acc v))))))
+        (if (=== op '-')   (return (ternary (=== (. args length) 1) (- 0 l) (- l r))))
+        (if (=== op '*')   (return (* l r)))
+        (if (=== op '/')   (return (/ l r)))
+        (if (=== op '%')   (return (% l r)))
+        (if (=== op '===') (return (=== l r)))
+        (if (=== op '!==') (return (!== l r)))
+        (if (=== op '==')  (return (== l r)))
+        (if (=== op '!=')  (return (!= l r)))
+        (if (=== op '<')   (return (< l r)))
+        (if (=== op '>')   (return (> l r)))
+        (if (=== op '<=')  (return (<= l r)))
+        (if (=== op '>=')  (return (>= l r)))
+        (if (=== op '&&')  (return (&& l r)))
+        (if (=== op '||')  (return (|| l r)))
+        (if (=== op '!')   (return (! l)))
+        (return undefined))))
+
+  ;; ---- Quasiquote: process an array of nodes, handling unquote-splicing ----
+  (const quasiArgs
+    (lambda ((nodes) (bindings) (env) (depth))
+      (let* ((result (array)))
+        ((. nodes forEach)
+          (lambda ((n))
+            (if (&& (=== (. n tag) 'unquote-splicing') (=== depth 1))
+              (begin
+                (let* ((spliced (evalMacroExpr (. n expr) bindings env)))
+                  (if ((. Array isArray) spliced)
+                    (set! result ((. result concat) spliced))
+                    ((. result push) spliced))))
+              (begin
+                ((. result push) (evalQuasi n bindings env depth))))))
+        (return result))))
+
+  ;; ---- quasiObjectFields: process object fields, handling unquote-splicing ----
+  (const quasiObjectFields
+    (lambda ((fields) (bindings) (env) (depth))
+      (let* ((result (array)))
+        ((. fields forEach)
+          (lambda ((f))
+            (if (=== (. f tag) 'unquote-splicing')
+              (if (=== depth 1)
+                (let* ((spliced (evalMacroExpr (. f expr) bindings env)))
+                  (if ((. Array isArray) spliced)
+                    ((. spliced forEach) (lambda ((item))
+                      (if (&& item (=== (. item tag) 'object'))
+                        (set! result ((. result concat) (. item fields)))
+                        ((. result push) item))))
+                    (if (&& spliced (=== (. spliced tag) 'object'))
+                      (set! result ((. result concat) (. spliced fields)))
+                      ((. result push) spliced))))
+                ((. result push) f))
+              (begin
+                (if (|| (. f isShorthand) (. f isMethod))
+                  ((. result push) f)
+                  (if (. f computed)
+                    ((. result push) (object
+                        (computed true)
+                        (keyExpr (evalQuasi (. f keyExpr) bindings env depth))
+                        (isMethod false)
+                        (isShorthand false)
+                        (value (evalQuasi (. f value) bindings env depth))))
+                    ((. result push) (object
+                        (key (. f key))
+                        (isMethod (. f isMethod))
+                        (isShorthand (. f isShorthand))
+                        (value (evalQuasi (. f value) bindings env depth))))))))))
+        (return result))))
+
+  ;; ---- extractBindingName: coerce a quasi-evaluated name to a string ----
+  ;; Binding names in let*/const* and assign targets are strings in the AST.
+  ;; When a template has ,(gensym) in the name position, evalQuasi returns an
+  ;; identifier node; this helper extracts the .name string from it.
+  (const extractBindingName
+    (lambda ((val))
+      ;; already a string
+      (if (=== (typeof val) 'string')
+        (return val))
+      ;; identifier node → extract .name
+      (if (&& val (=== (. val tag) 'identifier'))
+        (return (. val name)))
+      ;; fallback: coerce to string
+      (return (+ '' val))))
+
+  ;; ---- Quasiquote evaluator: walk a template, substitute unquotes ----
+  (const evalQuasi
+    (lambda ((node) (bindings) (env) (depth))
+      ;; nested quasi: sform field holds SFormNode (new pipeline handles this in evalQuasiToSForm)
+      (if (=== (. node tag) 'quasi')
+        (return node))
+      ;; unquote at depth 1: evaluate and splice result
+      (if (&& (=== (. node tag) 'unquote') (=== depth 1))
+        (return (evalMacroExpr (. node expr) bindings env)))
+      ;; unquote at depth > 1: decrement and recurse
+      (if (&& (=== (. node tag) 'unquote') (> depth 1))
+        (return (object (tag 'unquote') (text (. node text))
+          (expr (evalQuasi (. node expr) bindings env (- depth 1))))))
+      ;; unquote-splicing is only valid in array contexts (handled by quasiArgs)
+      (if (=== (. node tag) 'unquote-splicing')
+        (return node))
+      ;; begin/block in old-style template: call node where fn is identifier "begin" or "block"
+      ;; Must be checked BEFORE the generic call handler to avoid treating it as a function call.
+      (if (&& (=== (. node tag) 'call')
+              (&& (=== (. (. node fn) tag) 'identifier')
+                  (|| (=== (. (. node fn) name) 'begin') (=== (. (. node fn) name) 'block'))))
+        (return (object (tag 'block') (text (. node text)) (id (. node id))
+          (body (quasiArgs (. node args) bindings env depth)))))
+      ;; block node (if somehow encountered directly): recurse body
+      (if (=== (. node tag) 'block')
+        (return (object (tag 'block') (text (. node text)) (id (. node id))
+          (body (quasiArgs (. node body) bindings env depth)))))
+      ;; call: recurse on fn and args
+      (if (=== (. node tag) 'call')
+        (return (object (tag 'call') (text (. node text))
+          (fn (evalQuasi (. node fn) bindings env depth))
+          (args (quasiArgs (. node args) bindings env depth))
+          (typeArgs (. node typeArgs)))))
+      ;; array expr: recurse on elements (with splice support)
+      (if (=== (. node tag) 'array')
+        (return (object (tag 'array') (text (. node text))
+          (elements (quasiArgs (. node elements) bindings env depth)))))
+      ;; object expr: recurse on field values
+      (if (=== (. node tag) 'object')
+        (return (object (tag 'object') (text (. node text))
+          (fields (quasiObjectFields (. node fields) bindings env depth)))))
+      ;; prop-access: recurse on object, key is literal
+      (if (=== (. node tag) 'prop-access')
+        (return (object (tag 'prop-access') (text (. node text))
+          (object (evalQuasi (. node object) bindings env depth))
+          (key (. node key)))))
+      ;; ternary: recurse on all three
+      (if (=== (. node tag) 'ternary')
+        (return (object (tag 'ternary') (text (. node text))
+          (test (evalQuasi (. node test) bindings env depth))
+          (ifthen (evalQuasi (. node ifthen) bindings env depth))
+          (ifelse (evalQuasi (. node ifelse) bindings env depth)))))
+      ;; lambda / fn / async-lambda / async-fn / generator-fn / async-generator-fn
+      (if (|| (=== (. node tag) 'lambda')
+          (|| (=== (. node tag) 'fn')
+          (|| (=== (. node tag) 'async-lambda')
+          (|| (=== (. node tag) 'async-fn')
+          (|| (=== (. node tag) 'generator-fn')
+              (=== (. node tag) 'async-generator-fn'))))))
+        (return (object (tag (. node tag)) (text (. node text))
+          (params (. node params))
+          (rest (. node rest))
+          (restType (. node restType))
+          (returnType (. node returnType))
+          (body (quasiArgs (. node body) bindings env depth)))))
+      ;; fn-o / lambda-o and async/generator -o variants
+      (if (|| (=== (. node tag) 'fn-o')
+          (|| (=== (. node tag) 'fn-o-decl')
+          (|| (=== (. node tag) 'lambda-o')
+          (|| (=== (. node tag) 'async-fn-o')
+          (|| (=== (. node tag) 'async-lambda-o')
+          (|| (=== (. node tag) 'generator-fn-o')
+              (=== (. node tag) 'async-generator-fn-o')))))))
+        (return (object (tag (. node tag)) (text (. node text))
+          (name (. node name))
+          (params (. node params))
+          (rest (. node rest))
+          (restType (. node restType))
+          (returnType (. node returnType))
+          (body (quasiArgs (. node body) bindings env depth)))))
+      ;; await / yield / yield*
+      (if (|| (=== (. node tag) 'await')
+          (|| (=== (. node tag) 'yield')
+              (=== (. node tag) 'yield*')))
+        (return (object (tag (. node tag)) (text (. node text))
+          (expr (ternary (. node expr) (evalQuasi (. node expr) bindings env depth) undefined)))))
+      ;; cond: recurse on each clause
+      (if (=== (. node tag) 'cond')
+        (return (object (tag 'cond') (text (. node text))
+          (clauses ((. (. node clauses) map) (lambda ((c))
+            (return (object
+              (test (evalQuasi (. c test) bindings env depth))
+              (expr (evalQuasi (. c expr) bindings env depth)))))))
+          (elseExpr (ternary (!== (. node elseExpr) undefined) (evalQuasi (. node elseExpr) bindings env depth) undefined)))))
+      ;; ---- Statement-level forms ----
+      ;; let* / let: recurse into binding inits and body.
+      ;; Binding names support unquote: ,(gensym) → identifier node → name string.
+      (if (|| (=== (. node tag) 'let*') (=== (. node tag) 'let'))
+        (return (object (tag (. node tag)) (text (. node text))
+          (bindings ((. (. node bindings) map) (lambda ((b))
+            (let* ((rawName (ternary (=== (typeof (. b name)) 'string')
+                              (. b name)
+                              (extractBindingName (evalQuasi (. b name) bindings env depth)))))
+              (return (object
+                (name rawName)
+                (init (evalQuasi (. b init) bindings env depth))
+                (typeAnnotation (. b typeAnnotation))))))))
+          (body (quasiArgs (. node body) bindings env depth)))))
+      ;; const* / const
+      (if (|| (=== (. node tag) 'const*') (=== (. node tag) 'const'))
+        (return (object (tag (. node tag)) (text (. node text))
+          (bindings ((. (. node bindings) map) (lambda ((b))
+            (let* ((rawName (ternary (=== (typeof (. b name)) 'string')
+                              (. b name)
+                              (extractBindingName (evalQuasi (. b name) bindings env depth)))))
+              (return (object
+                (name rawName)
+                (init (evalQuasi (. b init) bindings env depth))
+                (typeAnnotation (. b typeAnnotation))))))))
+          (body (quasiArgs (. node body) bindings env depth)))))
+      ;; assign: name may be a dynamic identifier (e.g. ,a in (set! ,a ,b))
+      (if (=== (. node tag) 'assign')
+        (begin
+          (let* ((rawName (ternary (=== (typeof (. node name)) 'string')
+                            (. node name)
+                            (extractBindingName (evalQuasi (. node name) bindings env depth)))))
+            (return (object (tag 'assign') (text (. node text))
+              (name rawName)
+              (value (evalQuasi (. node value) bindings env depth)))))))
+      ;; assign-prop: recurse into target and value
+      (if (=== (. node tag) 'assign-prop')
+        (return (object (tag 'assign-prop') (text (. node text))
+          (target (evalQuasi (. node target) bindings env depth))
+          (value (evalQuasi (. node value) bindings env depth)))))
+      ;; compound-assign: recurse into target/name and value
+      (if (=== (. node tag) 'compound-assign')
+        (if (. node target)
+          (return (object (tag 'compound-assign') (text (. node text)) (op (. node op))
+            (target (evalQuasi (. node target) bindings env depth))
+            (value (evalQuasi (. node value) bindings env depth))))
+          (return (object (tag 'compound-assign') (text (. node text)) (op (. node op))
+            (name (. node name))
+            (value (evalQuasi (. node value) bindings env depth))))))
+      ;; return
+      (if (=== (. node tag) 'return')
+        (return (object (tag 'return') (text (. node text))
+          (expr (ternary (. node expr) (evalQuasi (. node expr) bindings env depth) undefined)))))
+      ;; if
+      (if (=== (. node tag) 'if')
+        (return (object (tag 'if') (text (. node text))
+          (test (evalQuasi (. node test) bindings env depth))
+          (ifthen (quasiArgs (. node ifthen) bindings env depth))
+          (ifelse (ternary (. node ifelse) (quasiArgs (. node ifelse) bindings env depth) undefined)))))
+      ;; while
+      (if (=== (. node tag) 'while')
+        (return (object (tag 'while') (text (. node text))
+          (test (evalQuasi (. node test) bindings env depth))
+          (body (quasiArgs (. node body) bindings env depth)))))
+      ;; switch: recurse discriminant and each case's test+body, splice in case array
+      (if (=== (. node tag) 'switch')
+        (return (object (tag 'switch') (text (. node text))
+          (discriminant (evalQuasi (. node discriminant) bindings env depth))
+          (cases (quasiArgs (. node cases) bindings env depth))
+          (defaultCase (ternary (. node defaultCase)
+            (object (body (quasiArgs (. (. node defaultCase) body) bindings env depth)))
+            undefined)))))
+      ;; throw
+      (if (=== (. node tag) 'throw')
+        (return (object (tag 'throw') (text (. node text))
+          (expr (evalQuasi (. node expr) bindings env depth)))))
+      ;; expr-stmt
+      (if (=== (. node tag) 'expr-stmt')
+        (return (object (tag 'expr-stmt') (text (. node text))
+          (expr (evalQuasi (. node expr) bindings env depth)))))
+      ;; identifier, literal, this, super: return as-is
+      ;; let-decl / const-decl
+      (if (|| (=== (. node tag) 'let-decl') (=== (. node tag) 'const-decl'))
+        (return (object
+          (tag (. node tag))
+          (text (. node text))
+          (name (. node name))
+          (init (evalQuasi (. node init) bindings env depth))
+          (meta (. node meta)))))
+      ;; type-alias: type expressions are opaque — return unchanged
+      (if (=== (. node tag) 'type-alias')
+        (return (object
+          (tag 'type-alias')
+          (text (. node text))
+          (name (. node name))
+          (typeParams (. node typeParams))
+          (type (. node type)))))
+      ;; interface-def: body is a type object — return unchanged
+      (if (=== (. node tag) 'interface-def')
+        (return (object
+          (tag 'interface-def')
+          (text (. node text))
+          (name (. node name))
+          (typeParams (. node typeParams))
+          (extends (. node extends))
+          (body (. node body)))))
+      ;; class-def: recurse into expression-bearing sub-nodes
+      (if (=== (. node tag) 'class-def')
+        (return (object
+          (tag 'class-def')
+          (text (. node text))
+          (modifiers (. node modifiers))
+          (name (. node name))
+          (typeParams (. node typeParams))
+          (extendsType (. node extendsType))
+          (implementsTypes (. node implementsTypes))
+          (body (object
+            (tag 'class-body')
+            (text (. (. node body) text))
+            (elements (quasiClassBody (. (. node body) elements) bindings env depth)))))))
+      ;; import-decl: no unquote positions — return unchanged
+      (if (=== (. node tag) 'import-decl')
+        (return node))
+      (return node)))
+
+  ;; ---- quasiClassBody: recurse into class elements substituting unquotes ----
+  (const quasiClassBody
+    (lambda ((elements) (bindings) (env) (depth))
+      (let* ((result (array)))
+        ((. elements forEach)
+          (lambda ((el))
+            (if (=== (. el tag) 'unquote-splicing')
+              (if (=== depth 1)
+                (let* ((spliced (evalMacroExpr (. el expr) bindings env)))
+                  (if ((. Array isArray) spliced)
+                    (set! result ((. result concat) spliced))
+                    ((. result push) spliced)))
+                ((. result push) el))
+              (begin
+                (if (=== (. el tag) 'field-def')
+                  (begin ((. result push) (object
+                    (tag 'field-def') (text (. el text))
+                    (modifiers (. el modifiers)) (name (. el name))
+                    (typeAnnotation (. el typeAnnotation))
+                    (init (ternary (. el init) (evalQuasi (. el init) bindings env depth) undefined))))
+                    (return undefined)))
+                (if (|| (=== (. el tag) 'constructor-def')
+                        (|| (=== (. el tag) 'class-method-def')
+                            (|| (=== (. el tag) 'getter-def')
+                                (=== (. el tag) 'setter-def'))))
+                  (begin ((. result push) (object
+                    (tag (. el tag)) (text (. el text))
+                    (modifiers (. el modifiers))
+                    (computed (. el computed))
+                    (name (. el name))
+                    (key (ternary (. el computed) (evalQuasi (. el key) bindings env depth) (. el key)))
+                    (sig (. el sig))
+                    (body (quasiArgs (. el body) bindings env depth))))
+                    (return undefined)))
+                ((. result push) el)))))
+        (return result))))
+
+  ;; ---- nodeToSForm: convert a macro-time value to an SForm for embedding ----
+  ;; SForm = string | { __opaque: true, node: ASTNode } | SForm[]
+  (const nodeToSForm
+    (lambda ((v))
+      ;; string → quoted string atom (JS string values are always string literals, not identifiers)
+      (if (=== (typeof v) 'string')
+        (return ((. JSON stringify) v)))
+      ;; number → string representation
+      (if (=== (typeof v) 'number')
+        (return (+ '' v)))
+      ;; boolean → "true" or "false"
+      (if (=== (typeof v) 'boolean')
+        (return (ternary v 'true' 'false')))
+      ;; null → "null"
+      (if (=== v null)
+        (return 'null'))
+      ;; undefined → "null"
+      (if (=== v undefined)
+        (return 'null'))
+      ;; array (SForm[]) from unquote-splicing: return as-is
+      (if ((. Array isArray) v)
+        (return v))
+      ;; AST identifier node → extract name string
+      (if (&& (=== (typeof v) 'object') (=== (. v tag) 'identifier'))
+        (return (. v name)))
+      ;; AST literal node → string representation (quote strings, stringify others)
+      (if (&& (=== (typeof v) 'object') (=== (. v tag) 'literal'))
+        (if (=== (typeof (. v value)) 'string')
+          (return ((. JSON stringify) (. v value)))
+          (return (+ '' (. v value)))))
+      ;; plain JS object without a tag: treat as a field spec for object splice
+      ;; e.g. {x: 99} → ['x', '99'] so parseForm sees it as a field key/value pair
+      (if (&& (=== (typeof v) 'object') (!== v null) (! ((. Array isArray) v)) (=== (. v tag) undefined))
+        (let* ((keys ((. Object keys) v)))
+          (if (=== (. keys length) 1)
+            (return (array (index keys 0) (nodeToSForm (index v (index keys 0))))))))
+      ;; any other AST node → wrap as opaque
+      (return (object (__opaque true) (node v)))))
+
+  ;; ---- evalQuasiToSForm: walk SFormNode tree, substitute holes → SForm ----
+  (const evalQuasiToSForm
+    (lambda ((sfNode) (bindings) (env) (depth))
+      ;; sf-atom: return the string value
+      (if (=== (. sfNode tag) 'sf-atom')
+        (return (. sfNode value)))
+      ;; sf-hole at depth 1: evaluate and convert to SForm
+      (if (&& (=== (. sfNode tag) 'sf-hole') (=== depth 1))
+        (let* ((v (evalMacroExpr (. sfNode expr) bindings env)))
+          (return (nodeToSForm v))))
+      ;; sf-hole at depth > 1: preserve as opaque wrapper for nested quasi.
+      ;; sfNode.expr is an AST expression node (not an SFormNode); we must NOT
+      ;; pass it through evalQuasiToSForm (which would stringify it via toString()).
+      ;; Keep it unchanged so evalMacroExpr can use it when the inner quasi fires.
+      (if (&& (=== (. sfNode tag) 'sf-hole') (> depth 1))
+        (return (object (__opaque true) (node (object (tag 'sf-hole') (expr (. sfNode expr)))))))
+      ;; sf-splice at depth > 1: same reasoning — preserve expr as-is.
+      (if (&& (=== (. sfNode tag) 'sf-splice') (> depth 1))
+        (return (object (__opaque true) (node (object (tag 'sf-splice') (expr (. sfNode expr)))))))
+      ;; sf-list: iterate items, handle splices, track nested quasi depth
+      (if (=== (. sfNode tag) 'sf-list')
+        (let* ((items (. sfNode items))
+               (result (array))
+               ;; If first item is atom "quasi", increment depth for inner items
+               (innerDepth (ternary
+                 (&& (> (. items length) 0)
+                     (&& (=== (. (index items 0) tag) 'sf-atom')
+                         (=== (. (index items 0) value) 'quasi')))
+                 (+ depth 1)
+                 depth)))
+          (let* ((i 0))
+            (while (< i (. items length))
+              (let* ((item (index items i)))
+                (if (&& (=== (. item tag) 'sf-splice') (=== innerDepth 1))
+                  (let* ((v (evalMacroExpr (. item expr) bindings env)))
+                    (if ((. Array isArray) v)
+                      ((. v forEach) (lambda ((elem)) ((. result push) (nodeToSForm elem))))
+                      ((. result push) (nodeToSForm v))))
+                  (begin
+                    (let* ((evItem (evalQuasiToSForm item bindings env innerDepth)))
+                      (if (&& (&& (=== (typeof evItem) 'string')
+                               (&& ((. evItem endsWith) '.')
+                                   (&& (> (. evItem length) 1)
+                                       (< (+ i 1) (. items length)))))
+                            true)
+                        ;; dot-sugar: "obj." followed by next item → prop-access sform
+                        (begin
+                          (let* ((nextItem (index items (+ i 1)))
+                                 (evNext (evalQuasiToSForm nextItem bindings env innerDepth))
+                                 (objName ((. evItem slice) 0 (- (. evItem length) 1))))
+                            ((. result push) (array '.' objName evNext))
+                            (set! i (+ i 1))))
+                        ((. result push) evItem)))))
+                (set! i (+ i 1)))))
+          (return result)))
+      ;; fallback: return sfNode as string
+      (return (+ '' sfNode))))
+
+  ;; ---- Macro-time expression evaluator ----
+  ;; Returns a JavaScript value (primitive, array, or AST node).
+  (const evalMacroExpr
+    (lambda ((node) (bindings) (env))
+      ;; literal: return the JS value
+      (if (=== (. node tag) 'literal')
+        (return (. node value)))
+      ;; identifier: look up in bindings (macro params), then moduleVars, then JS globals, else return node
+      (if (=== (. node tag) 'identifier')
+        (begin
+          (if ((. bindings has) (. node name))
+            (return ((. bindings get) (. node name))))
+          (if (&& (. env moduleVars) ((. (. env moduleVars) has) (. node name)))
+            (return ((. (. env moduleVars) get) (. node name))))
+          (if (!== (index globalThis (. node name)) undefined)
+            (return (index globalThis (. node name))))
+          (return node)))
+      ;; quasi: evaluate sform template at depth 1, then parse result back to typed AST
+      ;; Falls back to old evalQuasi path for unit tests that construct quasi nodes manually
+      (if (=== (. node tag) 'quasi')
+        (if (. node sform)
+          (let* ((sform (evalQuasiToSForm (. node sform) bindings env 1)))
+            (return (parseForm sform (. node id) env)))
+          (return (evalQuasi (. node expr) bindings env 1))))
+      ;; let* statement in expression position: eval bindings then body
+      (if (=== (. node tag) 'let*')
+        (return (evalMacroLetStar node bindings env)))
+      ;; if statement/expression
+      (if (=== (. node tag) 'if')
+        (begin
+          (let* ((test (evalMacroExpr (. node test) bindings env)))
+            (if test
+              (return (evalMacroStmt (. node ifthen) bindings env))
+              (begin
+                (if (. node ifelse)
+                  (return (evalMacroStmt (. node ifelse) bindings env)))
+                (return undefined))))))
+      ;; ternary: (ternary test then else) → evaluate like if/else
+      (if (=== (. node tag) 'ternary')
+        (let* ((test (evalMacroExpr (. node test) bindings env)))
+          (if test
+            (return (evalMacroExpr (. node ifthen) bindings env))
+            (return (evalMacroExpr (. node ifelse) bindings env)))))
+      ;; cond expression
+      (if (=== (. node tag) 'cond')
+        (return (evalMacroCond (. node clauses) (. node elseExpr) bindings env)))
+      ;; call: dispatch to evalMacroCall
+      (if (=== (. node tag) 'call')
+        (return (evalMacroCall node bindings env)))
+      ;; prop-access: (. obj key) → evaluate obj, return obj[key]
+      (if (=== (. node tag) 'prop-access')
+        (let* ((obj (evalMacroExpr (. node object) bindings env))
+               (key (. node key)))
+          (if obj
+            (return (index obj key)))
+          (return undefined)))
+      ;; index-access: (index obj i) → evaluate obj and i, return obj[i]
+      (if (=== (. node tag) 'index-access')
+        (let* ((obj (evalMacroExpr (. node object) bindings env))
+               (i   (evalMacroExpr (. node index)  bindings env)))
+          (if obj
+            (return (index obj i)))
+          (return undefined)))
+      ;; object expr: evaluate field values to produce a plain JS object
+      (if (=== (. node tag) 'object')
+        (let* ((result (object)))
+          ((. (. node fields) forEach) (lambda ((f))
+            (if (! (. f isMethod))
+              (let* ((val (ternary (. f isShorthand)
+                            (evalMacroExpr (object (tag 'identifier') (name (. f key)) (text (. f key)) (scopes (new Set))) bindings env)
+                            (evalMacroExpr (. f value) bindings env))))
+                ((. Reflect set) result (. f key) val)))))
+          (return result)))
+      ;; array expr: evaluate each element
+      (if (=== (. node tag) 'array')
+        (return ((. (. node elements) map) (lambda ((e)) (return (evalMacroExpr e bindings env))))))
+      ;; expr-stmt: unwrap
+      (if (=== (. node tag) 'expr-stmt')
+        (return (evalMacroExpr (. node expr) bindings env)))
+      ;; fallthrough: return node as-is (opaque AST node in template context)
+      (return node)))
+
+  ;; ---- Evaluate a cond clause list ----
+  (const evalMacroCond
+    (lambda ((clauses) (elseExpr) (bindings) (env))
+      (if (=== (. clauses length) 0)
+        (return (ternary (!== elseExpr undefined)
+                   (evalMacroExpr elseExpr bindings env)
+                   undefined)))
+      (let* ((clause (index clauses 0))
+             (testVal (evalMacroExpr (. clause test) bindings env)))
+        (if testVal
+          (return (evalMacroExpr (. clause expr) bindings env))
+          (return (evalMacroCond ((. clauses slice) 1) elseExpr bindings env))))))
+
+  ;; ---- Evaluate a let* form ----
+  (const evalMacroLetStar
+    (lambda ((node) (bindings) (env))
+      (let* ((extended (new Map bindings)))
+        ((. (. node bindings) forEach)
+          (lambda ((b))
+            (let* ((val (evalMacroExpr (. b init) extended env)))
+              ((. extended set) (. b name) val))))
+        (return (evalMacroBody (. node body) extended env)))))
+
+  ;; ---- Evaluate a statement in a macro body ----
+  (const evalMacroStmt
+    (lambda ((node) (bindings) (env))
+      (if (=== (. node tag) 'expr-stmt')
+        (return (evalMacroExpr (. node expr) bindings env)))
+      (if (=== (. node tag) 'let*')
+        (return (evalMacroLetStar node bindings env)))
+      ;; const* is handled identically to let* in macro bodies
+      (if (=== (. node tag) 'const*')
+        (return (evalMacroLetStar node bindings env)))
+      (if (=== (. node tag) 'if')
+        (begin
+          (let* ((test (evalMacroExpr (. node test) bindings env)))
+            (if test
+              (return (evalMacroBody (. node ifthen) bindings env))
+              (begin
+                (if (. node ifelse)
+                  (return (evalMacroBody (. node ifelse) bindings env)))
+                (return undefined))))))
+      ;; return form: evaluate expr
+      (if (=== (. node tag) 'return')
+        (begin
+          (if (. node expr)
+            (return (evalMacroExpr (. node expr) bindings env)))
+          (return undefined)))
+      ;; assign: (set! name expr) — update binding in place
+      (if (=== (. node tag) 'assign')
+        (begin
+          (let* ((val (evalMacroExpr (. node value) bindings env)))
+            ((. bindings set) (. node name) val)
+            (return val))))
+      ;; assign-prop: (set! (. obj key) val) — mutate JS object property
+      (if (=== (. node tag) 'assign-prop')
+        (begin
+          (let* ((target (. node target))
+                 (obj (evalMacroExpr (. target object) bindings env))
+                 (key (. target key))
+                 (val (evalMacroExpr (. node value) bindings env)))
+            (if obj
+              ((. Reflect set) obj key val))
+            (return val))))
+      ;; compound-assign: (+= name val) — no-op at macro time
+      (if (=== (. node tag) 'compound-assign')
+        (return undefined))
+      ;; fallthrough
+      (return undefined)))
+
+  ;; ---- Evaluate a list of statements, returning the last value ----
+  (const evalMacroBody
+    (lambda ((stmts) (bindings) (env))
+      (if (=== (. stmts length) 0)
+        (return undefined))
+      (let* ((last undefined)
+             (i 0))
+        (while (< i (. stmts length))
+          (set! last (evalMacroStmt (index stmts i) bindings env))
+          (set! i (+ i 1)))
+        (return last))))
+
+  ;; ---- Call a lambda/fn AST node at macro-time ----
+  ;; outerBindings: optional closure bindings to inherit (for lambda closures)
+  (const applyMacroFn
+    (lambda ((fnNode) (evArgs) (env) (outerBindings))
+      ;; fnNode is a lambda/fn AST node with .params (typed params, each {name}) and .body
+      (let* ((fnBindings (new Map (|| outerBindings (new Map)))))
+        ((. (. fnNode params) forEach) (lambda ((p) (i))
+          ((. fnBindings set) (. p name) (index evArgs i))))
+        (if (. fnNode rest)
+          ((. fnBindings set) (. fnNode rest) ((. evArgs slice) (. (. fnNode params) length))))
+        (return (evalMacroBody (. fnNode body) fnBindings env)))))
+
+  ;; ---- Apply a macro-callable (lambda or builtin-ref identifier) to evArgs ----
+  ;; Handles both fnNode-style lambdas (have .params) and identifier references to builtins.
+  ;; For builtins, wraps each already-evaluated arg in a literal node and dispatches to evalMacroCall.
+  (const applyMacroCallable
+    (lambda ((cbFn) (evArgs) (bindings) (env))
+      (if (&& cbFn (. cbFn params))
+        (return (applyMacroFn cbFn evArgs env bindings)))
+      (if (&& cbFn (=== (. cbFn tag) 'identifier'))
+        (let* ((literalArgs ((. evArgs map) (lambda ((v))
+                  (return (object (tag 'literal') (value v))))))
+               (synCall (object (tag 'call') (fn cbFn) (args literalArgs) (typeArgs (array)))))
+          (return (evalMacroCall synCall bindings env))))
+      (return undefined)))
+
+  ;; ---- Evaluate a call node at macro-time ----
+  (const evalMacroCall
+    (lambda ((node) (bindings) (env))
+      (let* ((callee (. node fn))
+             (rawArgs (. node args)))
+        ;; prop-access callee: evaluate object and call the method (e.g. Array.isArray, tag.replaceAll)
+        (if (=== (. callee tag) 'prop-access')
+          (let* ((obj (evalMacroExpr (. callee object) bindings env))
+                 (key (. callee key))
+                 (fn_ (ternary obj (index obj key) undefined)))
+            (if (&& fn_ (=== (typeof fn_) 'function'))
+              (let* ((evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env))))))
+                (return ((. fn_ apply) obj evArgs))))
+            (return node)))
+        ;; callee must be an identifier for macro-time dispatch
+        (if (!== (. callee tag) 'identifier')
+          (return node))
+        (let* ((name (. callee name)))
+          ;; operator: evaluate args and apply
+          (if (isMacroOp name)
+            (begin
+              (let* ((evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env))))))
+                (return (applyMacroOp name evArgs)))))
+          ;; gensym built-in
+          (if (=== name 'gensym')
+            (begin
+              (let* ((prefix (ternary (> (. rawArgs length) 0)
+                               (evalMacroExpr (index rawArgs 0) bindings env)
+                               undefined)))
+                (return (gensym env prefix)))))
+          ;; symbol built-in: (symbol str) → identifier node with that name
+          (if (=== name 'symbol')
+            (begin
+              (let* ((nameStr (evalMacroExpr (index rawArgs 0) bindings env)))
+                (if (!== (typeof nameStr) 'string')
+                  (set! nameStr (+ '' (|| nameStr ''))))
+                (if ((. nameStr endsWith) '?')
+                  (set! nameStr (+ ((. nameStr slice) 0 (- (. nameStr length) 1)) '_p')))
+                (return (object (tag 'identifier') (name nameStr) (scopes (new Set)) (hygiene undefined))))))
+          ;; length built-in: (length arr) → number
+          (if (=== name 'length')
+            (begin
+              (let* ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
+                (if ((. Array isArray) arg)
+                  (return (. arg length)))
+                (if (&& arg (. arg elements))
+                  (return (. (. arg elements) length)))
+                (if (&& arg (. arg args))
+                  (return (. (. arg args) length)))
+                (return 0))))
+          ;; str built-in: (str val ...) → concatenated string
+          (if (=== name 'str')
+            (begin
+              (let* ((evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env)))))
+                     (parts ((. evArgs map) (lambda ((v))
+                       (if (=== v null) (return 'null'))
+                       (if (=== v undefined) (return 'undefined'))
+                       (return ((. v toString)))))))
+                (return ((. parts join) '')))))
+          ;; macro-error built-in: push an error and return null (do not throw)
+          (if (=== name 'macro-error')
+            (begin
+              (let* ((msg (ternary (> (. rawArgs length) 0)
+                            (evalMacroExpr (index rawArgs 0) bindings env)
+                            'macro error')))
+                ((. (. env errors) push) (object
+                  (kind 'other')
+                  (message msg)
+                  (macroName (|| (. env currentMacroName) '<unknown>'))
+                  (callSite (|| (. env currentCallSite) '<unknown>'))
+                  (nodeId (. env currentCallNodeId))))
+                (return null))))
+          ;; resolve built-in: (resolve ident-or-str) → { name, meta } or undefined
+          (if (=== name 'resolve')
+            (begin
+              (let* ((arg (evalMacroExpr (index rawArgs 0) bindings env))
+                     (varName (ternary (=== (typeof arg) 'string') arg
+                               (ternary (&& arg (=== (. arg tag) 'identifier')) (. arg name)
+                               (+ '' arg))))
+                     (entry ((. (. env varRegistry) get) varName)))
+                (return entry))))
+          ;; nth built-in: (nth arr i) → element at index i
+          (if (=== name 'nth')
+            (begin
+              (let* ((arg (evalMacroExpr (index rawArgs 0) bindings env))
+                     (i   (evalMacroExpr (index rawArgs 1) bindings env)))
+                (if ((. Array isArray) arg)
+                  (return (index arg i)))
+                (if (&& arg (. arg elements))
+                  (return (index (. arg elements) i)))
+                (if (&& arg (. arg args))
+                  (return (index (. arg args) i)))
+                (return undefined))))
+          ;; node-tag built-in: (node-tag node) → node.tag string
+          (if (=== name 'node-tag')
+            (begin
+              (let* ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
+                (if (=== arg undefined) (return undefined))
+                (return (. arg tag)))))
+          ;; map built-in: (map arr cbFn) → JS array, calling cbFn at macro-time
+          (if (=== name 'map')
+            (begin
+              (let* ((arr  (evalMacroExpr (index rawArgs 0) bindings env))
+                     (cbFn (evalMacroExpr (index rawArgs 1) bindings env)))
+                (if ((. Array isArray) arr)
+                  (return ((. arr map) (lambda ((item))
+                    (return (applyMacroCallable cbFn (array item) bindings env)))))
+                  (return (array))))))
+          ;; filter built-in: (filter arr cbFn) → filtered JS array
+          (if (=== name 'filter')
+            (begin
+              (let* ((arr  (evalMacroExpr (index rawArgs 0) bindings env))
+                     (cbFn (evalMacroExpr (index rawArgs 1) bindings env)))
+                (if ((. Array isArray) arr)
+                  (return ((. arr filter) (lambda ((item))
+                    (return (applyMacroCallable cbFn (array item) bindings env)))))
+                  (return (array))))))
+          ;; find built-in: (find arr cbFn) → first matching item or undefined
+          (if (=== name 'find')
+            (begin
+              (let* ((arr  (evalMacroExpr (index rawArgs 0) bindings env))
+                     (cbFn (evalMacroExpr (index rawArgs 1) bindings env)))
+                (if ((. Array isArray) arr)
+                  (return ((. arr find) (lambda ((item))
+                    (return (applyMacroCallable cbFn (array item) bindings env)))))
+                  (return undefined)))))
+          ;; slice built-in: (slice arr start end?) → sliced JS array
+          (if (=== name 'slice')
+            (begin
+              (let* ((arr   (evalMacroExpr (index rawArgs 0) bindings env))
+                     (start (evalMacroExpr (index rawArgs 1) bindings env))
+                     (end_  (ternary (> (. rawArgs length) 2)
+                               (evalMacroExpr (index rawArgs 2) bindings env)
+                               undefined)))
+                (if ((. Array isArray) arr)
+                  (if (!== end_ undefined)
+                    (return ((. arr slice) start end_))
+                    (return ((. arr slice) start)))
+                  (return (array))))))
+          ;; string built-in: (string node) → JS string value
+          ;; Extracts .name from identifier nodes, else coerces to string
+          (if (=== name 'string')
+            (begin
+              (let* ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
+                (if (=== arg null) (return 'null'))
+                (if (=== arg undefined) (return 'undefined'))
+                (if (=== (typeof arg) 'string') (return arg))
+                (if (&& (=== (typeof arg) 'object') (=== (. arg tag) 'identifier'))
+                  (return (. arg name)))
+                (return (+ '' arg)))))
+          ;; string_lower built-in: (string_lower str) → str.toLowerCase()
+          (if (=== name 'string_lower')
+            (begin
+              (let* ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
+                (if (=== (typeof arg) 'string')
+                  (return ((. arg toLowerCase)))
+                  (return ((. (+ '' arg) toLowerCase)))))))
+          ;; head built-in: (head arr) → arr[0]
+          ;; If arr is a call AST node (clause stripped of expr-stmt by =& expansion), head → fn
+          (if (=== name 'head')
+            (begin
+              (let* ((arr (evalMacroExpr (index rawArgs 0) bindings env)))
+                (if ((. Array isArray) arr)
+                  (return (index arr 0)))
+                (if (&& arr (=== (. arr tag) 'call'))
+                  (return (. arr fn)))
+                (return undefined))))
+          ;; tail built-in: (tail arr) → arr.slice(1)
+          ;; If arr is a call AST node (clause stripped of expr-stmt by =& expansion), tail → args
+          (if (=== name 'tail')
+            (begin
+              (let* ((arr (evalMacroExpr (index rawArgs 0) bindings env)))
+                (if ((. Array isArray) arr)
+                  (return ((. arr slice) 1)))
+                (if (&& arr (=== (. arr tag) 'call'))
+                  (return (. arr args)))
+                (return (array)))))
+          ;; drop built-in: (drop n arr) → arr.slice(n)
+          (if (=== name 'drop')
+            (begin
+              (let* ((n   (evalMacroExpr (index rawArgs 0) bindings env))
+                     (arr (evalMacroExpr (index rawArgs 1) bindings env)))
+                (if ((. Array isArray) arr)
+                  (return ((. arr slice) n))
+                  (return (array))))))
+          ;; take_while built-in: (take_while cbFn arr) → prefix array while cbFn is truthy
+          (if (=== name 'take_while')
+            (begin
+              (let* ((cbFn (evalMacroExpr (index rawArgs 0) bindings env))
+                     (arr  (evalMacroExpr (index rawArgs 1) bindings env)))
+                (if ((. Array isArray) arr)
+                  (let* ((result (array))
+                         (i 0))
+                    (while (&& (< i (. arr length))
+                               (applyMacroCallable cbFn (array (index arr i)) bindings env))
+                      ((. result push) (index arr i))
+                      (set! i (+ i 1)))
+                    (return result))
+                  (return (array))))))
+          ;; map_indexed built-in: (map_indexed arr cbFn) → array mapped with (i item) args
+          (if (=== name 'map_indexed')
+            (begin
+              (let* ((arr  (evalMacroExpr (index rawArgs 0) bindings env))
+                     (cbFn (evalMacroExpr (index rawArgs 1) bindings env)))
+                (if ((. Array isArray) arr)
+                  (return ((. arr map) (lambda ((item) (i))
+                    (return (applyMacroCallable cbFn (array i item) bindings env)))))
+                  (return (array))))))
+          ;; get_option built-in: (get_option opts key) → value from [[key,val]...] pairs
+          (if (=== name 'get_option')
+            (begin
+              (let* ((opts (evalMacroExpr (index rawArgs 0) bindings env))
+                     (key  (evalMacroExpr (index rawArgs 1) bindings env)))
+                (if ((. Array isArray) opts)
+                  (let* ((found ((. opts find) (lambda ((pair))
+                            (return (&& ((. Array isArray) pair) (=== (index pair 0) key)))))))
+                    (if found
+                      (return (index found 1))
+                      (return undefined)))
+                  (return undefined)))))
+          ;; or built-in: (or x y ...) → first truthy value or last (short-circuit)
+          (if (=== name 'or')
+            (begin
+              (let* ((result undefined)
+                     (i 0))
+                (while (< i (. rawArgs length))
+                  (set! result (evalMacroExpr (index rawArgs i) bindings env))
+                  (if result (return result))
+                  (set! i (+ i 1)))
+                (return result))))
+          ;; and built-in: (and x y ...) short-circuit AND
+          (if (=== name 'and')
+            (begin
+              (let* ((result undefined)
+                     (i 0))
+                (while (< i (. rawArgs length))
+                  (set! result (evalMacroExpr (index rawArgs i) bindings env))
+                  (if (! result) (return result))
+                  (set! i (+ i 1)))
+                (return result))))
+          ;; not built-in: (not x) → !x
+          (if (=== name 'not')
+            (begin
+              (let* ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
+                (return (! arg)))))
+          ;; typeof built-in: (typeof x) → typeof x as JS string
+          (if (=== name 'typeof')
+            (begin
+              (let* ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
+                (return (typeof arg)))))
+          ;; macro-time function: look up, bind params, eval body
+          (if ((. (. env macroTimeFns) has) name)
+            (begin
+              (let* ((fn_ ((. (. env macroTimeFns) get) name))
+                     (evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env)))))
+                     (fnBindings (new Map)))
+                ((. (. fn_ params) forEach) (lambda ((p) (i))
+                  ((. fnBindings set) p (index evArgs i))))
+                ;; handle rest param for macro-time functions
+                (if (. fn_ rest)
+                  ((. fnBindings set) (. fn_ rest) ((. evArgs slice) (. (. fn_ params) length))))
+                (return (evalMacroBody (. fn_ body) fnBindings env)))))
+          ;; locally-bound callable: check bindings for a lambda-like value
+          (if ((. bindings has) name)
+            (let* ((fn_ ((. bindings get) name)))
+              (if (&& fn_ (. fn_ params))
+                (begin
+                  (let* ((evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env))))))
+                    (return (applyMacroFn fn_ evArgs env bindings)))))))
+          ;; moduleVars callable: #[macro-time] lambdas stored in env.moduleVars
+          (if (&& (. env moduleVars) ((. (. env moduleVars) has) name))
+            (let* ((fn_ ((. (. env moduleVars) get) name)))
+              (if (&& fn_ (. fn_ params))
+                (begin
+                  (let* ((evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env))))))
+                    (return (applyMacroFn fn_ evArgs env bindings)))))))
+          ;; unrecognised: return node as-is
+          (return node)))))
+
+  ;; ====== KFFD scope stamping ======
+
+  ;; addScopeToNode: non-mutating recursive AST walk that adds `scope` to
+  ;; every identifier node's scopes Set.  All other nodes are reconstructed
+  ;; with their children transformed.  Primitive values and unknown tags are
+  ;; returned as-is.
+  (const addScopeToNode
+    (lambda ((node) (scope))
+      ;; null / undefined
+      (if (|| (=== node null) (=== node undefined))
+        (return node))
+      ;; JS arrays (e.g. result of unquote-splicing)
+      (if ((. Array isArray) node)
+        (return ((. node map) (lambda ((n)) (return (addScopeToNode n scope))))))
+      ;; primitives / non-objects (no tag property)
+      (if (=== (. node tag) undefined)
+        (return node))
+      ;; identifier: return new node with scope added
+      (if (=== (. node tag) 'identifier')
+        (begin
+          (let* ((ns (new Set (. node scopes))))
+            ((. ns add) scope)
+            (return (object
+              (tag 'identifier')
+              (name (. node name))
+              (text (. node text))
+              (scopes ns)
+              (hygiene (. node hygiene)))))))
+      ;; call
+      (if (=== (. node tag) 'call')
+        (return (object (tag 'call') (text (. node text))
+          (fn (addScopeToNode (. node fn) scope))
+          (args ((. (. node args) map) (lambda ((a)) (return (addScopeToNode a scope)))))
+          (typeArgs (. node typeArgs)))))
+      ;; array
+      (if (=== (. node tag) 'array')
+        (return (object (tag 'array') (text (. node text))
+          (elements ((. (. node elements) map) (lambda ((e)) (return (addScopeToNode e scope))))))))
+      ;; object
+      (if (=== (. node tag) 'object')
+        (return (object (tag 'object') (text (. node text))
+          (fields ((. (. node fields) map) (lambda ((f))
+            (if (. f isShorthand) (return f))
+            (if (&& (. f computed) (. f isMethod))
+              (return (object
+                (computed true)
+                (keyExpr (addScopeToNode (. f keyExpr) scope))
+                (isMethod true)
+                (params (. f params))
+                (body ((. (. f body) map) (lambda ((s)) (return (addScopeToNode s scope))))))))
+            (if (. f computed)
+              (return (object
+                (computed true)
+                (keyExpr (addScopeToNode (. f keyExpr) scope))
+                (isMethod false)
+                (isShorthand false)
+                (value (addScopeToNode (. f value) scope)))))
+            (if (. f isMethod)
+              (return (object
+                (key (. f key))
+                (isMethod true)
+                (params (. f params))
+                (body ((. (. f body) map) (lambda ((s)) (return (addScopeToNode s scope))))))))
+            (return (object
+              (key (. f key))
+              (isMethod (. f isMethod))
+              (isShorthand (. f isShorthand))
+              (value (addScopeToNode (. f value) scope))))))))))
+      ;; lambda / fn / async-lambda / async-fn / generator-fn / async-generator-fn
+      (if (|| (=== (. node tag) 'lambda')
+          (|| (=== (. node tag) 'fn')
+          (|| (=== (. node tag) 'async-lambda')
+          (|| (=== (. node tag) 'async-fn')
+          (|| (=== (. node tag) 'generator-fn')
+              (=== (. node tag) 'async-generator-fn'))))))
+        (return (object (tag (. node tag)) (text (. node text))
+          (params (. node params))
+          (rest (. node rest))
+          (restType (. node restType))
+          (returnType (. node returnType))
+          (body ((. (. node body) map) (lambda ((s)) (return (addScopeToNode s scope))))))))
+      ;; fn-o / lambda-o and async/generator -o variants
+      (if (|| (=== (. node tag) 'fn-o')
+          (|| (=== (. node tag) 'fn-o-decl')
+          (|| (=== (. node tag) 'lambda-o')
+          (|| (=== (. node tag) 'async-fn-o')
+          (|| (=== (. node tag) 'async-lambda-o')
+          (|| (=== (. node tag) 'generator-fn-o')
+              (=== (. node tag) 'async-generator-fn-o')))))))
+        (return (object (tag (. node tag)) (text (. node text))
+          (name (. node name))
+          (params (. node params))
+          (rest (. node rest))
+          (restType (. node restType))
+          (returnType (. node returnType))
+          (body ((. (. node body) map) (lambda ((s)) (return (addScopeToNode s scope))))))))
+      ;; await / yield / yield*
+      (if (|| (=== (. node tag) 'await')
+          (|| (=== (. node tag) 'yield')
+              (=== (. node tag) 'yield*')))
+        (return (object (tag (. node tag)) (text (. node text))
+          (expr (ternary (. node expr) (addScopeToNode (. node expr) scope) undefined)))))
+      ;; let*
+      (if (=== (. node tag) 'let*')
+        (return (object (tag (. node tag)) (text (. node text))
+          (bindings ((. (. node bindings) map) (lambda ((b))
+            (return (object
+              (name (. b name))
+              (init (addScopeToNode (. b init) scope))
+              (typeAnnotation (. b typeAnnotation)))))))
+          (body ((. (. node body) map) (lambda ((s)) (return (addScopeToNode s scope))))))))
+      ;; const*
+      (if (=== (. node tag) 'const*')
+        (return (object (tag (. node tag)) (text (. node text))
+          (bindings ((. (. node bindings) map) (lambda ((b))
+            (return (object
+              (name (. b name))
+              (init (addScopeToNode (. b init) scope))
+              (typeAnnotation (. b typeAnnotation)))))))
+          (body ((. (. node body) map) (lambda ((s)) (return (addScopeToNode s scope))))))))
+      ;; if
+      (if (=== (. node tag) 'if')
+        (return (object (tag 'if') (text (. node text))
+          (test (addScopeToNode (. node test) scope))
+          (ifthen ((. (. node ifthen) map) (lambda ((s)) (return (addScopeToNode s scope)))))
+          (ifelse (ternary (. node ifelse) ((. (. node ifelse) map) (lambda ((s)) (return (addScopeToNode s scope)))) undefined)))))
+      ;; ternary
+      (if (=== (. node tag) 'ternary')
+        (return (object (tag 'ternary') (text (. node text))
+          (test (addScopeToNode (. node test) scope))
+          (ifthen (addScopeToNode (. node ifthen) scope))
+          (ifelse (addScopeToNode (. node ifelse) scope)))))
+      ;; cond
+      (if (=== (. node tag) 'cond')
+        (return (object (tag 'cond') (text (. node text))
+          (clauses ((. (. node clauses) map) (lambda ((c))
+            (return (object
+              (test (addScopeToNode (. c test) scope))
+              (expr (addScopeToNode (. c expr) scope)))))))
+          (elseExpr (ternary (!== (. node elseExpr) undefined) (addScopeToNode (. node elseExpr) scope) undefined)))))
+      ;; while
+      (if (=== (. node tag) 'while')
+        (return (object (tag 'while') (text (. node text))
+          (test (addScopeToNode (. node test) scope))
+          (body ((. (. node body) map) (lambda ((s)) (return (addScopeToNode s scope))))))))
+      ;; return
+      (if (=== (. node tag) 'return')
+        (return (object (tag 'return') (text (. node text))
+          (expr (ternary (. node expr) (addScopeToNode (. node expr) scope) undefined)))))
+      ;; throw
+      (if (=== (. node tag) 'throw')
+        (return (object (tag 'throw') (text (. node text))
+          (expr (addScopeToNode (. node expr) scope)))))
+      ;; expr-stmt
+      (if (=== (. node tag) 'expr-stmt')
+        (return (object (tag 'expr-stmt') (text (. node text))
+          (expr (addScopeToNode (. node expr) scope)))))
+      ;; prop-access
+      (if (=== (. node tag) 'prop-access')
+        (return (object (tag 'prop-access') (text (. node text))
+          (object (addScopeToNode (. node object) scope))
+          (key (. node key)))))
+      ;; index-access
+      (if (=== (. node tag) 'index-access')
+        (return (object (tag 'index-access') (text (. node text))
+          (object (addScopeToNode (. node object) scope))
+          (index (addScopeToNode (. node index) scope)))))
+      ;; quasi: recurse into sform holes to stamp scope on unquote expressions
+      ;; Handle both new-style (sform field) and old-style (expr field, used by legacy tests)
+      (if (=== (. node tag) 'quasi')
+        (if (. node sform)
+          (return (object (tag 'quasi') (id (. node id)) (text (. node text))
+            (sform (addScopeToSFormNode (. node sform) scope))
+            (expr (. node expr))))
+          (return (object (tag 'quasi') (id (. node id)) (text (. node text))
+            (sform undefined)
+            (expr (ternary (. node expr) (addScopeToNode (. node expr) scope) undefined))))))
+      (if (=== (. node tag) 'unquote')
+        (return (object (tag 'unquote') (text (. node text))
+          (expr (addScopeToNode (. node expr) scope)))))
+      (if (=== (. node tag) 'unquote-splicing')
+        (return (object (tag 'unquote-splicing') (text (. node text))
+          (expr (addScopeToNode (. node expr) scope)))))
+      ;; assign
+      (if (=== (. node tag) 'assign')
+        (return (object (tag 'assign') (text (. node text))
+          (name (. node name))
+          (value (addScopeToNode (. node value) scope)))))
+      ;; compound-assign
+      (if (=== (. node tag) 'compound-assign')
+        (if (. node target)
+          (return (object (tag 'compound-assign') (text (. node text)) (op (. node op))
+            (target (addScopeToNode (. node target) scope))
+            (value (addScopeToNode (. node value) scope))))
+          (return (object (tag 'compound-assign') (text (. node text)) (op (. node op))
+            (name (. node name))
+            (value (addScopeToNode (. node value) scope))))))
+      ;; new
+      (if (=== (. node tag) 'new')
+        (return (object (tag 'new') (text (. node text))
+          (ctor (. node ctor))
+          (args ((. (. node args) map) (lambda ((a)) (return (addScopeToNode a scope))))))))
+      ;; block: recurse into body so scope stamping reaches nested identifiers
+      (if (=== (. node tag) 'block')
+        (return (object (tag 'block') (text (. node text)) (id (. node id))
+          (body ((. (. node body) map) (lambda ((s)) (return (addScopeToNode s scope))))))))
+      ;; literal, keyword, this, super, defmacro, macro-time-fn-def, let-decl, const-decl, etc.
+      (return node)))
+
+  ;; ---- addScopeToSFormNode: stamp def scope on expressions inside SFormNode holes ----
+  (const addScopeToSFormNode
+    (lambda ((sfNode) (scope))
+      (if (=== (. sfNode tag) 'sf-atom')
+        (return sfNode))
+      (if (=== (. sfNode tag) 'sf-hole')
+        (return (object (tag 'sf-hole') (id (. sfNode id)) (text (. sfNode text))
+          (expr (addScopeToNode (. sfNode expr) scope)))))
+      (if (=== (. sfNode tag) 'sf-splice')
+        (return (object (tag 'sf-splice') (id (. sfNode id)) (text (. sfNode text))
+          (expr (addScopeToNode (. sfNode expr) scope)))))
+      (if (=== (. sfNode tag) 'sf-list')
+        (return (object (tag 'sf-list') (id (. sfNode id)) (text (. sfNode text))
+          (items ((. (. sfNode items) map) (lambda ((item)) (return (addScopeToSFormNode item scope))))))))
+      (return sfNode)))
+
+  ;; ====== Expander: recursive AST walk, replacing macro calls ======
+
+  ;; ---- Expand an expression node (surface AST) ----
+  ;; errors are accumulated in env.errors (no errors parameter).
+  (const expandExpr
+    (lambda ((node) (env))
+      (if (|| (=== node null) (=== node undefined))
+        (return node))
+      ;; call: the main expansion point
+      (if (=== (. node tag) 'call')
+        (begin
+          (let* ((callee (. node fn)))
+            (if (&& (=== (. callee tag) 'identifier') (lookupMacro (. callee name) env))
+              ;; macro call: expand — reject if returns array (top-level splicing not allowed in expr position)
+              (let* ((macroResult (expandMacroCall node env)))
+                (if ((. Array isArray) macroResult)
+                  (begin
+                    (pushMacroError env 'top-level macro expansion not allowed in this position' (. node id))
+                    (return null)))
+                (return macroResult))
+              ;; non-macro call: expand fn and args recursively
+              (begin
+                (return (object (tag 'call') (text (. node text))
+                  (fn (expandExpr callee env))
+                  (args ((. (. node args) map) (lambda ((a)) (return (expandExpr a env)))))
+                  (typeArgs (. node typeArgs)))))))))
+      ;; lambda / fn / async-lambda / async-fn / generator-fn / async-generator-fn
+      (if (|| (=== (. node tag) 'lambda')
+          (|| (=== (. node tag) 'fn')
+          (|| (=== (. node tag) 'async-lambda')
+          (|| (=== (. node tag) 'async-fn')
+          (|| (=== (. node tag) 'generator-fn')
+              (=== (. node tag) 'async-generator-fn'))))))
+        (return (object (tag (. node tag)) (text (. node text))
+          (params (. node params))
+          (rest (. node rest))
+          (restType (. node restType))
+          (returnType (. node returnType))
+          (body ((. (. node body) map) (lambda ((s)) (return (expandStmt s env))))))))
+      ;; fn-o / lambda-o and async/generator -o variants
+      (if (|| (=== (. node tag) 'fn-o')
+          (|| (=== (. node tag) 'fn-o-decl')
+          (|| (=== (. node tag) 'lambda-o')
+          (|| (=== (. node tag) 'async-fn-o')
+          (|| (=== (. node tag) 'async-lambda-o')
+          (|| (=== (. node tag) 'generator-fn-o')
+              (=== (. node tag) 'async-generator-fn-o')))))))
+        (return (object (tag (. node tag)) (text (. node text))
+          (name (. node name))
+          (params (. node params))
+          (rest (. node rest))
+          (restType (. node restType))
+          (returnType (. node returnType))
+          (body ((. (. node body) map) (lambda ((s)) (return (expandStmt s env))))))))
+      ;; await / yield / yield*
+      (if (|| (=== (. node tag) 'await')
+          (|| (=== (. node tag) 'yield')
+              (=== (. node tag) 'yield*')))
+        (return (object (tag (. node tag)) (text (. node text))
+          (expr (ternary (. node expr) (expandExpr (. node expr) env) undefined)))))
+      ;; array expr
+      (if (=== (. node tag) 'array')
+        (return (object (tag 'array') (text (. node text))
+          (elements ((. (. node elements) map) (lambda ((e)) (return (expandExpr e env))))))))
+      ;; object expr
+      (if (=== (. node tag) 'object')
+        (return (object (tag 'object') (text (. node text))
+          (fields ((. (. node fields) map) (lambda ((f))
+            (if (. f isShorthand) (return f))
+            (if (&& (. f computed) (. f isMethod))
+              (return (object
+                (computed true)
+                (keyExpr (expandExpr (. f keyExpr) env))
+                (isMethod true)
+                (params (. f params))
+                (body ((. (. f body) map) (lambda ((s)) (return (expandStmt s env))))))))
+            (if (. f computed)
+              (return (object
+                (computed true)
+                (keyExpr (expandExpr (. f keyExpr) env))
+                (isMethod false)
+                (isShorthand false)
+                (value (expandExpr (. f value) env)))))
+            (if (. f isMethod)
+              (return (object
+                (key (. f key))
+                (isMethod true)
+                (params (. f params))
+                (body ((. (. f body) map) (lambda ((s)) (return (expandStmt s env))))))))
+            (return (object
+              (key (. f key))
+              (isMethod (. f isMethod))
+              (isShorthand (. f isShorthand))
+              (value (expandExpr (. f value) env))))))))))
+      ;; prop-access
+      (if (=== (. node tag) 'prop-access')
+        (return (object (tag 'prop-access') (text (. node text))
+          (object (expandExpr (. node object) env))
+          (key (. node key)))))
+      ;; index-access
+      (if (=== (. node tag) 'index-access')
+        (return (object (tag 'index-access') (text (. node text))
+          (object (expandExpr (. node object) env))
+          (index (expandExpr (. node index) env)))))
+      ;; ternary
+      (if (=== (. node tag) 'ternary')
+        (return (object (tag 'ternary') (text (. node text))
+          (test (expandExpr (. node test) env))
+          (ifthen (expandExpr (. node ifthen) env))
+          (ifelse (expandExpr (. node ifelse) env)))))
+      ;; cond expr
+      (if (=== (. node tag) 'cond')
+        (return (object (tag 'cond') (text (. node text))
+          (clauses ((. (. node clauses) map) (lambda ((c))
+            (return (object
+              (test (expandExpr (. c test) env))
+              (expr (expandExpr (. c expr) env)))))))
+          (elseExpr (ternary (!== (. node elseExpr) undefined) (expandExpr (. node elseExpr) env) undefined)))))
+      ;; infix binary/unary ops
+      (if (=== (. node tag) 'binary-op')
+        (return (object (tag 'binary-op') (id (. node id)) (op (. node op))
+          (left (expandExpr (. node left) env))
+          (right (expandExpr (. node right) env)))))
+      (if (=== (. node tag) 'unary-op')
+        (return (object (tag 'unary-op') (id (. node id)) (op (. node op))
+          (operand (expandExpr (. node operand) env)))))
+      ;; macro block call — expression form (=>): call the macro, recurse on result
+      (if (=== (. node tag) 'macro-expr-call')
+        (begin
+          (let* ((macroName (. (. node fn) name)))
+            (if (lookupMacro macroName env)
+              (let* ((expandedHeader ((. (. node headerArgs) map) (lambda ((a)) (return (expandExpr a env)))))
+                     (unwrappedBody ((. (. node body) map) (lambda ((stmt))
+                       (return (ternary (&& stmt (=== (. stmt tag) 'expr-stmt'))
+                         (. stmt expr)
+                         stmt)))))
+                     (syntheticCall (object
+                       (tag 'call') (id (. node id)) (text (. node text)) (fn (. node fn))
+                       (args ((. expandedHeader concat) unwrappedBody))
+                       (typeArgs (array))))
+                     (result (expandMacroCall syntheticCall env)))
+                (if ((. Array isArray) result)
+                  (begin
+                    (pushMacroError env 'macro-expr-call (=>) may not return multiple forms' (. node id))
+                    (return null)))
+                (if result
+                  (return (expandExpr result env)))
+                (return null))
+              ;; not a macro — pass through (will error at lower if unexpanded)
+              (return (object (tag 'macro-expr-call') (id (. node id))
+                (fn (. node fn))
+                (headerArgs ((. (. node headerArgs) map) (lambda ((a)) (return (expandExpr a env)))))
+                (body (. node body))))))))
+      ;; quasi / unquote / unquote-splicing: don't expand inside templates
+      (if (|| (=== (. node tag) 'quasi')
+              (|| (=== (. node tag) 'unquote') (=== (. node tag) 'unquote-splicing')))
+        (return node))
+      ;; leaf nodes: identifier, literal, keyword, this, super, etc.
+      (return node)))
+
+  ;; ---- stampDefScope: stamp the definition scope on all identifiers in a macro body ----
+  ;; Called once per macro invocation before body evaluation.
+  ;; Template-introduced identifiers carry {defScope} after this step;
+  ;; the use-site scope is added later via addScopeToNode on the result.
+  (const stampDefScope
+    (lambda ((body) (defScope))
+      (return ((. body map) (lambda ((s)) (return (addScopeToNode s defScope)))))))
+
+  ;; ---- Single-step macro call expansion ----
+  ;; Errors are accumulated in env.errors.
+  ;; expandedFrom is set on errors produced by the recursive expansion of the result
+  ;; (i.e., errors from inner macro calls triggered by this expansion).
+  (const expandMacroCall
+    (lambda ((callNode) (env))
+      (let* ((macroName (. (. callNode fn) name))
+             (macroDef (lookupMacro macroName env))
+             (argNodes (. callNode args))
+             (callSite (ternary (. callNode text) (. callNode text) '<unknown>')))
+        
+        ;; Handle compiled macros (Phase 3)
+        (if (&& macroDef (. macroDef isCompiled))
+          (begin
+            ;; Record call site info for errors
+            (set! (. env currentCallSite) callSite)
+            (set! (. env currentCallNodeId) (. callNode id))
+            (set! (. env currentMacroName) macroName)
+            (try
+               (let* ((result ((. macroDef fn) argNodes env)))
+                 (set! (. env currentMacroName) null)
+                 (return result))
+               (catch e
+                 ((. (. env errors) push) (object
+                   (kind 'runtime')
+                   (message (. e message))
+                   (macroName macroName)
+                   (callSite callSite)
+                   (nodeId (. callNode id))))
+                 (set! (. env currentMacroName) null)
+                 (return null)))))
+
+        ;; arity check — if macro has no rest param, arg count must match exactly;
+        ;; if it has a rest param, arg count must be >= fixed param count.
+        (if (ternary (. macroDef rest)
+              (< (. argNodes length) (. (. macroDef params) length))
+              (!== (. argNodes length) (. (. macroDef params) length)))
+          (begin
+            ((. (. env errors) push) (object
+              (kind 'arity')
+              (message (+ macroName ' expects ' (. (. macroDef params) length)
+                          (ternary (. macroDef rest) '+ args' ' args')
+                          ', got ' (. argNodes length)))
+              (macroName macroName)
+              (callSite callSite)
+              (nodeId (. callNode id))))
+            (return callNode)))
+        ;; ---- KFFD scope stamping ----
+        ;; Allocate a fresh use-site scope U for this expansion.
+        (let* ((useScope (freshScope env))
+               (defScope (. macroDef scopeId)))
+          ;; Stamp definition scope onto every identifier in the body template
+          ;; (template-introduced identifiers end up with {defScope}).
+          (let* ((scopedBody (stampDefScope (. macroDef body) defScope)))
+            ;; Stamp use-site scope onto argument nodes so arg identifiers
+            ;; end up with {originalScopes, useScope} and won't be confused
+            ;; with same-named template identifiers ({defScope, useScope}).
+            (let* ((scopedArgs ((. argNodes map)
+                                 (lambda ((a)) (return (addScopeToNode a useScope))))))
+              ;; Bind params to the scope-stamped argument nodes.
+              (let* ((bindings (new Map)))
+                ((. (. macroDef params) forEach) (lambda ((p) (i))
+                  ((. bindings set) p (index scopedArgs i))))
+                ;; bind rest param to array of remaining args
+                (if (. macroDef rest)
+                  ((. bindings set) (. macroDef rest)
+                    ((. scopedArgs slice) (. (. macroDef params) length))))
+                ;; Record call site and call node id so macro-error can attach them to errors.
+                (set! (. env currentCallSite) callSite)
+                (set! (. env currentCallNodeId) (. callNode id))
+                ;; Set currentMacroName for gensym hygiene metadata.
+                (set! (. env currentMacroName) macroName)
+                ;; Evaluate the macro body using the scope-stamped template.
+                ;; Wrap in try/catch to route runtime errors through pushMacroError
+                ;; so they include macro name and call site in the error output.
+                (let* ((result undefined))
+                  (try
+                    (set! result (evalMacroBody scopedBody bindings env))
+                    (catch e
+                      (pushMacroError env (+ 'internal error in macro body: ' (. e message)) (. callNode id))
+                      (return callNode)))
+                  (set! (. env currentMacroName) null)
+                  ;; Stamp use-site scope onto the expanded result:
+                  ;; template identifiers → {defScope, useScope}
+                  ;; arg identifiers      → {originalScopes, useScope}  (idempotent)
+                  ;; gensym identifiers   → {useScope}
+                  (let* ((scopedResult (addScopeToNode result useScope))
+                         ;; Record errors.length before recursive expansion so we
+                         ;; can tag any newly-added errors (from inner macro calls)
+                         ;; with expandedFrom pointing to this call site.
+                         (errsBefore (. (. env errors) length))
+                         ;; Recursively expand the result until stable.
+                         (expanded (expandExpr scopedResult env)))
+                    ;; Tag errors added during recursive expansion with expandedFrom.
+                    (let* ((ii errsBefore))
+                      (while (< ii (. (. env errors) length))
+                        (let* ((err (index (. env errors) ii)))
+                          (if (=== (. err expandedFrom) undefined)
+                            (set! (. err expandedFrom) callSite)))
+                        (set! ii (+ ii 1))))
+                    (return expanded))))))))))
+
+  ;; ---- Expand a statement node ----
+  ;; errors are accumulated in env.errors (no errors parameter).
+  (const expandStmt
+    (lambda ((node) (env))
+      (if (|| (=== node null) (=== node undefined))
+        (return node))
+      ;; expression statement
+      (if (=== (. node tag) 'expr-stmt')
+        (return (object (tag 'expr-stmt') (id (. node id)) (text (. node text))
+          (expr (expandExpr (. node expr) env)))))
+      ;; let*
+      (if (=== (. node tag) 'let*')
+        (return (object (tag 'let*') (id (. node id)) (text (. node text))
+          (bindings ((. (. node bindings) map) (lambda ((b))
+            (return (object
+              (name (. b name))
+              (init (expandExpr (. b init) env))
+              (typeAnnotation (. b typeAnnotation)))))))
+          (body ((. (. node body) map) (lambda ((s)) (return (expandStmt s env))))))))
+      ;; const*
+      (if (=== (. node tag) 'const*')
+        (return (object (tag 'const*') (id (. node id)) (text (. node text))
+          (bindings ((. (. node bindings) map) (lambda ((b))
+            (return (object
+              (name (. b name))
+              (init (expandExpr (. b init) env))
+              (typeAnnotation (. b typeAnnotation)))))))
+          (body ((. (. node body) map) (lambda ((s)) (return (expandStmt s env))))))))
+      ;; if
+      (if (=== (. node tag) 'if')
+        (return (object (tag 'if') (id (. node id)) (text (. node text))
+          (test (expandExpr (. node test) env))
+          (ifthen ((. (. node ifthen) map) (lambda ((s)) (return (expandStmt s env)))))
+          (ifelse (ternary (. node ifelse) ((. (. node ifelse) map) (lambda ((s)) (return (expandStmt s env)))) undefined)))))
+      ;; while
+      (if (=== (. node tag) 'while')
+        (return (object (tag 'while') (id (. node id)) (text (. node text))
+          (test (expandExpr (. node test) env))
+          (body ((. (. node body) map) (lambda ((s)) (return (expandStmt s env))))))))
+      ;; return
+      (if (=== (. node tag) 'return')
+        (return (object (tag 'return') (id (. node id)) (text (. node text))
+          (expr (ternary (. node expr) (expandExpr (. node expr) env) undefined)))))
+      ;; throw
+      (if (=== (. node tag) 'throw')
+        (return (object (tag 'throw') (id (. node id)) (text (. node text))
+          (expr (expandExpr (. node expr) env)))))
+      ;; assign
+      (if (=== (. node tag) 'assign')
+        (return (object (tag 'assign') (id (. node id)) (text (. node text))
+          (name (. node name))
+          (value (expandExpr (. node value) env)))))
+      ;; compound-assign
+      (if (=== (. node tag) 'compound-assign')
+        (if (. node target)
+          (return (object (tag 'compound-assign') (id (. node id)) (text (. node text)) (op (. node op))
+            (target (expandExpr (. node target) env))
+            (value (expandExpr (. node value) env))))
+          (return (object (tag 'compound-assign') (id (. node id)) (text (. node text)) (op (. node op))
+            (name (. node name))
+            (value (expandExpr (. node value) env))))))
+      ;; block: recurse into body so nested macro calls inside a (begin ...) block are expanded
+      (if (=== (. node tag) 'block')
+        (return (object (tag 'block') (id (. node id)) (text (. node text))
+          (body ((. (. node body) map) (lambda ((s)) (return (expandStmt s env))))))))
+      ;; macro block call — statement form (=&): call the macro, splice result as statement(s)
+      (if (=== (. node tag) 'macro-body-call')
+        (begin
+          (let* ((macroName (. (. node fn) name)))
+            (if (lookupMacro macroName env)
+              (let* ((expandedHeader ((. (. node headerArgs) map) (lambda ((a)) (return (expandExpr a env)))))
+                     ;; Strip expr-stmt wrappers from body items so macros see raw call/form nodes,
+                     ;; not statement-level wrappers. (pattern body...) arrives as expr-stmt→call.
+                     (unwrappedBody ((. (. node body) map) (lambda ((stmt))
+                       (return (ternary (&& stmt (=== (. stmt tag) 'expr-stmt'))
+                         (. stmt expr)
+                         stmt)))))
+                     (syntheticCall (object
+                       (tag 'call') (id (. node id)) (text (. node text)) (fn (. node fn))
+                       (args ((. expandedHeader concat) unwrappedBody))
+                       (typeArgs (array))))
+                     (result (expandMacroCall syntheticCall env)))
+                (if ((. Array isArray) result)
+                  ;; Multiple statements: wrap in a block so expandStmt returns a single node
+                  (return (object (tag 'block') (id (. node id)) (text (. node text))
+                    (body ((. result map) (lambda ((s)) (return (expandStmt s env))))))))
+                (if result
+                  (return (expandStmt result env)))
+                (return node))
+              ;; not a macro — pass through (will error at lower if unexpanded)
+              (return (object (tag 'macro-body-call') (id (. node id))
+                (fn (. node fn))
+                (headerArgs ((. (. node headerArgs) map) (lambda ((a)) (return (expandExpr a env)))))
+                (body (. node body))))))))
+      ;; const / let (statement-level with optional type annotation): expand init
+      (if (=== (. node tag) 'const')
+        (return (object (tag 'const') (id (. node id)) (text (. node text))
+          (name (. node name)) (pattern (. node pattern))
+          (typeAnnotation (. node typeAnnotation))
+          (init (expandExpr (. node init) env)))))
+      (if (=== (. node tag) 'let')
+        (return (object (tag 'let') (id (. node id)) (text (. node text))
+          (name (. node name))
+          (typeAnnotation (. node typeAnnotation))
+          (init (expandExpr (. node init) env)))))
+      ;; fallthrough: return as-is
+      (return node)))
+
+  ;; ---- Expand a top-level node ----
+  (const expandTopLevel
+    (lambda ((node) (env))
+      ;; macro definitions: expanding only if compiling a macro module (isMacroCompilation)
+      (if (=== (. node tag) 'defmacro')
+        (if (. env isMacroCompilation)
+          (return (object (tag 'defmacro') (id (. node id)) (text (. node text))
+            (name (. node name)) (params (. node params)) (rest (. node rest)) (scopeId (. node scopeId))
+            (body ((. (. node body) map) (lambda ((s)) (return (expandStmt s env)))))))
+          (return node)))
+      ;; macro-time helpers: expand only if compiling a macro module
+      (if (=== (. node tag) 'macro-time-fn-def')
+        (if (. env isMacroCompilation)
+          (let* ((init (expandExpr (. node init) env)))
+            (return (object (tag 'macro-time-fn-def') (id (. node id)) (text (. node text))
+              (name (. node name)) (init init))))
+          (return node)))
+      ;; let-decl / const-decl: expand the init expression
+      (if (=== (. node tag) 'let-decl')
+        (return (object (tag 'let-decl') (id (. node id)) (callSiteId (. node callSiteId)) (text (. node text))
+          (name (. node name))
+          (init (expandExpr (. node init) env)))))
+      (if (=== (. node tag) 'const-decl')
+        (return (object (tag 'const-decl') (id (. node id)) (callSiteId (. node callSiteId)) (text (. node text))
+          (name (. node name))
+          (init (expandExpr (. node init) env)))))
+      ;; everything else: treat as a statement
+      (return (expandStmt node env))))
+
+  ;; ---- Format accumulated expansion errors for display ----
+  ;; Groups errors by macroName and returns a human-readable string.
+  ;; Each error line includes [kind], message, call site, and (if set) expandedFrom.
+  (const formatExpansionErrors
+    (lambda ((errors))
+      (let* ((grouped (new Map)))
+        ;; group by macroName
+        ((. errors forEach)
+          (lambda ((err))
+            (let* ((nm (. err macroName)))
+              (if (! ((. grouped has) nm))
+                ((. grouped set) nm (array)))
+              (let* ((bucket ((. grouped get) nm)))
+                ((. bucket push) err)))))
+        ;; format each group
+        (let* ((lines (array)))
+          ((. grouped forEach)
+            (lambda ((errs) (nm))
+              ((. lines push) (+ "Error in macro '" nm "':"))
+              ((. errs forEach)
+                (lambda ((err))
+                  (let* ((loc (ternary (. err nodeId)
+                                (+ " (at: " (formatSpan (. err nodeId)) ")")
+                                (ternary (. err callSite)
+                                  (+ " (at: " (. err callSite) ")")
+                                  '')))
+                         (from (ternary (. err expandedFrom)
+                                  (+ "\n    expanded from: " (. err expandedFrom))
+                                  '')))
+                    ((. lines push) (+ "  [" (. err kind) "] " (. err message) loc from)))))))
+          (return ((. lines join) '\n'))))))
+
+
+  (const TOP_LEVEL_DECL_TAGS
+    (new Set (array 'let-decl' 'const-decl' 'type-alias' 'interface-def' 'enum-def'
+                    'class-def' 'anon-class-def' 'defmacro' 'macro-time-fn-def')))
+  (const TOP_LEVEL_STATEMENT_TAGS
+    (new Set (array 'expr-stmt' 'let*' 'let' 'const*' 'const'
+                    'if' 'while' 'return' 'throw' 'assign'
+                    'switch' 'try' 'for' 'for-in' 'for-of' 'for-await')))
+
+  (const pushMacroError
+    (lambda ((env) (message) (nodeId))
+      ((. (. env errors) push) (object
+        (kind 'other')
+        (message message)
+        (macroName (|| (. env currentMacroName) '<unknown>'))
+        (callSite (|| (. env currentCallSite) '<unknown>'))
+        (nodeId (ternary (=== nodeId undefined) (. env currentCallNodeId) nodeId))))
+      (return null)))
+
+  (const ensureNodeHasId
+    (lambda ((node))
+      (if (&& node (=== (. node id) undefined))
+        (set! (. node id) (nextNodeId)))
+      (return node)))
+
+  (const isAllowedTopLevelTag
+    (lambda ((tag))
+      (return (|| ((. TOP_LEVEL_DECL_TAGS has) tag)
+                 ((. TOP_LEVEL_STATEMENT_TAGS has) tag)))))
+
+  ;; ---- lookupMacro: resolve plain or qualified macro name ----
+  ;; "foo"   → env.macros.get("foo")   (only valid in macro compilation mode)
+  ;; "m/foo" → env.macroNamespaces.get("m")?.get("foo")
+  (const lookupMacro
+    (lambda ((name) (env))
+      (let* ((slashIdx ((. name indexOf) '/')))
+        (if (=== slashIdx -1)
+          (return ((. (. env macros) get) name)))
+        (let* ((ns ((. name slice) 0 slashIdx))
+               (localName ((. name slice) (+ slashIdx 1)))
+               (nsMap (&& (. env macroNamespaces) ((. (. env macroNamespaces) get) ns))))
+          (if nsMap
+            (return ((. nsMap get) localName)))
+          (return undefined)))))
+
+  (const getTopLevelMacroCall
+    (lambda ((node) (env))
+      (if (=== (. node tag) 'expr-stmt')
+        (let* ((expr (. node expr)))
+          (if (=== (. expr tag) 'call')
+            (let* ((callee (. expr fn)))
+              (if (&& (=== (. callee tag) 'identifier') (lookupMacro (. callee name) env))
+                (return expr))))))
+      (return undefined)))
+
+  (const expandTopLevelMacroCall
+    (lambda ((callNode) (env))
+      (return (expandMacroCall callNode env))))
+
+  (const validateTopLevelNode
+    (lambda ((node) (env))
+      (if (! node)
+        (begin
+          (pushMacroError env 'macro top-level expansion produced disallowed form' undefined)
+          (return null)))
+      (let* ((withId (ensureNodeHasId node)) (tag (. withId tag)))
+        (if (=== tag undefined)
+          (begin
+            (pushMacroError env 'macro top-level expansion produced disallowed form' (. withId id))
+            (return null)))
+        (if (! (isAllowedTopLevelTag tag))
+          (begin
+            (pushMacroError env (+ 'macro top-level expansion produced disallowed form: ' tag) (. withId id))
+            (return null)))
+        (return withId))))
+
+  ;; ---- Main entry point ----
+  ;; Returns { ast: ProgramNode, errors: ExpansionError[] }
+  ;; Errors are accumulated in env.errors during expansion.
+  (const expandAll
+    (lambda ((programNode) (env) (macroLoader) (dbg))
+      (let* ((worklist ((. (. programNode body) slice) 0))
+             (expandedBody (array)))
+        (while (> (. worklist length) 0)
+          (let* ((node ((. worklist shift)))
+                 (_ (ternary dbg ((. dbg log_msg) 'macros' (+ 'expand: ' (|| (. node tag) '?') (ternary (. node name) (+ ' ' (. node name)) (ternary (. node text) (+ ' ' ((. (. node text) slice) 0 40)) '')))) null))
+                 (__ (registerTopLevelNode node env)) ;; registers local defmacros
+                 (macroCall (getTopLevelMacroCall node env)))
+            ;; Explicitly handle macro-import
+            (if (&& (=== (. node tag) 'macro-import') macroLoader)
+              (macroLoader (. node path) (. node namespace) env))
+            ;; macro-export / macro-reexport in non-macro file is an error
+            (if (&& (|| (=== (. node tag) 'macro-export') (=== (. node tag) 'macro-reexport')) (! (. env isMacroCompilation)))
+              (pushMacroError env 'macro-export is not allowed in .t2 files' (. node id)))
+            ;; macro-body-call (=&) at top level: explicit path that re-queues results
+            ;; via the worklist, mirroring getTopLevelMacroCall for =&-style macro calls.
+            (if (&& (=== (. node tag) 'macro-body-call') (lookupMacro (. (. node fn) name) env))
+              (let* ((expandedHeader ((. (. node headerArgs) map) (lambda ((a)) (return (expandExpr a env)))))
+                     (unwrappedBody ((. (. node body) map) (lambda ((stmt))
+                       (return (ternary (&& stmt (=== (. stmt tag) 'expr-stmt'))
+                         (. stmt expr)
+                         stmt)))))
+                     (syntheticCall (object
+                       (tag 'call') (id (. node id)) (text (. node text)) (fn (. node fn))
+                       (args ((. expandedHeader concat) unwrappedBody))
+                       (typeArgs (array))))
+                     (result (expandTopLevelMacroCall syntheticCall env)))
+                (if ((. Array isArray) result)
+                  ;; array result: validate and re-queue each
+                  (let* ((validated (array)))
+                    ((. result forEach)
+                      (lambda ((spliced))
+                        (let* ((validatedNode (validateTopLevelNode spliced env)))
+                          (if validatedNode
+                            (begin
+                              (set! (. validatedNode callSiteId) (. node id))
+                              ((. validated push) validatedNode)
+                              (registerTopLevelNode validatedNode env))))))
+                    (let* ((idx (- (. validated length) 1)))
+                      (while (>= idx 0)
+                        (begin
+                          (let* ((spliced (index validated idx)))
+                            ((. worklist unshift) spliced))
+                          (set! idx (- idx 1))))))
+                  (if result
+                    (if (=== (. result tag) 'block')
+                      ;; block result: splice body items onto worklist individually
+                      (let* ((body (. result body))
+                             (idx (- (. body length) 1)))
+                        (while (>= idx 0)
+                          (begin
+                            ((. worklist unshift) (index body idx))
+                            (set! idx (- idx 1)))))
+                      ;; single non-block result: re-queue if top-level, else wrap in expr-stmt
+                      (let* ((singleValidated (ternary (isAllowedTopLevelTag (. result tag))
+                                                (validateTopLevelNode result env)
+                                                null)))
+                        (if singleValidated
+                          (begin
+                            (set! (. singleValidated callSiteId) (. node id))
+                            (registerTopLevelNode singleValidated env)
+                            ((. worklist unshift) singleValidated))
+                          ((. expandedBody push)
+                            (object (tag 'expr-stmt') (id (. node id)) (text (. node text)) (expr result)))))))))
+              (if macroCall
+                (let* ((result (expandTopLevelMacroCall macroCall env)))
+                  (if ((. Array isArray) result)
+                    (let* ((validated (array)))
+                      ((. result forEach)
+                        (lambda ((spliced))
+                          (let* ((validatedNode (validateTopLevelNode spliced env)))
+                            (if validatedNode
+                              (begin
+                                (set! (. validatedNode callSiteId) (. node id))
+                                ((. validated push) validatedNode)
+                                (registerTopLevelNode validatedNode env))))))
+                      (let* ((idx (- (. validated length) 1)))
+                        (while (>= idx 0)
+                          (begin
+                            (let* ((spliced (index validated idx)))
+                              ((. worklist unshift) spliced))
+                            (set! idx (- idx 1))))))
+                    ;; block result: splice body items onto worklist individually
+                    (if (&& result (=== (. result tag) 'block'))
+                      (let* ((body (. result body))
+                             (idx (- (. body length) 1)))
+                        (while (>= idx 0)
+                          (begin
+                            ((. worklist unshift) (index body idx))
+                            (set! idx (- idx 1)))))
+                      ;; single result: if it's a top-level form, splice it; else wrap in expr-stmt
+                      (let* ((singleValidated (ternary (&& result (isAllowedTopLevelTag (. result tag)))
+                                                (validateTopLevelNode result env)
+                                                null)))
+                        (if singleValidated
+                          (begin
+                            (set! (. singleValidated callSiteId) (. node id))
+                            (registerTopLevelNode singleValidated env)
+                            ((. worklist unshift) singleValidated))
+                          ((. expandedBody push)
+                            (object (tag 'expr-stmt') (id (. node id)) (text (. node text)) (expr result))))))))
+                ((. expandedBody push) (expandTopLevel node env))))))
+        (let* ((expanded (object (tag 'program') (text (. programNode text))
+                 (body expandedBody))))
+          (return (object (ast expanded) (errors (. env errors))))))))
+
+  (export-named (expandAll) (expandTopLevel) (expandExpr) (expandStmt) (evalMacroExpr) (evalQuasi) (addScopeToNode) (stampDefScope) (extractBindingName) (formatExpansionErrors))
+)

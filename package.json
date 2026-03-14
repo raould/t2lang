@@ -13,15 +13,15 @@
   "license": "CC0-1.0",
   "author": "",
   "type": "module",
-  "main": "index.ts",
-  "directories": {
-    "doc": "docs"
+  "main": "./index.ts",
+  "exports": {
+    ".": "./index.ts"
   },
   "scripts": {
     "modules": "for ME in `find . -maxdepth 1 -type d -name stage\\* | grep -v crazy`; do (cd $ME; npm i); done",
-    "build": "npm --prefix stage8 run build",
-    "test": "npm run modules && npm run build && npm --prefix stage8 test",
-    "testnow": "npm --prefix stage8 testnow"
+    "build": "npm --prefix stage9 run build",
+    "test": "npm run modules && npm --prefix stage9 test",
+    "testnow": "npm --prefix stage9 run testnow"
   },
   "bin": {
     "t2tc": "bin/t2tc.js",
@@ -29,6 +29,7 @@
     "t2run": "bin/t2run.js"
   },
   "dependencies": {
-    "commander": "^14.0.3"
+    "commander": "^14.0.3",
+    "tsx": "^4.21.0"
   }
 }

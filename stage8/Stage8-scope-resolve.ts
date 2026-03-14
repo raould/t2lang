@@ -84,6 +84,22 @@ const resolveExpr  = (node, chain) => {
         if (f.isShorthand) {
           return f;
         }
+        if (f.isMethod) {
+          {
+            let extChain  = chain;
+            f.params.forEach((p) => {
+              extChain = addBinding(extChain, p, new Set());
+            });
+            return ({
+              key: f.key,
+              isMethod: true,
+              params: f.params,
+              body: f.body.map((s) => {
+                return resolveStmt(s, extChain);
+              })
+            });
+          }
+        }
         return ({
           key: f.key,
           isMethod: f.isMethod,
@@ -431,6 +447,24 @@ const resolveStmt  = (node, chain) => {
       text: node.text,
       name: node.name,
       value: resolveExpr(node.value, chain)
+    });
+  }
+  if ((node.tag === "let")) {
+    return ({
+      tag: "let",
+      text: node.text,
+      name: node.name,
+      typeAnnotation: node.typeAnnotation,
+      init: resolveExpr(node.init, chain)
+    });
+  }
+  if ((node.tag === "const")) {
+    return ({
+      tag: "const",
+      text: node.text,
+      name: node.name,
+      typeAnnotation: node.typeAnnotation,
+      init: resolveExpr(node.init, chain)
     });
   }
   if ((node.tag === "class-def")) {

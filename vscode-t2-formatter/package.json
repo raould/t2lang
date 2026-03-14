@@ -1,0 +1,41 @@
+{
+    "name": "vscode-t2-formatter",
+    "displayName": "T2 S-expression Support",
+    "publisher": "local",
+    "version": "0.0.3",
+    "engines": {
+        "vscode": "^1.60.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "t2",
+                "aliases": [
+                    "t2"
+                ],
+                "extensions": [
+                    ".t2"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "t2",
+                "scopeName": "source.t2",
+                "path": "./syntaxes/t2.tmLanguage.json"
+            }
+        ]
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/local/vscode-t2-formatter.git"
+    },
+    "license": "MIT",
+    "devDependencies": {
+        "vsce": "^2.15.0"
+    }
+}

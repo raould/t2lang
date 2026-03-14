@@ -1,6 +1,9 @@
+- [ ] update the style guide.
 - [ ] omfg version numbers.
 - [ ] use esbuild for crying out loud.
-- [ ] (method-call console log) sure is ugly.
 - [ ] error reporting unification, and the error glossary.
-- [ ] --macro-prelude seems to be modifying the supplied argument, breaking absolute paths?
 - [ ] (too) many things are hard-coded to use the highest stageN.
+- [ ] npm 'clean' script.
+- [ ] support a jsdoc syntax.
+- [ ] `(fn (x: number, y: string) ...)` sugar with required commas.
+- [ ] double-check that keyword collision detection is working for value and macro levels.

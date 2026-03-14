@@ -28,12 +28,40 @@ const emitProgram  = (node) => {
 };
 const emitTopLevel  = (node) => {
   if ((node.tag === "macro-def")) {
-    return ("// macro: " + node.name);
+    return emitMacroDef(node);
   }
   if ((node.tag === "macro-time-fn-def")) {
-    return ("// #[macro-time] fn: " + node.name);
+    return emitMacroTimeFnDef(node);
+  }
+  if ((node.tag === "macro-import-decl")) {
+    return ("// macro-import: " + node.path);
+  }
+  if ((node.tag === "macro-export-decl")) {
+    {
+      let specs  = node.specs.map(mangleIdentifier);
+      return (("module.exports = { " + specs.join(", ")) + " };");
+    }
   }
   return emitStmt(node);
+};
+const mangleIdentifier  = (name) => {
+  return name.replace(new RegExp("[^a-zA-Z0-9_$]", "g"), "_");
+};
+const emitMacroDef  = (node) => {
+  if (((!node.body) || (node.body.length === 0))) {
+    return ("// macro: " + node.name);
+  }
+  {
+    let mangledName  = mangleIdentifier(node.name);
+    let params  = node.params;
+    let restP  = node.rest;
+    let pattern  = ((("[" + params.join(", ")) + (restP ? ((((params.length > 0) ? ", " : "") + "...") + restP) : "")) + "]");
+    let body  = node.body.map(emitStmt);
+    return ((((((("export function " + mangledName) + "(args, env) {\n") + "  const ") + pattern) + " = args;\n") + indent(body.join("\n"))) + "\n}");
+  }
+};
+const emitMacroTimeFnDef  = (node) => {
+  return ("// #[macro-time] fn: " + node.name);
 };
 const emitStmt  = (stmt) => {
   if ((stmt.tag === "type-alias")) {
@@ -42,6 +70,9 @@ const emitStmt  = (stmt) => {
       let ty  = emitTypeExpr(stmt.type);
       return ((((("type " + stmt.name) + tparams) + " = ") + ty) + ";");
     }
+  }
+  if ((stmt.tag === "enum-def")) {
+    return emitEnumDef(stmt);
   }
   if ((stmt.tag === "interface-def")) {
     {
@@ -405,9 +436,6 @@ const emitExpr  = (expr) => {
   if ((expr.tag === "literal")) {
     return ((expr.value === undefined) ? "undefined" : JSON.stringify(expr.value));
   }
-  if ((expr.tag === "keyword")) {
-    return JSON.stringify(expr.value);
-  }
   if ((expr.tag === "identifier")) {
     return (expr.name.startsWith("...") ? expr.name : checkId(expr.name, expr.id));
   }
@@ -528,6 +556,9 @@ const emitExpr  = (expr) => {
   if ((expr.tag === "null-coalesce-expr")) {
     return (((("(" + emitExpr(expr.left)) + " ?? ") + emitExpr(expr.right)) + ")");
   }
+  if ((expr.tag === "regex-literal-expr")) {
+    return ((("/" + expr.pattern) + "/") + expr.flags);
+  }
   if ((expr.tag === "operator-expr")) {
     return emitOperator(expr);
   }
@@ -641,11 +672,11 @@ const emitFieldDef  = (node) => {
   {
     let typeStr  = (node.typeAnnotation ? (": " + emitTypeExpr(node.typeAnnotation)) : "");
     let initStr  = (isDefined(node.init) ? (" = " + emitExpr(node.init)) : "");
-    let priv  = (node.modifiers.includes(":private") ? "private " : "");
-    let prot  = (node.modifiers.includes(":protected") ? "protected " : "");
-    let pub  = (node.modifiers.includes(":public") ? "public " : "");
-    let staticStr  = (node.modifiers.includes(":static") ? "static " : "");
-    let rdonly  = (node.modifiers.includes(":readonly") ? "readonly " : "");
+    let priv  = (node.modifiers.includes("private") ? "private " : "");
+    let prot  = (node.modifiers.includes("protected") ? "protected " : "");
+    let pub  = (node.modifiers.includes("public") ? "public " : "");
+    let staticStr  = (node.modifiers.includes("static") ? "static " : "");
+    let rdonly  = (node.modifiers.includes("readonly") ? "readonly " : "");
     let prefix  = ((((priv + prot) + pub) + staticStr) + rdonly);
     return ((((prefix + node.name) + typeStr) + initStr) + ";");
   }
@@ -670,14 +701,14 @@ const emitClassMethodDef  = (node) => {
     let paramsStr  = params.join(", ");
     let returnTypeStr  = (node.sig.returnType ? (": " + emitTypeExpr(node.sig.returnType)) : "");
     let body  = node.body.map(emitStmt);
-    let priv  = (node.modifiers.includes(":private") ? "private " : "");
-    let prot  = (node.modifiers.includes(":protected") ? "protected " : "");
-    let pub  = (node.modifiers.includes(":public") ? "public " : "");
+    let priv  = (node.modifiers.includes("private") ? "private " : "");
+    let prot  = (node.modifiers.includes("protected") ? "protected " : "");
+    let pub  = (node.modifiers.includes("public") ? "public " : "");
     let accMod  = ((priv + prot) + pub);
-    let staticStr  = (node.modifiers.includes(":static") ? "static " : "");
-    let overrideStr  = (node.modifiers.includes(":override") ? "override " : "");
-    let asyncStr  = (node.modifiers.includes(":async") ? "async " : "");
-    let generatorStr  = (node.modifiers.includes(":generator") ? "*" : "");
+    let staticStr  = (node.modifiers.includes("static") ? "static " : "");
+    let overrideStr  = (node.modifiers.includes("override") ? "override " : "");
+    let asyncStr  = (node.modifiers.includes("async") ? "async " : "");
+    let generatorStr  = (node.modifiers.includes("generator") ? "*" : "");
     let nameStr  = emitMethodName(node);
     return ((((((((((((accMod + staticStr) + overrideStr) + asyncStr) + generatorStr) + nameStr) + "(") + paramsStr) + ")") + returnTypeStr) + " {\n") + indent(body.join("\n"))) + "\n}");
   }
@@ -687,9 +718,9 @@ const emitAbstractMethodDef  = (node) => {
     let params  = node.sig.params.map(emitTypedParam);
     let paramsStr  = params.join(", ");
     let returnTypeStr  = (node.sig.returnType ? (": " + emitTypeExpr(node.sig.returnType)) : "");
-    let priv  = (node.modifiers.includes(":private") ? "private " : "");
-    let prot  = (node.modifiers.includes(":protected") ? "protected " : "");
-    let pub  = (node.modifiers.includes(":public") ? "public " : "");
+    let priv  = (node.modifiers.includes("private") ? "private " : "");
+    let prot  = (node.modifiers.includes("protected") ? "protected " : "");
+    let pub  = (node.modifiers.includes("public") ? "public " : "");
     let accMod  = ((priv + prot) + pub);
     let nameStr  = emitMethodName(node);
     return (((((((accMod + "abstract ") + nameStr) + "(") + paramsStr) + ")") + returnTypeStr) + ";");
@@ -699,10 +730,10 @@ const emitGetterDef  = (node) => {
   {
     let returnTypeStr  = (node.sig.returnType ? (": " + emitTypeExpr(node.sig.returnType)) : "");
     let body  = node.body.map(emitStmt);
-    let priv  = (node.modifiers.includes(":private") ? "private " : "");
-    let prot  = (node.modifiers.includes(":protected") ? "protected " : "");
-    let pub  = (node.modifiers.includes(":public") ? "public " : "");
-    let staticStr  = (node.modifiers.includes(":static") ? "static " : "");
+    let priv  = (node.modifiers.includes("private") ? "private " : "");
+    let prot  = (node.modifiers.includes("protected") ? "protected " : "");
+    let pub  = (node.modifiers.includes("public") ? "public " : "");
+    let staticStr  = (node.modifiers.includes("static") ? "static " : "");
     let accMod  = (((priv + prot) + pub) + staticStr);
     let nameStr  = emitMethodName(node);
     return (((((((accMod + "get ") + nameStr) + "()") + returnTypeStr) + " {\n") + indent(body.join("\n"))) + "\n}");
@@ -713,10 +744,10 @@ const emitSetterDef  = (node) => {
     let params  = node.sig.params.map(emitTypedParam);
     let paramsStr  = params.join(", ");
     let body  = node.body.map(emitStmt);
-    let priv  = (node.modifiers.includes(":private") ? "private " : "");
-    let prot  = (node.modifiers.includes(":protected") ? "protected " : "");
-    let pub  = (node.modifiers.includes(":public") ? "public " : "");
-    let staticStr  = (node.modifiers.includes(":static") ? "static " : "");
+    let priv  = (node.modifiers.includes("private") ? "private " : "");
+    let prot  = (node.modifiers.includes("protected") ? "protected " : "");
+    let pub  = (node.modifiers.includes("public") ? "public " : "");
+    let staticStr  = (node.modifiers.includes("static") ? "static " : "");
     let accMod  = (((priv + prot) + pub) + staticStr);
     let nameStr  = emitMethodName(node);
     return (((((((accMod + "set ") + nameStr) + "(") + paramsStr) + ") {\n") + indent(body.join("\n"))) + "\n}");
@@ -755,7 +786,7 @@ const emitClassDef  = (node) => {
     let extendsStr  = (node.extendsType ? (" extends " + emitTypeExpr(node.extendsType)) : "");
     let implementsStr  = ((node.implementsTypes.length > 0) ? (" implements " + node.implementsTypes.map(emitTypeExpr).join(", ")) : "");
     let bodyStr  = emitClassBody(node.body);
-    let abstractStr  = (node.modifiers.includes(":abstract") ? "abstract " : "");
+    let abstractStr  = (node.modifiers.includes("abstract") ? "abstract " : "");
     return ((((((((abstractStr + "class ") + node.name) + typeParamsStr) + extendsStr) + implementsStr) + " {\n") + indent(bodyStr)) + "\n}");
   }
 };
@@ -764,7 +795,7 @@ const emitAnonClassDef  = (node) => {
     let extendsStr  = (node.extendsType ? (" extends " + emitTypeExpr(node.extendsType)) : "");
     let implementsStr  = ((node.implementsTypes.length > 0) ? (" implements " + node.implementsTypes.map(emitTypeExpr).join(", ")) : "");
     let bodyStr  = emitClassBody(node.body);
-    let abstractStr  = (node.modifiers.includes(":abstract") ? "abstract " : "");
+    let abstractStr  = (node.modifiers.includes("abstract") ? "abstract " : "");
     return ((((((abstractStr + "class") + extendsStr) + implementsStr) + " {\n") + indent(bodyStr)) + "\n}");
   }
 };
@@ -986,6 +1017,19 @@ const emitTemplateExpr  = (expr) => {
     });
     out = (out + "`");
     return out;
+  }
+};
+const emitEnumDef  = (node) => {
+  {
+    let members  = node.members.map((m) => {
+      if ((m.value === undefined)) {
+        return m.name;
+      }
+      else {
+        return ((m.name + " = ") + m.value);
+      }
+    }).join(", ");
+    return (((("enum " + node.name) + " { ") + members) + " }");
   }
 };
 const emitTypeParamDecl  = (p) => {

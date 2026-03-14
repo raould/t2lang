@@ -1,0 +1,227 @@
+(program
+  ;; Pre-parser reader: transforms backtick template literals into
+  ;; (template ...) forms before ANTLR parsing.
+  ;;
+  ;; `foo ${b} bar`  →  (template "foo " b " bar")
+  ;; `${b}`          →  (template b)
+  ;; `hello`         →  "hello"
+  ;; ``              →  ""
+
+  ;; ---- skipToEndOfLine ----
+  ;; Scans from i past the end-of-line newline. Returns new i.
+  (const skipToEndOfLine
+    (lambda ((src) (i))
+      (while (< i (. src length))
+        (if (=== ((. src charAt) i) "\n")
+          (return (+ i 1)))
+        (set! i (+ i 1)))
+      (return i)))
+
+  ;; ---- skipSingleQuoteString ----
+  ;; Called with i = position AFTER opening '. Returns i after closing '.
+  (const skipSingleQuoteString
+    (lambda ((src) (i))
+      (while (< i (. src length))
+        (let* ((ch ((. src charAt) i)))
+          (set! i (+ i 1))
+          (if (=== ch "\\")
+            (set! i (+ i 1))
+            (if (=== ch "'")
+              (return i)))))
+      (return i)))
+
+  ;; ---- skipDoubleQuoteString ----
+  ;; Called with i = position AFTER opening ". Returns i after closing ".
+  (const skipDoubleQuoteString
+    (lambda ((src) (i))
+      (while (< i (. src length))
+        (let* ((ch ((. src charAt) i)))
+          (set! i (+ i 1))
+          (if (=== ch "\\")
+            (set! i (+ i 1))
+            (if (=== ch '"')
+              (return i)))))
+      (return i)))
+
+  ;; ---- skipTripleString ----
+  ;; Called with i = position AFTER opening """. Returns i after closing """.
+  (const skipTripleString
+    (lambda ((src) (i))
+      (while (< i (. src length))
+        (if (&& (=== ((. src charAt) i) '"')
+                (&& (=== ((. src charAt) (+ i 1)) '"')
+                    (=== ((. src charAt) (+ i 2)) '"')))
+          (return (+ i 3)))
+        (set! i (+ i 1)))
+      (return i)))
+
+  ;; ---- escapeChunk ----
+  ;; Escape raw text for embedding as a double-quoted t2 string body.
+  (const escapeChunk
+    (lambda ((text))
+      (let* ((s1 ((. ((. text split) '\\') join) '\\\\'))
+             (s2 ((. ((. s1 split) '"') join) '\\"'))
+             (s3 ((. ((. s2 split) "\n") join) '\\n'))
+             (s4 ((. ((. s3 split) "\r") join) '\\r'))
+             (s5 ((. ((. s4 split) "\t") join) '\\t')))
+        (return s5))))
+
+  ;; ---- scanExprUntilClose ----
+  ;; Scan a ${...} expression body, tracking nested braces and skipping strings.
+  ;; i: position AFTER the opening { (brace depth starts at 1).
+  ;; Returns [exprText, newI].
+  (const scanExprUntilClose
+    (lambda ((src) (i))
+      (let* ((depth 1)
+             (buf ""))
+        (while (&& (< i (. src length)) (> depth 0))
+          (let* ((ch ((. src charAt) i)))
+            ;; Triple-quoted string
+            (if (&& (=== ch '"')
+                    (&& (=== ((. src charAt) (+ i 1)) '"')
+                        (=== ((. src charAt) (+ i 2)) '"')))
+              (let* ((end (skipTripleString src (+ i 3))))
+                (set! buf (+ buf ((. src slice) i end)))
+                (set! i end))
+              ;; Single-quoted string
+              (if (=== ch "'")
+                (let* ((end (skipSingleQuoteString src (+ i 1))))
+                  (set! buf (+ buf ((. src slice) i end)))
+                  (set! i end))
+                ;; Double-quoted string
+                (if (=== ch '"')
+                  (let* ((end (skipDoubleQuoteString src (+ i 1))))
+                    (set! buf (+ buf ((. src slice) i end)))
+                    (set! i end))
+                  ;; Comment
+                  (if (&& (=== ch ";") (=== ((. src charAt) (+ i 1)) ";"))
+                    (let* ((end (skipToEndOfLine src (+ i 2))))
+                      (set! buf (+ buf ((. src slice) i end)))
+                      (set! i end))
+                    ;; Open brace
+                    (if (=== ch "{")
+                      (begin
+                        (set! depth (+ depth 1))
+                        (set! buf (+ buf ch))
+                        (set! i (+ i 1)))
+                      ;; Close brace
+                      (if (=== ch "}")
+                        (begin
+                          (set! depth (- depth 1))
+                          (if (> depth 0)
+                            (begin
+                              (set! buf (+ buf ch))
+                              (set! i (+ i 1)))
+                            (set! i (+ i 1))))
+                        ;; Everything else
+                        (begin
+                          (set! buf (+ buf ch))
+                          (set! i (+ i 1)))))))))))
+        (return (array buf i)))))
+
+  ;; ---- scanTemplate ----
+  ;; Scan a backtick template from i (position AFTER opening backtick).
+  ;; Returns [parts, newI] where parts is array of {type, value} objects.
+  (const scanTemplate
+    (lambda ((src) (i))
+      (let* ((parts (array))
+             (textBuf ""))
+        (while (< i (. src length))
+          (let* ((ch ((. src charAt) i)))
+            ;; Escaped backtick: \`
+            (if (&& (=== ch "\\") (=== ((. src charAt) (+ i 1)) '`'))
+              (begin
+                (set! textBuf (+ textBuf '`'))
+                (set! i (+ i 2)))
+              ;; Interpolation hole: ${
+              (if (&& (=== ch "$") (=== ((. src charAt) (+ i 1)) "{"))
+                (begin
+                  (if (!== textBuf "")
+                    ((. parts push) (object (type 'str') (value textBuf))))
+                  (set! textBuf "")
+                  (let* ((result (scanExprUntilClose src (+ i 2)))
+                         (exprText (index result 0))
+                         (newI (index result 1)))
+                    ((. parts push) (object (type 'expr') (value exprText)))
+                    (set! i newI)))
+                ;; Closing backtick
+                (if (=== ch '`')
+                  (begin
+                    (if (!== textBuf "")
+                      ((. parts push) (object (type 'str') (value textBuf))))
+                    (return (array parts (+ i 1))))
+                  ;; Regular character (including literal $)
+                  (begin
+                    (set! textBuf (+ textBuf ch))
+                    (set! i (+ i 1))))))))
+        ;; Unterminated template — flush remainder
+        (if (!== textBuf "")
+          ((. parts push) (object (type 'str') (value textBuf))))
+        (return (array parts i)))))
+
+  ;; ---- buildTemplateForm ----
+  ;; Convert parts array to a t2 source string.
+  (const buildTemplateForm
+    (lambda ((parts))
+      ;; Empty template → empty string literal
+      (if (=== (. parts length) 0)
+        (return '""'))
+      ;; Single string part → plain double-quoted string
+      (if (&& (=== (. parts length) 1) (=== (. (index parts 0) type) 'str'))
+        (return (+ '"' (escapeChunk (. (index parts 0) value)) '"')))
+      ;; General case → (template part ...)
+      (let* ((inner ""))
+        ((. parts forEach)
+          (lambda ((part))
+            (if (=== (. part type) 'str')
+              (set! inner (+ inner ' "' (escapeChunk (. part value)) '"'))
+              (set! inner (+ inner ' ' (. part value))))))
+        (return (+ '(template' inner ')')))))
+
+  ;; ---- readerTransform ----
+  ;; Main entry point. Scans src, replacing backtick template literals with
+  ;; (template ...) forms. Skips over quoted strings and ;; comments verbatim.
+  (const readerTransform
+    (lambda ((src))
+      (let* ((out "")
+             (i 0)
+             (n (. src length)))
+        (while (< i n)
+          (let* ((ch ((. src charAt) i)))
+            ;; Triple-quoted string: copy verbatim
+            (if (&& (=== ch '"')
+                    (&& (=== ((. src charAt) (+ i 1)) '"')
+                        (=== ((. src charAt) (+ i 2)) '"')))
+              (let* ((end (skipTripleString src (+ i 3))))
+                (set! out (+ out ((. src slice) i end)))
+                (set! i end))
+              ;; Single-quoted string: copy verbatim
+              (if (=== ch "'")
+                (let* ((end (skipSingleQuoteString src (+ i 1))))
+                  (set! out (+ out ((. src slice) i end)))
+                  (set! i end))
+                ;; Double-quoted string: copy verbatim
+                (if (=== ch '"')
+                  (let* ((end (skipDoubleQuoteString src (+ i 1))))
+                    (set! out (+ out ((. src slice) i end)))
+                    (set! i end))
+                  ;; Comment: copy verbatim
+                  (if (&& (=== ch ";") (=== ((. src charAt) (+ i 1)) ";"))
+                    (let* ((end (skipToEndOfLine src (+ i 2))))
+                      (set! out (+ out ((. src slice) i end)))
+                      (set! i end))
+                    ;; Backtick template
+                    (if (=== ch '`')
+                      (let* ((result (scanTemplate src (+ i 1)))
+                             (parts (index result 0))
+                             (newI (index result 1)))
+                        (set! out (+ out (buildTemplateForm parts)))
+                        (set! i newI))
+                      ;; Regular character
+                      (begin
+                        (set! out (+ out ch))
+                        (set! i (+ i 1))))))))))
+        (return out))))
+
+  (export-named (readerTransform))
+)

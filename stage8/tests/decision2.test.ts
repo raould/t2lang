@@ -42,7 +42,7 @@ describe('Decision 2: (type-template ...) in type position', () => {
 
   it('type-template end-to-end: TStr<"bc"> resolves to "abc"', () => {
     fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
       ;; TStr<T extends string> = \`a\${T}\`
       (type TStr (type-params (T (extends string))) (type-template "a" T))
       ;; TStr<"bc"> resolves to "abc"
@@ -66,7 +66,7 @@ describe('Decision 2: (template ...) in value position', () => {
 
   it('template with an expression hole interpolates correctly', () => {
     fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
       (const name "World")
       (const greeting (template "Hello " name "!"))
       (asrt greeting "Hello World!")
@@ -75,7 +75,7 @@ describe('Decision 2: (template ...) in value position', () => {
 
   it('template with multiple holes interleaves correctly', () => {
     fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
       (const a "foo")
       (const b "bar")
       (const result (template a "-" b))
@@ -85,7 +85,7 @@ describe('Decision 2: (template ...) in value position', () => {
 
   it('template with numeric expression', () => {
     fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
       (const n 42)
       (const msg (template "answer=" n))
       (asrt msg "answer=42")

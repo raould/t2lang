@@ -51,7 +51,7 @@ describe('3a: valid identifiers are accepted', () => {
 // (Grammar keywords like `return`, `class`, `if` fail at parse time anyway.)
 
 describe('3b: JS reserved words as binding names are rejected', () => {
-  for (const word of ['var', 'void', 'break', 'delete', 'enum', 'in', 'static', 'with']) {
+  for (const word of ['var', 'void', 'break', 'delete', 'in', 'with']) {
     it(`rejects reserved word '${word}' as const binding`, () => {
       const r = callCompiler(`(program (const ${word} 1))`);
       expect(r.status).not.toBe(0);
@@ -94,7 +94,7 @@ describe('3c: digit-leading identifier is rejected by checkId at codegen', () =>
 // ── 3d: TS contextual keywords are allowed ───────────────────────────────────
 
 describe('3d: TS contextual keywords are valid identifiers', () => {
-  for (const word of ['of', 'from', 'async', 'target']) {
+  for (const word of ['of', 'from', 'target']) {
     it(`accepts TS contextual keyword '${word}'`, () => {
       const r = callCompiler(`(program (const ${word} 1))`);
       expect(r.status).toBe(0);
@@ -122,7 +122,7 @@ describe('Phase 4: checkId error includes source location', () => {
 )`);
     expect(r.status).not.toBe(0);
     const combined = r.stderr + r.stdout;
-    // Must mention the bad name and a location (file:line:col)
+    // Must mention the bad name and a location (file~line~col)
     expect(combined).toMatch(/Invalid identifier 'var'/);
     expect(combined).toMatch(/at .+:\d+:\d+/);
   }, T);
@@ -144,7 +144,7 @@ describe('Phase 6: private field names', () => {
   it('(. this #count) emits this.#count (dot notation, not bracket)', () => {
     const r = callCompiler(`(program
   (class Foo (class-body
-    (field #count)
+    (field (#count))
     (method getCount ()
       (return (. this #count)))))
 )`);

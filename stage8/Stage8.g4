@@ -15,11 +15,14 @@ program
 topLevel
     : defmacro
     | macroTimeFnDef
+    | macroImport
+    | macroExport
     | topLevelLet
     | topLevelConst
-    | fnDecl
+    | fn
     | typeAlias
     | interfaceDef
+    | enumDef
     | classDef
     | exportDeclForm
     | statement
@@ -33,9 +36,10 @@ topLevel
 decl
     : topLevelLet
     | topLevelConst
-    | fnDecl
+    | fn
     | classDef
     | interfaceDef
+    | enumDef
     | typeAlias
     ;
 
@@ -48,6 +52,18 @@ macroTimeFnDef
     | LPAREN MACRO_TIME_ATTR topLevelConst RPAREN
     ;
 
+macroImport
+    : LPAREN MACRO_IMPORT IDENTIFIER STRING RPAREN
+    ;
+
+macroExport
+    : LPAREN MACRO_EXPORT macroExportSpec+ RPAREN
+    ;
+
+macroExportSpec
+    : IDENTIFIER
+    ;
+
 topLevelLet
     : LPAREN LET metaAnnotation* IDENTIFIER expression RPAREN
     ;
@@ -56,13 +72,10 @@ topLevelConst
     : LPAREN CONST metaAnnotation* IDENTIFIER expression RPAREN
     ;
 
-fnDecl
-    : LPAREN DEFN metaAnnotation* IDENTIFIER fnSignature statement* RPAREN
-    ;
 
-// metadata annotation: ^:keyword  (e.g. ^:pure, ^:async)
+// metadata annotation: ^identifier  (e.g. ^pure, ^async)
 metaAnnotation
-    : CARET KEYWORD
+    : CARET IDENTIFIER
     ;
 
 typeAlias
@@ -75,6 +88,14 @@ interfaceDef
 
 interfaceExtends
     : LPAREN EXTENDS typeExpr+ RPAREN
+    ;
+
+enumDef
+    : LPAREN ENUM IDENTIFIER enumMember* RPAREN
+    ;
+
+enumMember
+    : LPAREN IDENTIFIER (NUMBER | NEG_NUMBER | STRING)? RPAREN
     ;
 
 // ─── class system ─────────────────────────────
@@ -110,11 +131,11 @@ classElement
     ;
 
 modifier
-    : KEYWORD
+    : PUBLIC | PRIVATE | PROTECTED | STATIC | ABSTRACT | OVERRIDE | ASYNC | GENERATOR | READONLY
     ;
 
 fieldDef
-    : LPAREN FIELD modifier* IDENTIFIER (COLON typeExpr)? expression? RPAREN
+    : LPAREN FIELD modifier* LPAREN IDENTIFIER (COLON typeExpr)? RPAREN expression? RPAREN
     ;
 
 constructorDef
@@ -139,6 +160,8 @@ setterDef
 
 methodKey
     : IDENTIFIER
+    | GET
+    | SETPROP
     | LBRACK expression RBRACK
     ;
 
@@ -146,7 +169,7 @@ typedParam
     : LPAREN IDENTIFIER OPTIONAL? (COLON typeExpr)? RPAREN
     ;
 
-fnSignatureTyped
+fnSignatureTyped // generics, i guess.
     : LPAREN (typedParam (COMMA? typedParam)*)? RPAREN (LPAREN RETURNS typeExpr RPAREN)?
     ;
 
@@ -305,7 +328,7 @@ exportTypeAllFromForm
     : LPAREN EXPORT_TYPE_ALL_FROM STRING RPAREN
     ;
 
-// (export (def ...)) | (export (class ...)) | (export (interface ...)) | (export (type ...))
+// (export (class ...)) | (export (interface ...)) | (export (type ...))
 // Hooked into topLevel, not exportForm.
 // Disambiguated from exportBinding by second token after EXPORT: LPAREN (decl) vs IDENTIFIER.
 exportDeclForm
@@ -344,11 +367,11 @@ typeExpr
     ;
 
 typeUnion
-    : LPAREN UNION typeExpr typeExpr+ RPAREN
+    : LPAREN UNION typeExpr+ RPAREN
     ;
 
 typeIntersection
-    : LPAREN INTERSECT typeExpr typeExpr+ RPAREN
+    : LPAREN INTERSECT typeExpr+ RPAREN
     ;
 
 typeArray
@@ -439,8 +462,7 @@ typeParams
     ;
 
 typeParamDecl
-    : IDENTIFIER
-    | LPAREN IDENTIFIER typeParamConstraint? typeParamDefault? RPAREN
+    : LPAREN IDENTIFIER typeParamConstraint? typeParamDefault? RPAREN
     ;
 
 typeParamConstraint
@@ -500,7 +522,6 @@ finallyClause
 
 expression
     : literal
-    | KEYWORD
     | IDENTIFIER
     | MACRO_ERROR
     | MINUS
@@ -567,7 +588,7 @@ lambda
     ;
 
 fn
-    : LPAREN FN fnSignature statement* RPAREN
+    : LPAREN FN IDENTIFIER? fnSignature statement* RPAREN
     ;
 
 asyncLambda
@@ -611,7 +632,15 @@ ternary
     ;
 
 condExpr
-    : LPAREN COND (expression expression)+ RPAREN
+    : LPAREN COND condClause+ condElseClause? RPAREN
+    ;
+
+condClause
+    : expression expression
+    ;
+
+condElseClause
+    : ELSE expression
     ;
 
 newForm
@@ -656,18 +685,17 @@ templateExpr
 // Example: adding `FOO : 'foo' ;` → also add `| FOO` here.
 propKey
     : IDENTIFIER
-    | KEYWORD
     | STRING
     | NUMBER
     | PROGRAM | LETSTAR | LET | CONSTSTAR | CONST | LAMBDA | FN | METHOD | BIND | METHOD_CALL
-    | DEFMACRO | MACRO_TIME_ATTR | MACRO_ERROR | IF | WHILE | BEGIN | RETURN | THROW | SET | TERNARY | COND
+    | DEFMACRO | MACRO_IMPORT | MACRO_EXPORT | MACRO_TIME_ATTR | MACRO_ERROR | IF | WHILE | BEGIN | RETURN | THROW | SET | TERNARY | COND
     | OBJECT | ARRAY | INDEX | QUASI | QUOTE | UNQUOTE_SPLICING | UNQUOTE
     | TYPE_ARRAY
     | NEW | IMPORT | SWITCH | CASE | DEFAULT | FORIN | FOROF | FOR
     | FORAWAIT | TRY | CATCH | FINALLY
     | UNION | INTERSECT | TUPLE | TYPEFN | LIT | KEYOF | TYPEOF | INFER | MAPPED | TYPE_TEMPLATE
     | TEMPLATE
-    | REST | READONLY | TYPE_AS | TYPE_PARAMS | TYPE_ARGS | EXTENDS | RETURNS | TYPE | INTERFACE | MODIFIERS
+    | REST | READONLY | TYPE_AS | TYPE_PARAMS | TYPE_ARGS | EXTENDS | RETURNS | TYPE | INTERFACE | ENUM | MODIFIERS
     | BOOLEAN | NULL | UNDEFINED
     | EXPORT | EXPORT_DEFAULT | EXPORT_NAMED | EXPORT_NS_FROM | EXPORT_FROM | EXPORT_ALL_FROM
     | IMPORT_TYPE | EXPORT_TYPE | EXPORT_TYPE_FROM | EXPORT_TYPE_ALL_FROM
@@ -675,6 +703,7 @@ propKey
     | GET | SETPROP | ABSTRACT_METHOD | IMPLEMENTS
     | ASYNC_GENERATOR_FN | ASYNC_LAMBDA | ASYNC_FN | GENERATOR_FN
     | YIELD_STAR | YIELD | AWAIT | CARET
+    | PUBLIC | PRIVATE | PROTECTED | STATIC | ABSTRACT | OVERRIDE | ASYNC | GENERATOR | ELSE
     ;
 
 propAccess
@@ -777,7 +806,8 @@ COMMENT
 LPAREN      : '(' ;
 RPAREN      : ')' ;
 COMMA       : ',' ;
-
+MACRO_IMPORT    : 'macro-import' ;
+MACRO_EXPORT    : 'macro-export' ;
 // keywords  (order matters – longest match first where needed)
 PROGRAM     : 'program' ;
 LETSTAR     : 'let*' ;
@@ -786,7 +816,6 @@ CONSTSTAR   : 'const*' ;
 CONST       : 'const' ;
 LAMBDA      : 'lambda' ;
 FN          : 'fn' ;
-DEFN        : 'defn' ;
 METHOD      : 'method' ;
 BIND        : 'bind' ;
 METHOD_CALL : 'method-call' ;
@@ -860,6 +889,7 @@ EXTENDS     : 'extends' ;
 RETURNS     : 'returns' ;
 TYPE        : 'type' ;
 INTERFACE   : 'interface' ;
+ENUM        : 'enum' ;
 MODIFIERS   : 'modifiers' ;
 OPTIONAL    : '?' ;
 
@@ -879,8 +909,19 @@ YIELD_STAR         : 'yield*' ;
 YIELD              : 'yield' ;
 AWAIT              : 'await' ;
 
-// metadata prefix: ^ before a :keyword annotation
+// metadata prefix: ^ before an identifier annotation
 CARET              : '^' ;
+
+// class modifiers
+PUBLIC      : 'public' ;
+PRIVATE     : 'private' ;
+PROTECTED   : 'protected' ;
+STATIC      : 'static' ;
+ABSTRACT    : 'abstract' ;
+OVERRIDE    : 'override' ;
+ASYNC       : 'async' ;
+GENERATOR   : 'generator' ;
+ELSE        : 'else' ;
 
 LBRACK      : '[' ;
 RBRACK      : ']' ;
@@ -895,11 +936,6 @@ IMPORT_TYPE          : 'import-type' ;
 EXPORT_TYPE_ALL_FROM : 'export-type-all-from' ;
 EXPORT_TYPE_FROM     : 'export-type-from' ;
 EXPORT_TYPE          : 'export-type' ;
-
-// :foo keyword literals — resolve to strings at runtime
-KEYWORD
-    : ':' ~[() \n\t\r]+
-    ;
 
 NUMBER
     : [0-9]+ ('.' [0-9]+)?
@@ -924,7 +960,7 @@ MINUS
     ;
 
 IDENTIFIER
-    : ~[() \n\t\r:;\-]+
+    : ~[() \n\t\r:;\-~]+
     ;
 
 WS

@@ -16,10 +16,10 @@ export function checkSource(source, label) {
   process.exit(1);
 }
 
-// Derive the keyword list from Stage8-tags.ts: any AST tag that contains a
+// Derive the keyword list from Stage9-tags.ts: any AST tag that contains a
 // hyphen could be accidentally written with underscores by TypeScript users.
 // We read the file as text so we don't need tsx to import it.
-const tagsSource = readFileSync(resolve(__dirname, '../stage8/Stage8-tags.ts'), 'utf-8');
+const tagsSource = readFileSync(resolve(__dirname, '../stage9/Stage9-tags.ts'), 'utf-8');
 const HYPHENATED_KEYWORDS = [...tagsSource.matchAll(/"([a-z][a-z0-9]*(?:-[a-z0-9]+)+)"/g)]
   .map(m => m[1]);
 
@@ -77,7 +77,7 @@ function findUnderscoredKeywords(source) {
   for (const kw of HYPHENATED_KEYWORDS) {
     const underscored = kw.replace(/-/g, '_');
     // Match the underscore form only when surrounded by non-identifier chars
-    // (identifiers are [a-zA-Z0-9_$?] in Stage8).
+    // (identifiers are [a-zA-Z0-9_$?] in Stage9).
     const re = new RegExp(`(?<![\\w$?])${underscored}(?![\\w$?])`, 'g');
     let m;
     while ((m = re.exec(stripped)) !== null) {

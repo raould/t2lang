@@ -15,7 +15,7 @@ function callCompiler(source: string) {
 it('assign.t2 end-to-end', () => {
     fromSourceEndToEnd(`
         (program
-            (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+            (import (object (named (array (object (name "asrt"))))) "./helpers")
 
             (let (x) 1)
             (asrt x 1)

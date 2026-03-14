@@ -6,7 +6,7 @@
   (const isOperator
     (lambda ((name))
       (let* ((ops (array "<" ">" "<=" ">=" "&&" "||" "!=" "!==" "==" "==="
-                "+" "-" "*" "/" "%" "^" "!")))
+                "+" "-" "*" "/" "%" "^" "!" "or" "and")))
       (return ((. ops includes) name)))))
 
   ;; ========== Phase B: Lowering ==========
@@ -16,11 +16,15 @@
         (return (object (node node) (id (. node id)) (tag 'program') (body body))))))
 
   (const lowerTopLevel
-    (lambda ((node))
+    (lambda ((node) (isMacroMode))
       (if (=== (. node tag) 'defmacro')
-        (return (lowerDefmacro node)))
+        (return (lowerDefmacro node isMacroMode)))
       (if (=== (. node tag) 'macro-time-fn-def')
         (return (lowerMacroTimeFnDef node)))
+      (if (=== (. node tag) 'macro-import')
+        (return (lowerMacroImport node)))
+      (if (=== (. node tag) 'macro-export')
+        (return (lowerMacroExport node)))
       (if (=== (. node tag) 'let-decl')
         (return (lowerLetDecl node)))
       (if (=== (. node tag) 'const-decl')
@@ -31,6 +35,8 @@
         (return (lowerTypeAlias node)))
       (if (=== (. node tag) 'interface-def')
         (return (lowerInterfaceDef node)))
+      (if (=== (. node tag) 'enum-def')
+        (return (lowerEnumDef node)))
       (if (=== (. node tag) 'class-def')
         (return (lowerClassDef node)))
       (if (=== (. node tag) 'export-decl')
@@ -61,6 +67,12 @@
                                     (array)))
                       ("extends" ((. (. node "extends") map) lowerTypeExpr))
                       (body (lowerTypeExpr (. node body)))))))
+
+  (const lowerEnumDef
+    (lambda ((node))
+      (return (object (node node) (id (. node id)) (tag 'enum-def')
+                      (name (. node name))
+                      (members (. node members))))))
 
   ;; ========== Class element lowering ==========
   (const lowerTypedParam
@@ -198,12 +210,23 @@
                           (returnType (ternary (. init returnType) (lowerTypeExpr (. init returnType)) undefined))
                           (body body)))))))
 
-  (const lowerDefmacro
+  (const lowerMacroImport
     (lambda ((node))
-      ;; The codegen for macro-def emits only "// macro: name" and ignores the body.
-      ;; Do not lower the body: it may contain quasi nodes wrapping top-level forms
-      ;; (let-decl, const-decl, class-def, etc.) that are not valid in expression position.
-      (return (object (node node) (id (. node id)) (tag 'macro-def') (name (. node name)) (params (. node params)) (body (array)) (scopeId (. node scopeId))))))
+      (return (object (node node) (id (. node id)) (tag 'macro-import-decl') (path (. node path))))))
+
+  (const lowerMacroExport
+    (lambda ((node))
+      (return (object (node node) (id (. node id)) (tag 'macro-export-decl') (specs (. node specs))))))
+
+  (const lowerDefmacro
+    (lambda ((node) (isMacroMode))
+      (if isMacroMode
+        (return (object (node node) (id (. node id)) (tag 'macro-def')
+          (name (. node name)) (params (. node params)) (rest (. node rest)) (scopeId (. node scopeId))
+          (body ((. (. node body) map) lowerStmt)))))
+      (return (object (node node) (id (. node id)) (tag 'macro-def')
+        (name (. node name)) (params (. node params)) (rest (. node rest)) (scopeId (. node scopeId))
+        (body (array))))))
 
   (const lowerMacroTimeFnDef
     (lambda ((node))
@@ -248,6 +271,8 @@
           (return (object (node node) (id (. node id)) (tag 'export-decl-stmt') (decl (lowerClassDef inner)))))
         (if (=== (. inner tag) 'interface-def')
           (return (object (node node) (id (. node id)) (tag 'export-decl-stmt') (decl (lowerInterfaceDef inner)))))
+        (if (=== (. inner tag) 'enum-def')
+          (return (object (node node) (id (. node id)) (tag 'export-decl-stmt') (decl (lowerEnumDef inner)))))
         (if (=== (. inner tag) 'type-alias')
           (return (object (node node) (id (. node id)) (tag 'export-decl-stmt') (decl (lowerTypeAlias inner)))))
         (throw (new Error (+ 'lowerExportDecl: unknown inner tag >' (. inner tag) '< at ' (formatSpan (. inner id))))))))
@@ -356,18 +381,18 @@
              (named undefined))
         (if spec
           ((. (. spec fields) forEach) (lambda ((f))
-            (if (=== (. f key) ':default')
+            (if (=== (. f key) 'default')
               (set! defaultName (. (. f value) value)))
-            (if (=== (. f key) ':namespace')
+            (if (=== (. f key) 'namespace')
               (set! namespaceName (. (. f value) value)))
-            (if (=== (. f key) ':named')
+            (if (=== (. f key) 'named')
               (set! named ((. (. (. f value) elements) map) (lambda ((el))
                 (let* ((nm undefined)
                        (al undefined))
                   ((. (. el fields) forEach) (lambda ((ff))
-                    (if (=== (. ff key) ':name')
+                    (if (=== (. ff key) 'name')
                       (set! nm (. (. ff value) value)))
-                    (if (=== (. ff key) ':as')
+                    (if (=== (. ff key) 'as')
                       (set! al (. (. ff value) value)))))
                   (return (object (name nm) ("alias" al)))))))))))
         (return (object (node node) (id (. node id)) (tag 'import-stmt') (defaultName defaultName) (namespaceName namespaceName) (named named) (source (. node source)))))))
@@ -395,8 +420,6 @@
           (if (=== (. p tag) 'str')
             (return p))
           (return (object (node node) (id (. node id)) (tag 'hole') (expr (lowerExpr (. p expr)))))))))))
-      (if (=== (. node tag) 'keyword')
-        (return node))
       (if (=== (. node tag) 'identifier')
         (return node))
       (if (=== (. node tag) 'lambda')
@@ -478,7 +501,11 @@
   (const lowerCall
     (lambda ((node))
       (if (&& (=== (. (. node fn) tag) 'identifier') (isOperator (. (. node fn) name)))
-        (let* ((op (. (. node fn) name))
+        (let* ((rawOp (. (. node fn) name))
+               (op (cond
+                 (=== rawOp 'or')  '||'
+                 (=== rawOp 'and') '&&'
+                 :else rawOp))
                (args ((. (. node args) map) lowerExpr)))
           (if (=== (. args length) 1)
             (return (object (node node) (id (. node id)) (tag 'operator-expr') (op op) (args args))))
@@ -488,6 +515,13 @@
               (set! result (object (node node) (tag 'operator-expr') (op op) (args (array result (index args i)))))
               (set! i (+ i 1)))
             (return result))))
+      ;; regex literal: (regex "pattern") or (regex "pattern" "flags") → /pattern/flags
+      (if (&& (=== (. (. node fn) tag) 'identifier') (=== (. (. node fn) name) 'regex'))
+        (let* ((patternArg (index (. node args) 0))
+               (flagsArg   (ternary (> (. (. node args) length) 1) (index (. node args) 1) null))
+               (pattern    (ternary (&& patternArg (=== (. patternArg tag) 'literal')) (. patternArg value) ''))
+               (flags      (ternary (&& flagsArg (=== (. flagsArg tag) 'literal')) (. flagsArg value) '')))
+          (return (object (node node) (id (. node id)) (tag 'regex-literal-expr') (pattern pattern) (flags flags)))))
       (let* ((typeArgs (ternary (. node typeArgs)
                                  ((. (. node typeArgs) map) lowerTypeExpr)
                                  (array)))
@@ -498,12 +532,9 @@
     (lambda ((node))
       (let* ((clauses (. node clauses))
              (i (- (. clauses length) 1))
-             (last (index clauses i))
-             (isElse (&& (=== (. (. last test) tag) 'keyword') (=== (. (. last test) value) ':else')))
-             (result (ternary isElse
-                       (lowerExpr (. last expr))
-                       (object (node node) (tag 'ternary-expr') (test (lowerExpr (. last test))) (ifthen (lowerExpr (. last expr))) (ifelse (object (tag 'literal') (value undefined)))))))
-        (set! i (- i 1))
+             (result (ternary (!== (. node elseExpr) undefined)
+                       (lowerExpr (. node elseExpr))
+                       (object (tag 'literal') (value undefined)))))
         (while (>= i 0)
           (let* ((c (index clauses i)))
             (set! result (object (node node) (tag 'ternary-expr') (test (lowerExpr (. c test))) (ifthen (lowerExpr (. c expr))) (ifelse result))))

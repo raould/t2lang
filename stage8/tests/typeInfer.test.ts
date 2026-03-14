@@ -3,9 +3,9 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('typeInfer end-to-end', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; UnpackArray<T> = T extends Array<infer U> ? U : never
-        (type UnpackArray (type-params T) (cond T (Array (infer U)) U never))
+        (type UnpackArray (type-params (T)) (cond T (Array (infer U)) U never))
         ;; UnpackArray<string[]> resolves to string
         (let (s : (UnpackArray (type-array string))) "hello")
         (asrt s "hello")

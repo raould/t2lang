@@ -4,7 +4,7 @@ Trying to save TypeScript from itself, one parenthasis at a time.
 
 ## quick start
 
-look at stage5
+- look at stage9/
 
 ## description
 
@@ -18,6 +18,7 @@ look at stage5
 
 ## notes
 
+* In order to get anywhere successfully with this, you likely need to have an AI debugging both the compiler and your code since there's lots of loose ends and misteaks in here.
 * Even though T2 already "threw one away," it really needs to do that again.
 * This implementation is, if I am lucky, akin to a dog that can play chess, albeit badly.
 * Warning: the syntax is hardly ideal. E.g. commas are often unexpected.

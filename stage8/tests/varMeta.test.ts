@@ -40,7 +40,7 @@ describe('collectMacros populates varRegistry', () => {
     expect(env.varRegistry.get('myFn')!.meta).toBeUndefined();
   });
 
-  it('registers a const-decl with ^:pure meta', () => {
+  it('registers a const-decl with ^pure meta', () => {
     const env = makeMacroEnv();
     const prog = makeProgram(
       makeConstDecl('myFn', makeLambda(['x']), { pure: true })

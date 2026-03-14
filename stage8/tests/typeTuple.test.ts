@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('typeTuple end-to-end', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; tuple type: [number, string]
         (let (x : (tuple number string)) (array 1 "hello"))
         (asrt (index x 0) 1)

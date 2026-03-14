@@ -24,10 +24,10 @@ it('export-default — named class declaration', () => {
     // The class is still instantiable in the same file (default export does not
     // prevent local use).
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (export-default (class Greeter
             (class-body
-                (field name : string)
+                (field (name : string))
                 (constructor ((n : string))
                     (set! (. this name) n))
                 (method greet () (returns string)
@@ -42,10 +42,10 @@ it('export-default — anonymous class declaration', () => {
     //   export default class { ... }
     // Anonymous class — no name token after 'class'.
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (export-default (class
             (class-body
-                (field value : number 0)
+                (field (value : number) 0)
                 (method getValue () (returns number)
                     (return (. this value))))))
         (asrt 1 1)
@@ -60,7 +60,7 @@ it('export-default — function declaration (declaration lifting)', () => {
     // the lambda is lifted into a named function declaration.
     // The function is still callable locally in the same file.
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (export-default (const add (lambda ((a) (b)) (return (+ a b)))))
         (asrt (add 3 4) 7)
     )`);
@@ -70,7 +70,7 @@ it('export-default — class with extends', () => {
     // Verifies that (export-default (class Child (extends Base) ...)) works
     // with an inheritance chain — class body lowering must still apply.
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         (class Base
             (class-body
                 (method name () (returns string)
@@ -78,7 +78,7 @@ it('export-default — class with extends', () => {
         (export-default (class Child
             (extends Base)
             (class-body
-                (method :override name () (returns string)
+                (method override name () (returns string)
                     (return "child")))))
         (let (c) (new Child))
         (asrt ((. c name)) "child")

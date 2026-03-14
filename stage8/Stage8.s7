@@ -3,11 +3,13 @@
   (import (object (:named (array (object (:name "Stage8Lexer"))))) "./Stage8Lexer")
   (import (object (:named (array (object (:name "Stage8Parser"))))) "./Stage8Parser")
   (import (object (:default "fs")) "node:fs")
+  (import (object (:default "path")) "node:path")
+  (import (object (:default "vm")) "node:vm")
   (import (object (:named (array (object (:name "astTopLevel"))))) "./Stage8-ast")
   (import (object (:named (array (object (:name "lowerTopLevel"))))) "./Stage8-lower")
   (import (object (:named (array (object (:name "emitTopLevel"))))) "./Stage8-codegen")
-  (import (object (:named (array (object (:name "makeMacroEnv"))))) "./Stage8-macro-env")
-  (import (object (:named (array (object (:name "expandAll")) (object (:name "formatExpansionErrors"))))) "./Stage8-macro-expand")
+  (import (object (:named (array (object (:name "makeMacroEnv")) (object (:name "gensym"))))) "./Stage8-macro-env")
+  (import (object (:named (array (object (:name "expandAll")) (object (:name "evalMacroExpr")) (object (:name "formatExpansionErrors"))))) "./Stage8-macro-expand")
   (import (object (:named (array (object (:name "resolveTopLevel")) (object (:name "addBinding"))))) "./Stage8-scope-resolve")
   (import (object (:named (array (object (:name "resetSpans")) (object (:name "formatSpan"))))) "./Stage8-spans")
 
@@ -22,6 +24,110 @@
              (tree ((. parser "program")))
              (body ((. ((. tree topLevel)) map) astTopLevel)))
         (return (object (tag 'program') (text ((. tree getText))) (body body))))))
+
+  ;; ========== compileMacroModule: compile a .t2m to CJS source string ==========
+  
+  ;; Shared ref to loadMacroModule to break recursion cycle
+  (const _macroLoaderRef (object (:loader null)))
+
+  ;; Cache for loaded macro modules to handle diamond dependencies and cycles
+  (const _macroModuleCache (new Map))
+  (const _macroLoadingSet (new Set))
+
+  (const compileMacroModule
+    (lambda ((filePath))
+      (let* ((input ((. fs readFileSync) filePath 'utf-8'))
+             (_spans (resetSpans filePath))
+             (programNode (parseFile filePath))
+             ;; macro module compilation mode
+             (macroEnv (makeMacroEnv true))
+             ;; Pass loader through ref for transitive loading
+             (expandedResult (expandAll programNode macroEnv (. _macroLoaderRef loader))))
+        ;; Check errors
+        (if (> (. (. expandedResult errors) length) 0)
+          (begin
+            ((. console error) (+ 'Errors in macro module ' filePath ':'))
+            ((. console error) (formatExpansionErrors (. expandedResult errors)))
+            ((. process exit) 1)))
+        
+        (let* ((output (array))
+               (chain (array)))
+          ((. (. (. expandedResult ast) body) forEach)
+            (lambda ((expandedNode))
+              (let* ((resolvedNode (resolveTopLevel expandedNode chain)))
+                (if (|| (=== (. resolvedNode tag) 'let-decl') (=== (. resolvedNode tag) 'const-decl'))
+                  (set! chain (addBinding chain (. resolvedNode name) (new Set))))
+                (let* ((loweredNode (lowerTopLevel resolvedNode true))
+                       (emittedStr (emitTopLevel loweredNode)))
+                  ((. output push) emittedStr)))))
+          (return ((. output join) '\n'))))))
+
+  ;; ========== loadMacroModule: interpreter-based macro module loader ==========
+  ;; Registers exported macros from the module into env.macroNamespaces[namespace].
+  (const loadMacroModule
+    (lambda ((relPath) (namespace) (env))
+      (let* ((absPath ((. path resolve) relPath)))
+        (if (! ((. fs existsSync) absPath))
+          (begin
+            ((. console error) (+ "Macro module not found: " absPath))
+            ((. process exit) 1)))
+        ;; Return early if already cached — still create namespace map from cached exports
+        (if ((. _macroModuleCache has) absPath)
+          (let* ((cached ((. _macroModuleCache get) absPath))
+                 (exports (. cached _exports))
+                 (nsMap (new Map)))
+            ((. (. env macroNamespaces) set) namespace nsMap)
+            ((. exports forEach)
+              (lambda ((exportName))
+                (if ((. (. cached macros) has) exportName)
+                  ((. nsMap set) exportName ((. (. cached macros) get) exportName)))))
+            ((. (. cached moduleVars) forEach)
+              (lambda ((varVal) (varKey))
+                ((. (. env moduleVars) set) varKey varVal)))
+            (return)))
+        ;; Parse and expand the module file
+        (let* ((_spans (resetSpans absPath))
+               (programNode (parseFile absPath))
+               ;; Child env for this module (macro compilation mode)
+               (childEnv (makeMacroEnv true))
+               (expandedResult (expandAll programNode childEnv loadMacroModule)))
+          (if (> (. (. expandedResult errors) length) 0)
+            (begin
+              ((. console error) (+ 'Errors in macro module ' absPath ':'))
+              ((. console error) (formatExpansionErrors (. expandedResult errors)))
+              ((. process exit) 1)))
+          ;; Register macros, eval const/let inits, collect macro-export specs
+          (let* ((exports (array)))
+            ((. (. (. expandedResult ast) body) forEach)
+              (lambda ((node))
+                (if (|| (=== (. node tag) 'defmacro') (=== (. node tag) 'macro-def'))
+                  ((. (. childEnv macros) set) (. node name)
+                    (object
+                      (name (. node name))
+                      (params (. node params))
+                      (rest (. node rest))
+                      (body (. node body))
+                      (scopeId (. node scopeId)))))
+                (if (|| (=== (. node tag) 'const-decl') (=== (. node tag) 'let-decl'))
+                  (let* ((val (evalMacroExpr (. node init) (new Map) childEnv)))
+                    ((. (. childEnv moduleVars) set) (. node name) val)))
+                (if (=== (. node tag) 'macro-export')
+                  (set! exports (. node specs)))))
+            ;; Attach export list to childEnv for cache reuse, then cache
+            (set! (. childEnv _exports) exports)
+            ((. _macroModuleCache set) absPath childEnv)
+            ;; Register only exported macros into the namespace map
+            (let* ((nsMap (new Map)))
+              ((. (. env macroNamespaces) set) namespace nsMap)
+              ((. exports forEach)
+                (lambda ((exportName))
+                  (if ((. (. childEnv macros) has) exportName)
+                    ((. nsMap set) exportName ((. (. childEnv macros) get) exportName)))))
+              ((. (. childEnv moduleVars) forEach)
+                (lambda ((varVal) (varKey))
+                  ((. (. env moduleVars) set) varKey varVal)))))))))
+  ;; Initialize transitive loader
+  (set! (. _macroLoaderRef loader) loadMacroModule)
 
   ;; ========== processPrelude: load a prelude file, register its macros ==========
   ;; Parses and expands a .t2 prelude file, registering any macros into macroEnv.
@@ -39,7 +145,7 @@
           ((. process exit) 1)))
       (let* ((_spans (resetSpans preludePath))
              (programNode (parseFile preludePath))
-             (_expanded (expandAll programNode macroEnv)))
+             (_expanded (expandAll programNode macroEnv loadMacroModule)))
         (if (> (. (. macroEnv errors) length) 0)
           (begin
             ((. console error) (+ 'error in macro prelude ' preludePath ':'))
@@ -64,7 +170,8 @@
                   ((. process exit) 1))))
             (set! filePath (index argv i)))
           (set! i (+ i 1)))
-        (let* ((macroEnv (makeMacroEnv)))
+        (let* ((isMacroCompilation (&& (!== filePath '-') ((. filePath endsWith) '.t2m')))
+               (macroEnv (makeMacroEnv isMacroCompilation)))
           ;; Process preludes in order, registering macros into macroEnv
           ((. preludePaths forEach)
             (lambda ((preludePath))
@@ -73,7 +180,7 @@
           (let* ((_spans (resetSpans (ternary (=== filePath '-') '<stdin>' filePath)))
                  (programNode (parseFile filePath))
                  ;; Expand all forms using worklist (handles macro splicing)
-                 (expandResult (expandAll programNode macroEnv)))
+                 (expandResult (expandAll programNode macroEnv loadMacroModule)))
             (if (> (. (. macroEnv errors) length) 0)
               (begin
                 ((. console error) (formatExpansionErrors (. macroEnv errors)))
@@ -86,7 +193,7 @@
                     (let* ((resolvedNode (resolveTopLevel expandedNode chain)))
                       (if (|| (=== (. resolvedNode tag) 'let-decl') (=== (. resolvedNode tag) 'const-decl'))
                         (set! chain (addBinding chain (. resolvedNode name) (new Set))))
-                      (let* ((loweredNode (lowerTopLevel resolvedNode))
+                      (let* ((loweredNode (lowerTopLevel resolvedNode isMacroCompilation))
                              (emittedStr (emitTopLevel loweredNode)))
                         ((. (. process stdout) write) (+ emittedStr '\n'))))
                     (catch e

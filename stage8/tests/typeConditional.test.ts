@@ -3,9 +3,9 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('typeConditional end-to-end', () => {
     fromSourceEndToEnd(`(program
-        (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+        (import (object (named (array (object (name "asrt"))))) "./helpers")
         ;; CondType<T> = T extends string ? number : string
-        (type CondType (type-params T) (cond T string number string))
+        (type CondType (type-params (T)) (cond T string number string))
         ;; CondType<string> resolves to number
         (let (a : (CondType string)) 42)
         (asrt (typeof a) "number")

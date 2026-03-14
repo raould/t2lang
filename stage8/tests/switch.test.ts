@@ -3,7 +3,7 @@ import { fromSourceEndToEnd } from './helpers';
 
 it('switch.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
-    (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+    (import (object (named (array (object (name "asrt"))))) "./helpers")
     (let* ((x 2)
            (lam (lambda ((x))
                 (switch x

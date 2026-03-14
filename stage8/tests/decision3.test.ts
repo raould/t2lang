@@ -44,7 +44,7 @@ describe('Decision 3: (optchain-index ...) emit shape', () => {
 describe('Decision 3: (optchain-index ...) runtime', () => {
   it('returns the value when the object exists', () => {
     fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
       (const arr (array 10 20 30))
       (const idx 1)
       (const val (optchain-index arr idx))
@@ -54,7 +54,7 @@ describe('Decision 3: (optchain-index ...) runtime', () => {
 
   it('returns undefined when the object is null', () => {
     fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
       (const arr null)
       (const idx 0)
       (const val (optchain-index arr idx))
@@ -64,7 +64,7 @@ describe('Decision 3: (optchain-index ...) runtime', () => {
 
   it('works with a string key on a plain object', () => {
     fromSourceEndToEnd(`(program
-      (import (object (:named (array (object (:name "asrt"))))) "./helpers")
+      (import (object (named (array (object (name "asrt"))))) "./helpers")
       (const obj (object (x 42)))
       (const key "x")
       (const val (optchain-index obj key))
