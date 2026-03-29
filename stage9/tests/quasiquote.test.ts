@@ -5,11 +5,11 @@ it('quasiquote.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
     ;; quasi form
-    (let (q1) (quasi (object (tag "div"))))
+    (let ((q1 (quasi (object (tag "div"))))))
     (asrt ((. JSON stringify) q1) '{"tag":"div"}')
 
     ;; quote form
-    (let (q2) (quote (object (tag "span"))))
+    (let ((q2 (quote (object (tag "span"))))))
     (asrt ((. JSON stringify) q2) '{"tag":"span"}')
   )
 `);

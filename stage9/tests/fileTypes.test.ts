@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { compile } from '../index';
+import { compile, compileSource } from '../index';
 
 function compileStdin(source: string): { stdout: string; stderr: string; status: number } {
   try {
-    return { stdout: compile({ filePath: '-', input: source }), stderr: '', status: 0 };
+    return { stdout: compileSource({ source }), stderr: '', status: 0 };
   } catch (e: any) {
     return { stdout: '', stderr: e.message, status: 1 };
   }

@@ -4,7 +4,7 @@ import { fromSourceEndToEnd } from './helpers';
 it('switch.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (let* ((x 2)
+    (let ((x 2)
            (lam (lambda ((x))
                 (switch x
                   (case 1 (return "one"))

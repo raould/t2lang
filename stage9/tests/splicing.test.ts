@@ -24,7 +24,7 @@ test('macro splicing in object', () => {
   const macroT2m = `
     (program
       (defmacro makeObj ()
-          (let* ((newFields (array
+          (let ((newFields (array
                    (object (x 99)))))
           (return (quasi
             (object

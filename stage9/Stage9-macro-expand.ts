@@ -275,7 +275,7 @@ const evalQuasi  = (node, bindings, env, depth) => {
       elseExpr: ((node.elseExpr !== undefined) ? evalQuasi(node.elseExpr, bindings, env, depth) : undefined)
     });
   }
-  if (((node.tag === "let*") || (node.tag === "let"))) {
+  if ((node.tag === "let")) {
     return ({
       tag: node.tag,
       text: node.text,
@@ -402,8 +402,10 @@ const evalQuasi  = (node, bindings, env, depth) => {
   if (((node.tag === "let-decl") || (node.tag === "const-decl"))) {
     return ({
       tag: node.tag,
+      id: node.id,
       text: node.text,
       name: node.name,
+      typeAnnotation: node.typeAnnotation,
       init: evalQuasi(node.init, bindings, env, depth),
       meta: node.meta
     });
@@ -658,7 +660,7 @@ const evalMacroExpr  = (node, bindings, env) => {
       return evalQuasi(node.expr, bindings, env, 1);
     }
   }
-  if ((node.tag === "let*")) {
+  if ((node.tag === "let")) {
     return evalMacroLetStar(node, bindings, env);
   }
   if ((node.tag === "if")) {
@@ -778,7 +780,7 @@ const evalMacroStmt  = (node, bindings, env) => {
   if ((node.tag === "expr-stmt")) {
     return evalMacroExpr(node.expr, bindings, env);
   }
-  if ((node.tag === "let*")) {
+  if ((node.tag === "let")) {
     return evalMacroLetStar(node, bindings, env);
   }
   if ((node.tag === "const*")) {
@@ -1472,7 +1474,7 @@ const addScopeToNode  = (node, scope) => {
       expr: (node.expr ? addScopeToNode(node.expr, scope) : undefined)
     });
   }
-  if ((node.tag === "let*")) {
+  if ((node.tag === "let")) {
     return ({
       tag: node.tag,
       text: node.text,
@@ -2050,9 +2052,9 @@ const expandStmt  = (node, env) => {
       expr: expandExpr(node.expr, env)
     });
   }
-  if ((node.tag === "let*")) {
+  if ((node.tag === "let")) {
     return ({
-      tag: "let*",
+      tag: "let",
       id: node.id,
       text: node.text,
       bindings: node.bindings.map((b) => {
@@ -2228,16 +2230,6 @@ const expandStmt  = (node, env) => {
       init: expandExpr(node.init, env)
     });
   }
-  if ((node.tag === "let")) {
-    return ({
-      tag: "let",
-      id: node.id,
-      text: node.text,
-      name: node.name,
-      typeAnnotation: node.typeAnnotation,
-      init: expandExpr(node.init, env)
-    });
-  }
   return node;
 };
 const expandTopLevel  = (node, env) => {
@@ -2284,6 +2276,8 @@ const expandTopLevel  = (node, env) => {
       callSiteId: node.callSiteId,
       text: node.text,
       name: node.name,
+      typeAnnotation: node.typeAnnotation,
+      meta: node.meta,
       init: expandExpr(node.init, env)
     });
   }
@@ -2294,6 +2288,8 @@ const expandTopLevel  = (node, env) => {
       callSiteId: node.callSiteId,
       text: node.text,
       name: node.name,
+      typeAnnotation: node.typeAnnotation,
+      meta: node.meta,
       init: expandExpr(node.init, env)
     });
   }
@@ -2331,7 +2327,7 @@ const formatExpansionErrors  = (errors) => {
   }
 };
 const TOP_LEVEL_DECL_TAGS  = new Set(["let-decl", "const-decl", "type-alias", "interface-def", "enum-def", "class-def", "anon-class-def", "defmacro", "macro-time-fn-def"]);
-const TOP_LEVEL_STATEMENT_TAGS  = new Set(["expr-stmt", "let*", "let", "const*", "const", "if", "while", "return", "throw", "assign", "switch", "try", "for", "for-in", "for-of", "for-await"]);
+const TOP_LEVEL_STATEMENT_TAGS  = new Set(["expr-stmt", "let", "const*", "const", "if", "while", "return", "throw", "assign", "switch", "try", "for", "for-in", "for-of", "for-await"]);
 const pushMacroError  = (env, message, nodeId) => {
   env.errors.push(({
     kind: "other",

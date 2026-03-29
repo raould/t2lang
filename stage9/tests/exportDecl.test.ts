@@ -42,10 +42,10 @@ it('export decl — export a class', () => {
         (export (class Counter
             (class-body
                 (field (n : number) 0)
-                (method inc () (returns number)
+                (method inc () : number
                     (set! (. this n) (+ (. this n) 1))
                     (return (. this n))))))
-        (let (c) (new Counter))
+        (let ((c (new Counter))))
         (asrt ((. c inc)) 1)
         (asrt ((. c inc)) 2)
     )`);
@@ -57,7 +57,7 @@ it('export decl — export an interface', () => {
     fromSourceEndToEnd(`(program
         (import {asrt} "./helpers")
         (export (interface IPoint (Object (x number) (y number))))
-        (let (p : IPoint) (object (x 3) (y 4)))
+        (let ((p : IPoint (object (x 3) (y 4)))))
         (asrt (. p x) 3)
         (asrt (. p y) 4)
     )`);
@@ -69,7 +69,7 @@ it('export decl — export a type alias', () => {
     fromSourceEndToEnd(`(program
         (import {asrt} "./helpers")
         (export (type Meters number))
-        (let (d : Meters) 42)
+        (let ((d : Meters 42)))
         (asrt d 42)
     )`);
 }, 30_000);

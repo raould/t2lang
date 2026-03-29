@@ -19,6 +19,7 @@ topLevel
     | macroExport
     | macroReexport
     | topLevelLet
+    | topLevelVar
     | topLevelConst
     | fn
     | fnO
@@ -37,6 +38,7 @@ topLevel
 // anonClassDef is NOT included — only reachable from exportDefaultDecl (Phase 3).
 decl
     : topLevelLet
+    | topLevelVar
     | topLevelConst
     | fn
     | classDef
@@ -75,7 +77,11 @@ macroReexport
     ;
 
 topLevelLet
-    : LPAREN LET metaAnnotation* IDENTIFIER expression RPAREN
+    : LPAREN LET metaAnnotation* LPAREN starBinding+ RPAREN RPAREN
+    ;
+
+topLevelVar
+    : LPAREN VAR metaAnnotation* LPAREN starBinding+ RPAREN RPAREN
     ;
 
 topLevelConst
@@ -156,7 +162,7 @@ constructorParam
     ;
 
 constructorSignature
-    : LPAREN (constructorParam (COMMA? constructorParam)*)? RPAREN (LPAREN RETURNS typeExpr RPAREN)?
+    : LPAREN (constructorParam (COMMA? constructorParam)*)? RPAREN (COLON typeExpr)?
     ;
 
 constructorDef
@@ -164,19 +170,19 @@ constructorDef
     ;
 
 classMethodDef
-    : LPAREN METHOD modifier* methodKey fnSignatureTyped statement* RPAREN
+    : LPAREN METHOD modifier* methodKey fnSignature statement* RPAREN
     ;
 
 abstractMethodDef
-    : LPAREN ABSTRACT_METHOD modifier* methodKey fnSignatureTyped RPAREN
+    : LPAREN ABSTRACT_METHOD modifier* methodKey fnSignature RPAREN
     ;
 
 getterDef
-    : LPAREN GET modifier* methodKey fnSignatureTyped statement* RPAREN
+    : LPAREN GET modifier* methodKey fnSignature statement* RPAREN
     ;
 
 setterDef
-    : LPAREN SETPROP modifier* methodKey fnSignatureTyped statement* RPAREN
+    : LPAREN SETPROP modifier* methodKey fnSignature statement* RPAREN
     ;
 
 methodKey
@@ -186,24 +192,16 @@ methodKey
     | LBRACK expression RBRACK
     ;
 
-typedParam
-    : LPAREN IDENTIFIER OPTIONAL? (COLON typeExpr)? RPAREN
-    ;
-
-fnSignatureTyped // generics, i guess.
-    : LPAREN (typedParam (COMMA? typedParam)*)? RPAREN (LPAREN RETURNS typeExpr RPAREN)?
-    ;
-
 // ─── statements ──────────────────────────────
 
 statement
-    : letStar
-    | letStmt
+    : letStmt
+    | varStmt
     | constStar
     | constStmt
     | ifForm
     | whileForm
-    | tryForm
+    | exceptForm
     | returnForm
     | throwForm
     | importForm
@@ -222,12 +220,13 @@ statement
     ;
 
 
-letStar
-    : LPAREN LETSTAR LPAREN starBinding* RPAREN statement* RPAREN
-    ;
 
 letStmt
-    : LPAREN LET singleBinding expression RPAREN
+    : LPAREN LET LPAREN starBinding+ RPAREN statement* RPAREN
+    ;
+
+varStmt
+    : LPAREN VAR LPAREN starBinding+ RPAREN statement* RPAREN
     ;
 
 constStar
@@ -568,8 +567,12 @@ forAwaitForm
     : LPAREN FORAWAIT IDENTIFIER expression statement* RPAREN
     ;
 
-tryForm
-    : LPAREN TRY statement* (catchClause finallyClause? | finallyClause) RPAREN
+exceptForm
+    : LPAREN EXCEPT tryClause catchClause? finallyClause? RPAREN
+    ;
+
+tryClause
+    : LPAREN TRY statement* RPAREN
     ;
 
 catchClause
@@ -610,6 +613,7 @@ expression
     | bracketArrayExpr
     | propAccess
     | indexAccess
+    | subscriptAccess
     | quasiquote
     | unquote
     | unquoteSplicing
@@ -793,11 +797,11 @@ arrayExpr
     ;
 
 bracketArrayExpr
-    : LBRACK (expression (COMMA? expression)*)? RBRACK
+    : LBRACK (expression (COMMA? expression)* COMMA?)? RBRACK
     ;
 
 braceObjectExpr
-    : LBRACE (braceObjectField (COMMA? braceObjectField)*)? RBRACE
+    : LBRACE (braceObjectField (COMMA? braceObjectField)* COMMA?)? RBRACE
     ;
 
 braceObjectField
@@ -826,12 +830,12 @@ propKey
     : IDENTIFIER
     | STRING
     | NUMBER
-    | PROGRAM | LETSTAR | LET | CONSTSTAR | CONST | LAMBDA_O | LAMBDA | FN_O | FN | METHOD_O | METHOD | BIND | METHOD_CALL
+    | PROGRAM | LET | VAR | CONSTSTAR | CONST | LAMBDA_O | LAMBDA | FN_O | FN | METHOD_O | METHOD | BIND | METHOD_CALL
     | DEFMACRO | MACRO_IMPORT | MACRO_EXPORT | MACRO_REEXPORT | MACRO_TIME_ATTR | MACRO_ERROR | IF | WHILE | THEN | RETURN | THROW | SET | TERNARY | COND
     | OBJECT | ARRAY | INDEX | QUASI | QUOTE | UNQUOTE_SPLICING | UNQUOTE
     | TYPE_ARRAY
     | NEW | IMPORT | SWITCH | CASE | DEFAULT | FORIN | FOROF | FOR
-    | FORAWAIT | TRY | CATCH | FINALLY
+    | FORAWAIT | TRY | CATCH | FINALLY | EXCEPT
     | UNION | INTERSECT | TUPLE | TYPEFN | LIT | KEYOF | TYPEOF | INFER | MAPPED | TYPE_TEMPLATE
     | TEMPLATE
     | REST | READONLY | TYPE_AS | TYPE_PARAMS | TYPE_ARGS | TYPE_APP | EXTENDS | RETURNS | TYPE | INTERFACE | ENUM | MODIFIERS
@@ -860,6 +864,10 @@ opSymbol
 propAccess
     : LPAREN DOT expression propKey RPAREN
     | LPAREN DOT expression LBRACK expression RBRACK RPAREN
+    ;
+
+subscriptAccess
+    : LPAREN SUBSCRIPT expression STRING RPAREN
     ;
 
 indexAccess
@@ -990,7 +998,7 @@ fnSignature
     ;
 
 param
-    : LPAREN IDENTIFIER (COLON typeExpr)? RPAREN
+    : LPAREN IDENTIFIER OPTIONAL? (COLON typeExpr)? RPAREN
     ;
 
 restParam
@@ -1022,8 +1030,9 @@ MACRO_EXPORT    : 'macro-export' ;
 MACRO_REEXPORT  : 'macro-reexport' ;
 // keywords  (order matters – longest match first where needed)
 PROGRAM     : 'program' ;
-LETSTAR     : 'let*' ;
+// LETSTAR     : 'let*' ; // deprecated
 LET         : 'let' ;
+VAR         : 'var' ;
 CONSTSTAR   : 'const*' ;
 CONST       : 'const' ;
 LAMBDA_O    : 'lambda-o' ;
@@ -1048,6 +1057,7 @@ COND        : 'cond' ;
 OBJECT      : 'object' ;
 TYPE_ARRAY  : 'type-array' ;
 ARRAY       : 'array' ;
+SUBSCRIPT   : 'subscript' ;
 OPTCHAIN_INDEX : 'optchain-index' ;
 OPTCHAIN    : '.?' ;
 DOT         : '.' ;
@@ -1068,6 +1078,7 @@ FORAWAIT    : 'for-await' ;
 TRY         : 'try' ;
 CATCH       : 'catch' ;
 FINALLY     : 'finally' ;
+EXCEPT      : 'except' ;
 FOR         : 'for' ;
 
 // class-system keywords (order matters: longer tokens before shorter prefixes)

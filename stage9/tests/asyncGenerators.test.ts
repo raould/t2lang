@@ -70,7 +70,7 @@ it('rest param in lambda collects extra args', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
     (const sum (lambda ((first) (rest args))
-      (let* ((total first))
+      (let ((total first))
         ((. args forEach) (lambda ((n))
           (set! total (+ total n))))
         (return total))))

@@ -8,7 +8,7 @@ it('type alias end-to-end', () => {
         (union
           (obj (ok T))
           (obj (err E))))
-      (let (r : (type-app Result number)) (object (ok 42)))
+      (let ((r : (type-app Result number) (object (ok 42)))))
       (asrtDeep r (object (ok 42)))
     )
   `);

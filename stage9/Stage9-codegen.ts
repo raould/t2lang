@@ -157,6 +157,17 @@ const emitStmt  = (stmt) => {
       }
     }
   }
+  if ((stmt.tag === "var-stmt")) {
+    {
+      let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : " ");
+      if (isDefined(stmt.init)) {
+        return ((((("var " + checkId(stmt.name, stmt.id)) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
+      }
+      else {
+        return ((("var " + checkId(stmt.name, stmt.id)) + typeStr) + ";");
+      }
+    }
+  }
   if ((stmt.tag === "const-stmt")) {
     if (stmt.pattern) {
       return (((("const " + emitDestructPattern(stmt.pattern)) + " = ") + emitExpr(stmt.init)) + ";");
@@ -514,6 +525,9 @@ const emitExpr  = (expr) => {
   if ((expr.tag === "index-access-expr")) {
     return (((emitExpr(expr.object) + "[") + emitExpr(expr.index)) + "]");
   }
+  if ((expr.tag === "subscript-access-expr")) {
+    return ((emitExpr(expr.object) + "[") + expr.rawIndex + "]");
+  }
   if ((expr.tag === "raw-template")) {
     return (("`" + expr.content) + "`");
   }
@@ -793,9 +807,7 @@ const emitFnoParams  = (node) => {
           return (((p.name + optStr) + ": ") + emitTypeExpr(p.typeAnnotation));
         }
       });
-      let restTPart  = ((restName && restType) ? ("[key: string]: " + emitTypeExpr(restType)) : undefined);
-      let allTParts  = (restTPart ? tParts.concat([restTPart]) : tParts);
-      let typeStr  = ((allTParts.length > 0) ? ((": { " + allTParts.join("; ")) + " }") : "");
+      let typeStr  = ((restName && restType) ? ((tParts.length > 0) ? (((": { " + tParts.join("; ")) + " } & ") + emitTypeExpr(restType)) : (": " + emitTypeExpr(restType))) : ((tParts.length > 0) ? ((": { " + tParts.join("; ")) + " }") : ""));
       return (destructStr + typeStr);
     }
   }
@@ -924,8 +936,7 @@ const emitMethodName  = (node) => {
 };
 const emitClassMethodDef  = (node) => {
   {
-    let params  = node.sig.params.map(emitTypedParam);
-    let paramsStr  = params.join(", ");
+    let paramsStr  = emitParams(node.sig);
     let returnTypeStr  = (node.sig.returnType ? (": " + emitTypeExpr(node.sig.returnType)) : "");
     let body  = node.body.map(emitStmt);
     let priv  = (node.modifiers.includes("private") ? "private " : "");
@@ -942,8 +953,7 @@ const emitClassMethodDef  = (node) => {
 };
 const emitAbstractMethodDef  = (node) => {
   {
-    let params  = node.sig.params.map(emitTypedParam);
-    let paramsStr  = params.join(", ");
+    let paramsStr  = emitParams(node.sig);
     let returnTypeStr  = (node.sig.returnType ? (": " + emitTypeExpr(node.sig.returnType)) : "");
     let priv  = (node.modifiers.includes("private") ? "private " : "");
     let prot  = (node.modifiers.includes("protected") ? "protected " : "");
@@ -968,8 +978,7 @@ const emitGetterDef  = (node) => {
 };
 const emitSetterDef  = (node) => {
   {
-    let params  = node.sig.params.map(emitTypedParam);
-    let paramsStr  = params.join(", ");
+    let paramsStr  = emitParams(node.sig);
     let body  = node.body.map(emitStmt);
     let priv  = (node.modifiers.includes("private") ? "private " : "");
     let prot  = (node.modifiers.includes("protected") ? "protected " : "");

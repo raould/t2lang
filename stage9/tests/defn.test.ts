@@ -61,7 +61,7 @@ it('function expr — anonymous, assigned to const', () => {
 it('function expr — IIFE', () => {
     fromSourceEndToEnd(`(program
         (import {asrt} "./helpers")
-        (let (result) ((fn ((x)) (return (* x x))) 7))
+        (let ((result ((fn ((x)) (return (* x x))) 7))))
         (asrt result 49)
     )`);
 }, 30_000);

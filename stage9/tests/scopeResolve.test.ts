@@ -15,9 +15,9 @@ function makeCall(fnName: string, ...args: any[]) {
 function makeProgram(...body: any[]) {
   return { tag: 'program', text: '', body };
 }
-function makeLetStar(bindings: { name: string; init: any }[], ...body: any[]) {
+function makeLet(bindings: { name: string; init: any }[], ...body: any[]) {
   return {
-    tag: 'let*',
+    tag: 'let',
     bindings: bindings.map(b => ({ name: b.name, init: b.init, typeAnnotation: null })),
     body,
     text: '',
@@ -174,9 +174,9 @@ describe('resolveNames: basic cases', () => {
   });
 
   it('bound identifier gets resolvedScopes annotation', () => {
-    // (let* ((x 1)) (return x))
+    // (let ((x 1)) (return x))
     const program = makeProgram(
-      makeLetStar([{ name: 'x', init: makeLit(1) }],
+      makeLet([{ name: 'x', init: makeLit(1) }],
         makeReturn(makeIdent('x')))
     );
     const { ast } = resolveNames(program);
@@ -188,13 +188,13 @@ describe('resolveNames: basic cases', () => {
   });
 
   it('inner binding shadows outer binding', () => {
-    // (let* ((x 1))
-    //   (let* ((x 2))
+    // (let ((x 1))
+    //   (let ((x 2))
     //     (return x)))
     // The inner `x` should resolve, and its reference should have resolvedScopes
-    const inner = makeLetStar([{ name: 'x', init: makeLit(2) }],
+    const inner = makeLet([{ name: 'x', init: makeLit(2) }],
       makeReturn(makeIdent('x')));
-    const outer = makeLetStar([{ name: 'x', init: makeLit(1) }], inner);
+    const outer = makeLet([{ name: 'x', init: makeLit(1) }], inner);
     const program = makeProgram(outer);
     const { ast } = resolveNames(program);
     const outerLet = ast.body[0] as any;
@@ -203,11 +203,11 @@ describe('resolveNames: basic cases', () => {
     expect(retExpr.resolvedScopes).toBeDefined();
   });
 
-  it('let* init can reference outer binding', () => {
-    // (let* ((a 1) (b a)) (return b))
+  it('let init can reference outer binding', () => {
+    // (let ((a 1) (b a)) (return b))
     // When resolving `a` in the init of `b`, only `a` is in scope (sequential)
     const program = makeProgram(
-      makeLetStar(
+      makeLet(
         [{ name: 'a', init: makeLit(1) }, { name: 'b', init: makeIdent('a') }],
         makeReturn(makeIdent('b'))
       )
@@ -219,10 +219,10 @@ describe('resolveNames: basic cases', () => {
     expect(bInit.resolvedScopes).toBeDefined();
   });
 
-  it('let* init cannot reference its own binding (sequential)', () => {
-    // (let* ((x x)) ...) — `x` in init is free (x not yet in chain)
+  it('let init cannot reference its own binding (sequential)', () => {
+    // (let ((x x)) ...) — `x` in init is free (x not yet in chain)
     const program = makeProgram(
-      makeLetStar([{ name: 'x', init: makeIdent('x') }],
+      makeLet([{ name: 'x', init: makeIdent('x') }],
         makeReturn(makeLit(0)))
     );
     const { ast } = resolveNames(program);
@@ -235,7 +235,7 @@ describe('resolveNames: basic cases', () => {
   it('non-macro call args are resolved', () => {
     // (console.log x) where x is in a binding
     const program = makeProgram(
-      makeLetStar([{ name: 'x', init: makeLit(1) }],
+      makeLet([{ name: 'x', init: makeLit(1) }],
         makeExprStmt(makeCall('console.log', makeIdent('x'))))
     );
     const { ast } = resolveNames(program);
@@ -259,12 +259,12 @@ describe('resolveNames: basic cases', () => {
 
 describe('resolveNames: KFFD hygiene', () => {
   it('template ref {defScope} resolves to user binding {}', () => {
-    // Simulate: outer let* binds `x` with empty scopes (user code);
+    // Simulate: outer let binds `x` with empty scopes (user code);
     // inside, we have a template reference `x` with scopes {defScope=5, useScope=0}.
     // The user binding {} IS visible to the template ref (since {} ⊆ {5,0}).
     const templateRef = makeIdent('x', [5, 0]);
     const program = makeProgram(
-      makeLetStar([{ name: 'x', init: makeLit(1) }],
+      makeLet([{ name: 'x', init: makeLit(1) }],
         makeReturn(templateRef))
     );
     const { ast } = resolveNames(program);
@@ -279,7 +279,7 @@ describe('resolveNames: KFFD hygiene', () => {
     // We manually construct a chain entry with scopes {5} (template binding).
     // A user reference `x` with {} cannot see it (since {5} ⊄ {}).
     // We verify via resolveIdent directly (resolveNames doesn't currently produce
-    // template-scoped bindings from let* nodes, so we use the lower-level API).
+    // template-scoped bindings from let nodes, so we use the lower-level API).
     const chain = [{ name: 'x', scopes: new Set([5]) }];
     const userRef = makeIdent('x', []);
     const result = resolveIdent(userRef, chain);

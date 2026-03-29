@@ -21,14 +21,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { compile } from '../index';
+import { compile, compileSource } from '../index';
 import { spanTable, resetSpans, nextNodeId, registerSpan } from '../Stage9-spans';
 
 const T = 30_000;
 
 function callCompiler(source: string): { stdout: string; stderr: string; status: number } {
   try {
-    const raw = compile({ filePath: '-', input: source });
+    const raw = compileSource({ source });
     const stdout = raw.endsWith('\n') ? raw : raw + '\n';
     return { stdout, stderr: '', status: 0 };
   } catch (e: any) {
@@ -38,7 +38,7 @@ function callCompiler(source: string): { stdout: string; stderr: string; status:
 
 function callCompilerFile(filePath: string, source: string): { stdout: string; stderr: string; status: number } {
   try {
-    const raw = compile({ filePath, input: source });
+    const raw = compileSource({ source, filePath });
     const stdout = raw.endsWith('\n') ? raw : raw + '\n';
     return { stdout, stderr: '', status: 0 };
   } catch (e: any) {

@@ -4,18 +4,18 @@
  * The full swap! macro is:
  *
  *   (defmacro swap! (a b)
- *     (let* ((tmp (gensym "tmp")))
- *       `(let* ((,tmp ,a))
+ *     (let ((tmp (gensym "tmp")))
+ *       `(let ((,tmp ,a))
  *          (set! ,a ,b)
  *          (set! ,b ,tmp))))
  *
- *   (let* ((tmp 1) (y 2))
+ *   (let ((tmp 1) (y 2))
  *     (swap! tmp y))
  *
  * Expected expansion:
  *
- *   (let* ((tmp 1) (y 2))
- *     (let* ((tmp_42 tmp))   ; gensym'd name — not 'tmp'
+ *   (let ((tmp 1) (y 2))
+ *     (let ((tmp_42 tmp))   ; gensym'd name — not 'tmp'
  *       (set! tmp y)
  *       (set! y tmp_42)))
  */
@@ -41,9 +41,9 @@ function makeProgram(...body: any[]) {
 function makeDefmacro(name: string, params: string[], scopeId: number, ...body: any[]) {
   return { tag: 'defmacro', name, params, body, scopeId, text: '' };
 }
-function makeLetStar(bindings: { name: any; init: any }[], ...body: any[]) {
+function makeLet(bindings: { name: any; init: any }[], ...body: any[]) {
   return {
-    tag: 'let*',
+    tag: 'let',
     bindings: bindings.map(b => ({ name: b.name, init: b.init, typeAnnotation: null })),
     body,
     text: '',
@@ -61,10 +61,10 @@ function makeQuasi(expr: any) {
 function makeUnquote(expr: any) {
   return { tag: 'unquote', expr, text: '' };
 }
-// Construct a let* node whose binding name may be a non-string (for quasiquote templates).
-function makeLetStarTemplate(bindings: { name: any; init: any }[], ...body: any[]) {
+// Construct a let node whose binding name may be a non-string (for quasiquote templates).
+function makeLetTemplate(bindings: { name: any; init: any }[], ...body: any[]) {
   return {
-    tag: 'let*',
+    tag: 'let',
     bindings: bindings.map(b => ({ name: b.name, init: b.init, typeAnnotation: null })),
     body,
     text: '',
@@ -77,22 +77,22 @@ function makeAssignTemplate(name: any, value: any) {
 // ---- Build the swap! macro AST ----
 //
 // (defmacro swap! (a b)
-//   (let* ((tmp (gensym "tmp")))
+//   (let ((tmp (gensym "tmp")))
 //     (return
-//       `(let* ((,tmp ,a))
+//       `(let ((,tmp ,a))
 //          (set! ,a ,b)
 //          (set! ,b ,tmp)))))
 //
 // Template node for the quasiquote body — binding name and assign targets
 // are unquote nodes (dynamic) so evalQuasi can substitute them.
 function makeSwapMacroDef() {
-  const template = makeLetStarTemplate(
+  const template = makeLetTemplate(
     [{ name: makeUnquote(makeIdent('tmp')), init: makeUnquote(makeIdent('a')) }],
     makeAssignTemplate(makeUnquote(makeIdent('a')), makeUnquote(makeIdent('b'))),
     makeAssignTemplate(makeUnquote(makeIdent('b')), makeUnquote(makeIdent('tmp')))
   );
   return makeDefmacro('swap!', ['a', 'b'], /* scopeId= */ 1,
-    makeLetStar(
+    makeLet(
       [{ name: 'tmp', init: makeCall('gensym', makeLit('tmp')) }],
       makeReturn(makeQuasi(template))
     )
@@ -105,10 +105,10 @@ function makeSwapMacroDef() {
 
 describe('swap! building blocks', () => {
   it('gensym in macro body produces tmp_N, distinct from user variable named tmp', () => {
-    // (defmacro swap-id (a b) (let* ((g (gensym "tmp"))) (return g)))
+    // (defmacro swap-id (a b) (let ((g (gensym "tmp"))) (return g)))
     // Call: (swap-id tmp y)  → result is the gensym'd ident (tmp_0), not 'tmp'
     const macroDef = makeDefmacro('swap-id', ['a', 'b'], 1,
-      makeLetStar(
+      makeLet(
         [{ name: 'g', init: makeCall('gensym', makeLit('tmp')) }],
         makeReturn(makeIdent('g'))
       )
@@ -129,7 +129,7 @@ describe('swap! building blocks', () => {
 
   it('two invocations of swap! each get a distinct gensym\'d name', () => {
     const macroDef = makeDefmacro('mk-g', ['a', 'b'], 2,
-      makeLetStar(
+      makeLet(
         [{ name: 'g', init: makeCall('gensym', makeLit('tmp')) }],
         makeReturn(makeIdent('g'))
       )
@@ -152,7 +152,7 @@ describe('swap! building blocks', () => {
 
   it('gensym\'d identifier carries the use-site scope after expansion', () => {
     const macroDef = makeDefmacro('mk-gsym', ['a', 'b'], 3,
-      makeLetStar(
+      makeLet(
         [{ name: 'g', init: makeCall('gensym', makeLit('tmp')) }],
         makeReturn(makeIdent('g'))
       )
@@ -190,11 +190,11 @@ describe('swap! building blocks', () => {
 });
 
 // ============================================================
-// Full swap! integration — evalQuasi now handles let*/assign
+// Full swap! integration — evalQuasi now handles let/assign
 // ============================================================
 
 describe('swap! full integration', () => {
-  it('full swap! expansion produces a let* node', () => {
+  it('full swap! expansion produces a let node', () => {
     const macroDef = makeSwapMacroDef();
     const callSite = makeExprStmt(makeCall('swap!', makeIdent('tmp'), makeIdent('y')));
     const program = makeProgram(macroDef, callSite);
@@ -205,10 +205,10 @@ describe('swap! full integration', () => {
 
     expect(errors).toHaveLength(0);
     const expanded = ast.body[1] as any;
-    expect(expanded.tag).toBe('let*');
+    expect(expanded.tag).toBe('let');
   });
 
-  it('full swap! expansion: let* binding name is the gensym\'d identifier (tmp_N, not tmp)', () => {
+  it('full swap! expansion: let binding name is the gensym\'d identifier (tmp_N, not tmp)', () => {
     const macroDef = makeSwapMacroDef();
     const callSite = makeExprStmt(makeCall('swap!', makeIdent('tmp'), makeIdent('y')));
     const program = makeProgram(macroDef, callSite);
@@ -225,7 +225,7 @@ describe('swap! full integration', () => {
     expect(bindingName).not.toBe('tmp');         // NOT the user variable name
   });
 
-  it('full swap! expansion: let* binding init is the first arg (user\'s tmp)', () => {
+  it('full swap! expansion: let binding init is the first arg (user\'s tmp)', () => {
     const macroDef = makeSwapMacroDef();
     const callSite = makeExprStmt(makeCall('swap!', makeIdent('tmp'), makeIdent('y')));
     const program = makeProgram(macroDef, callSite);
@@ -328,11 +328,11 @@ describe('swap! full integration', () => {
     expect(gensymName).not.toBe(initName);
   });
 
-  it('outer let* with user tmp is preserved unchanged; swap! call site is replaced', () => {
-    // (let* ((tmp 1) (y 2)) (swap! tmp y))
-    // The outer let* should survive unchanged; its body contains the expanded swap!
+  it('outer let with user tmp is preserved unchanged; swap! call site is replaced', () => {
+    // (let ((tmp 1) (y 2)) (swap! tmp y))
+    // The outer let should survive unchanged; its body contains the expanded swap!
     const macroDef = makeSwapMacroDef();
-    const outerLet = makeLetStar(
+    const outerLet = makeLet(
       [{ name: 'tmp', init: makeLit(1) }, { name: 'y', init: makeLit(2) }],
       makeExprStmt(makeCall('swap!', makeIdent('tmp'), makeIdent('y')))
     );
@@ -344,13 +344,13 @@ describe('swap! full integration', () => {
 
     expect(errors).toHaveLength(0);
     const outerNode = ast.body[1] as any;
-    expect(outerNode.tag).toBe('let*');
+    expect(outerNode.tag).toBe('let');
     // Outer bindings are intact
     expect(outerNode.bindings[0].name).toBe('tmp');
     expect(outerNode.bindings[1].name).toBe('y');
-    // Body[0] is the expanded swap! — a let* with gensym'd binding
+    // Body[0] is the expanded swap! — a let with gensym'd binding
     const swapExpanded = outerNode.body[0].expr;
-    expect(swapExpanded.tag).toBe('let*');
+    expect(swapExpanded.tag).toBe('let');
     expect(swapExpanded.bindings[0].name).toMatch(/^tmp_\d+$/);
     expect(swapExpanded.bindings[0].name).not.toBe('tmp');
   });

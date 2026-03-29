@@ -28,7 +28,7 @@
 
   (const registerSpan
     (lambda ((id) (ctx))
-      (let* ((start (. ctx start))
+      (let ((start (. ctx start))
              (stop  (. ctx stop))
              (endLine  (ternary stop (. stop line)   (. start line)))
              (endCol   (ternary stop (. stop column) (. start column))))
@@ -42,7 +42,7 @@
 
   (const formatSpan
     (lambda ((id))
-      (let* ((span ((. spanTable get) id)))
+      (let ((span ((. spanTable get) id)))
         (if (! span) (return undefined))
         (return (+ (. span file) ':' (. span startLine) ':' (+ (. span startCol) 1))))))
 

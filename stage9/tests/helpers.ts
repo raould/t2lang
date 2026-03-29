@@ -4,7 +4,7 @@ import ts from 'typescript';
 import vm from 'vm';
 import _ from 'lodash';
 import { diff } from 'deep-object-diff';
-import { compile } from '../index';
+import { compileSource } from '../index';
 
 export function asrt(actual, expected) {
   console.assert(actual === expected , `value>${actual}< != expected>${expected}<`);
@@ -26,7 +26,7 @@ export function prefixLineNumbers(str: string): string {
 
 function compileT2(t2Source: string): string {
   try {
-    return compile({ filePath: '-', input: t2Source });
+    return compileSource({ source: t2Source });
   } catch (e: any) {
     console.error(prefixLineNumbers(t2Source));
     console.error(e.message);

@@ -6,9 +6,9 @@ it('typeUnionIntersection.test.t2 end-to-end', () => {
       (import {asrt} "./helpers")
       (import {asrtDeep} "./helpers")
       ;; union: string | number | boolean
-      (let (u : (union string number boolean)) 1)
+      (let ((u : (union string number boolean) 1)))
       ;; intersection: A & B
-      (let (a : (intersect (obj (a number)) (obj (b string)))) (object (a 1) (b "x")))
+      (let ((a : (intersect (obj (a number)) (obj (b string))) (object (a 1) (b "x")))))
       (asrt u 1)
       (asrtDeep a (object (a 1) (b "x")))
 )

@@ -25,8 +25,8 @@ function makeExprStmt(expr: any) {
 function makeReturn(expr: any) {
   return { tag: 'return', expr, text: '' };
 }
-function makeLetStar(bindings: { name: string; init: any }[], ...body: any[]) {
-  return { tag: 'let*', bindings: bindings.map(b => ({ name: b.name, init: b.init, typeAnnotation: null })), body, text: '' };
+function makeLet(bindings: { name: string; init: any }[], ...body: any[]) {
+  return { tag: 'let', bindings: bindings.map(b => ({ name: b.name, init: b.init, typeAnnotation: null })), body, text: '' };
 }
 function makeQuasi(expr: any) {
   return { tag: 'quasi', expr, text: '' };
@@ -45,7 +45,7 @@ function makeArray(...elements: any[]) {
 
 describe('evalMacroExpr', () => {
   it('returns the JS value for a literal node', () => {
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     const bindings = new Map();
     expect(evalMacroExpr(makeLit(42), bindings, env)).toBe(42);
     expect(evalMacroExpr(makeLit('hello'), bindings, env)).toBe('hello');
@@ -53,48 +53,48 @@ describe('evalMacroExpr', () => {
   });
 
   it('looks up identifiers in bindings', () => {
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     const bindings = new Map([['x', makeLit(99)]]);
     expect(evalMacroExpr(makeIdent('x'), bindings, env)).toEqual(makeLit(99));
   });
 
   it('returns the identifier node when not in bindings', () => {
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     const bindings = new Map();
     const node = makeIdent('foo');
     expect(evalMacroExpr(node, bindings, env)).toBe(node);
   });
 
   it('evaluates operator call (+)', () => {
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     const bindings = new Map();
     const node = makeCall('+', makeLit(3), makeLit(4));
     expect(evalMacroExpr(node, bindings, env)).toBe(7);
   });
 
   it('evaluates operator call (===)', () => {
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     const bindings = new Map();
     expect(evalMacroExpr(makeCall('===', makeLit(1), makeLit(1)), bindings, env)).toBe(true);
     expect(evalMacroExpr(makeCall('===', makeLit(1), makeLit(2)), bindings, env)).toBe(false);
   });
 
   it('evaluates (length arr) on JS array', () => {
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     const bindings = new Map([['xs', [makeLit(1), makeLit(2), makeLit(3)]]]);
     const node = makeCall('length', makeIdent('xs'));
     expect(evalMacroExpr(node, bindings, env)).toBe(3);
   });
 
   it('evaluates (str ...) concatenation', () => {
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     const bindings = new Map();
     const node = makeCall('str', makeLit('hello'), makeLit('-'), makeLit('world'));
     expect(evalMacroExpr(node, bindings, env)).toBe('hello-world');
   });
 
   it('gensym built-in returns an identifier node', () => {
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     const bindings = new Map();
     const node = makeCall('gensym', makeLit('tmp'));
     const result = evalMacroExpr(node, bindings, env);
@@ -103,7 +103,7 @@ describe('evalMacroExpr', () => {
   });
 
   it('evaluates array expression', () => {
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     const bindings = new Map();
     const node = makeArray(makeLit(1), makeLit(2));
     const result = evalMacroExpr(node, bindings, env);
@@ -116,14 +116,14 @@ describe('evalMacroExpr', () => {
 
 describe('evalQuasi', () => {
   it('passes through a literal node unchanged', () => {
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     const bindings = new Map();
     const node = makeLit(42);
     expect(evalQuasi(node, bindings, env, 1)).toBe(node);
   });
 
   it('substitutes (unquote x) with the binding value at depth 1', () => {
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     const ident = makeIdent('foo');
     const bindings = new Map([['foo', ident]]);
     const node = makeUnquote(makeIdent('foo'));
@@ -131,7 +131,7 @@ describe('evalQuasi', () => {
   });
 
   it('handles nested (quasi (unquote x)) by incrementing depth', () => {
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     const bindings = new Map();
     const inner = makeUnquote(makeIdent('x'));
     const outer = makeQuasi(inner);
@@ -144,10 +144,12 @@ describe('evalQuasi', () => {
   });
 
   it('splices (unquote-splicing xs) in call args via quasiArgs', () => {
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     const a = makeLit(1);
     const b = makeLit(2);
-    const bindings = new Map([['xs', [a, b]]]);
+    const bindings = new Map([
+      ['xs', [a, b]]
+    ]);
     // Build a call node: (myFn ,@xs)
     const callNode = {
       tag: 'call',
@@ -170,14 +172,14 @@ describe('expandAll: basic macro expansion', () => {
   it('expands a zero-arg macro returning a literal', () => {
     // (defmacro const-42 () (return 42))
     const macroDef = makeDefmacro('const-42', [],
-      makeExprStmt(makeLit(42))
+      makeReturn(makeLit(42))
     );
     const callSite = makeExprStmt(makeCall('const-42'));
     const program = makeProgram(macroDef, callSite);
 
-    const env = makeMacroEnv();
+      const env = makeMacroEnv(false);
     collectMacros(program, env);
-    const { ast, errors } = expandAll(program, env);
+    const { ast, errors } = expandAll(program, env, false, undefined);
 
     expect(errors).toHaveLength(0);
     // The call site should be replaced by the literal 42
@@ -195,9 +197,9 @@ describe('expandAll: basic macro expansion', () => {
     const callSite = makeExprStmt(makeCall('identity', argNode));
     const program = makeProgram(macroDef, callSite);
 
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     collectMacros(program, env);
-    const { ast, errors } = expandAll(program, env);
+      const { ast, errors } = expandAll(program, env, false, undefined);
 
     expect(errors).toHaveLength(0);
     const expandedStmt = ast.body[1] as any;
@@ -215,9 +217,9 @@ describe('expandAll: basic macro expansion', () => {
     const callSite = makeExprStmt(makeCall('my-not', arg));
     const program = makeProgram(macroDef, callSite);
 
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     collectMacros(program, env);
-    const { ast, errors } = expandAll(program, env);
+      const { ast, errors } = expandAll(program, env, false, undefined);
 
     expect(errors).toHaveLength(0);
     const expanded = ast.body[1] as any;
@@ -235,9 +237,9 @@ describe('expandAll: basic macro expansion', () => {
     const callSite = makeExprStmt(makeCall('takes-one', makeLit(1), makeLit(2)));
     const program = makeProgram(macroDef, callSite);
 
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     collectMacros(program, env);
-    const { errors } = expandAll(program, env);
+      const { errors } = expandAll(program, env, false, undefined);
 
     expect(errors).toHaveLength(1);
     expect(errors[0].kind).toBe('arity');
@@ -248,8 +250,8 @@ describe('expandAll: basic macro expansion', () => {
     const program = makeProgram(
       makeExprStmt(makeCall('console.log', makeLit('hi')))
     );
-    const env = makeMacroEnv();
-    const { ast, errors } = expandAll(program, env);
+    const env = makeMacroEnv(false);
+      const { ast, errors } = expandAll(program, env, false, undefined);
     expect(errors).toHaveLength(0);
     expect(ast.body[0]).toEqual(program.body[0]);
   });
@@ -257,9 +259,9 @@ describe('expandAll: basic macro expansion', () => {
   it('keeps the defmacro node in the expanded AST', () => {
     const macroDef = makeDefmacro('noop', [], makeReturn(makeIdent('undefined')));
     const program = makeProgram(macroDef);
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     collectMacros(program, env);
-    const { ast } = expandAll(program, env);
+      const { ast } = expandAll(program, env, false, undefined);
     expect(ast.body[0]).toBe(macroDef);
   });
 });
@@ -276,9 +278,9 @@ describe('expandAll: recursive expansion', () => {
     const callSite = makeExprStmt(makeCall('wrap', makeLit(42)));
     const program = makeProgram(macroIdentity, macroWrap, callSite);
 
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     collectMacros(program, env);
-    const { ast, errors } = expandAll(program, env);
+    const { ast, errors } = expandAll(program, env, false, undefined);
 
     expect(errors).toHaveLength(0);
     // wrap(42) → (identity 42) → literal node {tag:'literal', value:42}
@@ -289,9 +291,9 @@ describe('expandAll: recursive expansion', () => {
 
 describe('expandAll: gensym hygiene', () => {
   it('gensym inside a macro body produces a fresh identifier', () => {
-    // (defmacro make-tmp () (let* ((tmp (gensym 'tmp'))) (return tmp)))
+    // (defmacro make-tmp () (let ((tmp (gensym 'tmp'))) (return tmp)))
     const macroDef = makeDefmacro('make-tmp', [],
-      makeLetStar(
+      makeLet(
         [{ name: 'tmp', init: makeCall('gensym', makeLit('tmp')) }],
         makeReturn(makeIdent('tmp'))
       )
@@ -300,9 +302,9 @@ describe('expandAll: gensym hygiene', () => {
     const callB = makeExprStmt(makeCall('make-tmp'));
     const program = makeProgram(macroDef, callA, callB);
 
-    const env = makeMacroEnv();
+    const env = makeMacroEnv(false);
     collectMacros(program, env);
-    const { ast, errors } = expandAll(program, env);
+    const { ast, errors } = expandAll(program, env, false, undefined);
 
     expect(errors).toHaveLength(0);
     const nameA = (ast.body[1] as any).expr.name;

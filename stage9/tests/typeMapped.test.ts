@@ -9,7 +9,7 @@ it('typeMapped end-to-end', () => {
         ;; Use a named alias to avoid grammar ambiguity
         (type Point (obj (x number) (y string)))
         ;; A value of type Mapped<Point> has same fields as Point
-        (let (pt : (type-app Mapped Point)) (object (x 10) (y "hello")))
+        (let ((pt : (type-app Mapped Point) (object (x 10) (y "hello")))))
         (asrt (. pt x) 10)
         (asrt (. pt y) "hello")
     )`);

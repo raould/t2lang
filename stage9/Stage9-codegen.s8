@@ -78,7 +78,7 @@
         (return rawSource))
       (if (! ((. rawSource endsWith) '.t2'))
         (return rawSource))
-      (let* ((withoutExt ((. rawSource slice) 0 (- (. rawSource length) 3)))
+      (let ((withoutExt ((. rawSource slice) 0 (- (. rawSource length) 3)))
              (inputFile (. _importCtx inputFile))
              (rootDir (. _importCtx rootDir))
              (outDir (. _importCtx outDir)))
@@ -87,12 +87,12 @@
                 (=== rootDir outDir))
           (return (+ withoutExt '.js')))
         ;; Full path rewrite: map both files through rootDir→outDir
-        (let* ((inputDir ((. path dirname) ((. path resolve) inputFile)))
+        (let ((inputDir ((. path dirname) ((. path resolve) inputFile)))
                (absImported ((. path resolve) inputDir rawSource))
                (relImported ((. path relative) rootDir absImported)))
           (if ((. relImported startsWith) '..')
             (throw (new Error (+ "import '" rawSource "' escapes root-dir " rootDir))))
-          (let* ((noExt ((. relImported slice) 0 (- (. relImported length) 3)))
+          (let ((noExt ((. relImported slice) 0 (- (. relImported length) 3)))
                  (absImportOut ((. path join) outDir (+ noExt '.js')))
                  (absInput ((. path resolve) inputFile))
                  (relInput ((. path relative) rootDir absInput))
@@ -117,7 +117,7 @@
       (if (=== (. node tag) 'macro-import-decl')
         (return (+ '// macro-import: ' (. node path))))
       (if (=== (. node tag) 'macro-export-decl')
-        (let* ((specs ((. (. node specs) map) mangleIdentifier)))
+        (let ((specs ((. (. node specs) map) mangleIdentifier)))
            (return (+ 'module.exports = { ' ((. specs join) ', ') ' };'))))
       (return (emitStmt node))))
 
@@ -132,7 +132,7 @@
       (if (|| (! (. node body)) (=== (. (. node body) length) 0))
         (return (+ '// macro: ' (. node name))))
       ;; Else emit ESM export function for macro compilation mode
-      (let* ((mangledName (mangleIdentifier (. node name)))
+      (let ((mangledName (mangleIdentifier (. node name)))
              (params (. node params))
              (restP (. node rest))
              ;; Build destructuring pattern: [p1, p2, ...restP]
@@ -149,7 +149,7 @@
   (const emitStmt
     (lambda ((stmt))
       (if (=== (. stmt tag) 'type-alias')
-        (let* ((tparams (ternary (&& (. stmt typeParams) (> (. (. stmt typeParams) length) 0))
+        (let ((tparams (ternary (&& (. stmt typeParams) (> (. (. stmt typeParams) length) 0))
                           (+ '<' ((. ((. (. stmt typeParams) map) emitTypeParamDecl) join) ', ') '>')
                           ' '))
                (ty (emitTypeExpr (. stmt type))))
@@ -157,7 +157,7 @@
       (if (=== (. stmt tag) 'enum-def')
         (return (emitEnumDef stmt)))
       (if (=== (. stmt tag) 'interface-def')
-        (let* ((tparams (ternary (&& (. stmt typeParams) (> (. (. stmt typeParams) length) 0))
+        (let ((tparams (ternary (&& (. stmt typeParams) (> (. (. stmt typeParams) length) 0))
                           (+ '<' ((. ((. (. stmt typeParams) map) emitTypeParamDecl) join) ', ') '>')
                           ' '))
                (extendsStr (ternary (> (. (. stmt "extends") length) 0)
@@ -170,24 +170,29 @@
       (if (=== (. stmt tag) 'anon-class-def')
         (return (emitAnonClassDef stmt)))
       (if (=== (. stmt tag) 'let-stmt')
-        (let* ((typeStr (ternary (. stmt typeAnnotation) (+ ': ' (emitTypeExpr (. stmt typeAnnotation))) ' ')))
+        (let ((typeStr (ternary (. stmt typeAnnotation) (+ ': ' (emitTypeExpr (. stmt typeAnnotation))) ' ')))
           (if (isDefined (. stmt init))
             (return (+ 'let ' (checkId (. stmt name) (. stmt id)) typeStr ' = ' (emitExpr (. stmt init)) ';'))
             (return (+ 'let ' (checkId (. stmt name) (. stmt id)) typeStr ';')))))
+      (if (=== (. stmt tag) 'var-stmt')
+        (let ((typeStr (ternary (. stmt typeAnnotation) (+ ': ' (emitTypeExpr (. stmt typeAnnotation))) ' ')))
+          (if (isDefined (. stmt init))
+            (return (+ 'var ' (checkId (. stmt name) (. stmt id)) typeStr ' = ' (emitExpr (. stmt init)) ';'))
+            (return (+ 'var ' (checkId (. stmt name) (. stmt id)) typeStr ';')))))
       (if (=== (. stmt tag) 'const-stmt')
         (if (. stmt pattern)
           (return (+ 'const ' (emitDestructPattern (. stmt pattern)) ' = ' (emitExpr (. stmt init)) ';'))
-          (let* ((typeStr (ternary (. stmt typeAnnotation) (+ ': ' (emitTypeExpr (. stmt typeAnnotation))) ' ')))
+          (let ((typeStr (ternary (. stmt typeAnnotation) (+ ': ' (emitTypeExpr (. stmt typeAnnotation))) ' ')))
             (if (isDefined (. stmt init))
               (return (+ 'const ' (checkId (. stmt name) (. stmt id)) typeStr ' = ' (emitExpr (. stmt init)) ';'))
               (return (+ 'const ' (checkId (. stmt name) (. stmt id)) typeStr ';'))))))
       (if (=== (. stmt tag) 'fn-decl-stmt')
-        (let* ((params (emitParams stmt))
+        (let ((params (emitParams stmt))
                (retStr (ternary (. stmt returnType) (+ ': ' (emitTypeExpr (. stmt returnType))) ''))
                (body ((. (. stmt body) map) emitStmt)))
           (return (+ 'function ' (checkId (. stmt name) (. stmt id)) '(' params ')' retStr ' {\n' (indent ((. body join) '\n')) '\n}'))))
       (if (=== (. stmt tag) 'fn-o-decl-stmt')
-        (let* ((params (emitFnoParams stmt))
+        (let ((params (emitFnoParams stmt))
                (retStr (ternary (. stmt returnType) (+ ': ' (emitTypeExpr (. stmt returnType))) ''))
                (body ((. (. stmt body) map) emitStmt)))
           (return (+ 'function ' (checkId (. stmt name) (. stmt id)) '(' params ')' retStr ' {\n' (indent ((. body join) '\n')) '\n}'))))
@@ -198,7 +203,7 @@
       (if (=== (. stmt tag) 'block-stmt')
         (return (emitBlock stmt)))
       (if (=== (. stmt tag) 'try-stmt')
-        (let* ((lines (array)))
+        (let ((lines (array)))
           ((. lines push) 'try {')
           ((. (. stmt body) forEach) (lambda ((s))
             ((. lines push) (indent (emitStmt s)))))
@@ -241,13 +246,13 @@
       (if (=== (. stmt tag) 'export-default-fn-decl')
         (return (emitExportDefaultFnDecl stmt)))
       (if (=== (. stmt tag) 'export-named-stmt')
-        (let* ((specs ((. ((. (. stmt pairs) map) (lambda ((p))
+        (let ((specs ((. ((. (. stmt pairs) map) (lambda ((p))
                  (if (. p "alias")
                    (return (+ (. p name) ' as ' (. p "alias")))
                    (return (. p name))))) join) ', ')))
           (return (+ 'export { ' specs ' };'))))
       (if (=== (. stmt tag) 'export-from-stmt')
-        (let* ((specs ((. ((. (. stmt pairs) map) (lambda ((p))
+        (let ((specs ((. ((. (. stmt pairs) map) (lambda ((p))
                  (if (. p "alias")
                    (return (+ (. p name) ' as ' (. p "alias")))
                    (return (. p name))))) join) ', ')))
@@ -257,19 +262,19 @@
       (if (=== (. stmt tag) 'export-ns-from-stmt')
         (return (+ 'export * as ' (. stmt ns) ' from ' ((. JSON stringify) (. stmt source)) ';')))
       (if (=== (. stmt tag) 'import-type-stmt')
-        (let* ((specs ((. ((. (. stmt names) map) (lambda ((n))
+        (let ((specs ((. ((. (. stmt names) map) (lambda ((n))
                  (if (. n "alias")
                    (return (+ (. n name) ' as ' (. n "alias")))
                    (return (. n name))))) join) ', ')))
           (return (+ 'import type { ' specs ' } from ' ((. JSON stringify) (. stmt source)) ';'))))
       (if (=== (. stmt tag) 'export-type-stmt')
-        (let* ((specs ((. ((. (. stmt pairs) map) (lambda ((p))
+        (let ((specs ((. ((. (. stmt pairs) map) (lambda ((p))
                  (if (. p "alias")
                    (return (+ (. p name) ' as ' (. p "alias")))
                    (return (. p name))))) join) ', ')))
           (return (+ 'export type { ' specs ' };'))))
       (if (=== (. stmt tag) 'export-type-from-stmt')
-        (let* ((specs ((. ((. (. stmt pairs) map) (lambda ((p))
+        (let ((specs ((. ((. (. stmt pairs) map) (lambda ((p))
                  (if (. p "alias")
                    (return (+ (. p name) ' as ' (. p "alias")))
                    (return (. p name))))) join) ', ')))
@@ -294,7 +299,7 @@
 
   (const emitIf
     (lambda ((node))
-      (let* ((lines (array)))
+      (let ((lines (array)))
         ((. lines push) (+ 'if (' (emitExpr (. node test)) ') {'))
         ((. (. node ifthen) forEach) (lambda ((s))
           ((. lines push) (indent (emitStmt s)))))
@@ -309,7 +314,7 @@
 
   (const emitWhile
     (lambda ((node))
-      (let* ((lines (array)))
+      (let ((lines (array)))
         ((. lines push) (+ 'while (' (emitExpr (. node test)) ') {'))
         ((. (. node body) forEach) (lambda ((s))
           ((. lines push) (indent (emitStmt s)))))
@@ -318,7 +323,7 @@
 
   (const emitBlock
     (lambda ((node))
-      (let* ((lines (array '{')))
+      (let ((lines (array '{')))
         ((. (. node body) forEach) (lambda ((s))
           ((. lines push) (indent (emitStmt s)))))
         ((. lines push) '}')
@@ -326,25 +331,25 @@
 
   (const emitImport
     (lambda ((node))
-      (let* ((parts (array)))
+      (let ((parts (array)))
         (if (. node defaultName)
           ((. parts push) (. node defaultName)))
         (if (. node namespaceName)
           ((. parts push) (+ '* as ' (. node namespaceName))))
         (if (. node named)
-          (let* ((specs ((. (. node named) map) (lambda ((n))
+          (let ((specs ((. (. node named) map) (lambda ((n))
                    (if (. n "alias")
                      (return (+ (. n name) ' as ' (. n "alias")))
                      (return (. n name)))))))
             ((. parts push) (+ '{ ' ((. specs join) ', ') ' }'))))
-        (let* ((src (rewriteImportSource (. node source))))
+        (let ((src (rewriteImportSource (. node source))))
           (if (> (. parts length) 0)
             (return (+ 'import ' ((. parts join) ', ') ' from ' ((. JSON stringify) src) ';')))
           (return (+ 'import ' ((. JSON stringify) src) ';'))))))
 
   (const emitSwitch
     (lambda ((node))
-      (let* ((lines (array)))
+      (let ((lines (array)))
         ((. lines push) (+ 'switch (' (emitExpr (. node discriminant)) ') {'))
         ((. (. node cases) forEach) (lambda ((c))
           ((. lines push) (+ '  case ' (emitExpr (. c test)) ': {'))
@@ -362,7 +367,7 @@
 
   (const emitFor
     (lambda ((node))
-      (let* ((lines (array))
+      (let ((lines (array))
              (init (+ 'let ' (checkId (. node initName) (. node id)) ' = ' (emitExpr (. node initExpr))))
              (test (emitExpr (. node test)))
              (update (+ (checkId (. node updateName) (. node id)) ' = ' (emitExpr (. node updateExpr)))))
@@ -374,7 +379,7 @@
 
   (const emitForIn
     (lambda ((node))
-      (let* ((lines (array)))
+      (let ((lines (array)))
         ((. lines push) (+ 'for (const ' (checkId (. node name) (. node id)) ' in ' (emitExpr (. node "object")) ') {'))
         ((. (. node body) forEach) (lambda ((s))
           ((. lines push) (indent (emitStmt s)))))
@@ -383,7 +388,7 @@
 
   (const emitForOf
     (lambda ((node))
-      (let* ((lines (array)))
+      (let ((lines (array)))
         ((. lines push) (+ 'for (const ' (checkId (. node name) (. node id)) ' of ' (emitExpr (. node iterable)) ') {'))
         ((. (. node body) forEach) (lambda ((s))
           ((. lines push) (indent (emitStmt s)))))
@@ -392,7 +397,7 @@
 
   (const emitForAwait
     (lambda ((node))
-      (let* ((lines (array)))
+      (let ((lines (array)))
         ((. lines push) (+ 'for await (const ' (checkId (. node name) (. node id)) ' of ' (emitExpr (. node iterable)) ') {'))
         ((. (. node body) forEach) (lambda ((s))
           ((. lines push) (indent (emitStmt s)))))
@@ -408,6 +413,8 @@
             (+ '["' (. expr key) '"]')))))
       (if (=== (. expr tag) 'index-access-expr')
         (return (+ (emitExpr (. expr "object")) '[' (emitExpr (. expr "index")) ']')))
+      (if (=== (. expr tag) 'subscript-access-expr')
+        (return (+ (emitExpr (. expr "object")) '[' (. expr rawIndex) ']')))
       (if (=== (. expr tag) 'raw-template')
         (return (+ '`' (. expr content) '`')))
       (if (=== (. expr tag) 'template-expr')
@@ -419,20 +426,20 @@
       (if (=== (. expr tag) 'object-expr')
         (return (+ '({\n' (indent ((. ((. (. expr fields) map) (lambda ((f))
           (if (. f computed)
-            (let* ((keyStr (+ '[' (emitExpr (. f keyExpr)) ']')))
+            (let ((keyStr (+ '[' (emitExpr (. f keyExpr)) ']')))
               (if (. f isMethod)
-                (let* ((params ((. (. f params) join) ', '))
+                (let ((params ((. (. f params) join) ', '))
                        (body ((. (. f body) map) emitStmt)))
                   (return (+ keyStr '(' params ') {\n' (indent ((. body join) '\n')) '\n}'))))
               (return (+ keyStr ': ' (emitExpr (. f value))))))
           (if (. f isMethod)
-            (let* ((params ((. (. f params) join) ', '))
+            (let ((params ((. (. f params) join) ', '))
                    (body ((. (. f body) map) emitStmt))
                    (keyStr (ternary (isValidId (. f key)) (. f key) (+ '"' (. f key) '"'))))
               (return (+ keyStr '(' params ') {\n' (indent ((. body join) '\n')) '\n}'))))
           (if (. f isShorthand)
             (return (. f key)))
-          (let* ((keyStr (ternary (isValidId (. f key)) (. f key) (+ '"' (. f key) '"'))))
+          (let ((keyStr (ternary (isValidId (. f key)) (. f key) (+ '"' (. f key) '"'))))
             (return (+ keyStr ': ' (emitExpr (. f value))))))) join) ',\n')) '\n})')))
       (if (=== (. expr tag) 'array-expr')
         (return (+ '[' ((. ((. (. expr elements) map) emitExpr) join) ', ') ']')))
@@ -451,22 +458,22 @@
       (if (=== (. expr tag) 'fn')
         (return (emitFn expr)))
       (if (=== (. expr tag) 'async-lambda')
-        (let* ((params (emitParams expr))
+        (let ((params (emitParams expr))
                (retStr (ternary (. expr returnType) (+ ': ' (emitTypeExpr (. expr returnType))) ''))
                (body ((. (. expr body) map) emitStmt)))
           (return (+ 'async (' params ')' retStr ' => {\n' (indent ((. body join) '\n')) '\n}'))))
       (if (=== (. expr tag) 'async-fn')
-        (let* ((params (emitParams expr))
+        (let ((params (emitParams expr))
                (retStr (ternary (. expr returnType) (+ ': ' (emitTypeExpr (. expr returnType))) ''))
                (body ((. (. expr body) map) emitStmt)))
           (return (+ 'async function(' params ')' retStr ' {\n' (indent ((. body join) '\n')) '\n}'))))
       (if (=== (. expr tag) 'generator-fn')
-        (let* ((params (emitParams expr))
+        (let ((params (emitParams expr))
                (retStr (ternary (. expr returnType) (+ ': ' (emitTypeExpr (. expr returnType))) ''))
                (body ((. (. expr body) map) emitStmt)))
           (return (+ 'function*(' params ')' retStr ' {\n' (indent ((. body join) '\n')) '\n}'))))
       (if (=== (. expr tag) 'async-generator-fn')
-        (let* ((params (emitParams expr))
+        (let ((params (emitParams expr))
                (retStr (ternary (. expr returnType) (+ ': ' (emitTypeExpr (. expr returnType))) ''))
                (body ((. (. expr body) map) emitStmt)))
           (return (+ 'async function*(' params ')' retStr ' {\n' (indent ((. body join) '\n')) '\n}'))))
@@ -475,22 +482,22 @@
       (if (=== (. expr tag) 'lambda-o')
         (return (emitLambdaO expr)))
       (if (=== (. expr tag) 'async-fn-o')
-        (let* ((params (emitFnoParams expr))
+        (let ((params (emitFnoParams expr))
                (retStr (ternary (. expr returnType) (+ ': ' (emitTypeExpr (. expr returnType))) ''))
                (body ((. (. expr body) map) emitStmt)))
           (return (+ 'async function(' params ')' retStr ' {\n' (indent ((. body join) '\n')) '\n}'))))
       (if (=== (. expr tag) 'async-lambda-o')
-        (let* ((params (emitFnoParams expr))
+        (let ((params (emitFnoParams expr))
                (retStr (ternary (. expr returnType) (+ ': ' (emitTypeExpr (. expr returnType))) ''))
                (body ((. (. expr body) map) emitStmt)))
           (return (+ 'async (' params ')' retStr ' => {\n' (indent ((. body join) '\n')) '\n}'))))
       (if (=== (. expr tag) 'generator-fn-o')
-        (let* ((params (emitFnoParams expr))
+        (let ((params (emitFnoParams expr))
                (retStr (ternary (. expr returnType) (+ ': ' (emitTypeExpr (. expr returnType))) ''))
                (body ((. (. expr body) map) emitStmt)))
           (return (+ 'function*(' params ')' retStr ' {\n' (indent ((. body join) '\n')) '\n}'))))
       (if (=== (. expr tag) 'async-generator-fn-o')
-        (let* ((params (emitFnoParams expr))
+        (let ((params (emitFnoParams expr))
                (retStr (ternary (. expr returnType) (+ ': ' (emitTypeExpr (. expr returnType))) ''))
                (body ((. (. expr body) map) emitStmt)))
           (return (+ 'async function*(' params ')' retStr ' {\n' (indent ((. body join) '\n')) '\n}'))))
@@ -511,7 +518,7 @@
       (if (=== (. expr tag) 'type-assert')
         (return (+ (emitExpr (. expr expr)) ' as ' (emitTypeExpr (. expr ty)))))
       (if (=== (. expr tag) 'new-expr')
-        (let* ((tstr
+        (let ((tstr
                 (ternary (&& (. expr typeArgs) (> (. (. expr typeArgs) length) 0))
                     (+ '<' ((. ((. (. expr typeArgs) map) emitTypeExpr) join) ', ') '>')
                     ''
@@ -546,27 +553,27 @@
 
   (const emitInfixOperand
     (lambda ((node))
-      (let* ((s (emitExpr node)))
+      (let ((s (emitExpr node)))
         (if (isCompoundInfix node)
           (return (+ '(' s ')'))
           (return s)))))
 
   (const emitBinaryOp
     (lambda ((expr))
-      (let* ((left (emitInfixOperand (. expr left)))
+      (let ((left (emitInfixOperand (. expr left)))
              (right (emitInfixOperand (. expr right))))
         (return (+ left ' ' (. expr op) ' ' right)))))
 
   (const emitUnaryOp
     (lambda ((expr))
-      (let* ((operandStr (emitInfixOperand (. expr operand))))
+      (let ((operandStr (emitInfixOperand (. expr operand))))
         (return (+ (. expr op) operandStr)))))
 
   ;; emitParams: build the parameter list string, including optional rest param.
   ;; params may be plain strings (legacy/defmacro) or { name, optional, typeAnnotation } objects.
   (const emitParams
     (lambda ((node))
-      (let* ((base ((. ((. (. node params) map) (lambda ((p))
+      (let ((base ((. ((. (. node params) map) (lambda ((p))
                         (if (=== (typeof p) 'string')
                           (return (ternary ((. p startsWith) '...') p (checkId p undefined))))
                         (return (emitTypedParam p))))
@@ -589,10 +596,10 @@
   ;; (type object is omitted when no params have type annotations)
   (const emitFnoParams
     (lambda ((node))
-      (let* ((params (. node params))
+      (let ((params (. node params))
              (restName (. node rest))
              (restType (. node restType)))
-        (let* ((dParts ((. params map) (lambda ((p))
+        (let ((dParts ((. params map) (lambda ((p))
                  (if (. p defaultExpr)
                    (return (+ (. p name) ' = ' (emitExpr (. p defaultExpr))))
                    (return (. p name))))))
@@ -604,50 +611,52 @@
                  '{}'))
                (tFiltered ((. params filter) (lambda ((p)) (return (!== (. p typeAnnotation) undefined)))))
                (tParts ((. tFiltered map) (lambda ((p))
-                 (let* ((optStr (ternary (. p optional) '?' '')))
+                 (let ((optStr (ternary (. p optional) '?' '')))
                    (return (+ (. p name) optStr ': ' (emitTypeExpr (. p typeAnnotation))))))))
-               (restTPart (ternary (&& restName restType)
-                 (+ '[key: string]: ' (emitTypeExpr restType))
-                 undefined))
-               (allTParts (ternary restTPart
-                 ((. tParts concat) (array restTPart))
-                 tParts))
-               (typeStr (ternary (> (. allTParts length) 0)
-                 (+ ': { ' ((. allTParts join) '; ') ' }')
-                 '')))
+               ;; When there are both named typed params and a rest type, use intersection
+               ;; e.g. { target: string } & Record<string, unknown>
+               ;; A plain index signature { target: string; [key: string]: T } is invalid TS
+               ;; when the named type is not assignable to T.
+               (typeStr (ternary (&& restName restType)
+                 (ternary (> (. tParts length) 0)
+                   (+ ': { ' ((. tParts join) '; ') ' } & ' (emitTypeExpr restType))
+                   (+ ': ' (emitTypeExpr restType)))
+                 (ternary (> (. tParts length) 0)
+                   (+ ': { ' ((. tParts join) '; ') ' }')
+                   ''))))
           (return (+ destructStr typeStr))))))
 
   (const emitLambda
     (lambda ((node))
-      (let* ((params (emitParams node))
+      (let ((params (emitParams node))
              (retStr (ternary (. node returnType) (+ ': ' (emitTypeExpr (. node returnType))) ''))
              (body ((. (. node body) map) emitStmt)))
         (return (+ '(' params ')' retStr ' => {\n' (indent ((. body join) '\n')) '\n}')))))
 
   (const emitFn
     (lambda ((node))
-      (let* ((params (emitParams node))
+      (let ((params (emitParams node))
              (retStr (ternary (. node returnType) (+ ': ' (emitTypeExpr (. node returnType))) ''))
              (body ((. (. node body) map) emitStmt)))
         (return (+ 'function(' params ')' retStr ' {\n' (indent ((. body join) '\n')) '\n}')))))
 
   (const emitLambdaO
     (lambda ((node))
-      (let* ((params (emitFnoParams node))
+      (let ((params (emitFnoParams node))
              (retStr (ternary (. node returnType) (+ ': ' (emitTypeExpr (. node returnType))) ''))
              (body ((. (. node body) map) emitStmt)))
         (return (+ '(' params ')' retStr ' => {\n' (indent ((. body join) '\n')) '\n}')))))
 
   (const emitFnO
     (lambda ((node))
-      (let* ((params (emitFnoParams node))
+      (let ((params (emitFnoParams node))
              (retStr (ternary (. node returnType) (+ ': ' (emitTypeExpr (. node returnType))) ''))
              (body ((. (. node body) map) emitStmt)))
         (return (+ 'function(' params ')' retStr ' {\n' (indent ((. body join) '\n')) '\n}')))))
 
   (const emitBindExpr
     (lambda ((node))
-      (let* ((fnExpr (emitExpr (. node fn)))
+      (let ((fnExpr (emitExpr (. node fn)))
              (thisArg (emitExpr (. node thisArg)))
              (extraArgs ((. (. node args) map) emitExpr))
              (allArgs ((. (array thisArg) concat) extraArgs)))
@@ -655,7 +664,7 @@
 
   (const emitMethodCall
     (lambda ((node))
-      (let* ((obj (emitExpr (. node "object")))
+      (let ((obj (emitExpr (. node "object")))
              (methodNode (. node "method"))
              (args ((. (. node args) map) emitExpr)))
         (if (=== (. methodNode tag) 'identifier')
@@ -666,7 +675,7 @@
 
   (const emitCall
     (lambda ((node))
-      (let* ((fnExpr (emitExpr (. node fn)))
+      (let ((fnExpr (emitExpr (. node fn)))
              (typeStr
               (ternary (&& (. node typeArgs) (> (. (. node typeArgs) length) 0))
                          (+ '<' ((. ((. (. node typeArgs) map) emitTypeExpr) join) ', ') '>' )
@@ -679,7 +688,7 @@
 
   (const emitOperator
     (lambda ((node))
-      (let* ((args ((. (. node args) map) emitExpr)))
+      (let ((args ((. (. node args) map) emitExpr)))
         (if (=== (. args length) 1)
           (return (+ '(' (. node op) (index args 0) ')')))
         (return (+ '(' (index args 0) ' ' (. node op) ' ' (index args 1) ')')))))
@@ -687,7 +696,7 @@
   ;; ========== Class codegen ==========
   (const emitTypedParam
     (lambda ((param))
-      (let* ((opt (ternary (. param optional) '?' ''))
+      (let ((opt (ternary (. param optional) '?' ''))
              (typeStr (ternary (. param typeAnnotation) (+ ': ' (emitTypeExpr (. param typeAnnotation))) ''))
              (nm (. param name))
              (validNm (ternary ((. nm startsWith) '...') nm (checkId nm (. param id)))))
@@ -695,7 +704,7 @@
 
   (const emitFieldDef
     (lambda ((node))
-      (let* ((typeStr (ternary (. node typeAnnotation) (+ ': ' (emitTypeExpr (. node typeAnnotation))) ''))
+      (let ((typeStr (ternary (. node typeAnnotation) (+ ': ' (emitTypeExpr (. node typeAnnotation))) ''))
              (initStr (ternary (isDefined (. node init)) (+ ' = ' (emitExpr (. node init))) ''))
              (priv (ternary ((. (. node modifiers) includes) 'private') 'private ' ''))
              (prot (ternary ((. (. node modifiers) includes) 'protected') 'protected ' ''))
@@ -707,7 +716,7 @@
 
   (const emitConstructorParam
     (lambda ((param))
-      (let* ((mods (. param modifiers))
+      (let ((mods (. param modifiers))
              (modsStr (ternary (&& mods (> (. mods length) 0)) (+ ((. mods join) ' ') ' ') ''))
              (opt (ternary (. param optional) '?' ''))
              (typeStr (ternary (. param typeAnnotation) (+ ': ' (emitTypeExpr (. param typeAnnotation))) ''))
@@ -717,7 +726,7 @@
 
   (const emitConstructorDef
     (lambda ((node))
-      (let* ((params ((. (. (. node sig) params) map) emitConstructorParam))
+      (let ((params ((. (. (. node sig) params) map) emitConstructorParam))
              (paramsStr ((. params join) ', '))
              (body ((. (. node body) map) emitStmt)))
         (return (+ 'constructor(' paramsStr ') {\n' (indent ((. body join) '\n')) '\n}')))))
@@ -730,8 +739,7 @@
 
   (const emitClassMethodDef
     (lambda ((node))
-      (let* ((params ((. (. (. node sig) params) map) emitTypedParam))
-             (paramsStr ((. params join) ', '))
+      (let ((paramsStr (emitParams (. node sig)))
              (returnTypeStr (ternary (. (. node sig) returnType) (+ ': ' (emitTypeExpr (. (. node sig) returnType))) ''))
              (body ((. (. node body) map) emitStmt))
              (priv (ternary ((. (. node modifiers) includes) 'private') 'private ' ''))
@@ -739,52 +747,50 @@
              (pub (ternary ((. (. node modifiers) includes) 'public') 'public ' ''))
              (accMod (+ priv prot pub))
              (staticStr (ternary ((. (. node modifiers) includes) 'static') 'static ' ''))
-              (overrideStr (ternary ((. (. node modifiers) includes) 'override') 'override ' ''))
-              (asyncStr (ternary ((. (. node modifiers) includes) 'async') 'async ' ''))
-              (generatorStr (ternary ((. (. node modifiers) includes) 'generator') '*' ''))
-              (nameStr (emitMethodName node)))
-             (return (+ accMod staticStr overrideStr asyncStr generatorStr nameStr '(' paramsStr ')' returnTypeStr ' {\n' (indent ((. body join) '\n')) '\n}')))))
+             (overrideStr (ternary ((. (. node modifiers) includes) 'override') 'override ' ''))
+             (asyncStr (ternary ((. (. node modifiers) includes) 'async') 'async ' ''))
+             (generatorStr (ternary ((. (. node modifiers) includes) 'generator') '*' ''))
+             (nameStr (emitMethodName node)))
+        (return (+ accMod staticStr overrideStr asyncStr generatorStr nameStr '(' paramsStr ')' returnTypeStr ' {\n' (indent ((. body join) '\n')) '\n}')))))
 
   (const emitAbstractMethodDef
     (lambda ((node))
-      (let* ((params ((. (. (. node sig) params) map) emitTypedParam))
-             (paramsStr ((. params join) ', '))
+      (let ((paramsStr (emitParams (. node sig)))
              (returnTypeStr (ternary (. (. node sig) returnType) (+ ': ' (emitTypeExpr (. (. node sig) returnType))) ''))
              (priv (ternary ((. (. node modifiers) includes) 'private') 'private ' ''))
              (prot (ternary ((. (. node modifiers) includes) 'protected') 'protected ' ''))
              (pub (ternary ((. (. node modifiers) includes) 'public') 'public ' ''))
-           (accMod (+ priv prot pub))
-           (nameStr (emitMethodName node)))
-         (return (+ accMod 'abstract ' nameStr '(' paramsStr ')' returnTypeStr ';')))))
+             (accMod (+ priv prot pub))
+             (nameStr (emitMethodName node)))
+        (return (+ accMod 'abstract ' nameStr '(' paramsStr ')' returnTypeStr ';')))))
 
   (const emitGetterDef
     (lambda ((node))
-      (let* ((returnTypeStr (ternary (. (. node sig) returnType) (+ ': ' (emitTypeExpr (. (. node sig) returnType))) ''))
+      (let ((returnTypeStr (ternary (. (. node sig) returnType) (+ ': ' (emitTypeExpr (. (. node sig) returnType))) ''))
              (body ((. (. node body) map) emitStmt))
              (priv (ternary ((. (. node modifiers) includes) 'private') 'private ' ''))
              (prot (ternary ((. (. node modifiers) includes) 'protected') 'protected ' ''))
              (pub (ternary ((. (. node modifiers) includes) 'public') 'public ' ''))
              (staticStr (ternary ((. (. node modifiers) includes) 'static') 'static ' ''))
-           (accMod (+ priv prot pub staticStr))
-           (nameStr (emitMethodName node)))
-         (return (+ accMod 'get ' nameStr '()' returnTypeStr ' {\n' (indent ((. body join) '\n')) '\n}')))))
+             (accMod (+ priv prot pub staticStr))
+             (nameStr (emitMethodName node)))
+        (return (+ accMod 'get ' nameStr '()' returnTypeStr ' {\n' (indent ((. body join) '\n')) '\n}')))))
 
   (const emitSetterDef
     (lambda ((node))
-      (let* ((params ((. (. (. node sig) params) map) emitTypedParam))
-             (paramsStr ((. params join) ', '))
+      (let ((paramsStr (emitParams (. node sig)))
              (body ((. (. node body) map) emitStmt))
              (priv (ternary ((. (. node modifiers) includes) 'private') 'private ' ''))
              (prot (ternary ((. (. node modifiers) includes) 'protected') 'protected ' ''))
              (pub (ternary ((. (. node modifiers) includes) 'public') 'public ' ''))
              (staticStr (ternary ((. (. node modifiers) includes) 'static') 'static ' ''))
-           (accMod (+ priv prot pub staticStr))
-           (nameStr (emitMethodName node)))
-         (return (+ accMod 'set ' nameStr '(' paramsStr ') {\n' (indent ((. body join) '\n')) '\n}')))))
+             (accMod (+ priv prot pub staticStr))
+             (nameStr (emitMethodName node)))
+        (return (+ accMod 'set ' nameStr '(' paramsStr ') {\n' (indent ((. body join) '\n')) '\n}')))))
 
   (const emitMethodODef
     (lambda ((node))
-      (let* ((params (emitFnoParams node))
+      (let ((params (emitFnoParams node))
              (returnTypeStr (ternary (. node returnType) (+ ': ' (emitTypeExpr (. node returnType))) ''))
              (body ((. (. node body) map) emitStmt))
              (priv (ternary ((. (. node modifiers) includes) 'private') 'private ' ''))
@@ -800,7 +806,7 @@
 
   (const emitAbstractMethodODef
     (lambda ((node))
-      (let* ((params (emitFnoParams node))
+      (let ((params (emitFnoParams node))
              (returnTypeStr (ternary (. node returnType) (+ ': ' (emitTypeExpr (. node returnType))) ''))
              (priv (ternary ((. (. node modifiers) includes) 'private') 'private ' ''))
              (prot (ternary ((. (. node modifiers) includes) 'protected') 'protected ' ''))
@@ -811,7 +817,7 @@
 
   (const emitConstructorODef
     (lambda ((node))
-      (let* ((params (emitFnoParams node))
+      (let ((params (emitFnoParams node))
              (body ((. (. node body) map) emitStmt)))
         (return (+ 'constructor(' params ') {\n' (indent ((. body join) '\n')) '\n}')))))
 
@@ -830,12 +836,12 @@
 
   (const emitClassBody
     (lambda ((body))
-      (let* ((elements ((. (. body elements) map) emitClassElement)))
+      (let ((elements ((. (. body elements) map) emitClassElement)))
         (return ((. elements join) '\n')))))
 
   (const emitClassDef
     (lambda ((node))
-      (let* ((typeParamsStr (ternary (&& (. node typeParams) (> (. (. node typeParams) length) 0))
+      (let ((typeParamsStr (ternary (&& (. node typeParams) (> (. (. node typeParams) length) 0))
                               (+ '<' ((. ((. (. node typeParams) map) emitTypeParamDecl) join) ', ') '>')
                               ''))
              (extendsStr (ternary (. node extendsType) (+ ' extends ' (emitTypeExpr (. node extendsType))) ''))
@@ -848,7 +854,7 @@
 
   (const emitAnonClassDef
     (lambda ((node))
-      (let* ((extendsStr (ternary (. node extendsType) (+ ' extends ' (emitTypeExpr (. node extendsType))) ''))
+      (let ((extendsStr (ternary (. node extendsType) (+ ' extends ' (emitTypeExpr (. node extendsType))) ''))
              (implementsStr (ternary (> (. (. node implementsTypes) length) 0)
                               (+ ' implements ' ((. ((. (. node implementsTypes) map) emitTypeExpr) join) ', '))
                               ''))
@@ -866,7 +872,7 @@
 
   (const emitExportDefaultFnDecl
     (lambda ((node))
-      (let* ((params (emitParams node))
+      (let ((params (emitParams node))
              (retStr (ternary (. node returnType) (+ ': ' (emitTypeExpr (. node returnType))) ''))
              (body ((. (. node body) map) emitStmt)))
         (return (+ 'export default function ' (. node name) '(' params ')' retStr ' {\n' (indent ((. body join) '\n')) '\n}')))))
@@ -886,7 +892,7 @@
 
   (const typeWrapIf
     (lambda ((node) (contextPrec))
-      (let* ((s (emitTypeExpr node))
+      (let ((s (emitTypeExpr node))
              (innerPrec (typePrecedence (. node tag))))
         (if (< innerPrec contextPrec)
           (return (+ '(' s ')')))
@@ -897,7 +903,7 @@
       (if (=== (. node tag) 'type-id')
         (return (. node name)))
       (if (=== (. node tag) 'type-app')
-        (let* ((callee (emitTypeExpr (. node callee)))
+        (let ((callee (emitTypeExpr (. node callee)))
                (args ((. ((. (. node args) map) emitTypeExpr) join) ', ')))
           (return (+ callee '<' args '>'))))
       (if (=== (. node tag) 'type-union')
@@ -905,13 +911,13 @@
       (if (=== (. node tag) 'type-intersection')
         (return ((. ((. (. node members) map) (lambda ((m)) (return (typeWrapIf m 3)))) join) ' & ')))
       (if (=== (. node tag) 'type-array')
-        (let* ((inner (emitTypeExpr (. node element)))
+        (let ((inner (emitTypeExpr (. node element)))
                (needsWrap (< (typePrecedence (. (. node element) tag)) 5)))
           (if needsWrap
             (return (+ '(' inner ')[]')))
           (return (+ inner '[]'))))
       (if (=== (. node tag) 'type-tuple')
-        (let* ((parts ((. ((. (. node elements) map) emitTupleElement) join) ', ')))
+        (let ((parts ((. ((. (. node elements) map) emitTupleElement) join) ', ')))
           (return (+ '[' parts ']'))))
       (if (=== (. node tag) 'type-fn')
         (return (emitFnType node)))
@@ -947,10 +953,10 @@
 
   (const emitFnType
     (lambda ((node))
-      (let* ((tparams (ternary (&& (. node typeParams) (> (. (. node typeParams) length) 0))
+      (let ((tparams (ternary (&& (. node typeParams) (> (. (. node typeParams) length) 0))
                (+ '<' ((. ((. (. node typeParams) map) emitTypeParamDecl) join) ', ') '>') ''))
              (params ((. ((. (. node params) map) (lambda ((p))
-               (let* ((opt (ternary (. p "optional") '?' ''))
+               (let ((opt (ternary (. p "optional") '?' ''))
                       (ty (emitTypeExpr (. p "type"))))
                  (return (+ (. p name) opt ': ' ty))))) join) ', '))
              (ret (emitTypeExpr (. node result))))
@@ -960,8 +966,8 @@
     (lambda ((node))
       (if (=== (. (. node props) length) 0)
         (return '{}'))
-      (let* ((props ((. ((. (. node props) map) (lambda ((p))
-               (let* ((ro (ternary (. p "readonly") 'readonly ' ''))
+      (let ((props ((. ((. (. node props) map) (lambda ((p))
+               (let ((ro (ternary (. p "readonly") 'readonly ' ''))
                       (opt (ternary (. p "optional") '?' ''))
                       (ty (emitTypeExpr (. p "type"))))
                  (return (+ ro (. p name) opt ': ' ty))))) join) '; ')))
@@ -975,7 +981,7 @@
 
   (const emitMappedType
     (lambda ((node))
-      (let* ((constraint (emitTypeExpr (. node constraint)))
+      (let ((constraint (emitTypeExpr (. node constraint)))
              (value (emitTypeExpr (. node value)))
              (modStr ' ')
              (optSuffix ' '))
@@ -989,7 +995,7 @@
 
   (const emitTemplateType
     (lambda ((node))
-      (let* ((out '`'))
+      (let ((out '`'))
         ((. (. node parts) forEach) (lambda ((part))
           (if (=== (. part tag) 'str')
             (set! out (+ out (. part value)))
@@ -1000,7 +1006,7 @@
   ;; Value-level template literal: {tag:'template-expr', parts:[{tag:'str',value:...}|{tag:'hole',expr:...}]}
   (const emitTemplateExpr
     (lambda ((expr))
-      (let* ((out '`'))
+      (let ((out '`'))
         ((. (. expr parts) forEach) (lambda ((part))
           (if (=== (. part tag) 'str')
             (set! out (+ out (. part value)))
@@ -1010,7 +1016,7 @@
 
   (const emitEnumDef
     (lambda ((node))
-      (let* ((members ((. ((. (. node members) map) (lambda ((m))
+      (let ((members ((. ((. (. node members) map) (lambda ((m))
                            (if (=== (. m value) undefined)
                              (return (. m name))
                              (return (+ (. m name) ' = ' (. m value))))))
@@ -1019,7 +1025,7 @@
 
   (const emitTypeParamDecl
     (lambda ((p))
-      (let* ((out (. p name)))
+      (let ((out (. p name)))
         (if (. p constraint)
           (set! out (+ out ' extends ' (emitTypeExpr (. p constraint)))))
         (if (. p "default")

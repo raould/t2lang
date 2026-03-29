@@ -125,7 +125,7 @@ singleBinding
 ```antlr
 starBinding
     : LPAREN IDENTIFIER (COLON typeExpr)? expression RPAREN    // existing
-    | LPAREN destructPattern (COLON typeExpr)? expression RPAREN  // new: ({x y} obj) inside let*
+    | LPAREN destructPattern (COLON typeExpr)? expression RPAREN  // new: ({x y} obj) inside let
     ;
 ```
 
@@ -158,7 +158,7 @@ Add before `astForIn` (line 631):
 
 (const astObjectDestructPat
   (lambda ((ctx))
-    (let* ((fields ((. ((. ctx objDestructField)) map) astObjDestructField))
+    (let ((fields ((. ((. ctx objDestructField)) map) astObjDestructField)))
            (rest (ternary ((. ctx ELLIPSIS))
                    ((. ((. ((. ctx IDENTIFIER)) getText)))  ;; last IDENTIFIER after ...
                    undefined)))
@@ -169,13 +169,13 @@ Add before `astForIn` (line 631):
 (const astObjDestructField
   (lambda ((ctx))
     ;; Phase 1: plain IDENTIFIER shorthand only
-    (let* ((idents ((. ctx IDENTIFIER)))
+    (let ((idents ((. ctx IDENTIFIER))))
            (name ((. ((. idents 0)) getText))))
       (return (object (name name))))))
 
 (const astArrayDestructPat
   (lambda ((ctx))
-    (let* ((elems ((. ((. ctx arrayDestructElem)) map) astArrayDestructElem))
+    (let ((elems ((. ((. ctx arrayDestructElem)) map) astArrayDestructElem)))
            (rest (ternary ((. ctx ELLIPSIS))
                    ((. ((. ((. ctx IDENTIFIER)) getText))))
                    undefined)))
@@ -186,7 +186,7 @@ Add before `astForIn` (line 631):
 (const astArrayDestructElem
   (lambda ((ctx))
     ;; Phase 1: plain IDENTIFIER only
-    (let* ((name ((. ((. ctx IDENTIFIER)) getText))))
+    (let ((name ((. ((. ctx IDENTIFIER)) getText))))
       (return (object (name name))))))
 ```
 
@@ -207,16 +207,16 @@ Add a branch: when `ctx.singleBinding()` has a `destructPattern` child instead o
 ```lisp
 (const astLetStmt
   (lambda ((ctx))
-    (let* ((bindCtx ((. ctx singleBinding))))
+    (let ((bindCtx ((. ctx singleBinding))))
       (if ((. bindCtx destructPattern))
         ;; destructuring binding
-        (let* ((pattern (astDestructPattern ((. bindCtx destructPattern))))
+        (let ((pattern (astDestructPattern ((. bindCtx destructPattern)))))
                (typeAnnotation (ternary ((. bindCtx typeExpr)) (astTypeExpr ((. bindCtx typeExpr))) undefined))
                (init (astExpression ((. ctx expression)))))
           (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText)))
             (tag 'let') (pattern pattern) (typeAnnotation typeAnnotation) (init init))))
         ;; plain identifier binding (existing path)
-        (let* ((name ((. ((. bindCtx IDENTIFIER)) getText)))
+        (let ((name ((. ((. bindCtx IDENTIFIER)) getText))))
                (typeAnnotation (ternary ((. bindCtx typeExpr)) (astTypeExpr ((. bindCtx typeExpr))) undefined))
                (init (astExpression ((. ctx expression)))))
           (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText)))
@@ -230,13 +230,13 @@ Add a branch: when `ctx.singleBinding()` has a `destructPattern` child instead o
 In the `starBinding` map lambda, check for `destructPattern` on `b`:
 
 ```lisp
-(let* ((bindings ((. ((. ctx starBinding)) map) (lambda ((b))
+(let ((bindings ((. ((. ctx starBinding)) map) (lambda ((b))
          (if ((. b destructPattern))
-           (let* ((pattern (astDestructPattern ((. b destructPattern))))
+           (let ((pattern (astDestructPattern ((. b destructPattern)))))
                   (init (astExpression ((. b expression))))
                   (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
              (return (object (pattern pattern) (init init) (typeAnnotation typeAnnotation))))
-           (let* ((id ((. ((. b IDENTIFIER)) getText)))
+           (let ((id ((. ((. b IDENTIFIER)) getText))))
                   (init (astExpression ((. b expression))))
                   (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
              (return (object (name id) (init init) (typeAnnotation typeAnnotation)))))))))
@@ -248,12 +248,12 @@ In the `starBinding` map lambda, check for `destructPattern` on `b`:
 (const astForOf
   (lambda ((ctx))
     (if ((. ctx destructPattern))
-      (let* ((pattern (astDestructPattern ((. ctx destructPattern))))
+      (let ((pattern (astDestructPattern ((. ctx destructPattern)))))
              (iterable (astExpression ((. ctx expression))))
              (body ((. ((. ctx statement)) map) astStatement)))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText)))
           (tag 'for-of') (pattern pattern) (iterable iterable) (body body))))
-      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+      (let ((name ((. ((. ctx IDENTIFIER)) getText))))
              (iterable (astExpression ((. ctx expression))))
              (body ((. ((. ctx statement)) map) astStatement)))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText)))
@@ -289,7 +289,7 @@ Extracts all bound names from a pattern as a flat array of strings:
 ```lisp
 (const patternNames
   (lambda ((pattern))
-    (let* ((names (array)))
+    (let ((names (array)))
       (if (=== (. pattern tag) 'destruct-object')
         (begin
           ((. (. pattern fields) forEach) (lambda ((f))
@@ -305,12 +305,12 @@ Extracts all bound names from a pattern as a flat array of strings:
 
 ### `evalQuasi` (around line 195)
 
-In the `let*` / `const*` cases, bindings may have `pattern` instead of a string `name`:
+In the `let` / `const*` cases, bindings may have `pattern` instead of a string `name`:
 
 ```lisp
 ;; existing path for plain names unchanged
 ;; add check for pattern:
-(let* ((bindingResult
+(let ((bindingResult
          (if (. b pattern)
            (object (pattern (evalQuasiPattern (. b pattern) bindings env depth))
                    (init (evalQuasi (. b init) bindings env depth))
@@ -322,7 +322,7 @@ In the `let*` / `const*` cases, bindings may have `pattern` instead of a string 
 
 ### `addScopeToNode` (around line 920)
 
-The `let` / `const` / `let*` / `const*` / `for-of` / `for-in` cases already pass through `name` unchanged. Patterns don't contain identifier *references* that need scope-stamping — they're binding *definitions* — so pass `pattern` through as-is:
+The `let` / `const` / `const*` / `for-of` / `for-in` cases already pass through `name` unchanged. Patterns don't contain identifier *references* that need scope-stamping — they're binding *definitions* — so pass `pattern` through as-is:
 
 ```lisp
 ;; In the 'let' case:
@@ -356,7 +356,7 @@ The `let` / `const` / `let*` / `const*` / `for-of` / `for-in` cases already pass
       (init (expandExpr (. node init) env))))))
 ```
 
-Same treatment for `const`, `for-of`, `for-in`, `for-await`, and the `let*`/`const*` binding maps.
+Same treatment for `const`, `for-of`, `for-in`, `for-await`, and the `const*` binding maps.
 
 ---
 
@@ -372,11 +372,11 @@ Add near `addBinding` (line 38):
 (const addPatternBindings
   (lambda ((chain) (pattern))
     ;; Registers all leaf binding names from a destructuring pattern.
-    (let* ((extChain chain))
+    (let ((extChain chain)))
       (if (=== (. pattern tag) 'destruct-object')
         (begin
           ((. (. pattern fields) forEach) (lambda ((f))
-            (let* ((bound (ternary (. f alias) (. f alias) (. f name))))
+            (let ((bound (ternary (. f alias) (. f alias) (. f name))))
               (set! extChain (addBinding extChain bound (new Set))))))
           (if (. pattern rest)
             (set! extChain (addBinding extChain (. pattern rest) (new Set))))))
@@ -407,16 +407,16 @@ Phase 3: recurse into nested patterns inside `addPatternBindings`.
       (init (resolveExpr (. node init) chain))))))
 ```
 
-> `resolveStmt` does **not** extend the chain — it only resolves references inside the `init`. Extending the chain for callers is handled by `resolveTopLevel` and `let*`. For statement-level `let`/`const`, the name is available to *subsequent* statements in the same block, but that isn't currently modelled (the chain is not threaded across sibling statements). This is a pre-existing limitation, not something to solve here.
+> `resolveStmt` does **not** extend the chain — it only resolves references inside the `init`. Extending the chain for callers is handled by `resolveTopLevel` and `let`. For statement-level `let`/`const`, the name is available to *subsequent* statements in the same block, but that isn't currently modelled (the chain is not threaded across sibling statements). This is a pre-existing limitation, not something to solve here.
 
-### `resolveStmt` — `let*` / `const*` cases (lines 341–374)
+### `resolveStmt` — `const*` cases (lines 341–374)
 
 Add a branch in the binding-loop lambda:
 
 ```lisp
 ((. (. node bindings) forEach)
   (lambda ((b))
-    (let* ((resolvedInit (resolveExpr (. b init) extChain)))
+    (let ((resolvedInit (resolveExpr (. b init) extChain)))
       (if (. b pattern)
         (begin
           ;; Register all names introduced by the pattern
@@ -426,7 +426,7 @@ Add a branch in the binding-loop lambda:
             (init resolvedInit)
             (typeAnnotation (. b typeAnnotation)))))
         (begin
-          (let* ((bindScopes (ternary (. b scopes) (. b scopes) (new Set))))
+          (let ((bindScopes (ternary (. b scopes) (. b scopes) (new Set)))))
             ((. resolvedBindings push) (object
               (name (. b name))
               (init resolvedInit)
@@ -440,7 +440,7 @@ Currently not in `resolveStmt` (falls through as-is). Add handling:
 
 ```lisp
 (if (=== (. node tag) 'for-of')
-  (let* ((bodyChain (ternary (. node pattern)
+  (let ((bodyChain (ternary (. node pattern)
                       (addPatternBindings chain (. node pattern))
                       (addBinding chain (. node name) (new Set)))))
     (return (object (tag 'for-of') (text (. node text))
@@ -504,7 +504,7 @@ Thread `pattern` through each binding instead of `name`.
 (const emitDestructPattern
   (lambda ((pattern))
     (if (=== (. pattern tag) 'destruct-object')
-      (let* ((parts ((. (. pattern fields) map) (lambda ((f))
+      (let ((parts ((. (. pattern fields) map) (lambda ((f))
                  ;; Phase 1: only plain shorthand
                  (return (. f name)))))
              (withRest (ternary (. pattern rest)
@@ -512,7 +512,7 @@ Thread `pattern` through each binding instead of `name`.
                           parts)))
         (return (+ '{ ' ((. withRest join) ', ') ' }'))))
     (if (=== (. pattern tag) 'destruct-array')
-      (let* ((parts ((. (. pattern elements) map) (lambda ((e))
+      (let ((parts ((. (. pattern elements) map) (lambda ((e))
                  (return (. e name)))))
              (withRest (ternary (. pattern rest)
                           ((. parts concat) (array (+ '...' (. pattern rest))))
@@ -531,7 +531,7 @@ Phase 3: recurse into nested patterns.
 
 ```lisp
 (if (=== (. stmt tag) 'let-stmt')
-  (let* ((typeStr (ternary (. stmt typeAnnotation) (+ ': ' (emitTypeExpr (. stmt typeAnnotation))) ''))
+  (let ((typeStr (ternary (. stmt typeAnnotation) (+ ': ' (emitTypeExpr (. stmt typeAnnotation))) '')))
          (lhs (ternary (. stmt pattern)
                  (emitDestructPattern (. stmt pattern))
                  (checkId (. stmt name) (. stmt id)))))
@@ -547,7 +547,7 @@ Same change to `const-stmt` (line 168).
 ```lisp
 (const emitForOf
   (lambda ((node))
-    (let* ((lines (array))
+    (let ((lines (array)))
            (lhs (ternary (. node pattern)
                    (emitDestructPattern (. node pattern))
                    (checkId (. node name) (. node id)))))
@@ -562,7 +562,7 @@ Same change to `const-stmt` (line 168).
 
 ## 7. Tags (`Stage9-tags.ts`)
 
-No new tags required for Phase 1 — `'let'`, `'const'`, `'let*'`, `'const*'`, `'for-of'`, `'for-in'`, `'for-await'` already exist and the pattern is carried as a field. The `destruct-object` and `destruct-array` values live in `.pattern` fields and are not top-level statement tags.
+No new tags required for Phase 1 — `'let'`, `'const'`, `'const*'`, `'for-of'`, `'for-in'`, `'for-await'` already exist and the pattern is carried as a field. The `destruct-object` and `destruct-array` values live in `.pattern` fields and are not top-level statement tags.
 
 ---
 
@@ -584,8 +584,8 @@ New test file: `stage9/tests/destructure.test.ts`
 'array destructure — rest'
   (const [head ...tail] [1 2 3])  →  head === 1, tail.length === 2
 
-'let* with object destruct'
-  (let* (({x y} { x: 5, y: 6 })) (+ x y))  →  11
+'let with object destruct'
+  (let (({x y} { x: 5, y: 6 })) (+ x y))  →  11
 
 'for-of with array destruct'
   (for-of [k v] entries  (set! sum (+ sum v)))  →  sum correct
@@ -612,7 +612,7 @@ New test file: `stage9/tests/destructure.test.ts`
 1. **Grammar** — add `destructPattern` rules + modify `singleBinding`, `starBinding`, `forOfForm`, `forInForm`, `forAwaitForm`; rebuild grammar (`npm run build-grammar`)
 2. **AST** — add `astDestructPattern`, `astObjectDestructPat`, `astArrayDestructPat`; update `astLetStmt`, `astConstStmt`, `astLetStar`, `astConstStar`, `astForOf`, `astForIn`, `astForAwait`
 3. **Macro-expand** — add `patternNames` helper; update `evalQuasi`, `addScopeToNode`, `expandStmt` to handle `pattern` field alongside `name`
-4. **Scope-resolve** — add `addPatternBindings`; update `let*`/`const*` binding loop and `for-of`/`for-in`/`for-await` handling
+4. **Scope-resolve** — add `addPatternBindings`; update `const*` binding loop and `for-of`/`for-in`/`for-await` handling
 5. **Lower** — update `lowerStmt` `let`/`const`/`for-*` cases and `lowerLetStar`/`lowerConstStar`
 6. **Codegen** — add `emitDestructPattern`; update `emitStmt` and `emitForOf`/`emitForIn`/`emitForAwait`
 7. **Rebuild compiler** — `npm run build-compiler`
@@ -625,5 +625,5 @@ New test file: `stage9/tests/destructure.test.ts`
 - **Either `name` or `pattern`, never both**: All AST nodes that currently have `name: string` gain an optional `pattern: DestructPattern`. Code at each pipeline stage checks `node.pattern` first, then falls back to `node.name`. This avoids a breaking change to existing plain-identifier bindings.
 - **Scope chain**: `addPatternBindings` extracts all leaf names from a pattern and adds them to the chain in one pass. Nested patterns are handled by recursing into sub-patterns.
 - **No new statement tags**: The existing `let`/`const`/`for-of` etc. tags are reused; the pattern is a field on those nodes. This keeps the tag set stable and avoids touching macro-expand `expandAll` worklist logic.
-- **`let`/`const` statement scope chain not threaded**: Currently t2 does not thread the binding chain across sibling statements inside a block (only `let*`/`const*` does). This means destructured names from a bare `(const {x} obj)` are not visible to subsequent sibling statements in scope-resolution. This is the same limitation that applies to plain `(const (x) obj)` today.
+- **`let`/`const` statement scope chain not threaded**: Currently t2 does not thread the binding chain across sibling statements inside a block (only `const*` does). This means destructured names from a bare `(const {x} obj)` are not visible to subsequent sibling statements in scope-resolution. This is the same limitation that applies to plain `(const (x) obj)` today.
 - **`_` as hole in array patterns**: A name `_` in array position emits as a normal binding name. True holes (`[, b]`) would require a `HOLE` token; defer to Phase 2.

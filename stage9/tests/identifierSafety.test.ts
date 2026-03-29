@@ -6,13 +6,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { compile } from '../index';
+import { compileSource as compile } from '../index';
 
 const T = 30_000;
 
 function callCompiler(source: string): { stdout: string; stderr: string; status: number } {
   try {
-    const stdout = compile({ filePath: '-', input: source });
+    const stdout = compile({ source: source });
     return { stdout, stderr: '', status: 0 };
   } catch (e: any) {
     return { stdout: '', stderr: e.message, status: 1 };
@@ -52,7 +52,7 @@ describe('3a: valid identifiers are accepted', () => {
 // (Grammar keywords like `return`, `class`, `if` fail at parse time anyway.)
 
 describe('3b: JS reserved words as binding names are rejected', () => {
-  for (const word of ['var', 'void', 'break', 'delete', 'in', 'with']) {
+  for (const word of ['void', 'break', 'delete', 'in', 'with']) {
     it(`rejects reserved word '${word}' as const binding`, () => {
       const r = callCompiler(`(program (const ${word} 1))`);
       expect(r.status).not.toBe(0);
@@ -119,12 +119,12 @@ describe('3e: spread / rest params are not checked by checkId', () => {
 describe('Phase 4: checkId error includes source location', () => {
   it('error for reserved word contains "at <file>:<line>:<col>"', () => {
     const r = callCompiler(`(program
-  (const var 1)
+  (const void 1)
 )`);
     expect(r.status).not.toBe(0);
     const combined = r.stderr + r.stdout;
     // Must mention the bad name and a location (file~line~col)
-    expect(combined).toMatch(/Invalid identifier 'var'/);
+    expect(combined).toMatch(/Invalid identifier 'void'/);
     expect(combined).toMatch(/at .+:\d+:\d+/);
   }, T);
 

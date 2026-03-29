@@ -9,12 +9,12 @@ it('fn end-to-end', () => {
         (asrt (add 2 3) 5)
         (asrt (typeof add) "function")
         ;; fn called immediately (IIFE-style)
-        (let (result) ((fn ((x)) (return (* x x))) 7))
+        (let ((result ((fn ((x)) (return (* x x))) 7))))
         (asrt result 49)
         ;; fn is constructible (can use new)
         (const Greeter (fn ((name))
             (set! (. this name) name)))
-        (let (g) (new Greeter "world"))
+        (let ((g (new Greeter "world"))))
         (asrt (. g name) "world")
     )`);
 }, 30_000);
@@ -22,7 +22,7 @@ it('fn end-to-end', () => {
 it('fn with types end-to-end', () => {
         fromSourceEndToEnd(`(program
         (import {asrt} "./helpers")
-        (let* ((add (fn ((a : number) (b : number)) : string
+        (let ((add (fn ((a : number) (b : number)) : string
                     (return (+ (String a) (String b))))))
             (asrt (add 2 3) "23")
             (asrt (typeof (add 2 3)) "string")

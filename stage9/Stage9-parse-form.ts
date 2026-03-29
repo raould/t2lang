@@ -367,23 +367,38 @@ function parseFormImpl(sform: any, spanId: number, env: any): any {
     // Disambiguate: top-level (name is atom) vs statement (name is array)
     const nameForm = tail[0];
     if (Array.isArray(nameForm)) {
-      // Statement form: (let (name) init body...)
-      const name =
-        typeof nameForm[0] === "string"
-          ? nameForm[0]
-          : isOpaque(nameForm[0])
-          ? nameForm[0].node.name ?? String(nameForm[0].node.value ?? "?")
-          : "?";
-      const init =
-        tail[1] != null
-          ? parseFormImpl(tail[1], spanId, env)
-          : mk("literal", { value: undefined });
-      const body = tail.slice(2).map((s: any) => parseFormImpl(s, spanId, env));
-      const tag = headStr === "let" ? "let*" : "const*";
-      return mk(tag, {
-        bindings: [{ name, init, typeAnnotation: null, id: nextNodeId() }],
-        body,
-      });
+      // Distinguish new multi-binding form (let ((n i) ...) body...) from
+      // legacy single-binding form (let (name) init body...).
+      // In the new form nameForm[0] is itself an array (a binding pair).
+      if (nameForm.length === 0 || Array.isArray(nameForm[0]) || isOpaque(nameForm[0])) {
+        // New multi-binding statement form: (let ((name init) ...) body...)
+        const bindingsForms: any[] = nameForm;
+        const body = tail.slice(1).map((s: any) => parseFormImpl(s, spanId, env));
+        const bindings = bindingsForms.map((bf: any) => {
+          if (!Array.isArray(bf)) return { name: "?", init: mk("literal", { value: undefined }), typeAnnotation: null, id: nextNodeId() };
+          const bname = typeof bf[0] === "string" ? bf[0] : isOpaque(bf[0]) ? bf[0].node.name ?? "?" : "?";
+          const binit = bf[1] != null ? parseFormImpl(bf[1], spanId, env) : mk("literal", { value: undefined });
+          return { name: bname, init: binit, typeAnnotation: null, id: nextNodeId() };
+        });
+        const tag = headStr === "let" ? "let" : "const*";
+        return mk(tag, { bindings, body });
+      } else {
+        // Legacy single-binding statement form: (let (name) init body...)
+        const name =
+          typeof nameForm[0] === "string"
+            ? nameForm[0]
+            : "?";
+        const init =
+          tail[1] != null
+            ? parseFormImpl(tail[1], spanId, env)
+            : mk("literal", { value: undefined });
+        const body = tail.slice(2).map((s: any) => parseFormImpl(s, spanId, env));
+        const tag = headStr === "let" ? "let" : "const*";
+        return mk(tag, {
+          bindings: [{ name, init, typeAnnotation: null, id: nextNodeId() }],
+          body,
+        });
+      }
     } else {
       // Top-level form: (let name init) or (const name init)
       const name = isOpaque(nameForm)
@@ -400,8 +415,8 @@ function parseFormImpl(sform: any, spanId: number, env: any): any {
     }
   }
 
-  if (headStr === "let*" || headStr === "const*") {
-    // (let* ((name init) ...) body...)
+  if (headStr === "const*") {
+    // (const* ((name init) ...) body...)
     const bindingsForms = Array.isArray(tail[0]) ? tail[0] : [];
     const body = tail.slice(1).map((s: any) => parseFormImpl(s, spanId, env));
     const bindings = bindingsForms.map((bf: any) => {
@@ -410,7 +425,7 @@ function parseFormImpl(sform: any, spanId: number, env: any): any {
       const init = bf[1] != null ? parseFormImpl(bf[1], spanId, env) : mk("literal", { value: undefined });
       return { name, init, typeAnnotation: null, id: nextNodeId() };
     });
-    return mk(headStr, { bindings, body });
+    return mk("const*", { bindings, body });
   }
 
   if (headStr === "return") {
@@ -528,23 +543,13 @@ function parseFormImpl(sform: any, spanId: number, env: any): any {
     headStr === "async-generator-fn"
   ) {
     // (lambda ((params...)) body-stmts...)
-    // OR (lambda ((params...)) (returns ReturnType) body-stmts...)
+    // Return type via trailing ": ReturnType" inside the param list sform.
     const sigForm = tail[0];
-    let bodyStart = 1;
-    let returnTypeSform: any = null;
-
-    if (
-      tail[1] != null &&
-      Array.isArray(tail[1]) &&
-      (tail[1] as any[])[0] === "returns"
-    ) {
-      returnTypeSform = (tail[1] as any[])[1];
-      bodyStart = 2;
-    }
+    const bodyStart = 1;
 
     const { params, rest, restType, returnType } = parseFnSig(
       sigForm,
-      returnTypeSform,
+      null,
       spanId,
       env
     );

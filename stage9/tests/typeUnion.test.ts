@@ -5,10 +5,10 @@ it('typeUnion end-to-end', () => {
     fromSourceEndToEnd(`(program
         (import {asrt} "./helpers")
         ;; union type: number | string — holds either kind of value
-        (let (x : (union number string)) 42)
+        (let ((x : (union number string) 42)))
         (asrt x 42)
         (asrt (typeof x) "number")
-        (let (y : (union number string)) "hello")
+        (let ((y : (union number string) "hello")))
         (asrt y "hello")
         (asrt (typeof y) "string")
     )`);

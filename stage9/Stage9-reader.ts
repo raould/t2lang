@@ -223,11 +223,165 @@ const buildTemplateForm  = (parts) => {
     return (("(template" + inner) + ")");
   }
 };
+const isWhitespace  = (ch) => {
+  return ((ch === " ") || ((ch === "\t") || ((ch === "\n") || (ch === "\r"))));
+};
+const isSubscriptTrigger  = (ch) => {
+  if ((ch === undefined)) {
+    return false;
+  }
+  {
+    let nonTrigger  = " \t\n\r([,;{#[";
+    return (nonTrigger.indexOf(ch) === -1);
+  }
+};
+const METHOD_MODIFIERS  = new Set(["static", "async", "generator", "abstract", "override", "readonly"]);
+// Scan from i (position AFTER opening '[') to matching ']', skipping strings and nested brackets.
+// Returns [content, newI] where content is the raw text and newI is the position after ']'.
+const scanBracketContent  = (src, i) => {
+  let depth = 1;
+  let buf = "";
+  let j = i;
+  while ((j < src.length) && (depth > 0)) {
+    const ch = src.charAt(j);
+    if ((ch === "'")) { const end = skipSingleQuoteString(src, j + 1); buf += src.slice(j, end); j = end; continue; }
+    if (((ch === '"') && ((src.charAt(j + 1) === '"') && (src.charAt(j + 2) === '"')))) { const end = skipTripleString(src, j + 3); buf += src.slice(j, end); j = end; continue; }
+    if ((ch === '"')) { const end = skipDoubleQuoteString(src, j + 1); buf += src.slice(j, end); j = end; continue; }
+    if (((ch === ';') && (src.charAt(j + 1) === ';'))) { const end = skipToEndOfLine(src, j + 2); buf += src.slice(j, end); j = end; continue; }
+    if ((ch === '[')) { depth++; buf += ch; j++; continue; }
+    if ((ch === ']')) { depth--; if ((depth > 0)) { buf += ch; } j++; continue; }
+    buf += ch;
+    j++;
+  }
+  return [buf, j];
+};
+const bracketHasTopLevelComma  = (src, i) => {
+  {
+    let depth  = 1;
+    let j  = (i + 1);
+    while (((j < src.length) && (depth > 0))) {
+      {
+        let ch  = src.charAt(j);
+        if ((ch === "'")) {
+          {
+            j = skipSingleQuoteString(src, (j + 1));
+          }
+        }
+        else {
+          if (((ch === "\"") && ((src.charAt((j + 1)) === "\"") && (src.charAt((j + 2)) === "\"")))) {
+            {
+              j = skipTripleString(src, (j + 3));
+            }
+          }
+          else {
+            if ((ch === "\"")) {
+              {
+                j = skipDoubleQuoteString(src, (j + 1));
+              }
+            }
+            else {
+              if (((ch === "[") || ((ch === "(") || (ch === "{")))) {
+                {
+                  depth = (depth + 1);
+                  j = (j + 1);
+                }
+              }
+              else {
+                if (((ch === "]") || ((ch === ")") || (ch === "}")))) {
+                  {
+                    depth = (depth - 1);
+                    j = (j + 1);
+                  }
+                }
+                else {
+                  if (((ch === ",") && (depth === 1))) {
+                    return true;
+                  }
+                  else {
+                    j = (j + 1);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+};
+const findPrecedingExprStart  = (text) => {
+  {
+    let j  = (text.length - 1);
+    if ((j < 0)) {
+      return -1;
+    }
+    {
+      let last  = text.charAt(j);
+      if ((last === ")")) {
+        {
+          let depth  = 1;
+          j = (j - 1);
+          while (((j >= 0) && (depth > 0))) {
+            {
+              let c  = text.charAt(j);
+              if ((c === ")")) {
+                depth = (depth + 1);
+              }
+              if ((c === "(")) {
+                depth = (depth - 1);
+              }
+            }
+            if ((depth > 0)) {
+              j = (j - 1);
+            }
+          }
+          return j;
+        }
+      }
+      if ((last === "]")) {
+        {
+          let depth  = 1;
+          j = (j - 1);
+          while (((j >= 0) && (depth > 0))) {
+            {
+              let c  = text.charAt(j);
+              if ((c === "]")) {
+                depth = (depth + 1);
+              }
+              if ((c === "[")) {
+                depth = (depth - 1);
+              }
+            }
+            if ((depth > 0)) {
+              j = (j - 1);
+            }
+          }
+          return j;
+        }
+      }
+      while ((j >= 0)) {
+        {
+          let c  = text.charAt(j);
+          if (((((((((((((c !== " ") && (c !== "\t")) && (c !== "\n")) && (c !== "\r")) && (c !== "(")) && (c !== ")")) && (c !== "[")) && (c !== "]")) && (c !== "{")) && (c !== "}")) && (c !== ",")) && (c !== ";"))) {
+            j = (j - 1);
+          }
+          else {
+            return (j + 1);
+          }
+        }
+      }
+      return (j + 1);
+    }
+  }
+};
 const readerTransform  = (src) => {
   {
     let out  = "";
     let i  = 0;
     let n  = src.length;
+    let bracketDepth  = 0;
+    let subscriptStack  = [];
     while ((i < n)) {
       {
         let ch  = src.charAt(i);
@@ -273,9 +427,109 @@ const readerTransform  = (src) => {
                   }
                 }
                 else {
-                  {
-                    out = (out + ch);
-                    i = (i + 1);
+                  if ((ch === "[")) {
+                    {
+                      let prevChar  = ((i > 0) ? src.charAt((i - 1)) : undefined);
+                      // Helper: capture raw bracket content and emit (subscript precExpr "raw")
+                      const emitSubscript  = (precExpr, prefix) => {
+                        const captured  = scanBracketContent(src, (i + 1));
+                        const rawContent  = captured[0];
+                        const newI  = captured[1];
+                        out = (((prefix + "(subscript ") + precExpr) + (" \"" + (escapeChunk(rawContent) + "\")") ));
+                        i = newI;
+                      };
+                      if (isSubscriptTrigger(prevChar)) {
+                        {
+                          let start  = findPrecedingExprStart(out);
+                          if ((start >= 0)) {
+                            emitSubscript(out.slice(start), out.slice(0, start));
+                          }
+                          else {
+                            {
+                              out = (out + "[");
+                              bracketDepth = (bracketDepth + 1);
+                              i = (i + 1);
+                            }
+                          }
+                        }
+                      }
+                      else {
+                        if (isWhitespace(prevChar)) {
+                          {
+                            let trimmedOut  = out.trimEnd();
+                            if (isSubscriptTrigger(trimmedOut.charAt((trimmedOut.length - 1)))) {
+                              {
+                                let start  = findPrecedingExprStart(trimmedOut);
+                                if ((start >= 0)) {
+                                  {
+                                    let precExpr  = trimmedOut.slice(start);
+                                    let prefix0  = trimmedOut.slice(0, start);
+                                    {
+                                      let prefix0Trim  = prefix0.trimEnd();
+                                      {
+                                        let charBefore  = ((prefix0Trim.length > 0) ? prefix0Trim.charAt((prefix0Trim.length - 1)) : "");
+                                        if (((charBefore !== "(") && ((charBefore !== ".") && (((precExpr.length === 0) || (precExpr.charAt(0) !== "[")) && ((!METHOD_MODIFIERS.has(precExpr)) && (!bracketHasTopLevelComma(src, i))))))) {
+                                          emitSubscript(precExpr, prefix0);
+                                        }
+                                        else {
+                                          {
+                                            out = (out + "[");
+                                            bracketDepth = (bracketDepth + 1);
+                                            i = (i + 1);
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                                else {
+                                  {
+                                    out = (out + "[");
+                                    bracketDepth = (bracketDepth + 1);
+                                    i = (i + 1);
+                                  }
+                                }
+                              }
+                            }
+                            else {
+                              {
+                                out = (out + "[");
+                                bracketDepth = (bracketDepth + 1);
+                                i = (i + 1);
+                              }
+                            }
+                          }
+                        }
+                        else {
+                          {
+                            out = (out + "[");
+                            bracketDepth = (bracketDepth + 1);
+                            i = (i + 1);
+                          }
+                        }
+                      }
+                    }
+                  }
+                  else {
+                    if ((ch === "]")) {
+                      {
+                        out = (out + "]");
+                        bracketDepth = (bracketDepth - 1);
+                        if (((subscriptStack.length > 0) && (subscriptStack[(subscriptStack.length - 1)] === bracketDepth))) {
+                          {
+                            subscriptStack.pop();
+                            out = (out + ")");
+                          }
+                        }
+                        i = (i + 1);
+                      }
+                    }
+                    else {
+                      {
+                        out = (out + ch);
+                        i = (i + 1);
+                      }
+                    }
                   }
                 }
               }

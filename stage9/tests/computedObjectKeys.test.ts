@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { fromSourceEndToEnd } from './helpers';
-import { compile } from '../index';
+import { compileSource as compile } from '../index';
 
 function callCompiler(source: string): { stdout: string; stderr: string; status: number } {
   try {
-    const stdout = compile({ filePath: '-', input: source });
+    const stdout = compile({ source: source });
     return { stdout, stderr: '', status: 0 };
   } catch (e: any) {
     return { stdout: '', stderr: e.message, status: 1 };

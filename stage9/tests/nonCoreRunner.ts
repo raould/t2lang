@@ -8,10 +8,10 @@ const tags = require('../Stage9-tags');
 tags.AST_TAG_SET.delete('prop-access');
 
 // Use programmatic API instead of main()
-const { compile } = require('../index');
+const { compileSource } = require('../index');
 const input = readFileSync(0, 'utf-8');
 try {
-  const result = compile({ filePath: '-', input });
+  const result = compileSource({ source: input });
   process.stdout.write(result + '\n');
 } catch (e: any) {
   console.error(e.message);

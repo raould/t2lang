@@ -5,7 +5,7 @@ import { Command } from 'commander';
 import { checkSource } from './t2helpers.js';
 import stage9 from '../stage9/index.ts';
 import stage9debug from '../stage9/Stage9-debug.ts';
-const { compile } = stage9;
+const { compile, compileSource } = stage9;
 const { makeDebugContextFromOptions } = stage9debug;
 
 const program = new Command();
@@ -67,9 +67,8 @@ for (const arg of inputs) {
     if (arg === '-') {
       const stdinData = readFileSync(0, 'utf-8');
       checkSource(stdinData, '<stdin>');
-      const output = compile({
-        filePath: '-',
-        input: stdinData,
+      const output = compileSource({
+        source: stdinData,
         t2exts,
         t2mexts,
         rootDir,

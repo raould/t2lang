@@ -8,9 +8,9 @@ it('class — implements single interface', () => {
         (class Hello
             (implements Greetable)
             (class-body
-                (method greet () (returns string)
+                (method greet () : string
                     (return "hello"))))
-        (let (h) (new Hello))
+        (let ((h (new Hello))))
         (asrt ((. h greet)) "hello")
     )`);
 }, 30_000);
@@ -28,7 +28,7 @@ it('class — implements multiple interfaces', () => {
                 (constructor ((n : string) (a : number))
                     (set! (. this name) n)
                     (set! (. this age) a))))
-        (let (p) (new Person "Alice" 30))
+        (let ((p (new Person "Alice" 30))))
         (asrt (. p name) "Alice")
         (asrt (. p age) 30)
     )`);
@@ -43,7 +43,7 @@ it('class — extends and implements', () => {
                 (field (name : string))
                 (constructor ((n : string))
                     (set! (. this name) n))
-                (method speak () (returns string)
+                (method speak () : string
                     (return (+ (. this name) " speaks")))))
         (class Dog
             (extends Animal)
@@ -51,9 +51,9 @@ it('class — extends and implements', () => {
             (class-body
                 (constructor ((n : string))
                     (super n))
-                (method describe () (returns string)
+                (method describe () : string
                     (return (+ "Dog: " (. this name))))))
-        (let (d) (new Dog "Rex"))
+        (let ((d (new Dog "Rex"))))
         (asrt ((. d speak)) "Rex speaks")
         (asrt ((. d describe)) "Dog: Rex")
     )`);
@@ -66,7 +66,7 @@ it('class — abstract class implementing interface', () => {
         (class abstract AbstractShape
             (implements Shape)
             (class-body
-                (abstract-method public area () (returns number))))
+                (abstract-method public area () : number)))
         (class Circle
             (extends AbstractShape)
             (class-body
@@ -74,9 +74,9 @@ it('class — abstract class implementing interface', () => {
                 (constructor ((radius : number))
                     (super)
                     (set! (. this r) radius))
-                (method public override area () (returns number)
+                (method public override area () : number
                     (return (* 3 (* (. this r) (. this r)))))))
-        (let (c) (new Circle 5))
+        (let ((c (new Circle 5))))
         (asrt ((. c area)) 75)
     )`);
 }, 30_000);

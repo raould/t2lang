@@ -4,9 +4,9 @@ import { fromSourceEndToEnd } from './helpers';
 it('unquote.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
       (import {asrtDeep} "./helpers")
-      (let (x) 42)
+      (let ((x 42)))
       ;; unquote inside quasiquote
-      (let (tmpl) (quasi (object (val (unquote x)))))
+      (let ((tmpl (quasi (object (val (unquote x)))))))
       (asrtDeep tmpl (object (val 42)))
   )
 `);
@@ -15,9 +15,9 @@ it('unquote.test.t2 end-to-end', () => {
 it('~ tilde unquote sugar: same result as (unquote x)', () => {
   fromSourceEndToEnd(`(program
       (import {asrtDeep} "./helpers")
-      (let (x) 42)
+      (let ((x 42)))
       ;; ~x is sugar for (unquote x)
-      (let (tmpl) (quasi (object (val ~x))))
+      (let ((tmpl (quasi (object (val ~x))))))
       (asrtDeep tmpl (object (val 42)))
   )
 `);

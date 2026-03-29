@@ -2,6 +2,10 @@
 
 A bootstrapping compiler chain (stage3 → ... → stage9) that compiles s-expression source files (`.s8`, `.s7`, `.s6`, `.s5`) to TypeScript.
 
+## Code Style & Conventions
+
+Read STYLE_GUIDE.md
+
 ## Project Structure
 
 - `stage9/` — current compiler stage (`.s8` sources → `.ts` outputs)
@@ -43,90 +47,6 @@ Always run vitest as `npx vitest --typecheck run` — never bare `vitest run`.
 - **Source → output mapping:** `Stage9-foo.s8` → `Stage9-foo.ts`; exception: `Stage9.s8` → `index.ts`
 - **Never edit `.ts` files** that are compiled from `.s8` sources — they get overwritten on build
 
-## Code Style & Conventions
-
-Source files use t2 s-expression syntax that compiles to TypeScript. Prefer the concise literal forms over verbose s-expression forms.
-
-### Object literals: `{ ... }` not `(object ...)`
-
-Bare keys, colon separators, **no commas** between entries.
-
-```lisp
-;; PREFERRED
-{ kind: "file" path: "stage9/Stage9.g4" }
-
-;; AVOID
-(object (kind "file") (path "stage9/Stage9.g4"))
-```
-
-Nested:
-
-```lisp
-{ name: "build-grammar"
-  output: "stage9/Stage9Lexer.ts"
-  deps: [{ kind: "file" path: "stage9/Stage9.g4" }] }
-```
-
-### Array literals: `[ ... ]` not `(array ...)`
-
-Square brackets, **no commas** between elements.
-
-```lisp
-;; PREFERRED
-[1 2 3]
-["hello" "world"]
-[{ kind: "file" path: "a.ts" }
- { kind: "rule" name: "build-grammar" }]
-
-;; AVOID
-(array 1 2 3)
-```
-
-### Import syntax: `{ name1 name2 }` for named imports
-
-```lisp
-(import { readdirSync writeFileSync renameSync } "node:fs")
-(import path "node:path")
-```
-
-### Type annotations everywhere
-
-Annotate all bindings and parameters.
-
-```lisp
-(const (stage9Dir : string) ((. path join) (. ctx projectRoot) "stage9"))
-(const (items : (type-array string)) [])
-(fn ((ctx : BuildContext)) ...)
-(async-fn ((filePath : string) (input : string)) ...)
-```
-
-| t2 syntax | TypeScript output |
-|---|---|
-| `(x : string)` | `x: string` |
-| `(x : number)` | `x: number` |
-| `(x : boolean)` | `x: boolean` |
-| `(x : any)` | `x: any` |
-| `(x : (type-array string))` | `x: string[]` |
-| `(x : (or string null))` | `x: string \| null` |
-
-### Complete example
-
-```lisp
-((. shk rule) {
-  name: "build-compiler"
-  output: "stage9/index.ts"
-  deps: [{ kind: "rule" name: "build-grammar" }
-         { kind: "glob" pattern: "stage9/Stage9*.s8" }
-         { kind: "file" path: "stage9/Stage9-tags.ts" }]
-  action: (async-fn ((ctx : any))
-    (const (stage9Dir : string) ((. path join) (. ctx projectRoot) "stage9"))
-    (const (files : (type-array string))
-      ((. (readdirSync stage9Dir) filter) (fn ((f : string)) (return ((. f endsWith) ".s8")))))
-    (for-of f files
-      (const (result : any) (await ((. ctx run) tsxBin [compilerPath srcPath])))
-      (writeFileSync tmpPath (. result stdout))))})
-```
-
 ## Testing
 
 - Framework: Vitest (with `--typecheck`)
@@ -146,7 +66,6 @@ Annotate all bindings and parameters.
 
 ## General Notes
 
-- **No commas** in object or array literals — whitespace separates entries
 - Object literal keys are bare identifiers (no quotes for simple keys)
-- Literal forms compile to identical JavaScript as verbose counterparts
-- Paren balance is critical — verify with a depth-checking script before committing `.s8` changes
+- Literal forms `{ ... }` vs. `(obj ...)`, `[ ... ]` vs. `(array ...)` compile to identical JavaScript, so prefer the literal forms.
+- Paren balance is critical — verify with a depth-checking script before committing changes.

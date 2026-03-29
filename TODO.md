@@ -1,9 +1,9 @@
-- [ ] update the style guide.
+- [ ] stageN/src/** duh.
+- [ ] keep updating the style guide.
 - [ ] omfg version numbers.
-- [ ] use esbuild for crying out loud.
 - [ ] error reporting unification, and the error glossary.
 - [ ] (too) many things are hard-coded to use the highest stageN.
-- [ ] npm 'clean' script.
+- [ ] 'clean' script; use minishake; esbuild.
 - [ ] support a jsdoc syntax.
-- [ ] `(fn (x: number, y: string) ...)` sugar with required commas.
+- [ ] `(fn (x: number, y: string) ...)` sugar with required commas. (nightmare!)
 - [ ] double-check that keyword collision detection is working for value and macro levels.

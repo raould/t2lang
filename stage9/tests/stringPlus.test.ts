@@ -4,7 +4,7 @@ import { fromSourceEndToEnd } from './helpers';
 it('stringPlus.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
       (import {asrt} "./helpers")
-      (let* ((a "one")
+      (let ((a "one")
             (b "Two")
             (c "3")
             (abc (+ a b c)))

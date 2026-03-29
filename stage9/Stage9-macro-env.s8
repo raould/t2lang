@@ -38,7 +38,7 @@
   ;; Used by the expander to stamp use-site scopes on expanded output.
   (const freshScope
     (lambda ((env))
-      (let* ((s (. env scopeCounter)))
+      (let ((s (. env scopeCounter)))
         (set! (. env scopeCounter) (+ (. env scopeCounter) 1))
         (return s))))
 
@@ -47,7 +47,7 @@
   ;; scopes starts empty; the expander (Step 5) stamps the KFFD labels.
   (const gensym
     (lambda ((env) (prefix))
-      (let* ((pfx (ternary (!== prefix undefined) prefix 'g'))
+      (let ((pfx (ternary (!== prefix undefined) prefix 'g'))
              (id (. env gensymCounter)))
         (set! (. env gensymCounter) (+ (. env gensymCounter) 1))
         (return (object

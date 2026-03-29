@@ -149,6 +149,9 @@ const astTopLevel  = (ctx) => {
   if (ctx.topLevelLet()) {
     return astTopLevelLet(ctx.topLevelLet());
   }
+  if (ctx.topLevelVar()) {
+    return astTopLevelVar(ctx.topLevelVar());
+  }
   if (ctx.topLevelConst()) {
     return astTopLevelConst(ctx.topLevelConst());
   }
@@ -287,17 +290,42 @@ const astMacroTimeFnDef  = (ctx) => {
 };
 const astTopLevelLet  = (ctx) => {
   {
-    let name  = ctx.IDENTIFIER().getText();
-    let init  = astExpression(ctx.expression());
+    let b  = ctx.starBinding()[0];
     let meta  = astParseMeta(ctx);
-    return ({
-      id: registerSpan(nextNodeId(), ctx),
-      text: ctx.getText(),
-      tag: "let-decl",
-      name: name,
-      init: init,
-      meta: meta
-    });
+    {
+      let name  = b.IDENTIFIER().getText();
+      let init  = astExpression(b.expression());
+      let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
+      return ({
+        id: registerSpan(nextNodeId(), ctx),
+        text: ctx.getText(),
+        tag: "let-decl",
+        name: name,
+        init: init,
+        typeAnnotation: typeAnnotation,
+        meta: meta
+      });
+    }
+  }
+};
+const astTopLevelVar  = (ctx) => {
+  {
+    let b  = ctx.starBinding()[0];
+    let meta  = astParseMeta(ctx);
+    {
+      let name  = b.IDENTIFIER().getText();
+      let init  = astExpression(b.expression());
+      let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
+      return ({
+        id: registerSpan(nextNodeId(), ctx),
+        text: ctx.getText(),
+        tag: "var-decl",
+        name: name,
+        init: init,
+        typeAnnotation: typeAnnotation,
+        meta: meta
+      });
+    }
   }
 };
 const astTopLevelConst  = (ctx) => {
@@ -375,29 +403,6 @@ const astModifiers  = (ctx) => {
   return ctx.modifier().map((m) => {
     return m.start.text;
   });
-};
-const astTypedParam  = (ctx) => {
-  {
-    let name  = ctx.IDENTIFIER().getText();
-    let optional  = (ctx.OPTIONAL() ? true : false);
-    let typeAnn  = (ctx.typeExpr() ? astTypeExpr(ctx.typeExpr()) : undefined);
-    return ({
-      id: registerSpan(nextNodeId(), ctx),
-      name: name,
-      optional: optional,
-      typeAnnotation: typeAnn
-    });
-  }
-};
-const astFnSignatureTyped  = (ctx) => {
-  {
-    let params  = ctx.typedParam().map(astTypedParam);
-    let returnType  = (ctx.typeExpr() ? astTypeExpr(ctx.typeExpr()) : undefined);
-    return ({
-      params: params,
-      returnType: returnType
-    });
-  }
 };
 const astFieldDef  = (ctx) => {
   {
@@ -486,7 +491,7 @@ const astClassMethodDef  = (ctx) => {
   {
     let mods  = astModifiers(ctx);
     let keyInfo  = astMethodKey(ctx.methodKey());
-    let sig  = astFnSignatureTyped(ctx.fnSignatureTyped());
+    let sig  = astParseFnSig(ctx.fnSignature());
     let body  = ctx.statement().map(astStatement);
     return ({
       id: registerSpan(nextNodeId(), ctx),
@@ -505,7 +510,7 @@ const astAbstractMethodDef  = (ctx) => {
   {
     let mods  = astModifiers(ctx);
     let keyInfo  = astMethodKey(ctx.methodKey());
-    let sig  = astFnSignatureTyped(ctx.fnSignatureTyped());
+    let sig  = astParseFnSig(ctx.fnSignature());
     return ({
       id: registerSpan(nextNodeId(), ctx),
       text: ctx.getText(),
@@ -522,7 +527,7 @@ const astGetterDef  = (ctx) => {
   {
     let mods  = astModifiers(ctx);
     let keyInfo  = astMethodKey(ctx.methodKey());
-    let sig  = astFnSignatureTyped(ctx.fnSignatureTyped());
+    let sig  = astParseFnSig(ctx.fnSignature());
     let body  = ctx.statement().map(astStatement);
     return ({
       id: registerSpan(nextNodeId(), ctx),
@@ -541,7 +546,7 @@ const astSetterDef  = (ctx) => {
   {
     let mods  = astModifiers(ctx);
     let keyInfo  = astMethodKey(ctx.methodKey());
-    let sig  = astFnSignatureTyped(ctx.fnSignatureTyped());
+    let sig  = astParseFnSig(ctx.fnSignature());
     let body  = ctx.statement().map(astStatement);
     return ({
       id: registerSpan(nextNodeId(), ctx),
@@ -670,9 +675,10 @@ const astCatchClause  = (ctx) => {
     });
   }
 };
-const astTry  = (ctx) => {
+const astExcept  = (ctx) => {
   {
-    let body  = ctx.statement().map(astStatement);
+    let tryCtx  = ctx.tryClause();
+    let body  = tryCtx.statement().map(astStatement);
     let catchCtx  = ctx.catchClause();
     let catchNode  = (catchCtx ? astCatchClause(catchCtx) : undefined);
     let finallyCtx  = ctx.finallyClause();
@@ -688,11 +694,11 @@ const astTry  = (ctx) => {
   }
 };
 const astStatement  = (ctx) => {
-  if (ctx.letStar()) {
-    return astLetStar(ctx.letStar());
-  }
   if (ctx.letStmt()) {
-    return astLetStmt(ctx.letStmt());
+    return astLetStar(ctx.letStmt());
+  }
+  if (ctx.varStmt()) {
+    return astVarStar(ctx.varStmt());
   }
   if (ctx.constStar()) {
     return astConstStar(ctx.constStar());
@@ -706,8 +712,8 @@ const astStatement  = (ctx) => {
   if (ctx.whileForm()) {
     return astWhile(ctx.whileForm());
   }
-  if (ctx.tryForm()) {
-    return astTry(ctx.tryForm());
+  if (ctx.exceptForm()) {
+    return astExcept(ctx.exceptForm());
   }
   if (ctx.assign()) {
     return astAssign(ctx.assign());
@@ -1127,9 +1133,9 @@ const astFor  = (ctx) => {
   }
   {
     let initCtx  = ctx.letStmt();
-    let bindCtx  = initCtx.singleBinding();
+    let bindCtx  = initCtx.starBinding()[0];
     let initName  = bindCtx.IDENTIFIER().getText();
-    let initExpr  = astExpression(initCtx.expression());
+    let initExpr  = astExpression(bindCtx.expression());
     let test  = astExpression(ctx.expression(0));
     let updateCtx  = ctx.assign();
     let updateName  = updateCtx.IDENTIFIER().getText();
@@ -1260,25 +1266,33 @@ const astLetStar  = (ctx) => {
     return ({
       id: registerSpan(nextNodeId(), ctx),
       text: ctx.getText(),
-      tag: "let*",
+      tag: "let",
       bindings: bindings,
       body: body
     });
   }
 };
-const astLetStmt  = (ctx) => {
+const astVarStar  = (ctx) => {
   {
-    let bindCtx  = ctx.singleBinding();
-    let name  = bindCtx.IDENTIFIER().getText();
-    let typeAnnotation  = (bindCtx.typeExpr() ? astTypeExpr(bindCtx.typeExpr()) : undefined);
-    let init  = astExpression(ctx.expression());
+    let bindings  = ctx.starBinding().map((b) => {
+      {
+        let id  = b.IDENTIFIER().getText();
+        let init  = astExpression(b.expression());
+        let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
+        return ({
+          name: id,
+          init: init,
+          typeAnnotation: typeAnnotation
+        });
+      }
+    });
+    let body  = ctx.statement().map(astStatement);
     return ({
       id: registerSpan(nextNodeId(), ctx),
       text: ctx.getText(),
-      tag: "let",
-      name: name,
-      typeAnnotation: typeAnnotation,
-      init: init
+      tag: "var",
+      bindings: bindings,
+      body: body
     });
   }
 };
@@ -1922,6 +1936,9 @@ const astExpression  = (ctx) => {
   if (ctx.indexAccess()) {
     return astIndexAccess(ctx.indexAccess());
   }
+  if (ctx.subscriptAccess()) {
+    return astSubscriptAccess(ctx.subscriptAccess());
+  }
   if (ctx.quasiquote()) {
     return astQuasiquote(ctx.quasiquote());
   }
@@ -2078,15 +2095,29 @@ const astIndexAccess  = (ctx) => {
     });
   }
 };
+const astSubscriptAccess  = (ctx) => {
+  {
+    let obj  = astExpression(ctx.expression());
+    let rawIndex  = parseString(ctx.STRING().getText());
+    return ({
+      id: registerSpan(nextNodeId(), ctx),
+      text: ctx.getText(),
+      tag: "subscript-access",
+      object: obj,
+      rawIndex: rawIndex
+    });
+  }
+};
 const astParseFnSig  = (sig) => {
   {
     let params  = sig.param().map((p) => {
       {
         let name  = p.IDENTIFIER().getText();
+        let optional  = (p.OPTIONAL() ? true : false);
         let typeAnn  = (p.typeExpr() ? astTypeExpr(p.typeExpr()) : undefined);
         return ({
           name: name,
-          optional: false,
+          optional: optional,
           typeAnnotation: typeAnn
         });
       }

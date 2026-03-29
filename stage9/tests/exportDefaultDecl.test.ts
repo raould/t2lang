@@ -30,9 +30,9 @@ it('export-default — named class declaration', () => {
                 (field (name : string))
                 (constructor ((n : string))
                     (set! (. this name) n))
-                (method greet () (returns string)
+                (method greet () : string
                     (return (+ "hello " (. this name)))))))
-        (let (g) (new Greeter "world"))
+        (let ((g (new Greeter "world"))))
         (asrt ((. g greet)) "hello world")
     )`);
 }, 30_000);
@@ -46,7 +46,7 @@ it('export-default — anonymous class declaration', () => {
         (export-default (class
             (class-body
                 (field (value : number) 0)
-                (method getValue () (returns number)
+                (method getValue () : number
                     (return (. this value))))))
         (asrt 1 1)
     )`);
@@ -73,14 +73,14 @@ it('export-default — class with extends', () => {
         (import {asrt} "./helpers")
         (class Base
             (class-body
-                (method name () (returns string)
+                (method name () : string
                     (return "base"))))
         (export-default (class Child
             (extends Base)
             (class-body
-                (method override name () (returns string)
+                (method override name () : string
                     (return "child")))))
-        (let (c) (new Child))
+        (let ((c (new Child))))
         (asrt ((. c name)) "child")
     )`);
 }, 30_000);

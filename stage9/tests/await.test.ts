@@ -2,11 +2,11 @@ import { expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { transformSync } from 'esbuild';
 import path from 'node:path';
-import { compile as t2compile } from '../index';
+import { compileSource as t2compile } from '../index';
 
 const compile = (t2Source: string) => {
   try {
-    const ts = t2compile({ filePath: '-', input: t2Source });
+    const ts = t2compile({ source: t2Source });
     return { ts, status: 0, errors: [] as string[] };
   } catch (e: any) {
     return { ts: '', status: 1, errors: [e.message] };
@@ -43,7 +43,7 @@ it('for-await over async generator accumulates values', () => {
     (const makeGen (async-generator-fn ()
       (yield (await ((. Promise resolve) 3)))
       (yield 4)))
-    (let (sum) 0)
+    (let ((sum 0)))
     (for-await x (makeGen)
       (set! sum (+ sum x)))
     ((. console log) sum)

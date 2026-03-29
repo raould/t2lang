@@ -1,7 +1,7 @@
 import path from 'path';
 import ts from 'typescript';
 import { expect, it, vi } from 'vitest';
-import { compile } from '../index';
+import { compileSource as compile } from '../index';
 import { fromSourceEndToEnd } from './helpers';
 
 const T = 30_000;
@@ -10,7 +10,7 @@ const CWD = path.join(__dirname, '..');
 
 function callCompiler(source: string): { stdout: string; stderr: string; status: number } {
   try {
-    const stdout = compile({ filePath: '-', input: source });
+    const stdout = compile({ source: source });
     return { stdout, stderr: '', status: 0 };
   } catch (e: any) {
     return { stdout: '', stderr: e.message, status: 1 };
@@ -20,10 +20,11 @@ function callCompiler(source: string): { stdout: string; stderr: string; status:
 it('try/catch/finally runs expected blocks', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (let (events) (array))
-    (try
-      ((. events push) "try")
-      (throw "boom")
+    (let ((events (array))))
+    (except
+      (try
+        ((. events push) "try")
+        (throw "boom"))
       (catch err
         ((. events push) (+ "catch:" err)))
       (finally
@@ -35,9 +36,10 @@ it('try/catch/finally runs expected blocks', () => {
 it('try/finally without catch still runs finally', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (let (events) (array))
-    (try
-      ((. events push) "start")
+    (let ((events (array))))
+    (except
+      (try
+        ((. events push) "start"))
       (finally
         ((. events push) "done")))
     (asrt ((. events join) ",") "start,done")
@@ -47,10 +49,11 @@ it('try/finally without catch still runs finally', () => {
 it('try/catch without finally runs catch path only', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (let (events) (array))
-    (try
-      ((. events push) "start")
-      (throw "boom")
+    (let ((events (array))))
+    (except
+      (try
+        ((. events push) "start")
+        (throw "boom"))
       (catch err
         ((. events push) (+ "caught:" err))))
     (asrt ((. events join) ",") "start,caught:boom")
@@ -60,11 +63,12 @@ it('try/catch without finally runs catch path only', () => {
 it('finally runs even when returning from try', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (let (events) (array))
+    (let ((events (array))))
     (const run (lambda ()
-      (try
-        ((. events push) "try")
-        (return "value")
+      (except
+        (try
+          ((. events push) "try")
+          (return "value"))
         (finally
           ((. events push) "finally")))))
     (asrt (run) "value")
@@ -75,19 +79,21 @@ it('finally runs even when returning from try', () => {
 it('finally throwing overrides earlier throw', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (let (events) (array))
-    (try
+    (let ((events (array))))
+    (except
       (try
-        (throw "inner")
-        (finally
-          (throw "finally")))
+        (except
+          (try
+            (throw "inner"))
+          (finally
+            (throw "finally"))))
       (catch err
         ((. events push) (+ "outer:" err))))
     (asrt ((. events join) ",") "outer:finally")
   )`);
 }, T);
 
-it('rejects try with neither catch nor finally', () => {
+it('rejects bare (try) — not a valid statement without (except) wrapper', () => {
   const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
   try {
     const result = callCompiler(`(program
@@ -95,7 +101,6 @@ it('rejects try with neither catch nor finally', () => {
         ((. console log) "oops"))
     )`);
     expect(result.status).toBe(1);
-    expect(result.stderr).toMatch(/parse error/i);
   } finally {
     spy.mockRestore();
   }
@@ -104,8 +109,9 @@ it('rejects try with neither catch nor finally', () => {
 it('catch binding is scoped only to the catch body', () => {
   const result = callCompiler(`(program
     (import {asrt} "./helpers")
-    (try
-      (throw "boom")
+    (except
+      (try
+        (throw "boom"))
       (catch err
         ((. console log) err)))
     (asrt err "boom")

@@ -139,23 +139,23 @@ End-to-end tests via `fromSourceEndToEnd`:
 
 ```scheme
 ;; basic interpolation
-(let* ((b 42) (a `foo ${b}`))
+(let ((b 42) (a `foo ${b}`))
   (asrt a "foo 42"))
 
 ;; expression in hole
-(let* ((x 3) (s `result: ${(* x x)}`))
+(let ((x 3) (s `result: ${(* x x)}`))
   (asrt s "result: 9"))
 
 ;; hole at start
-(let* ((name "world") (s `${name}!`))
+(let ((name "world") (s `${name}!`))
   (asrt s "world!"))
 
 ;; multiple holes
-(let* ((a "hi") (b "there") (s `${a} ${b}`))
+(let ((a "hi") (b "there") (s `${a} ${b}`))
   (asrt s "hi there"))
 
 ;; no interpolation (plain backtick string)
-(let* ((s `hello`))
+(let ((s `hello`))
   (asrt s "hello"))
 
 ;; empty template

@@ -21,7 +21,7 @@ it('export-type — named type export of a locally defined alias', () => {
         (import {asrt} "./helpers")
         (type Score number)
         (export-type (Score))
-        (let (s : Score) 100)
+        (let ((s : Score 100)))
         (asrt s 100)
     )`);
 }, 30_000);
@@ -32,7 +32,7 @@ it('export-type — named type export with alias', () => {
         (import {asrt} "./helpers")
         (type Score number)
         (export-type (Score Points))
-        (let (s : Score) 99)
+        (let ((s : Score 99)))
         (asrt s 99)
     )`);
 }, 30_000);
@@ -44,7 +44,7 @@ it('export-type — multiple names in one export-type form', () => {
         (type Width number)
         (type Height number)
         (export-type (Width) (Height))
-        (let (w : Width) 800)
+        (let ((w : Width 800)))
         (asrt w 800)
     )`);
 }, 30_000);

@@ -2,11 +2,11 @@ import { expect, it, vi } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fromSourceEndToEnd } from './helpers';
-import { compile as t2compile } from '../index';
+import { compileSource as t2compile } from '../index';
 
 const compile = (t2Source: string) => {
   try {
-    const ts = t2compile({ filePath: '-', input: t2Source });
+    const ts = t2compile({ source: t2Source });
     return { ts, status: 0, errors: [] as string[] };
   } catch (e: any) {
     const errors: string[] = [e.message];

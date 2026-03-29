@@ -8,7 +8,7 @@ it('typeKeyof end-to-end', () => {
         (type Keys (type-params (T)) (keyof T))
         ;; Keys<{a~number,b~string}> = "a" | "b"
         ;; annotate a variable with that key type and check the value
-        (let (k : (type-app Keys (obj (a number) (b string)))) "a")
+        (let ((k : (type-app Keys (obj (a number) (b string))) "a")))
         (asrt k "a")
         (asrt (typeof k) "string")
     )`);

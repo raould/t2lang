@@ -13,7 +13,7 @@ it('lambda.test.t2 end-to-end', () => {
         (return "hi")))
 
       ;; lambda as inline expression
-      (let (result) ((lambda ((x)) (return (* x x))) 5))
+      (let ((result ((lambda ((x)) (return (* x x))) 5))))
       
       (asrt (add 1 2) 3)
       (asrt (greet) "hi")

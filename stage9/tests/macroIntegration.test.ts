@@ -17,14 +17,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { compile } from '../index';
+import { compileSource as compile } from '../index';
 import { fromSourceEndToEnd } from './helpers';
 
 // ---- helper: call compiler directly to check exit code / stderr ----
 
 function callCompiler(source: string): { stdout: string; stderr: string; status: number } {
   try {
-    const stdout = compile({ filePath: '-', input: source });
+    const stdout = compile({ source: source });
     return { stdout, stderr: '', status: 0 };
   } catch (e: any) {
     return { stdout: '', stderr: e.message, status: 1 };
@@ -108,7 +108,7 @@ describe('Step 7: macro expansion in the compiler pipeline', () => {
     fromSourceEndToEnd(`(program
   (import {asrt} "./helpers")
   (defmacro negateFresh (x)
-    (let* ((tmp (gensym "tmp")))
+    (let ((tmp (gensym "tmp")))
       (return (quasi (- 0 (unquote x))))))
   (const tmp 5)
   (const result (negateFresh tmp))
@@ -204,9 +204,9 @@ describe('Step 7: tilde reader-macro sugar (~, ~@)', () => {
     fromSourceEndToEnd(`(program
   (import {asrt} "./helpers")
   (defmacro swap (a b)
-    (return (quasi (let* ((tmp ~a)) (set! ~a ~b) (set! ~b tmp)))))
-  (let (x) 1)
-  (let (y) 99)
+    (return (quasi (let ((tmp ~a)) (set! ~a ~b) (set! ~b tmp)))))
+  (let ((x 1)))
+  (let ((y 99)))
   (swap x y)
   (asrt x 99)
   (asrt y 1)

@@ -9,11 +9,11 @@ it('class — basic getter and setter', () => {
                 (field (_v : number))
                 (constructor ((v : number))
                     (set! (. this _v) v))
-                (get value () (returns number)
+                (get value () : number
                     (return (. this _v)))
                 (set value ((n : number))
                     (set! (. this _v) n))))
-        (let (b) (new Box 10))
+        (let ((b (new Box 10))))
         (asrt (. b value) 10)
         (set! (. b value) 42)
         (asrt (. b value) 42)
@@ -30,11 +30,11 @@ it('class — getter derived from multiple fields', () => {
                 (constructor ((w : number) (h : number))
                     (set! (. this width) w)
                     (set! (. this height) h))
-                (get area () (returns number)
+                (get area () : number
                     (return (* (. this width) (. this height))))
-                (get perimeter () (returns number)
+                (get perimeter () : number
                     (return (* 2 (+ (. this width) (. this height)))))))
-        (let (r) (new Rect 5 3))
+        (let ((r (new Rect 5 3))))
         (asrt (. r area) 15)
         (asrt (. r perimeter) 16)
         (set! (. r width) 10)
@@ -48,13 +48,13 @@ it('class — setter with clamping logic', () => {
         (class Clamp
             (class-body
                 (field (_pct : number) 0)
-                (get pct () (returns number)
+                (get pct () : number
                     (return (. this _pct)))
                 (set pct ((v : number))
                     (if (< v 0) (then (set! (. this _pct) 0)))
                     (if (> v 100) (then (set! (. this _pct) 100)))
                     (if (&& (>= v 0) (<= v 100)) (then (set! (. this _pct) v))))))
-        (let (c) (new Clamp))
+        (let ((c (new Clamp))))
         (set! (. c pct) 50)
         (asrt (. c pct) 50)
         (set! (. c pct) -10)
@@ -70,15 +70,15 @@ it('class — getter override calling super getter via (. super prop)', () => {
         ;; (. super label) emits super.label — pure property access, no call parens
         (class Base
             (class-body
-                (get label () (returns string)
+                (get label () : string
                     (return "base"))))
         (class Child
             (extends Base)
             (class-body
-                (get override label () (returns string)
+                (get override label () : string
                     (return (+ (. super label) "+child")))))
-        (let (b) (new Base))
-        (let (c) (new Child))
+        (let ((b (new Base))))
+        (let ((c (new Child))))
         (asrt (. b label) "base")
         (asrt (. c label) "base+child")
     )`);
@@ -93,7 +93,7 @@ it('class — getter and setter with inheritance', () => {
                 (field (_n : number))
                 (constructor ((n : number))
                     (set! (. this _n) n))
-                (get value () (returns number)
+                (get value () : number
                     (return (. this _n)))
                 (set value ((n : number))
                     (set! (. this _n) n))))
@@ -102,10 +102,10 @@ it('class — getter and setter with inheritance', () => {
             (class-body
                 (constructor ((n : number))
                     (super n))
-                (get override value () (returns number)
+                (get override value () : number
                     (return (* 2 (. this _n))))))
-        (let (b) (new Base 5))
-        (let (d) (new Doubled 5))
+        (let ((b (new Base 5))))
+        (let ((d (new Doubled 5))))
         (asrt (. b value) 5)
         (asrt (. d value) 10)
         (set! (. b value) 7)

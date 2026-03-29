@@ -5,10 +5,10 @@ it('typeAnnotation.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
       (import {asrt} "./helpers")
       (import {asrtDeep} "./helpers")
-      (let (x : number) 42)
-      (let (name : string) "hello")
+      (let ((x : number 42)))
+      (let ((name : string "hello")))
       (const (pi : number) 3.14)
-      (let (pair : (tuple number string)) (array 42 "foo"))
+      (let ((pair : (tuple number string) (array 42 "foo"))))
 
       (asrt x 42)
       (asrt (typeof x) "number")
@@ -22,7 +22,7 @@ it('typeAnnotation.test.t2 end-to-end', () => {
       (asrtDeep pair (array 42 "foo"))
       (asrt (typeof pair) "object")
 
-      (let* ((a : number 10)
+      (let ((a : number 10)
             (b : string "world"))
         (asrt a 10)
         (asrt (typeof a) "number")

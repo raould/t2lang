@@ -55,23 +55,23 @@ pipeline is unchanged.
 `stage9/tests/bracketArrayLiteral.test.ts` — end-to-end tests:
 
 ```scheme
-(let* ((a [1, 2, 3]))
+(let ((a [1, 2, 3]))
   (asrt (index a 0) 1)
   (asrt (index a 2) 3))
 
 ;; no commas
-(let* ((b [10 20 30]))
+(let ((b [10 20 30]))
   (asrt ((. b length)) 3))
 
 ;; nested
-(let* ((m [[1 2] [3 4]]))
+(let ((m [[1 2] [3 4]]))
   (asrt (index (index m 1) 0) 3))
 
 ;; empty
 (asrt ((. JSON stringify) []) "[]")
 
 ;; expressions as elements
-(let* ((x 7) (a [x (+ x 1)]))
+(let ((x 7) (a [x (+ x 1)]))
   (asrt (index a 1) 8))
 ```
 
@@ -174,23 +174,23 @@ Again the same shape as `astObjectExpr`, so no downstream changes.
 
 ```scheme
 ;; string keys
-(let* ((o { "name": "Alice", "age": 30 }))
+(let ((o { "name": "Alice", "age": 30 }))
   (asrt ((. JSON stringify) o) '{"name":"Alice","age":30}'))
 
 ;; identifier keys
-(let* ((o { x: 1, y: 2 }))
+(let ((o { x: 1, y: 2 }))
   (asrt (. o x) 1))
 
 ;; shorthand { x }  (same as { x: x })
-(let* ((x 42) (o { x }))
+(let ((x 42) (o { x }))
   (asrt (. o x) 42))
 
 ;; computed key [expr]
-(let* ((k "hello") (o { [k]: "world" }))
+(let ((k "hello") (o { [k]: "world" }))
   (asrt (. o hello) "world"))
 
 ;; mixed
-(let* ((tag "t") (o { "a": 1, b: 2, [tag]: 3 }))
+(let ((tag "t") (o { "a": 1, b: 2, [tag]: 3 }))
   (asrt (. o a) 1)
   (asrt (. o b) 2)
   (asrt (. o t) 3))

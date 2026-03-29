@@ -16,11 +16,11 @@ it('stringTemplate end-to-end', () => {
     (asrt 'say "hi"' 'say "hi"')
 
     ;; string as object field key (was: backtick key)
-    (let (obj) (object ("myKey" 42)))
+    (let ((obj (object ("myKey" 42)))))
     (asrt (. obj myKey) 42)
 
     ;; hyphenated key — use quoted string (keywords/identifiers can't have hyphens)
-    (let (obj2) (object ("has-hyphen" 99)))
+    (let ((obj2 (object ("has-hyphen" 99)))))
     (asrt (index obj2 "has-hyphen") 99)
   )`);
 }, 30_000);

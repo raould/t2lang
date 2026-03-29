@@ -283,10 +283,10 @@ describe('KFFD scope stamping', () => {
   });
 
   it('gensym identifiers get the use-site scope after expansion', () => {
-    // (defmacro make-g () (let* ((g (gensym))) (return g)))
+    // (defmacro make-g () (let ((g (gensym))) (return g)))
     const macroDef = makeDefmacro('make-g', [], 0,
       {
-        tag: 'let*',
+        tag: 'let',
         bindings: [{ name: 'g', init: makeCall('gensym'), typeAnnotation: null }],
         body: [makeReturn(makeIdent('g'))],
         text: '',

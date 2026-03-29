@@ -54,7 +54,7 @@ it('fn-o: rest param', () => {
 
     (fn-o forward
       ((target : string)
-       (rest opts : Record<string, unknown>))
+       (rest opts : (type-app Record string unknown)))
       (return target))
 
     (asrt (forward { target: "x" }) "x")
@@ -66,7 +66,7 @@ it('lambda-o: anonymous named-args callable', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
 
-    (let* ((mul (lambda-o
+    (let ((mul (lambda-o
                   ((x) (y (default 2)))
                   (return (* x y)))))
       (asrt (mul { x: 5 }) 10)
@@ -98,10 +98,10 @@ it('fn-o: class method-o', () => {
           ((name : string)
            (loud? : boolean (default false)))
           : string
-          (let* ((msg (+ "Hello, " name)))
+          (let ((msg (+ "Hello, " name)))
             (return (ternary loud ((. msg toUpperCase)) msg))))))
 
-    (let* ((g (new Greeter)))
+    (let ((g (new Greeter)))
       (asrt ((. g greet) { name: "World" }) "Hello, World")
       (asrt ((. g greet) { name: "World", loud: true }) "HELLO, WORLD"))
 )`);

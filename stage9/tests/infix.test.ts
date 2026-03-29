@@ -1,9 +1,9 @@
 import { it, expect } from 'vitest';
-import { compile } from '../index';
+import { compileSource as compile } from '../index';
 
 function callCompiler(src: string): { stdout: string; stderr: string; status: number } {
   try {
-    const stdout = compile({ filePath: '-', input: src });
+    const stdout = compile({ source: src });
     return { stdout, stderr: '', status: 0 };
   } catch (e: any) {
     return { stdout: '', stderr: e.message, status: 1 };

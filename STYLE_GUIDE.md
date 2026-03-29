@@ -4,6 +4,20 @@ This guide documents preferred syntax forms and available sugar. It is primarily
 
 The golden rule: **prefer the shorter, more readable form** whenever it produces identical output.
 
+## WARNING
+
+*WARNING*
+
+Note that T2 is an unholy collision of TypeScript and S-Expression-linage syntax.
+
+### let and const
+
+- `let` is the typescript `let`, but with a sexpr syntax that allows for multiple bindings.
+- `let` is not the scheme `let` where bindinds are "in parallel" i.e. they cannot see the other bindings.
+- `let` is more like the scheme `let*` where bindings are done sequentially in order, thus later ones can see earlier ones.
+- same goes for `const`.
+- i guess we don't support `var`.
+
 ---
 
 ## 1. Property Access
@@ -66,19 +80,16 @@ When the receiver is a plain name (possibly dotted), put the receiver and method
 Zero-arg method calls — wrap in parens to call:
 
 ```lisp
-;; PREFER — calls the method (emits s.toUpperCase())
-(s.toUpperCase)
+;; PREFER — calls the method.
+(s.toUpperCase) ; emits 's.toUpperCase()'
 
-;; NOT a call — just the property value (emits s.toUpperCase)
-s.toUpperCase
+;; NOT a call — just the property value.
+s.toUpperCase ; emits 's.toUpperCase'
 ```
 
-**Use `method-call` only when the receiver is a complex expression:**
-
 ```lisp
-;; Required — receiver is a call result
-(method-call (getArr) join ", ")
-(method-call (. matrix [i]) toString)
+((getArr).join ", ")
+((. matrix [i]) toString)
 ```
 
 ---
@@ -87,19 +98,19 @@ s.toUpperCase
 
 ```lisp
 ;; PREFER — bracket sugar
-[1 2 3]
+[1, 2, 3]
 []
-["a" "b" "c"]
-[x (+ x 1) true null]
-[[1 2] [3 4]]         ;; nested
-[0 ...rest 9]         ;; spread
+["a", "b", "c"]
+[x, (+ x 1), true, null]
+[[1, 2], [3 ,4]]         ;; nested
+[0, ...rest, 9]         ;; spread
 
 ;; AVOID — verbose form
 (array 1 2 3)
 (array)
 ```
 
-Commas between elements are optional: `[1 2 3]` and `[1, 2, 3]` are identical.
+In T2 commas are often optional, but it is preferred to use them in literals.
 
 ---
 
@@ -120,7 +131,7 @@ Commas between elements are optional: `[1 2 3]` and `[1, 2, 3]` are identical.
 (object (name "Alice") (age 30))
 ```
 
-Commas between fields are optional: `{ a: 1 b: 2 }` and `{ a: 1, b: 2 }` are identical.
+In T2 commas are often optional, but it is preferred to use them in literals.
 
 ---
 
@@ -139,10 +150,10 @@ Dotted sugar works on the left-hand side of `set!`:
 ```lisp
 ;; PREFER
 (set! obj.x 99)
-(set! this.count (+ this.count 1))
+(+= this.coun 1)
 (set! obj.a.b 42)        ;; chained path
 
-;; VERBOSE — still valid
+;; AVOID
 (set! (. obj x) 99)
 (set! (. this count) (+ (. this count) 1))
 ```
@@ -210,7 +221,7 @@ Names get parens in statement position:
 (let (x) 10)
 
 ;; Mutable, multiple sequential bindings (each sees previous)
-(let* ((x 10) (y 20) (z (+ x y)))
+(let ((x 10) (y 20) (z (+ x y)))
   (console.log z))
 
 ;; Immutable
@@ -222,7 +233,7 @@ Names get parens in statement position:
 ```lisp
 (let (x : number) 42)
 (const (name : string) "Alice")
-(let* ((a : number 10) (b : string "world"))
+(let ((a : number 10) (b : string "world"))
   body)
 ```
 
@@ -281,7 +292,7 @@ Use for functions called with a brace-object `{ key: val }` instead of positiona
 
 ```lisp
 (fn-o greet ((name : string) (greeting? : string (default "Hello"))) : string
-  (return (template greeting ", " name "!")))
+  (return `${greeting}, ${name}!`))
 
 ;; Call with brace object
 (greet { name: "Alice" })
@@ -297,11 +308,11 @@ For `lambda`/`fn`/`async-lambda` etc., `: returnType` goes between the param-lis
 ;;                     ^^^^^^^^ after param list, before body
 ```
 
-For **class methods**, use `(returns TypeExpr)` — not `: type`:
+For **class methods**, use `: type` — same as `lambda`/`fn`:
 
 ```lisp
-(method greet () (returns string) (return "hello"))
-;;               ^^^^^^^^^^^^^^^ not `: string`
+(method greet () : string (return "hello"))
+;;               ^^^^^^^^ after param list, before body
 ```
 
 ---
@@ -447,34 +458,57 @@ The sugar form `(for (var init) cond (delta) body...)` is shorter. The `delta` i
 
 ## 13. Error Handling
 
+Use `(except ...)` as the canonical wrapper. `try`, `catch`, and `finally` are
+sibling clauses inside it, indented at the same column:
+
 ```lisp
-(try
-  (doSomething)
-  (throw "explode")
+;; try/catch/finally
+(except
+  (try
+    (doSomething)
+    (throw "explode"))
   (catch err
     (console.log "caught:" err))
   (finally
     (cleanup)))
 
 ;; try/finally without catch
-(try
-  (doSomething)
+(except
+  (try
+    (doSomething))
   (finally
     (cleanup)))
+
+;; try/catch without finally
+(except
+  (try
+    (doSomething))
+  (catch err
+    (handleErr err)))
 ```
+
+`throw` is a plain statement inside the `(try ...)` clause body.
 
 ---
 
 ## 14. String Interpolation
 
-Use `template` for template literals. Alternating strings and expressions:
+Use backtick template literals directly — the reader transforms them to `(template ...)` before parsing:
 
 ```lisp
-(template "Hello, " name "! Score: " score ".")
-;; emits: `Hello, ${name}! Score: ${score}.`
+;; PREFER — backtick syntax
+`Hello, ${name}! Score: ${score}.`
+`${x}`
+`(program\n${text}\n)`
 
-(template "" x "")      ;; `${x}` — wrap expression in empty strings
+;; AVOID — verbose form
+(template "Hello, " name "! Score: " score ".")
+(template "" x "")
 ```
+
+A plain backtick string with no interpolations becomes a regular string literal: `` `hello` `` → `"hello"`.
+
+The `(template ...)` form is still valid and may appear in compiler source files (`.s8`) compiled by earlier stages that predate the reader.
 
 ---
 
@@ -486,22 +520,23 @@ Use `template` for template literals. Alternating strings and expressions:
     (field (count : number) 0)
 
     (constructor ((start : number))
-      (set! (. this count) start))
+      (set! this.count start))
 
-    (method inc ()
-      (set! (. this count) (+ (. this count) 1)))
+    (method inc () : void
+      (+= this.count 1))
 
     (get value () : number
-      (return (. this count)))))
+      (return this.count))))
 ```
 
 Key rules for class bodies:
+- Return type uses `: Type` after the param list — same as `lambda`/`fn`: `(method greet () : string ...)`
 - Use `(set! this.field val)` to mutate fields (dotted sugar works on both sides of `set!`)
 - Use `this.field` (dotted sugar) to **read** fields: `(return this.count)`
 - Use `(this.method)` to call a zero-arg method on self: `(return (this.inner))`
 - Use `(this.method arg)` to call a method with args: `(this.push x)`
 - Use `this.a.b` to read chained properties on self
-- Modifiers (`public`, `private`, `static`, `readonly`, etc.) go between the form keyword and the name: `(private method foo () ...)`
+- Modifiers (`public`, `private`, `static`, `readonly`, etc.) go between the form keyword and the name: `(private method foo () : string ...)`
 
 ---
 
@@ -816,9 +851,9 @@ These names are available inside macro body expressions:
 | Mutate array index | `(arr [i] = val)` | — |
 | Compound update | `(+= x 1)` | `(set! x (+ x 1))` |
 | Multi-branch expression | `(cond test1 e1 test2 e2 else e3)` | nested ternary |
-| Sequential let | `(let* ((a 1) (b 2)) ...)` | multiple `(let (x) ...)` |
+| Sequential let | `(let ((a 1) (b 2)) ...)` | multiple `(let (x) ...)` |
 | Iterate array values | `(for-of item arr ...)` | `(for ...)` |
-| String template | `(template "x=" x ".")` | string concat |
+| String interpolation | `` `x=${x}.` `` | `(template "x=" x ".")` or string concat |
 | Optional access | `(.? obj key)` | manual null check |
 | Default if null | `(?? val default)` | `(ternary (!== val null) val default)` |
 | Named imports | `(import {foo bar} "mod")` | verbose `(import (object ...) "mod")` |

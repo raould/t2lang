@@ -36,9 +36,9 @@ function makeExprStmt(expr: any) {
 function makeReturn(expr: any) {
   return { tag: 'return', expr, text: '' };
 }
-function makeLetStar(bindings: { name: string; init: any }[], ...body: any[]) {
+function makeLet(bindings: { name: string; init: any }[], ...body: any[]) {
   return {
-    tag: 'let*',
+    tag: 'let',
     bindings: bindings.map(b => ({ name: b.name, init: b.init, typeAnnotation: null })),
     body,
     text: '',

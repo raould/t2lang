@@ -13,14 +13,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { compile } from '../index';
+import { compileSource as compile } from '../index';
 import { fromSourceEndToEnd } from './helpers';
 
 const T = 30_000;
 
 function callCompiler(source: string): { stdout: string; stderr: string; status: number } {
   try {
-    const stdout = compile({ filePath: '-', input: source });
+    const stdout = compile({ source: source });
     return { stdout, stderr: '', status: 0 };
   } catch (e: any) {
     return { stdout: '', stderr: e.message, status: 1 };
@@ -47,7 +47,7 @@ describe('Decision 2: (type-template ...) in type position', () => {
       ;; TStr<T extends string> = \`a\${T}\`
       (type TStr (type-params (T (extends string))) (type-template "a" T))
       ;; TStr<"bc"> resolves to "abc"
-      (let (s : (type-app TStr (tlit "bc"))) "abc")
+      (let ((s : (type-app TStr (tlit "bc")) "abc")))
       (asrt s "abc")
       (asrt (typeof s) "string")
     )`);

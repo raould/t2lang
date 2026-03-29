@@ -21,7 +21,7 @@
   ;; ---- Apply a binary/unary operator to evaluated JS values ----
   (const applyMacroOp
     (lambda ((op) (args))
-      (let* ((l (index args 0))
+      (let ((l (index args 0))
              (r (index args 1)))
         (if (=== op '+')   (return ((. args reduce) (lambda ((acc) (v)) (return (+ acc v))))))
         (if (=== op '-')   (return (ternary (=== (. args length) 1) (- 0 l) (- l r))))
@@ -44,12 +44,12 @@
   ;; ---- Quasiquote: process an array of nodes, handling unquote-splicing ----
   (const quasiArgs
     (lambda ((nodes) (bindings) (env) (depth))
-      (let* ((result (array)))
+      (let ((result (array)))
         ((. nodes forEach)
           (lambda ((n))
             (if (&& (=== (. n tag) 'unquote-splicing') (=== depth 1))
               (begin
-                (let* ((spliced (evalMacroExpr (. n expr) bindings env)))
+                (let ((spliced (evalMacroExpr (. n expr) bindings env)))
                   (if ((. Array isArray) spliced)
                     (set! result ((. result concat) spliced))
                     ((. result push) spliced))))
@@ -60,12 +60,12 @@
   ;; ---- quasiObjectFields: process object fields, handling unquote-splicing ----
   (const quasiObjectFields
     (lambda ((fields) (bindings) (env) (depth))
-      (let* ((result (array)))
+      (let ((result (array)))
         ((. fields forEach)
           (lambda ((f))
             (if (=== (. f tag) 'unquote-splicing')
               (if (=== depth 1)
-                (let* ((spliced (evalMacroExpr (. f expr) bindings env)))
+                (let ((spliced (evalMacroExpr (. f expr) bindings env)))
                   (if ((. Array isArray) spliced)
                     ((. spliced forEach) (lambda ((item))
                       (if (&& item (=== (. item tag) 'object'))
@@ -93,7 +93,7 @@
         (return result))))
 
   ;; ---- extractBindingName: coerce a quasi-evaluated name to a string ----
-  ;; Binding names in let*/const* and assign targets are strings in the AST.
+  ;; Binding names in let/const and assign targets are strings in the AST.
   ;; When a template has ,(gensym) in the name position, evalQuasi returns an
   ;; identifier node; this helper extracts the .name string from it.
   (const extractBindingName
@@ -202,12 +202,12 @@
               (expr (evalQuasi (. c expr) bindings env depth)))))))
           (elseExpr (ternary (!== (. node elseExpr) undefined) (evalQuasi (. node elseExpr) bindings env depth) undefined)))))
       ;; ---- Statement-level forms ----
-      ;; let* / let: recurse into binding inits and body.
+      ;; let: recurse into binding inits and body.
       ;; Binding names support unquote: ,(gensym) → identifier node → name string.
-      (if (|| (=== (. node tag) 'let*') (=== (. node tag) 'let'))
+      (if (=== (. node tag) 'let')
         (return (object (tag (. node tag)) (text (. node text))
           (bindings ((. (. node bindings) map) (lambda ((b))
-            (let* ((rawName (ternary (=== (typeof (. b name)) 'string')
+            (let ((rawName (ternary (=== (typeof (. b name)) 'string')
                               (. b name)
                               (extractBindingName (evalQuasi (. b name) bindings env depth)))))
               (return (object
@@ -219,7 +219,7 @@
       (if (|| (=== (. node tag) 'const*') (=== (. node tag) 'const'))
         (return (object (tag (. node tag)) (text (. node text))
           (bindings ((. (. node bindings) map) (lambda ((b))
-            (let* ((rawName (ternary (=== (typeof (. b name)) 'string')
+            (let ((rawName (ternary (=== (typeof (. b name)) 'string')
                               (. b name)
                               (extractBindingName (evalQuasi (. b name) bindings env depth)))))
               (return (object
@@ -230,7 +230,7 @@
       ;; assign: name may be a dynamic identifier (e.g. ,a in (set! ,a ,b))
       (if (=== (. node tag) 'assign')
         (begin
-          (let* ((rawName (ternary (=== (typeof (. node name)) 'string')
+          (let ((rawName (ternary (=== (typeof (. node name)) 'string')
                             (. node name)
                             (extractBindingName (evalQuasi (. node name) bindings env depth)))))
             (return (object (tag 'assign') (text (. node text))
@@ -286,8 +286,10 @@
       (if (|| (=== (. node tag) 'let-decl') (=== (. node tag) 'const-decl'))
         (return (object
           (tag (. node tag))
+          (id (. node id))
           (text (. node text))
           (name (. node name))
+          (typeAnnotation (. node typeAnnotation))
           (init (evalQuasi (. node init) bindings env depth))
           (meta (. node meta)))))
       ;; type-alias: type expressions are opaque — return unchanged
@@ -329,12 +331,12 @@
   ;; ---- quasiClassBody: recurse into class elements substituting unquotes ----
   (const quasiClassBody
     (lambda ((elements) (bindings) (env) (depth))
-      (let* ((result (array)))
+      (let ((result (array)))
         ((. elements forEach)
           (lambda ((el))
             (if (=== (. el tag) 'unquote-splicing')
               (if (=== depth 1)
-                (let* ((spliced (evalMacroExpr (. el expr) bindings env)))
+                (let ((spliced (evalMacroExpr (. el expr) bindings env)))
                   (if ((. Array isArray) spliced)
                     (set! result ((. result concat) spliced))
                     ((. result push) spliced)))
@@ -396,7 +398,7 @@
       ;; plain JS object without a tag: treat as a field spec for object splice
       ;; e.g. {x: 99} → ['x', '99'] so parseForm sees it as a field key/value pair
       (if (&& (=== (typeof v) 'object') (!== v null) (! ((. Array isArray) v)) (=== (. v tag) undefined))
-        (let* ((keys ((. Object keys) v)))
+        (let ((keys ((. Object keys) v)))
           (if (=== (. keys length) 1)
             (return (array (index keys 0) (nodeToSForm (index v (index keys 0))))))))
       ;; any other AST node → wrap as opaque
@@ -410,7 +412,7 @@
         (return (. sfNode value)))
       ;; sf-hole at depth 1: evaluate and convert to SForm
       (if (&& (=== (. sfNode tag) 'sf-hole') (=== depth 1))
-        (let* ((v (evalMacroExpr (. sfNode expr) bindings env)))
+        (let ((v (evalMacroExpr (. sfNode expr) bindings env)))
           (return (nodeToSForm v))))
       ;; sf-hole at depth > 1: preserve as opaque wrapper for nested quasi.
       ;; sfNode.expr is an AST expression node (not an SFormNode); we must NOT
@@ -423,7 +425,7 @@
         (return (object (__opaque true) (node (object (tag 'sf-splice') (expr (. sfNode expr)))))))
       ;; sf-list: iterate items, handle splices, track nested quasi depth
       (if (=== (. sfNode tag) 'sf-list')
-        (let* ((items (. sfNode items))
+        (let ((items (. sfNode items))
                (result (array))
                ;; If first item is atom "quasi", increment depth for inner items
                (innerDepth (ternary
@@ -432,16 +434,16 @@
                          (=== (. (index items 0) value) 'quasi')))
                  (+ depth 1)
                  depth)))
-          (let* ((i 0))
+          (let ((i 0))
             (while (< i (. items length))
-              (let* ((item (index items i)))
+              (let ((item (index items i)))
                 (if (&& (=== (. item tag) 'sf-splice') (=== innerDepth 1))
-                  (let* ((v (evalMacroExpr (. item expr) bindings env)))
+                  (let ((v (evalMacroExpr (. item expr) bindings env)))
                     (if ((. Array isArray) v)
                       ((. v forEach) (lambda ((elem)) ((. result push) (nodeToSForm elem))))
                       ((. result push) (nodeToSForm v))))
                   (begin
-                    (let* ((evItem (evalQuasiToSForm item bindings env innerDepth)))
+                    (let ((evItem (evalQuasiToSForm item bindings env innerDepth)))
                       (if (&& (&& (=== (typeof evItem) 'string')
                                (&& ((. evItem endsWith) '.')
                                    (&& (> (. evItem length) 1)
@@ -449,7 +451,7 @@
                             true)
                         ;; dot-sugar: "obj." followed by next item → prop-access sform
                         (begin
-                          (let* ((nextItem (index items (+ i 1)))
+                          (let ((nextItem (index items (+ i 1)))
                                  (evNext (evalQuasiToSForm nextItem bindings env innerDepth))
                                  (objName ((. evItem slice) 0 (- (. evItem length) 1))))
                             ((. result push) (array '.' objName evNext))
@@ -481,16 +483,16 @@
       ;; Falls back to old evalQuasi path for unit tests that construct quasi nodes manually
       (if (=== (. node tag) 'quasi')
         (if (. node sform)
-          (let* ((sform (evalQuasiToSForm (. node sform) bindings env 1)))
+          (let ((sform (evalQuasiToSForm (. node sform) bindings env 1)))
             (return (parseForm sform (. node id) env)))
           (return (evalQuasi (. node expr) bindings env 1))))
-      ;; let* statement in expression position: eval bindings then body
-      (if (=== (. node tag) 'let*')
+      ;; let statement in expression position: eval bindings then body
+      (if (=== (. node tag) 'let')
         (return (evalMacroLetStar node bindings env)))
       ;; if statement/expression
       (if (=== (. node tag) 'if')
         (begin
-          (let* ((test (evalMacroExpr (. node test) bindings env)))
+          (let ((test (evalMacroExpr (. node test) bindings env)))
             (if test
               (return (evalMacroStmt (. node ifthen) bindings env))
               (begin
@@ -499,7 +501,7 @@
                 (return undefined))))))
       ;; ternary: (ternary test then else) → evaluate like if/else
       (if (=== (. node tag) 'ternary')
-        (let* ((test (evalMacroExpr (. node test) bindings env)))
+        (let ((test (evalMacroExpr (. node test) bindings env)))
           (if test
             (return (evalMacroExpr (. node ifthen) bindings env))
             (return (evalMacroExpr (. node ifelse) bindings env)))))
@@ -511,24 +513,24 @@
         (return (evalMacroCall node bindings env)))
       ;; prop-access: (. obj key) → evaluate obj, return obj[key]
       (if (=== (. node tag) 'prop-access')
-        (let* ((obj (evalMacroExpr (. node object) bindings env))
+        (let ((obj (evalMacroExpr (. node object) bindings env))
                (key (. node key)))
           (if obj
             (return (index obj key)))
           (return undefined)))
       ;; index-access: (index obj i) → evaluate obj and i, return obj[i]
       (if (=== (. node tag) 'index-access')
-        (let* ((obj (evalMacroExpr (. node object) bindings env))
+        (let ((obj (evalMacroExpr (. node object) bindings env))
                (i   (evalMacroExpr (. node index)  bindings env)))
           (if obj
             (return (index obj i)))
           (return undefined)))
       ;; object expr: evaluate field values to produce a plain JS object
       (if (=== (. node tag) 'object')
-        (let* ((result (object)))
+        (let ((result (object)))
           ((. (. node fields) forEach) (lambda ((f))
             (if (! (. f isMethod))
-              (let* ((val (ternary (. f isShorthand)
+              (let ((val (ternary (. f isShorthand)
                             (evalMacroExpr (object (tag 'identifier') (name (. f key)) (text (. f key)) (scopes (new Set))) bindings env)
                             (evalMacroExpr (. f value) bindings env))))
                 ((. Reflect set) result (. f key) val)))))
@@ -549,19 +551,19 @@
         (return (ternary (!== elseExpr undefined)
                    (evalMacroExpr elseExpr bindings env)
                    undefined)))
-      (let* ((clause (index clauses 0))
+      (let ((clause (index clauses 0))
              (testVal (evalMacroExpr (. clause test) bindings env)))
         (if testVal
           (return (evalMacroExpr (. clause expr) bindings env))
           (return (evalMacroCond ((. clauses slice) 1) elseExpr bindings env))))))
 
-  ;; ---- Evaluate a let* form ----
+  ;; ---- Evaluate a let form ----
   (const evalMacroLetStar
     (lambda ((node) (bindings) (env))
-      (let* ((extended (new Map bindings)))
+      (let ((extended (new Map bindings)))
         ((. (. node bindings) forEach)
           (lambda ((b))
-            (let* ((val (evalMacroExpr (. b init) extended env)))
+            (let ((val (evalMacroExpr (. b init) extended env)))
               ((. extended set) (. b name) val))))
         (return (evalMacroBody (. node body) extended env)))))
 
@@ -570,14 +572,14 @@
     (lambda ((node) (bindings) (env))
       (if (=== (. node tag) 'expr-stmt')
         (return (evalMacroExpr (. node expr) bindings env)))
-      (if (=== (. node tag) 'let*')
+      (if (=== (. node tag) 'let')
         (return (evalMacroLetStar node bindings env)))
-      ;; const* is handled identically to let* in macro bodies
+      ;; const* is handled identically to let in macro bodies
       (if (=== (. node tag) 'const*')
         (return (evalMacroLetStar node bindings env)))
       (if (=== (. node tag) 'if')
         (begin
-          (let* ((test (evalMacroExpr (. node test) bindings env)))
+          (let ((test (evalMacroExpr (. node test) bindings env)))
             (if test
               (return (evalMacroBody (. node ifthen) bindings env))
               (begin
@@ -593,13 +595,13 @@
       ;; assign: (set! name expr) — update binding in place
       (if (=== (. node tag) 'assign')
         (begin
-          (let* ((val (evalMacroExpr (. node value) bindings env)))
+          (let ((val (evalMacroExpr (. node value) bindings env)))
             ((. bindings set) (. node name) val)
             (return val))))
       ;; assign-prop: (set! (. obj key) val) — mutate JS object property
       (if (=== (. node tag) 'assign-prop')
         (begin
-          (let* ((target (. node target))
+          (let ((target (. node target))
                  (obj (evalMacroExpr (. target object) bindings env))
                  (key (. target key))
                  (val (evalMacroExpr (. node value) bindings env)))
@@ -617,7 +619,7 @@
     (lambda ((stmts) (bindings) (env))
       (if (=== (. stmts length) 0)
         (return undefined))
-      (let* ((last undefined)
+      (let ((last undefined)
              (i 0))
         (while (< i (. stmts length))
           (set! last (evalMacroStmt (index stmts i) bindings env))
@@ -629,7 +631,7 @@
   (const applyMacroFn
     (lambda ((fnNode) (evArgs) (env) (outerBindings))
       ;; fnNode is a lambda/fn AST node with .params (typed params, each {name}) and .body
-      (let* ((fnBindings (new Map (|| outerBindings (new Map)))))
+      (let ((fnBindings (new Map (|| outerBindings (new Map)))))
         ((. (. fnNode params) forEach) (lambda ((p) (i))
           ((. fnBindings set) (. p name) (index evArgs i))))
         (if (. fnNode rest)
@@ -644,7 +646,7 @@
       (if (&& cbFn (. cbFn params))
         (return (applyMacroFn cbFn evArgs env bindings)))
       (if (&& cbFn (=== (. cbFn tag) 'identifier'))
-        (let* ((literalArgs ((. evArgs map) (lambda ((v))
+        (let ((literalArgs ((. evArgs map) (lambda ((v))
                   (return (object (tag 'literal') (value v))))))
                (synCall (object (tag 'call') (fn cbFn) (args literalArgs) (typeArgs (array)))))
           (return (evalMacroCall synCall bindings env))))
@@ -653,37 +655,37 @@
   ;; ---- Evaluate a call node at macro-time ----
   (const evalMacroCall
     (lambda ((node) (bindings) (env))
-      (let* ((callee (. node fn))
+      (let ((callee (. node fn))
              (rawArgs (. node args)))
         ;; prop-access callee: evaluate object and call the method (e.g. Array.isArray, tag.replaceAll)
         (if (=== (. callee tag) 'prop-access')
-          (let* ((obj (evalMacroExpr (. callee object) bindings env))
+          (let ((obj (evalMacroExpr (. callee object) bindings env))
                  (key (. callee key))
                  (fn_ (ternary obj (index obj key) undefined)))
             (if (&& fn_ (=== (typeof fn_) 'function'))
-              (let* ((evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env))))))
+              (let ((evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env))))))
                 (return ((. fn_ apply) obj evArgs))))
             (return node)))
         ;; callee must be an identifier for macro-time dispatch
         (if (!== (. callee tag) 'identifier')
           (return node))
-        (let* ((name (. callee name)))
+        (let ((name (. callee name)))
           ;; operator: evaluate args and apply
           (if (isMacroOp name)
             (begin
-              (let* ((evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env))))))
+              (let ((evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env))))))
                 (return (applyMacroOp name evArgs)))))
           ;; gensym built-in
           (if (=== name 'gensym')
             (begin
-              (let* ((prefix (ternary (> (. rawArgs length) 0)
+              (let ((prefix (ternary (> (. rawArgs length) 0)
                                (evalMacroExpr (index rawArgs 0) bindings env)
                                undefined)))
                 (return (gensym env prefix)))))
           ;; symbol built-in: (symbol str) → identifier node with that name
           (if (=== name 'symbol')
             (begin
-              (let* ((nameStr (evalMacroExpr (index rawArgs 0) bindings env)))
+              (let ((nameStr (evalMacroExpr (index rawArgs 0) bindings env)))
                 (if (!== (typeof nameStr) 'string')
                   (set! nameStr (+ '' (|| nameStr ''))))
                 (if ((. nameStr endsWith) '?')
@@ -692,7 +694,7 @@
           ;; length built-in: (length arr) → number
           (if (=== name 'length')
             (begin
-              (let* ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
+              (let ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
                 (if ((. Array isArray) arg)
                   (return (. arg length)))
                 (if (&& arg (. arg elements))
@@ -703,7 +705,7 @@
           ;; str built-in: (str val ...) → concatenated string
           (if (=== name 'str')
             (begin
-              (let* ((evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env)))))
+              (let ((evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env)))))
                      (parts ((. evArgs map) (lambda ((v))
                        (if (=== v null) (return 'null'))
                        (if (=== v undefined) (return 'undefined'))
@@ -712,7 +714,7 @@
           ;; macro-error built-in: push an error and return null (do not throw)
           (if (=== name 'macro-error')
             (begin
-              (let* ((msg (ternary (> (. rawArgs length) 0)
+              (let ((msg (ternary (> (. rawArgs length) 0)
                             (evalMacroExpr (index rawArgs 0) bindings env)
                             'macro error')))
                 ((. (. env errors) push) (object
@@ -725,7 +727,7 @@
           ;; resolve built-in: (resolve ident-or-str) → { name, meta } or undefined
           (if (=== name 'resolve')
             (begin
-              (let* ((arg (evalMacroExpr (index rawArgs 0) bindings env))
+              (let ((arg (evalMacroExpr (index rawArgs 0) bindings env))
                      (varName (ternary (=== (typeof arg) 'string') arg
                                (ternary (&& arg (=== (. arg tag) 'identifier')) (. arg name)
                                (+ '' arg))))
@@ -734,7 +736,7 @@
           ;; nth built-in: (nth arr i) → element at index i
           (if (=== name 'nth')
             (begin
-              (let* ((arg (evalMacroExpr (index rawArgs 0) bindings env))
+              (let ((arg (evalMacroExpr (index rawArgs 0) bindings env))
                      (i   (evalMacroExpr (index rawArgs 1) bindings env)))
                 (if ((. Array isArray) arg)
                   (return (index arg i)))
@@ -746,13 +748,13 @@
           ;; node-tag built-in: (node-tag node) → node.tag string
           (if (=== name 'node-tag')
             (begin
-              (let* ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
+              (let ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
                 (if (=== arg undefined) (return undefined))
                 (return (. arg tag)))))
           ;; map built-in: (map arr cbFn) → JS array, calling cbFn at macro-time
           (if (=== name 'map')
             (begin
-              (let* ((arr  (evalMacroExpr (index rawArgs 0) bindings env))
+              (let ((arr  (evalMacroExpr (index rawArgs 0) bindings env))
                      (cbFn (evalMacroExpr (index rawArgs 1) bindings env)))
                 (if ((. Array isArray) arr)
                   (return ((. arr map) (lambda ((item))
@@ -761,7 +763,7 @@
           ;; filter built-in: (filter arr cbFn) → filtered JS array
           (if (=== name 'filter')
             (begin
-              (let* ((arr  (evalMacroExpr (index rawArgs 0) bindings env))
+              (let ((arr  (evalMacroExpr (index rawArgs 0) bindings env))
                      (cbFn (evalMacroExpr (index rawArgs 1) bindings env)))
                 (if ((. Array isArray) arr)
                   (return ((. arr filter) (lambda ((item))
@@ -770,7 +772,7 @@
           ;; find built-in: (find arr cbFn) → first matching item or undefined
           (if (=== name 'find')
             (begin
-              (let* ((arr  (evalMacroExpr (index rawArgs 0) bindings env))
+              (let ((arr  (evalMacroExpr (index rawArgs 0) bindings env))
                      (cbFn (evalMacroExpr (index rawArgs 1) bindings env)))
                 (if ((. Array isArray) arr)
                   (return ((. arr find) (lambda ((item))
@@ -779,7 +781,7 @@
           ;; slice built-in: (slice arr start end?) → sliced JS array
           (if (=== name 'slice')
             (begin
-              (let* ((arr   (evalMacroExpr (index rawArgs 0) bindings env))
+              (let ((arr   (evalMacroExpr (index rawArgs 0) bindings env))
                      (start (evalMacroExpr (index rawArgs 1) bindings env))
                      (end_  (ternary (> (. rawArgs length) 2)
                                (evalMacroExpr (index rawArgs 2) bindings env)
@@ -793,7 +795,7 @@
           ;; Extracts .name from identifier nodes, else coerces to string
           (if (=== name 'string')
             (begin
-              (let* ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
+              (let ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
                 (if (=== arg null) (return 'null'))
                 (if (=== arg undefined) (return 'undefined'))
                 (if (=== (typeof arg) 'string') (return arg))
@@ -803,7 +805,7 @@
           ;; string_lower built-in: (string_lower str) → str.toLowerCase()
           (if (=== name 'string_lower')
             (begin
-              (let* ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
+              (let ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
                 (if (=== (typeof arg) 'string')
                   (return ((. arg toLowerCase)))
                   (return ((. (+ '' arg) toLowerCase)))))))
@@ -811,7 +813,7 @@
           ;; If arr is a call AST node (clause stripped of expr-stmt by =& expansion), head → fn
           (if (=== name 'head')
             (begin
-              (let* ((arr (evalMacroExpr (index rawArgs 0) bindings env)))
+              (let ((arr (evalMacroExpr (index rawArgs 0) bindings env)))
                 (if ((. Array isArray) arr)
                   (return (index arr 0)))
                 (if (&& arr (=== (. arr tag) 'call'))
@@ -821,7 +823,7 @@
           ;; If arr is a call AST node (clause stripped of expr-stmt by =& expansion), tail → args
           (if (=== name 'tail')
             (begin
-              (let* ((arr (evalMacroExpr (index rawArgs 0) bindings env)))
+              (let ((arr (evalMacroExpr (index rawArgs 0) bindings env)))
                 (if ((. Array isArray) arr)
                   (return ((. arr slice) 1)))
                 (if (&& arr (=== (. arr tag) 'call'))
@@ -830,7 +832,7 @@
           ;; drop built-in: (drop n arr) → arr.slice(n)
           (if (=== name 'drop')
             (begin
-              (let* ((n   (evalMacroExpr (index rawArgs 0) bindings env))
+              (let ((n   (evalMacroExpr (index rawArgs 0) bindings env))
                      (arr (evalMacroExpr (index rawArgs 1) bindings env)))
                 (if ((. Array isArray) arr)
                   (return ((. arr slice) n))
@@ -838,10 +840,10 @@
           ;; take_while built-in: (take_while cbFn arr) → prefix array while cbFn is truthy
           (if (=== name 'take_while')
             (begin
-              (let* ((cbFn (evalMacroExpr (index rawArgs 0) bindings env))
+              (let ((cbFn (evalMacroExpr (index rawArgs 0) bindings env))
                      (arr  (evalMacroExpr (index rawArgs 1) bindings env)))
                 (if ((. Array isArray) arr)
-                  (let* ((result (array))
+                  (let ((result (array))
                          (i 0))
                     (while (&& (< i (. arr length))
                                (applyMacroCallable cbFn (array (index arr i)) bindings env))
@@ -852,7 +854,7 @@
           ;; map_indexed built-in: (map_indexed arr cbFn) → array mapped with (i item) args
           (if (=== name 'map_indexed')
             (begin
-              (let* ((arr  (evalMacroExpr (index rawArgs 0) bindings env))
+              (let ((arr  (evalMacroExpr (index rawArgs 0) bindings env))
                      (cbFn (evalMacroExpr (index rawArgs 1) bindings env)))
                 (if ((. Array isArray) arr)
                   (return ((. arr map) (lambda ((item) (i))
@@ -861,10 +863,10 @@
           ;; get_option built-in: (get_option opts key) → value from [[key,val]...] pairs
           (if (=== name 'get_option')
             (begin
-              (let* ((opts (evalMacroExpr (index rawArgs 0) bindings env))
+              (let ((opts (evalMacroExpr (index rawArgs 0) bindings env))
                      (key  (evalMacroExpr (index rawArgs 1) bindings env)))
                 (if ((. Array isArray) opts)
-                  (let* ((found ((. opts find) (lambda ((pair))
+                  (let ((found ((. opts find) (lambda ((pair))
                             (return (&& ((. Array isArray) pair) (=== (index pair 0) key)))))))
                     (if found
                       (return (index found 1))
@@ -873,7 +875,7 @@
           ;; or built-in: (or x y ...) → first truthy value or last (short-circuit)
           (if (=== name 'or')
             (begin
-              (let* ((result undefined)
+              (let ((result undefined)
                      (i 0))
                 (while (< i (. rawArgs length))
                   (set! result (evalMacroExpr (index rawArgs i) bindings env))
@@ -883,7 +885,7 @@
           ;; and built-in: (and x y ...) short-circuit AND
           (if (=== name 'and')
             (begin
-              (let* ((result undefined)
+              (let ((result undefined)
                      (i 0))
                 (while (< i (. rawArgs length))
                   (set! result (evalMacroExpr (index rawArgs i) bindings env))
@@ -893,17 +895,17 @@
           ;; not built-in: (not x) → !x
           (if (=== name 'not')
             (begin
-              (let* ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
+              (let ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
                 (return (! arg)))))
           ;; typeof built-in: (typeof x) → typeof x as JS string
           (if (=== name 'typeof')
             (begin
-              (let* ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
+              (let ((arg (evalMacroExpr (index rawArgs 0) bindings env)))
                 (return (typeof arg)))))
           ;; macro-time function: look up, bind params, eval body
           (if ((. (. env macroTimeFns) has) name)
             (begin
-              (let* ((fn_ ((. (. env macroTimeFns) get) name))
+              (let ((fn_ ((. (. env macroTimeFns) get) name))
                      (evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env)))))
                      (fnBindings (new Map)))
                 ((. (. fn_ params) forEach) (lambda ((p) (i))
@@ -914,17 +916,17 @@
                 (return (evalMacroBody (. fn_ body) fnBindings env)))))
           ;; locally-bound callable: check bindings for a lambda-like value
           (if ((. bindings has) name)
-            (let* ((fn_ ((. bindings get) name)))
+            (let ((fn_ ((. bindings get) name)))
               (if (&& fn_ (. fn_ params))
                 (begin
-                  (let* ((evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env))))))
+                  (let ((evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env))))))
                     (return (applyMacroFn fn_ evArgs env bindings)))))))
           ;; moduleVars callable: #[macro-time] lambdas stored in env.moduleVars
           (if (&& (. env moduleVars) ((. (. env moduleVars) has) name))
-            (let* ((fn_ ((. (. env moduleVars) get) name)))
+            (let ((fn_ ((. (. env moduleVars) get) name)))
               (if (&& fn_ (. fn_ params))
                 (begin
-                  (let* ((evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env))))))
+                  (let ((evArgs ((. rawArgs map) (lambda ((a)) (return (evalMacroExpr a bindings env))))))
                     (return (applyMacroFn fn_ evArgs env bindings)))))))
           ;; unrecognised: return node as-is
           (return node)))))
@@ -949,7 +951,7 @@
       ;; identifier: return new node with scope added
       (if (=== (. node tag) 'identifier')
         (begin
-          (let* ((ns (new Set (. node scopes))))
+          (let ((ns (new Set (. node scopes))))
             ((. ns add) scope)
             (return (object
               (tag 'identifier')
@@ -1031,8 +1033,8 @@
               (=== (. node tag) 'yield*')))
         (return (object (tag (. node tag)) (text (. node text))
           (expr (ternary (. node expr) (addScopeToNode (. node expr) scope) undefined)))))
-      ;; let*
-      (if (=== (. node tag) 'let*')
+      ;; let (multi-binding)
+      (if (=== (. node tag) 'let')
         (return (object (tag (. node tag)) (text (. node text))
           (bindings ((. (. node bindings) map) (lambda ((b))
             (return (object
@@ -1165,10 +1167,10 @@
       ;; call: the main expansion point
       (if (=== (. node tag) 'call')
         (begin
-          (let* ((callee (. node fn)))
+          (let ((callee (. node fn)))
             (if (&& (=== (. callee tag) 'identifier') (lookupMacro (. callee name) env))
               ;; macro call: expand — reject if returns array (top-level splicing not allowed in expr position)
-              (let* ((macroResult (expandMacroCall node env)))
+              (let ((macroResult (expandMacroCall node env)))
                 (if ((. Array isArray) macroResult)
                   (begin
                     (pushMacroError env 'top-level macro expansion not allowed in this position' (. node id))
@@ -1283,9 +1285,9 @@
       ;; macro block call — expression form (=>): call the macro, recurse on result
       (if (=== (. node tag) 'macro-expr-call')
         (begin
-          (let* ((macroName (. (. node fn) name)))
+          (let ((macroName (. (. node fn) name)))
             (if (lookupMacro macroName env)
-              (let* ((expandedHeader ((. (. node headerArgs) map) (lambda ((a)) (return (expandExpr a env)))))
+              (let ((expandedHeader ((. (. node headerArgs) map) (lambda ((a)) (return (expandExpr a env)))))
                      (unwrappedBody ((. (. node body) map) (lambda ((stmt))
                        (return (ternary (&& stmt (=== (. stmt tag) 'expr-stmt'))
                          (. stmt expr)
@@ -1328,7 +1330,7 @@
   ;; (i.e., errors from inner macro calls triggered by this expansion).
   (const expandMacroCall
     (lambda ((callNode) (env))
-      (let* ((macroName (. (. callNode fn) name))
+      (let ((macroName (. (. callNode fn) name))
              (macroDef (lookupMacro macroName env))
              (argNodes (. callNode args))
              (callSite (ternary (. callNode text) (. callNode text) '<unknown>')))
@@ -1341,7 +1343,7 @@
             (set! (. env currentCallNodeId) (. callNode id))
             (set! (. env currentMacroName) macroName)
             (try
-               (let* ((result ((. macroDef fn) argNodes env)))
+               (let ((result ((. macroDef fn) argNodes env)))
                  (set! (. env currentMacroName) null)
                  (return result))
                (catch e
@@ -1371,18 +1373,18 @@
             (return callNode)))
         ;; ---- KFFD scope stamping ----
         ;; Allocate a fresh use-site scope U for this expansion.
-        (let* ((useScope (freshScope env))
+        (let ((useScope (freshScope env))
                (defScope (. macroDef scopeId)))
           ;; Stamp definition scope onto every identifier in the body template
           ;; (template-introduced identifiers end up with {defScope}).
-          (let* ((scopedBody (stampDefScope (. macroDef body) defScope)))
+          (let ((scopedBody (stampDefScope (. macroDef body) defScope)))
             ;; Stamp use-site scope onto argument nodes so arg identifiers
             ;; end up with {originalScopes, useScope} and won't be confused
             ;; with same-named template identifiers ({defScope, useScope}).
-            (let* ((scopedArgs ((. argNodes map)
+            (let ((scopedArgs ((. argNodes map)
                                  (lambda ((a)) (return (addScopeToNode a useScope))))))
               ;; Bind params to the scope-stamped argument nodes.
-              (let* ((bindings (new Map)))
+              (let ((bindings (new Map)))
                 ((. (. macroDef params) forEach) (lambda ((p) (i))
                   ((. bindings set) p (index scopedArgs i))))
                 ;; bind rest param to array of remaining args
@@ -1397,7 +1399,7 @@
                 ;; Evaluate the macro body using the scope-stamped template.
                 ;; Wrap in try/catch to route runtime errors through pushMacroError
                 ;; so they include macro name and call site in the error output.
-                (let* ((result undefined))
+                (let ((result undefined))
                   (try
                     (set! result (evalMacroBody scopedBody bindings env))
                     (catch e
@@ -1408,7 +1410,7 @@
                   ;; template identifiers → {defScope, useScope}
                   ;; arg identifiers      → {originalScopes, useScope}  (idempotent)
                   ;; gensym identifiers   → {useScope}
-                  (let* ((scopedResult (addScopeToNode result useScope))
+                  (let ((scopedResult (addScopeToNode result useScope))
                          ;; Record errors.length before recursive expansion so we
                          ;; can tag any newly-added errors (from inner macro calls)
                          ;; with expandedFrom pointing to this call site.
@@ -1416,9 +1418,9 @@
                          ;; Recursively expand the result until stable.
                          (expanded (expandExpr scopedResult env)))
                     ;; Tag errors added during recursive expansion with expandedFrom.
-                    (let* ((ii errsBefore))
+                    (let ((ii errsBefore))
                       (while (< ii (. (. env errors) length))
-                        (let* ((err (index (. env errors) ii)))
+                        (let ((err (index (. env errors) ii)))
                           (if (=== (. err expandedFrom) undefined)
                             (set! (. err expandedFrom) callSite)))
                         (set! ii (+ ii 1))))
@@ -1434,9 +1436,9 @@
       (if (=== (. node tag) 'expr-stmt')
         (return (object (tag 'expr-stmt') (id (. node id)) (text (. node text))
           (expr (expandExpr (. node expr) env)))))
-      ;; let*
-      (if (=== (. node tag) 'let*')
-        (return (object (tag 'let*') (id (. node id)) (text (. node text))
+      ;; let (multi-binding)
+      (if (=== (. node tag) 'let')
+        (return (object (tag 'let') (id (. node id)) (text (. node text))
           (bindings ((. (. node bindings) map) (lambda ((b))
             (return (object
               (name (. b name))
@@ -1492,9 +1494,9 @@
       ;; macro block call — statement form (=&): call the macro, splice result as statement(s)
       (if (=== (. node tag) 'macro-body-call')
         (begin
-          (let* ((macroName (. (. node fn) name)))
+          (let ((macroName (. (. node fn) name)))
             (if (lookupMacro macroName env)
-              (let* ((expandedHeader ((. (. node headerArgs) map) (lambda ((a)) (return (expandExpr a env)))))
+              (let ((expandedHeader ((. (. node headerArgs) map) (lambda ((a)) (return (expandExpr a env)))))
                      ;; Strip expr-stmt wrappers from body items so macros see raw call/form nodes,
                      ;; not statement-level wrappers. (pattern body...) arrives as expr-stmt→call.
                      (unwrappedBody ((. (. node body) map) (lambda ((stmt))
@@ -1524,11 +1526,6 @@
           (name (. node name)) (pattern (. node pattern))
           (typeAnnotation (. node typeAnnotation))
           (init (expandExpr (. node init) env)))))
-      (if (=== (. node tag) 'let')
-        (return (object (tag 'let') (id (. node id)) (text (. node text))
-          (name (. node name))
-          (typeAnnotation (. node typeAnnotation))
-          (init (expandExpr (. node init) env)))))
       ;; fallthrough: return as-is
       (return node)))
 
@@ -1545,7 +1542,7 @@
       ;; macro-time helpers: expand only if compiling a macro module
       (if (=== (. node tag) 'macro-time-fn-def')
         (if (. env isMacroCompilation)
-          (let* ((init (expandExpr (. node init) env)))
+          (let ((init (expandExpr (. node init) env)))
             (return (object (tag 'macro-time-fn-def') (id (. node id)) (text (. node text))
               (name (. node name)) (init init))))
           (return node)))
@@ -1553,10 +1550,14 @@
       (if (=== (. node tag) 'let-decl')
         (return (object (tag 'let-decl') (id (. node id)) (callSiteId (. node callSiteId)) (text (. node text))
           (name (. node name))
+          (typeAnnotation (. node typeAnnotation))
+          (meta (. node meta))
           (init (expandExpr (. node init) env)))))
       (if (=== (. node tag) 'const-decl')
         (return (object (tag 'const-decl') (id (. node id)) (callSiteId (. node callSiteId)) (text (. node text))
           (name (. node name))
+          (typeAnnotation (. node typeAnnotation))
+          (meta (. node meta))
           (init (expandExpr (. node init) env)))))
       ;; everything else: treat as a statement
       (return (expandStmt node env))))
@@ -1566,23 +1567,23 @@
   ;; Each error line includes [kind], message, call site, and (if set) expandedFrom.
   (const formatExpansionErrors
     (lambda ((errors))
-      (let* ((grouped (new Map)))
+      (let ((grouped (new Map)))
         ;; group by macroName
         ((. errors forEach)
           (lambda ((err))
-            (let* ((nm (. err macroName)))
+            (let ((nm (. err macroName)))
               (if (! ((. grouped has) nm))
                 ((. grouped set) nm (array)))
-              (let* ((bucket ((. grouped get) nm)))
+              (let ((bucket ((. grouped get) nm)))
                 ((. bucket push) err)))))
         ;; format each group
-        (let* ((lines (array)))
+        (let ((lines (array)))
           ((. grouped forEach)
             (lambda ((errs) (nm))
               ((. lines push) (+ "Error in macro '" nm "':"))
               ((. errs forEach)
                 (lambda ((err))
-                  (let* ((loc (ternary (. err nodeId)
+                  (let ((loc (ternary (. err nodeId)
                                 (+ " (at: " (formatSpan (. err nodeId)) ")")
                                 (ternary (. err callSite)
                                   (+ " (at: " (. err callSite) ")")
@@ -1598,7 +1599,7 @@
     (new Set (array 'let-decl' 'const-decl' 'type-alias' 'interface-def' 'enum-def'
                     'class-def' 'anon-class-def' 'defmacro' 'macro-time-fn-def')))
   (const TOP_LEVEL_STATEMENT_TAGS
-    (new Set (array 'expr-stmt' 'let*' 'let' 'const*' 'const'
+    (new Set (array 'expr-stmt' 'let' 'const*' 'const'
                     'if' 'while' 'return' 'throw' 'assign'
                     'switch' 'try' 'for' 'for-in' 'for-of' 'for-await')))
 
@@ -1628,10 +1629,10 @@
   ;; "m/foo" → env.macroNamespaces.get("m")?.get("foo")
   (const lookupMacro
     (lambda ((name) (env))
-      (let* ((slashIdx ((. name indexOf) '/')))
+      (let ((slashIdx ((. name indexOf) '/')))
         (if (=== slashIdx -1)
           (return ((. (. env macros) get) name)))
-        (let* ((ns ((. name slice) 0 slashIdx))
+        (let ((ns ((. name slice) 0 slashIdx))
                (localName ((. name slice) (+ slashIdx 1)))
                (nsMap (&& (. env macroNamespaces) ((. (. env macroNamespaces) get) ns))))
           (if nsMap
@@ -1641,9 +1642,9 @@
   (const getTopLevelMacroCall
     (lambda ((node) (env))
       (if (=== (. node tag) 'expr-stmt')
-        (let* ((expr (. node expr)))
+        (let ((expr (. node expr)))
           (if (=== (. expr tag) 'call')
-            (let* ((callee (. expr fn)))
+            (let ((callee (. expr fn)))
               (if (&& (=== (. callee tag) 'identifier') (lookupMacro (. callee name) env))
                 (return expr))))))
       (return undefined)))
@@ -1658,7 +1659,7 @@
         (begin
           (pushMacroError env 'macro top-level expansion produced disallowed form' undefined)
           (return null)))
-      (let* ((withId (ensureNodeHasId node)) (tag (. withId tag)))
+      (let ((withId (ensureNodeHasId node)) (tag (. withId tag)))
         (if (=== tag undefined)
           (begin
             (pushMacroError env 'macro top-level expansion produced disallowed form' (. withId id))
@@ -1674,10 +1675,10 @@
   ;; Errors are accumulated in env.errors during expansion.
   (const expandAll
     (lambda ((programNode) (env) (macroLoader) (dbg))
-      (let* ((worklist ((. (. programNode body) slice) 0))
+      (let ((worklist ((. (. programNode body) slice) 0))
              (expandedBody (array)))
         (while (> (. worklist length) 0)
-          (let* ((node ((. worklist shift)))
+          (let ((node ((. worklist shift)))
                  (_ (ternary dbg ((. dbg log_msg) 'macros' (+ 'expand: ' (|| (. node tag) '?') (ternary (. node name) (+ ' ' (. node name)) (ternary (. node text) (+ ' ' ((. (. node text) slice) 0 40)) '')))) null))
                  (__ (registerTopLevelNode node env)) ;; registers local defmacros
                  (macroCall (getTopLevelMacroCall node env)))
@@ -1690,7 +1691,7 @@
             ;; macro-body-call (=&) at top level: explicit path that re-queues results
             ;; via the worklist, mirroring getTopLevelMacroCall for =&-style macro calls.
             (if (&& (=== (. node tag) 'macro-body-call') (lookupMacro (. (. node fn) name) env))
-              (let* ((expandedHeader ((. (. node headerArgs) map) (lambda ((a)) (return (expandExpr a env)))))
+              (let ((expandedHeader ((. (. node headerArgs) map) (lambda ((a)) (return (expandExpr a env)))))
                      (unwrappedBody ((. (. node body) map) (lambda ((stmt))
                        (return (ternary (&& stmt (=== (. stmt tag) 'expr-stmt'))
                          (. stmt expr)
@@ -1702,32 +1703,32 @@
                      (result (expandTopLevelMacroCall syntheticCall env)))
                 (if ((. Array isArray) result)
                   ;; array result: validate and re-queue each
-                  (let* ((validated (array)))
+                  (let ((validated (array)))
                     ((. result forEach)
                       (lambda ((spliced))
-                        (let* ((validatedNode (validateTopLevelNode spliced env)))
+                        (let ((validatedNode (validateTopLevelNode spliced env)))
                           (if validatedNode
                             (begin
                               (set! (. validatedNode callSiteId) (. node id))
                               ((. validated push) validatedNode)
                               (registerTopLevelNode validatedNode env))))))
-                    (let* ((idx (- (. validated length) 1)))
+                    (let ((idx (- (. validated length) 1)))
                       (while (>= idx 0)
                         (begin
-                          (let* ((spliced (index validated idx)))
+                          (let ((spliced (index validated idx)))
                             ((. worklist unshift) spliced))
                           (set! idx (- idx 1))))))
                   (if result
                     (if (=== (. result tag) 'block')
                       ;; block result: splice body items onto worklist individually
-                      (let* ((body (. result body))
+                      (let ((body (. result body))
                              (idx (- (. body length) 1)))
                         (while (>= idx 0)
                           (begin
                             ((. worklist unshift) (index body idx))
                             (set! idx (- idx 1)))))
                       ;; single non-block result: re-queue if top-level, else wrap in expr-stmt
-                      (let* ((singleValidated (ternary (isAllowedTopLevelTag (. result tag))
+                      (let ((singleValidated (ternary (isAllowedTopLevelTag (. result tag))
                                                 (validateTopLevelNode result env)
                                                 null)))
                         (if singleValidated
@@ -1738,33 +1739,33 @@
                           ((. expandedBody push)
                             (object (tag 'expr-stmt') (id (. node id)) (text (. node text)) (expr result)))))))))
               (if macroCall
-                (let* ((result (expandTopLevelMacroCall macroCall env)))
+                (let ((result (expandTopLevelMacroCall macroCall env)))
                   (if ((. Array isArray) result)
-                    (let* ((validated (array)))
+                    (let ((validated (array)))
                       ((. result forEach)
                         (lambda ((spliced))
-                          (let* ((validatedNode (validateTopLevelNode spliced env)))
+                          (let ((validatedNode (validateTopLevelNode spliced env)))
                             (if validatedNode
                               (begin
                                 (set! (. validatedNode callSiteId) (. node id))
                                 ((. validated push) validatedNode)
                                 (registerTopLevelNode validatedNode env))))))
-                      (let* ((idx (- (. validated length) 1)))
+                      (let ((idx (- (. validated length) 1)))
                         (while (>= idx 0)
                           (begin
-                            (let* ((spliced (index validated idx)))
+                            (let ((spliced (index validated idx)))
                               ((. worklist unshift) spliced))
                             (set! idx (- idx 1))))))
                     ;; block result: splice body items onto worklist individually
                     (if (&& result (=== (. result tag) 'block'))
-                      (let* ((body (. result body))
+                      (let ((body (. result body))
                              (idx (- (. body length) 1)))
                         (while (>= idx 0)
                           (begin
                             ((. worklist unshift) (index body idx))
                             (set! idx (- idx 1)))))
                       ;; single result: if it's a top-level form, splice it; else wrap in expr-stmt
-                      (let* ((singleValidated (ternary (&& result (isAllowedTopLevelTag (. result tag)))
+                      (let ((singleValidated (ternary (&& result (isAllowedTopLevelTag (. result tag)))
                                                 (validateTopLevelNode result env)
                                                 null)))
                         (if singleValidated
@@ -1775,7 +1776,7 @@
                           ((. expandedBody push)
                             (object (tag 'expr-stmt') (id (. node id)) (text (. node text)) (expr result))))))))
                 ((. expandedBody push) (expandTopLevel node env))))))
-        (let* ((expanded (object (tag 'program') (text (. programNode text))
+        (let ((expanded (object (tag 'program') (text (. programNode text))
                  (body expandedBody))))
           (return (object (ast expanded) (errors (. env errors))))))))
 

@@ -13,6 +13,7 @@ import { MacroExportContext } from "./Stage9Parser.js";
 import { MacroExportSpecContext } from "./Stage9Parser.js";
 import { MacroReexportContext } from "./Stage9Parser.js";
 import { TopLevelLetContext } from "./Stage9Parser.js";
+import { TopLevelVarContext } from "./Stage9Parser.js";
 import { TopLevelConstContext } from "./Stage9Parser.js";
 import { MetaAnnotationContext } from "./Stage9Parser.js";
 import { TypeAliasContext } from "./Stage9Parser.js";
@@ -36,11 +37,9 @@ import { AbstractMethodDefContext } from "./Stage9Parser.js";
 import { GetterDefContext } from "./Stage9Parser.js";
 import { SetterDefContext } from "./Stage9Parser.js";
 import { MethodKeyContext } from "./Stage9Parser.js";
-import { TypedParamContext } from "./Stage9Parser.js";
-import { FnSignatureTypedContext } from "./Stage9Parser.js";
 import { StatementContext } from "./Stage9Parser.js";
-import { LetStarContext } from "./Stage9Parser.js";
 import { LetStmtContext } from "./Stage9Parser.js";
+import { VarStmtContext } from "./Stage9Parser.js";
 import { ConstStarContext } from "./Stage9Parser.js";
 import { ConstStmtContext } from "./Stage9Parser.js";
 import { IfFormContext } from "./Stage9Parser.js";
@@ -106,7 +105,8 @@ import { ForFormContext } from "./Stage9Parser.js";
 import { ForInFormContext } from "./Stage9Parser.js";
 import { ForOfFormContext } from "./Stage9Parser.js";
 import { ForAwaitFormContext } from "./Stage9Parser.js";
-import { TryFormContext } from "./Stage9Parser.js";
+import { ExceptFormContext } from "./Stage9Parser.js";
+import { TryClauseContext } from "./Stage9Parser.js";
 import { CatchClauseContext } from "./Stage9Parser.js";
 import { FinallyClauseContext } from "./Stage9Parser.js";
 import { ExpressionContext } from "./Stage9Parser.js";
@@ -155,6 +155,7 @@ import { TemplateExprContext } from "./Stage9Parser.js";
 import { PropKeyContext } from "./Stage9Parser.js";
 import { OpSymbolContext } from "./Stage9Parser.js";
 import { PropAccessContext } from "./Stage9Parser.js";
+import { SubscriptAccessContext } from "./Stage9Parser.js";
 import { IndexAccessContext } from "./Stage9Parser.js";
 import { QuasiquoteContext } from "./Stage9Parser.js";
 import { QuasiFormContext } from "./Stage9Parser.js";
@@ -297,6 +298,16 @@ export class Stage9Listener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitTopLevelLet?: (ctx: TopLevelLetContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage9Parser.topLevelVar`.
+     * @param ctx the parse tree
+     */
+    enterTopLevelVar?: (ctx: TopLevelVarContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage9Parser.topLevelVar`.
+     * @param ctx the parse tree
+     */
+    exitTopLevelVar?: (ctx: TopLevelVarContext) => void;
     /**
      * Enter a parse tree produced by `Stage9Parser.topLevelConst`.
      * @param ctx the parse tree
@@ -528,26 +539,6 @@ export class Stage9Listener implements ParseTreeListener {
      */
     exitMethodKey?: (ctx: MethodKeyContext) => void;
     /**
-     * Enter a parse tree produced by `Stage9Parser.typedParam`.
-     * @param ctx the parse tree
-     */
-    enterTypedParam?: (ctx: TypedParamContext) => void;
-    /**
-     * Exit a parse tree produced by `Stage9Parser.typedParam`.
-     * @param ctx the parse tree
-     */
-    exitTypedParam?: (ctx: TypedParamContext) => void;
-    /**
-     * Enter a parse tree produced by `Stage9Parser.fnSignatureTyped`.
-     * @param ctx the parse tree
-     */
-    enterFnSignatureTyped?: (ctx: FnSignatureTypedContext) => void;
-    /**
-     * Exit a parse tree produced by `Stage9Parser.fnSignatureTyped`.
-     * @param ctx the parse tree
-     */
-    exitFnSignatureTyped?: (ctx: FnSignatureTypedContext) => void;
-    /**
      * Enter a parse tree produced by `Stage9Parser.statement`.
      * @param ctx the parse tree
      */
@@ -558,16 +549,6 @@ export class Stage9Listener implements ParseTreeListener {
      */
     exitStatement?: (ctx: StatementContext) => void;
     /**
-     * Enter a parse tree produced by `Stage9Parser.letStar`.
-     * @param ctx the parse tree
-     */
-    enterLetStar?: (ctx: LetStarContext) => void;
-    /**
-     * Exit a parse tree produced by `Stage9Parser.letStar`.
-     * @param ctx the parse tree
-     */
-    exitLetStar?: (ctx: LetStarContext) => void;
-    /**
      * Enter a parse tree produced by `Stage9Parser.letStmt`.
      * @param ctx the parse tree
      */
@@ -577,6 +558,16 @@ export class Stage9Listener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitLetStmt?: (ctx: LetStmtContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage9Parser.varStmt`.
+     * @param ctx the parse tree
+     */
+    enterVarStmt?: (ctx: VarStmtContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage9Parser.varStmt`.
+     * @param ctx the parse tree
+     */
+    exitVarStmt?: (ctx: VarStmtContext) => void;
     /**
      * Enter a parse tree produced by `Stage9Parser.constStar`.
      * @param ctx the parse tree
@@ -1228,15 +1219,25 @@ export class Stage9Listener implements ParseTreeListener {
      */
     exitForAwaitForm?: (ctx: ForAwaitFormContext) => void;
     /**
-     * Enter a parse tree produced by `Stage9Parser.tryForm`.
+     * Enter a parse tree produced by `Stage9Parser.exceptForm`.
      * @param ctx the parse tree
      */
-    enterTryForm?: (ctx: TryFormContext) => void;
+    enterExceptForm?: (ctx: ExceptFormContext) => void;
     /**
-     * Exit a parse tree produced by `Stage9Parser.tryForm`.
+     * Exit a parse tree produced by `Stage9Parser.exceptForm`.
      * @param ctx the parse tree
      */
-    exitTryForm?: (ctx: TryFormContext) => void;
+    exitExceptForm?: (ctx: ExceptFormContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage9Parser.tryClause`.
+     * @param ctx the parse tree
+     */
+    enterTryClause?: (ctx: TryClauseContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage9Parser.tryClause`.
+     * @param ctx the parse tree
+     */
+    exitTryClause?: (ctx: TryClauseContext) => void;
     /**
      * Enter a parse tree produced by `Stage9Parser.catchClause`.
      * @param ctx the parse tree
@@ -1717,6 +1718,16 @@ export class Stage9Listener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitPropAccess?: (ctx: PropAccessContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage9Parser.subscriptAccess`.
+     * @param ctx the parse tree
+     */
+    enterSubscriptAccess?: (ctx: SubscriptAccessContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage9Parser.subscriptAccess`.
+     * @param ctx the parse tree
+     */
+    exitSubscriptAccess?: (ctx: SubscriptAccessContext) => void;
     /**
      * Enter a parse tree produced by `Stage9Parser.indexAccess`.
      * @param ctx the parse tree

@@ -12,13 +12,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { compile } from '../index';
+import { compileSource as compile } from '../index';
 
 const T = 30_000;
 
 function callCompiler(source: string): { stdout: string; stderr: string; status: number } {
   try {
-    const stdout = compile({ filePath: '-', input: source });
+    const stdout = compile({ source: source });
     return { stdout, stderr: '', status: 0 };
   } catch (e: any) {
     return { stdout: '', stderr: e.message, status: 1 };
@@ -125,7 +125,7 @@ describe('Invariant 3: resolveNames is called in the pipeline (no regression)', 
   it('pipeline with gensym works correctly after resolveNames', () => {
     const result = callCompiler(`(program
   (defmacro withFresh (x)
-    (let* ((s (gensym "k")))
+    (let ((s (gensym "k")))
       (return (quasi (unquote x)))))
   (const v (withFresh 99))
 )`);
@@ -140,7 +140,7 @@ describe('Invariant 4: gensym counter is not persisted across compilations', () 
   it('two independent compilations both start gensym counter at 0', () => {
     const src = `(program
   (defmacro firstSym ()
-    (let* ((s (gensym "c")))
+    (let ((s (gensym "c")))
       (return (quasi (unquote s)))))
   (const x (firstSym))
 )`;

@@ -1,1 +1,1 @@
-export { compile } from "./stage9/index.ts";
+export { compile, compileSource } from "./stage9/index.ts";

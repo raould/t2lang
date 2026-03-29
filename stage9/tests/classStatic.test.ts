@@ -22,9 +22,9 @@ it('class — static method', () => {
         (import {asrt} "./helpers")
         (class MathUtils
             (class-body
-                (method static square ((n : number)) (returns number)
+                (method static square ((n : number)) : number
                     (return (* n n)))
-                (method static cube ((n : number)) (returns number)
+                (method static cube ((n : number)) : number
                     (return (* n (* n n))))))
         (asrt ((. MathUtils square) 5) 25)
         (asrt ((. MathUtils cube) 3) 27)
@@ -39,7 +39,7 @@ it('class — static method reading static field', () => {
                 (field private static (items : number) 0)
                 (method public static register ()
                     (set! (. Registry items) (+ (. Registry items) 1)))
-                (method public static getCount () (returns number)
+                (method public static getCount () : number
                     (return (. Registry items)))))
         ((. Registry register))
         ((. Registry register))
@@ -57,13 +57,13 @@ it('class — static and instance members coexist', () => {
                 (constructor ()
                     (set! (. this id) (. IdGen nextId))
                     (set! (. IdGen nextId) (+ (. IdGen nextId) 1)))
-                (method public getId () (returns number)
+                (method public getId () : number
                     (return (. this id)))
-                (method public static peekNextId () (returns number)
+                (method public static peekNextId () : number
                     (return (. IdGen nextId)))))
-        (let (a) (new IdGen))
-        (let (b) (new IdGen))
-        (let (c) (new IdGen))
+        (let ((a (new IdGen))))
+        (let ((b (new IdGen))))
+        (let ((c (new IdGen))))
         (asrt ((. a getId)) 1)
         (asrt ((. b getId)) 2)
         (asrt ((. c getId)) 3)

@@ -1,10 +1,10 @@
 import { it, expect } from 'vitest';
-import { compile as t2compile } from '../index';
+import { compileSource as t2compile } from '../index';
 import { fromSourceEndToEnd } from './helpers';
 
 const compile = (src: string): { stdout: string; stderr: string; status: number } => {
   try {
-    const stdout = t2compile({ filePath: '-', input: src });
+    const stdout = t2compile({ source: src });
     return { stdout, stderr: '', status: 0 };
   } catch (e: any) {
     return { stdout: '', stderr: e.message, status: 1 };

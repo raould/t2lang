@@ -48,7 +48,7 @@ const checkParenBalance  = (tokenStream, filePath) => {
 };
 const parseFile  = (filePath, sourceText) => {
   {
-    let rawInput  = (sourceText ? sourceText : fs.readFileSync(((filePath === "-") ? 0 : filePath), "utf-8"));
+    let rawInput  = (sourceText ? sourceText : fs.readFileSync(filePath, "utf-8"));
     let input  = readerTransform(rawInput);
     let inputStream  = CharStream.fromString(input);
     let lexer  = new Stage9Lexer(inputStream);
@@ -242,10 +242,8 @@ const validateFileTypeConstraints  = (programNode, isMacroCompilation) => {
     }
   }
 };
-const compile  = (config) => {
+const compileCore  = (filePath, source, config) => {
   {
-    let filePath  = (config.filePath || "-");
-    let input  = config.input;
     let rootDir  = config.rootDir;
     let outDir  = config.outDir;
     let t2exts  = (config.t2exts || ["t2"]);
@@ -261,10 +259,10 @@ const compile  = (config) => {
         _macroRoots.set(k, v);
       });
     }
-    if ((filePath !== "-")) {
+    if (filePath) {
       {
         if ((rootDir === undefined)) {
-          rootDir = path.dirname(path.resolve(filePath));
+          rootDir = path.dirname(filePath);
         }
         rootDir = path.resolve(rootDir);
         if ((outDir === undefined)) {
@@ -277,16 +275,17 @@ const compile  = (config) => {
     }
     setImportContext(filePath, rootDir, outDir);
     {
-      let isMacroCompilation  = ((filePath !== "-") && t2mexts.some((ext) => {
+      let isMacroCompilation  = (filePath && t2mexts.some((ext) => {
         return filePath.endsWith(("." + ext));
       }));
       let macroEnv  = makeMacroEnv(isMacroCompilation);
-      if ((filePath !== "-")) {
-        macroEnv.sourceDir = path.dirname(path.resolve(filePath));
+      let displayName  = (filePath || "<stdin>");
+      if (filePath) {
+        macroEnv.sourceDir = path.dirname(filePath);
       }
       {
-        let _spans  = resetSpans(((filePath === "-") ? "<stdin>" : filePath));
-        let programNode  = parseFile(filePath, input);
+        let _spans  = resetSpans(displayName);
+        let programNode  = parseFile(displayName, source);
         validateFileTypeConstraints(programNode, isMacroCompilation);
         {
           let expandResult  = expandAll(programNode, macroEnv, loadMacroModule, dbg);
@@ -321,4 +320,16 @@ const compile  = (config) => {
     }
   }
 };
-export { compile };
+const compile  = (config) => {
+  {
+    let filePath  = path.resolve(config.filePath);
+    return compileCore(filePath, null, config);
+  }
+};
+const compileSource  = (config) => {
+  {
+    let filePath  = (config.filePath ? path.resolve(config.filePath) : null);
+    return compileCore(filePath, config.source, config);
+  }
+};
+export { compile, compileSource };

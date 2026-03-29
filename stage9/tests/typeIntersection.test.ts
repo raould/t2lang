@@ -10,7 +10,7 @@ it('typeIntersection end-to-end', () => {
         (type HasX (obj (x number)))
         (type HasY (obj (y string)))
         ;; a value of type Intersect<HasX, HasY> must have both x and y
-        (let (pt : (type-app Intersect HasX HasY)) (object (x 3) (y "hi")))
+        (let ((pt : (type-app Intersect HasX HasY) (object (x 3) (y "hi")))))
         (asrt (. pt x) 3)
         (asrt (. pt y) "hi")
     )`);

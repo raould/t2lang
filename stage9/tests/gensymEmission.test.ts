@@ -12,13 +12,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { compile } from '../index';
+import { compileSource as compile } from '../index';
 
 const T = 30_000;
 
 function callCompiler(source: string): { stdout: string; stderr: string; status: number } {
   try {
-    const stdout = compile({ filePath: '-', input: source });
+    const stdout = compile({ source: source });
     return { stdout, stderr: '', status: 0 };
   } catch (e: any) {
     return { stdout: '', stderr: e.message, status: 1 };
@@ -32,7 +32,7 @@ describe('Section 2 Step 3: gensym identifier emission', () => {
     // raw identifier g_0, which the emitter must write as exactly "g_0".
     const result = callCompiler(`(program
   (defmacro makeSym ()
-    (let* ((s (gensym "g")))
+    (let ((s (gensym "g")))
       (return (quasi (unquote s)))))
   (const x (makeSym))
 )`);
@@ -48,7 +48,7 @@ describe('Section 2 Step 3: gensym identifier emission', () => {
     // invocations produce g_0 and g_1 (different suffixes).
     const result = callCompiler(`(program
   (defmacro makeSym ()
-    (let* ((s (gensym "g")))
+    (let ((s (gensym "g")))
       (return (quasi (unquote s)))))
   (const a (makeSym))
   (const b (makeSym))
@@ -63,7 +63,7 @@ describe('Section 2 Step 3: gensym identifier emission', () => {
   it('gensym prefix is preserved verbatim in the emitted name', () => {
     const result = callCompiler(`(program
   (defmacro useTmp ()
-    (let* ((s (gensym "myprefix")))
+    (let ((s (gensym "myprefix")))
       (return (quasi (unquote s)))))
   (const x (useTmp))
 )`);
@@ -76,7 +76,7 @@ describe('Section 2 Step 3: gensym identifier emission', () => {
     // expanded result, not any reference to gensym itself.
     const result = callCompiler(`(program
   (defmacro passthru (x)
-    (let* ((tmp (gensym "tmp")))
+    (let ((tmp (gensym "tmp")))
       (return (quasi (unquote x)))))
   (const val (passthru 99))
 )`);

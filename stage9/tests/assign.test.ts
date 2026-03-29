@@ -1,12 +1,12 @@
 import {it, expect, describe} from 'vitest';
-import {compile} from '../index';
+import { compileSource as compile } from '../index';
 import {fromSourceEndToEnd} from './helpers';
 
 const T = 30_000;
 
 function callCompiler(source: string): { stdout: string; stderr: string; status: number } {
   try {
-    const stdout = compile({ filePath: '-', input: source });
+    const stdout = compile({ source: source });
     return { stdout, stderr: '', status: 0 };
   } catch (e: any) {
     return { stdout: '', stderr: e.message, status: 1 };
@@ -18,7 +18,7 @@ it('assign.t2 end-to-end', () => {
         (program
             (import {asrt} "./helpers")
 
-            (let (x) 1)
+            (let ((x 1)))
             (asrt x 1)
 
             ;; set! mutates a binding
@@ -35,7 +35,7 @@ it('assign.t2 end-to-end', () => {
 
 describe('= operator is rejected as a syntax error', () => {
   it('rejects (= a 2) and suggests == or set!', () => {
-    const r = callCompiler(`(program (let (x) 1) (= x 2))`);
+    const r = callCompiler(`(program (let ((x 1))) (= x 2))`);
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/syntax error/);
     expect(r.stderr).toMatch(/==/);

@@ -4,10 +4,10 @@ import { fromSourceEndToEnd } from './helpers';
 it('ifForm.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (let (x) 10)
+    (let ((x 10)))
 
     ;; if with then and else
-    (let (out) undefined)
+    (let ((out undefined)))
     (if (> x 5)
       (then (set! out "big"))
       (else (set! out "small")))
@@ -19,8 +19,8 @@ it('ifForm.test.t2 end-to-end', () => {
     (asrt out "positive")
 
     ;; if with multi-statement branches
-    (let (a) 0)
-    (let (b) 0)
+    (let ((a 0)))
+    (let ((b 0)))
     (if (> x 5)
       (then
         (set! a 1)

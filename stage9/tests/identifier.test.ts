@@ -4,8 +4,8 @@ import { fromSourceEndToEnd } from './helpers';
 it('identifier.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (let (x) 42)
-    (let (myVar) "hello")
+    (let ((x 42)))
+    (let ((myVar "hello")))
 
     ;; identifier references
     (asrt x 42)

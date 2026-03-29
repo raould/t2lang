@@ -4,9 +4,9 @@ import { fromSourceEndToEnd } from './helpers';
 it('unquoteSplicing.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
       (import {asrtDeep} "./helpers")
-      (let (items) (array 1 2 3))
+      (let ((items (array 1 2 3))))
       ;; unquote-splicing inside quasiquote
-      (let (tmpl) (quasi (object (vals (unquote-splicing items)))))
+      (let ((tmpl (quasi (object (vals (unquote-splicing items)))))))
       (asrtDeep tmpl (object (vals (array 1 2 3))))
     )
 `);
@@ -15,9 +15,9 @@ it('unquoteSplicing.test.t2 end-to-end', () => {
 it('~@ tilde splice sugar: same result as (unquote-splicing items)', () => {
   fromSourceEndToEnd(`(program
       (import {asrtDeep} "./helpers")
-      (let (items) (array 1 2 3))
+      (let ((items (array 1 2 3))))
       ;; ~@items is sugar for (unquote-splicing items)
-      (let (tmpl) (quasi (object (vals ~@items))))
+      (let ((tmpl (quasi (object (vals ~@items))))))
       (asrtDeep tmpl (object (vals (array 1 2 3))))
     )
 `);

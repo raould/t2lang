@@ -4,13 +4,13 @@ import { fromSourceEndToEnd } from './helpers';
 it('class computed method key uses expression value', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (let (calls) 0)
-    (let (key) ((fn () (set! calls (+ calls 1)) (return "run"))))
+    (let ((calls 0)))
+    (let ((key ((fn () (set! calls (+ calls 1)) (return "run"))))))
     (class Runner
       (class-body
         (method [key] ()
           (return "ok"))))
-    (let (r) (new Runner))
+    (let ((r (new Runner))))
     (asrt ((. r run)) "ok")
     (asrt calls 1)
   )`);
@@ -19,15 +19,15 @@ it('class computed method key uses expression value', () => {
 it('computed setter/getter share outer key expression', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (let (key) "value")
+    (let ((key "value")))
     (class Box
       (class-body
         (field (data : number))
-        (get [key] () (returns number)
+        (get [key] () : number
           (return (. this data)))
         (set [key] ((v : number))
           (set! (. this data) v))))
-    (let (b) (new Box))
+    (let ((b (new Box))))
     (set! (. b value) 41)
     (asrt (. b data) 41)
     (asrt (. b value) 41)
@@ -37,11 +37,11 @@ it('computed setter/getter share outer key expression', () => {
 it('static computed method key evaluates expression once', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (let (calls) 0)
-    (let (name : (tlit "ignite")) "ignite")
-    (let (computeKey) (lambda () : (tlit "ignite")
+    (let ((calls 0)))
+    (let ((name : (tlit "ignite") "ignite")))
+    (let ((computeKey (lambda () : (tlit "ignite")
       (set! calls (+ calls 1))
-      (return name)))
+      (return name)))))
     (class Engine
       (class-body
         (method static [(computeKey)] ()
@@ -55,13 +55,13 @@ it('static computed method key evaluates expression once', () => {
 it('async generator computed method returns async iterator', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (let (key : (tlit "drain")) "drain")
+    (let ((key : (tlit "drain") "drain")))
     (class Pump
       (class-body
         (method static async generator [key] ()
           (yield 10)
           (yield 20))))
-    (let (it) ((index Pump key)))
+    (let ((it ((index Pump key)))))
     (asrt (typeof (. ((. it next)) then)) "function")
   )`);
 }, 30_000);
@@ -73,7 +73,7 @@ it('computed symbol method key works with method-call', () => {
       (class-body
         (method [(. Symbol asyncDispose)] ()
           (return "done"))))
-    (let (c) (new Cleaner))
+    (let ((c (new Cleaner))))
     (asrt (method-call c (. Symbol asyncDispose)) "done")
   )`);
 }, 30_000);

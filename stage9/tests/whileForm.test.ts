@@ -4,8 +4,8 @@ import { fromSourceEndToEnd } from './helpers';
 it('whileForm.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
       (import {asrt} "./helpers")
-      (let (i) 5)
-      (let (sum) 0)
+      (let ((i 5)))
+      (let ((sum 0)))
       ;; while loop with multiple body statements
       (while (> i 0)
         ((. console log) i)

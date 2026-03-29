@@ -200,7 +200,7 @@ statement
 
 
 letStar
-    : LPAREN LETSTAR LPAREN starBinding* RPAREN statement* RPAREN
+    : LPAREN (LETSTAR | LET) LPAREN starBinding* RPAREN statement* RPAREN
     ;
 
 letStmt

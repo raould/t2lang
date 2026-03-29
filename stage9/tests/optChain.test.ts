@@ -4,7 +4,7 @@ import { fromSourceEndToEnd } from './helpers';
 it('optChain.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
       (import {asrt} "./helpers")
-      (let* ((user (object (name "alice")))
+      (let ((user (object (name "alice")))
             (nobody undefined))
         (asrt (.? user name) "alice")
         (asrt (.? nobody name) undefined))

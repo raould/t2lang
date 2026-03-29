@@ -4,7 +4,7 @@ import {fromSourceEndToEnd} from './helpers';
 it('forIn.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (let* ((obj (object (a 1) (b 2) (c 3)))
+    (let ((obj (object (a 1) (b 2) (c 3)))
           (keys (array)))
       (for-in k obj
         ((. keys push) k))

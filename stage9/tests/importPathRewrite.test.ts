@@ -2,20 +2,22 @@ import { test, expect } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { compile as t2compile } from '../index';
+import { compile, compileSource } from '../index';
 
 function compileWith(args: string[], input?: string): { stdout: string; stderr: string; status: number } {
-  let filePath = '-';
+  let filePath: string | undefined;
   let rootDir: string | undefined;
   let outDir: string | undefined;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--root-dir' && i + 1 < args.length) { rootDir = args[++i]; }
     else if (args[i] === '--out-dir' && i + 1 < args.length) { outDir = args[++i]; }
-    else if (args[i] === '-') { filePath = '-'; }
-    else { filePath = args[i]; }
+    else if (args[i] !== '-') { filePath = args[i]; }
   }
   try {
-    return { stdout: t2compile({ filePath, input, rootDir, outDir }), stderr: '', status: 0 };
+    if (input !== undefined) {
+      return { stdout: compileSource({ source: input, filePath, rootDir, outDir }), stderr: '', status: 0 };
+    }
+    return { stdout: compile({ filePath: filePath!, rootDir, outDir }), stderr: '', status: 0 };
   } catch (e: any) {
     return { stdout: '', stderr: e.message, status: 1 };
   }

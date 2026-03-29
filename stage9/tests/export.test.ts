@@ -15,12 +15,12 @@ it('export forms end-to-end', () => {
 
     ;; (export-named (x) ...) — re-exports an already-declared name.
     ;; The variable is still accessible locally after the re-export.
-    (let (version) "1.0.0")
+    (let ((version "1.0.0")))
     (export-named (version))
     (asrt version "1.0.0")
 
     ;; (export-named (x alias)) — re-exports under a different name.
-    (let (internalCount) 42)
+    (let ((internalCount 42)))
     (export-named (internalCount count))
     (asrt internalCount 42)
 

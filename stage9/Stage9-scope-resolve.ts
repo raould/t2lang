@@ -467,7 +467,7 @@ const resolveStmt  = (node, chain) => {
       expr: resolveExpr(node.expr, chain)
     });
   }
-  if ((node.tag === "let*")) {
+  if ((node.tag === "let")) {
     {
       {
         let extChain  = chain;
@@ -485,7 +485,7 @@ const resolveStmt  = (node, chain) => {
           }
         });
         return ({
-          tag: "let*",
+          tag: "let",
           text: node.text,
           bindings: resolvedBindings,
           body: node.body.map((s) => {
@@ -664,18 +664,22 @@ const resolveTopLevel  = (node, chain) => {
   if ((node.tag === "let-decl")) {
     return ({
       tag: "let-decl",
+      id: node.id,
       text: node.text,
       name: node.name,
       meta: node.meta,
+      typeAnnotation: node.typeAnnotation,
       init: resolveExpr(node.init, chain)
     });
   }
   if ((node.tag === "const-decl")) {
     return ({
       tag: "const-decl",
+      id: node.id,
       text: node.text,
       name: node.name,
       meta: node.meta,
+      typeAnnotation: node.typeAnnotation,
       init: resolveExpr(node.init, chain)
     });
   }

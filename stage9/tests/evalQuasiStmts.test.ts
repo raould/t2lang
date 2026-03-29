@@ -48,16 +48,16 @@ describe('extractBindingName', () => {
 // ---- evalQuasi: let* ----
 
 describe('evalQuasi: let* node', () => {
-  it('passes through a let* with string name at depth 1 (no unquotes)', () => {
+  it('passes through a let with string name at depth 1 (no unquotes)', () => {
     const env = makeMacroEnv();
     const bindings = new Map<string, any>();
     const node = {
-      tag: 'let*', text: '',
+      tag: 'let', text: '',
       bindings: [{ name: 'x', init: makeLit(1), typeAnnotation: null }],
       body: [{ tag: 'return', expr: makeIdent('x'), text: '' }],
     };
     const result = evalQuasi(node, bindings, env, 1);
-    expect(result.tag).toBe('let*');
+    expect(result.tag).toBe('let');
     expect(result.bindings[0].name).toBe('x');
     expect(result.bindings[0].init.value).toBe(1);
   });
@@ -67,7 +67,7 @@ describe('evalQuasi: let* node', () => {
     const argNode = makeLit(42);
     const bindings = new Map([['v', argNode]]);
     const node = {
-      tag: 'let*', text: '',
+      tag: 'let', text: '',
       bindings: [{ name: 'x', init: makeUnquote(makeIdent('v')), typeAnnotation: null }],
       body: [],
     };
@@ -76,13 +76,13 @@ describe('evalQuasi: let* node', () => {
   });
 
   it('substitutes unquote in binding name (dynamic name → gensym\'d string)', () => {
-    // Template: (let* ((,g ,v)) ...)  where g is a gensym'd identifier
+    // Template: (let ((,g ,v)) ...)  where g is a gensym'd identifier
     const env = makeMacroEnv();
     const gensymIdent = makeIdent('tmp_0');
     const valNode = makeLit(99);
     const bindings = new Map([['g', gensymIdent], ['v', valNode]]);
     const node = {
-      tag: 'let*', text: '',
+      tag: 'let', text: '',
       bindings: [{ name: makeUnquote(makeIdent('g')), init: makeUnquote(makeIdent('v')), typeAnnotation: null }],
       body: [],
     };
@@ -96,7 +96,7 @@ describe('evalQuasi: let* node', () => {
     const ident = makeIdent('foo');
     const bindings = new Map([['x', ident]]);
     const node = {
-      tag: 'let*', text: '',
+      tag: 'let', text: '',
       bindings: [{ name: 'unused', init: makeLit(0), typeAnnotation: null }],
       body: [{ tag: 'return', expr: makeUnquote(makeIdent('x')), text: '' }],
     };
@@ -110,7 +110,7 @@ describe('evalQuasi: let* node', () => {
     const s2 = { tag: 'return', expr: makeLit(2), text: '' };
     const bindings = new Map([['stmts', [s1, s2]]]);
     const node = {
-      tag: 'let*', text: '',
+      tag: 'let', text: '',
       bindings: [{ name: 'x', init: makeLit(0), typeAnnotation: null }],
       body: [makeUnquoteSplicing(makeIdent('stmts'))],
     };
@@ -126,7 +126,7 @@ describe('evalQuasi: let* node', () => {
     const argNode = makeLit(42);
     const bindings = new Map([['v', argNode]]);
     const node = {
-      tag: 'let*', text: '',
+      tag: 'let', text: '',
       bindings: [{ name: 'x', init: makeUnquote(makeIdent('v')), typeAnnotation: null }],
       body: [],
     };
@@ -309,7 +309,7 @@ describe('evalQuasi: expr-stmt node', () => {
 
 describe('evalQuasi: nested quasiquote inside statement forms', () => {
   it('nested quasi bumps depth — inner unquote does not fire at depth 1', () => {
-    // `(let* ((x `(,y))) ...) at depth 1:
+    // `(let ((x `(,y))) ...) at depth 1:
     //  outer quasi → depth 1
     //  inner quasi → depth 2 for the inner unquote
     const env = makeMacroEnv();

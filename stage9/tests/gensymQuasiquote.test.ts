@@ -4,11 +4,11 @@
  * The canonical pattern (from DESIGN.md §2 Step 4) is:
  *
  *   (defmacro inc! ((x))
- *     (let* ((tmp (gensym "t")))
- *       `(let* ((,tmp ,x))
+ *     (let ((tmp (gensym "t")))
+ *       `(let ((,tmp ,x))
  *          (set! ,x (+ ,tmp 1)))))
  *
- * Note: Stage4 grammar constraints prevent (unquote …) in let*-binding-name
+ * Note: Stage4 grammar constraints prevent (unquote …) in let-binding-name
  * or set! target positions in *source text*.  The full inc!/swap! pattern is
  * verified at the AST level by swapMacro.test.ts.
  *
@@ -27,13 +27,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { compile } from '../index';
+import { compileSource as compile } from '../index';
 
 const T = 30_000;
 
 function callCompiler(source: string): { stdout: string; stderr: string; status: number } {
   try {
-    const stdout = compile({ filePath: '-', input: source });
+    const stdout = compile({ source: source });
     return { stdout, stderr: '', status: 0 };
   } catch (e: any) {
     return { stdout: '', stderr: e.message, status: 1 };
@@ -47,7 +47,7 @@ describe('Section 2 Step 4: gensym bound outside quasi template', () => {
     // (e.g., "v_0 + v_0"), not two different names ("v_0 + v_1").
     const result = callCompiler(`(program
   (defmacro refTwice (x)
-    (let* ((s (gensym "v")))
+    (let ((s (gensym "v")))
       (return (quasi (+ (unquote s) (unquote s))))))
   (const r (refTwice 0))
 )`);
@@ -62,7 +62,7 @@ describe('Section 2 Step 4: gensym bound outside quasi template', () => {
   it('same gensym binding unquoted three times still produces one unique name', () => {
     const result = callCompiler(`(program
   (defmacro refThree (x)
-    (let* ((s (gensym "k")))
+    (let ((s (gensym "k")))
       (return (quasi (+ (unquote s) (+ (unquote s) (unquote s)))))))
   (const r (refThree 0))
 )`);
@@ -77,7 +77,7 @@ describe('Section 2 Step 4: gensym bound outside quasi template', () => {
     // afresh.  The counter advances, so each expansion gets a distinct name.
     const result = callCompiler(`(program
   (defmacro oneSym ()
-    (let* ((s (gensym "v")))
+    (let ((s (gensym "v")))
       (return (quasi (unquote s)))))
   (const a (oneSym))
   (const b (oneSym))

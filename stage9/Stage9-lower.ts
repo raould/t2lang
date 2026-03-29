@@ -33,6 +33,9 @@ const lowerTopLevel  = (node, isMacroMode) => {
   if ((node.tag === "let-decl")) {
     return lowerLetDecl(node);
   }
+  if ((node.tag === "var-decl")) {
+    return lowerVarDecl(node);
+  }
   if ((node.tag === "const-decl")) {
     return lowerConstDecl(node);
   }
@@ -460,11 +463,28 @@ const lowerMacroTimeFnDef  = (node) => {
 const lowerLetDecl  = (node) => {
   {
     let init  = lowerExpr(node.init);
+    let typeAnnotation  = (node.typeAnnotation ? lowerTypeExpr(node.typeAnnotation) : undefined);
     return ({
       node: node,
       id: node.id,
       tag: "let-stmt",
       name: node.name,
+      typeAnnotation: typeAnnotation,
+      init: init,
+      meta: node.meta
+    });
+  }
+};
+const lowerVarDecl  = (node) => {
+  {
+    let init  = lowerExpr(node.init);
+    let typeAnnotation  = (node.typeAnnotation ? lowerTypeExpr(node.typeAnnotation) : undefined);
+    return ({
+      node: node,
+      id: node.id,
+      tag: "var-stmt",
+      name: node.name,
+      typeAnnotation: typeAnnotation,
       init: init,
       meta: node.meta
     });
@@ -585,18 +605,11 @@ const lowerExportDecl  = (node) => {
   }
 };
 const lowerStmt  = (node) => {
-  if ((node.tag === "let*")) {
+  if ((node.tag === "let")) {
     return lowerLetStar(node);
   }
-  if ((node.tag === "let")) {
-    return ({
-      node: node,
-      id: node.id,
-      tag: "let-stmt",
-      name: node.name,
-      typeAnnotation: (node.typeAnnotation ? lowerTypeExpr(node.typeAnnotation) : undefined),
-      init: lowerExpr(node.init)
-    });
+  if ((node.tag === "var")) {
+    return lowerVarStar(node);
   }
   if ((node.tag === "const*")) {
     return lowerConstStar(node);
@@ -919,6 +932,32 @@ const lowerLetStar  = (node) => {
     });
   }
 };
+const lowerVarStar  = (node) => {
+  {
+    let stmts  = [];
+    node.bindings.forEach((b) => {
+      stmts.push(({
+        node: node,
+        tag: "var-stmt",
+        name: b.name,
+        typeAnnotation: (b.typeAnnotation ? lowerTypeExpr(b.typeAnnotation) : undefined),
+        init: (b.init ? lowerExpr(b.init) : undefined)
+      }));
+    });
+    node.body.forEach((s) => {
+      stmts.push(lowerStmt(s));
+    });
+    if (((node.body.length === 0) && (stmts.length === 1))) {
+      return stmts[0];
+    }
+    return ({
+      node: node,
+      id: node.id,
+      tag: "block-stmt",
+      body: stmts
+    });
+  }
+};
 const lowerConstStar  = (node) => {
   {
     let stmts  = [];
@@ -1039,6 +1078,15 @@ const lowerExpr  = (node) => {
       tag: "index-access-expr",
       object: lowerExpr(node.object),
       index: lowerExpr(node.index)
+    });
+  }
+  if ((node.tag === "subscript-access")) {
+    return ({
+      node: node,
+      id: node.id,
+      tag: "subscript-access-expr",
+      object: lowerExpr(node.object),
+      rawIndex: node.rawIndex
     });
   }
   if ((node.tag === "literal")) {
