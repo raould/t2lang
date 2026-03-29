@@ -1,18 +1,28 @@
 import { it } from 'vitest';
 import { fromSourceEndToEnd } from './helpers';
 
+it('objectExpr.test.t2 object with identifier keys', () => {
+  fromSourceEndToEnd(`(program
+      (import {asrtDeep} "./helpers")
+      (let (obj) (object (x 1) (y 2) (z 3)))
+      (asrtDeep obj {"x":1,"y":2,"z":3})
+      (asrtDeep obj {x:1,y:2,z:3})
+  )`);
+},30_000);
+
+it('objectExpr.test.t2 object with string keys', () => {
+  fromSourceEndToEnd(`(program
+      (import {asrtDeep} "./helpers")
+      (let (obj2) (object ("name" "Alice") ("age" 30)))
+      (asrtDeep obj2 {"name":"Alice","age":30})
+      (asrtDeep obj2 {name:"Alice",age:30})
+  )`);
+}, 30_000);
+
 it('objectExpr.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
-      (import {asrt} "./helpers")
-      ;; object with identifier keys
-      (let (obj) (object (x 1) (y 2) (z 3)))
-      (asrt ((. JSON stringify) obj) '{"x":1,"y":2,"z":3}')
-
-      ;; object with string keys
-      (let (obj2) (object ("name" "Alice") ("age" 30)))
-      (asrt ((. JSON stringify) obj2) '{"name":"Alice","age":30}')
-      ;; empty object
+      (import {asrtDeep} "./helpers")
       (let (empty) (object))
-      (asrt ((. JSON stringify) empty) "{}"))
-`);
+      (asrtDeep empty {})
+  )`)
 }, 30_000);

@@ -3,6 +3,7 @@ import path from 'path';
 import ts from 'typescript';
 import vm from 'vm';
 import _ from 'lodash';
+import { diff } from 'deep-object-diff';
 import { compile } from '../index';
 
 export function asrt(actual, expected) {
@@ -10,7 +11,11 @@ export function asrt(actual, expected) {
 }
 
 export function asrtDeep(actual, expected) {
-  console.assert(_.isEqual(actual, expected), "actual != expected");
+  const ok = _.isEqual(actual, expected);
+  if (!ok) {
+    console.log("diff:", diff(actual, expected));
+    console.assert(ok, "value != expected");
+  }
 }
 
 export function prefixLineNumbers(str: string): string {

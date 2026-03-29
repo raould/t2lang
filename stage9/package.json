@@ -24,6 +24,7 @@
         "@types/node": "^20.19.33",
         "@vitest/ui": "^4.0.18",
         "antlr4ng": "^3.0.16",
+        "deep-object-diff": "^1.1.9",
         "eslint": "^10.0.1",
         "lodash": "^4.17.23",
         "tsx": "^4.21.0",
