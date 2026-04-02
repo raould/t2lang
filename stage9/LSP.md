@@ -18,9 +18,9 @@ The design is intentionally staged so that early versions remain minimal and pre
 
 # Stage 0 — Syntax Highlighting
 
-Syntax highlighting is provided by a static TextMate grammar (`syntaxes/t2lang.tmLanguage.json`), bundled with the editor extension. This is independent of the LSP server — no server process is required.
-
 See also: `vscode-t2-formatter`.
+
+Syntax highlighting is provided by a static TextMate grammar (`vscode-t2-formatter/syntaxes/t2.tmLanguage.json`), bundled with the editor extension. This is independent of the LSP server — no server process is required.
 
 **Coverage:**
 - Parentheses (paren depth coloring)

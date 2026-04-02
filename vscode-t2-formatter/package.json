@@ -35,6 +35,9 @@
         "url": "https://github.com/local/vscode-t2-formatter.git"
     },
     "license": "MIT",
+    "scripts": {
+        "package": "vsce package"
+    },
     "devDependencies": {
         "vsce": "^2.15.0"
     }
