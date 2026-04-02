@@ -236,24 +236,83 @@ const isSubscriptTrigger  = (ch) => {
   }
 };
 const METHOD_MODIFIERS  = new Set(["static", "async", "generator", "abstract", "override", "readonly"]);
-// Scan from i (position AFTER opening '[') to matching ']', skipping strings and nested brackets.
-// Returns [content, newI] where content is the raw text and newI is the position after ']'.
 const scanBracketContent  = (src, i) => {
-  let depth = 1;
-  let buf = "";
-  let j = i;
-  while ((j < src.length) && (depth > 0)) {
-    const ch = src.charAt(j);
-    if ((ch === "'")) { const end = skipSingleQuoteString(src, j + 1); buf += src.slice(j, end); j = end; continue; }
-    if (((ch === '"') && ((src.charAt(j + 1) === '"') && (src.charAt(j + 2) === '"')))) { const end = skipTripleString(src, j + 3); buf += src.slice(j, end); j = end; continue; }
-    if ((ch === '"')) { const end = skipDoubleQuoteString(src, j + 1); buf += src.slice(j, end); j = end; continue; }
-    if (((ch === ';') && (src.charAt(j + 1) === ';'))) { const end = skipToEndOfLine(src, j + 2); buf += src.slice(j, end); j = end; continue; }
-    if ((ch === '[')) { depth++; buf += ch; j++; continue; }
-    if ((ch === ']')) { depth--; if ((depth > 0)) { buf += ch; } j++; continue; }
-    buf += ch;
-    j++;
+  {
+    let depth  = 1;
+    let buf  = "";
+    let j  = i;
+    while (((j < src.length) && (depth > 0))) {
+      {
+        let ch  = src.charAt(j);
+        if ((ch === "'")) {
+          {
+            let end  = skipSingleQuoteString(src, (j + 1));
+            buf = (buf + src.slice(j, end));
+            j = end;
+          }
+        }
+        else {
+          if (((ch === "\"") && ((src.charAt((j + 1)) === "\"") && (src.charAt((j + 2)) === "\"")))) {
+            {
+              let end  = skipTripleString(src, (j + 3));
+              buf = (buf + src.slice(j, end));
+              j = end;
+            }
+          }
+          else {
+            if ((ch === "\"")) {
+              {
+                let end  = skipDoubleQuoteString(src, (j + 1));
+                buf = (buf + src.slice(j, end));
+                j = end;
+              }
+            }
+            else {
+              if (((ch === ";") && (src.charAt((j + 1)) === ";"))) {
+                {
+                  let end  = skipToEndOfLine(src, (j + 2));
+                  buf = (buf + src.slice(j, end));
+                  j = end;
+                }
+              }
+              else {
+                if ((ch === "[")) {
+                  {
+                    depth = (depth + 1);
+                    buf = (buf + ch);
+                    j = (j + 1);
+                  }
+                }
+                else {
+                  if ((ch === "]")) {
+                    {
+                      depth = (depth - 1);
+                      if ((depth > 0)) {
+                        {
+                          buf = (buf + ch);
+                          j = (j + 1);
+                        }
+                      }
+                      else {
+                        j = (j + 1);
+                      }
+                    }
+                  }
+                  else {
+                    {
+                      buf = (buf + ch);
+                      j = (j + 1);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return [buf, j];
   }
-  return [buf, j];
 };
 const bracketHasTopLevelComma  = (src, i) => {
   {
@@ -430,66 +489,21 @@ const readerTransform  = (src) => {
                   if ((ch === "[")) {
                     {
                       let prevChar  = ((i > 0) ? src.charAt((i - 1)) : undefined);
-                      // Helper: capture raw bracket content and emit (subscript precExpr "raw")
-                      const emitSubscript  = (precExpr, prefix) => {
-                        const captured  = scanBracketContent(src, (i + 1));
-                        const rawContent  = captured[0];
-                        const newI  = captured[1];
-                        out = (((prefix + "(subscript ") + precExpr) + (" \"" + (escapeChunk(rawContent) + "\")") ));
-                        i = newI;
-                      };
-                      if (isSubscriptTrigger(prevChar)) {
-                        {
-                          let start  = findPrecedingExprStart(out);
-                          if ((start >= 0)) {
-                            emitSubscript(out.slice(start), out.slice(0, start));
-                          }
-                          else {
-                            {
-                              out = (out + "[");
-                              bracketDepth = (bracketDepth + 1);
-                              i = (i + 1);
-                            }
-                          }
-                        }
-                      }
-                      else {
-                        if (isWhitespace(prevChar)) {
+                      {
+                        let emitSubscript  = (precExpr, prefix) => {
                           {
-                            let trimmedOut  = out.trimEnd();
-                            if (isSubscriptTrigger(trimmedOut.charAt((trimmedOut.length - 1)))) {
-                              {
-                                let start  = findPrecedingExprStart(trimmedOut);
-                                if ((start >= 0)) {
-                                  {
-                                    let precExpr  = trimmedOut.slice(start);
-                                    let prefix0  = trimmedOut.slice(0, start);
-                                    {
-                                      let prefix0Trim  = prefix0.trimEnd();
-                                      {
-                                        let charBefore  = ((prefix0Trim.length > 0) ? prefix0Trim.charAt((prefix0Trim.length - 1)) : "");
-                                        if (((charBefore !== "(") && ((charBefore !== ".") && (((precExpr.length === 0) || (precExpr.charAt(0) !== "[")) && ((!METHOD_MODIFIERS.has(precExpr)) && (!bracketHasTopLevelComma(src, i))))))) {
-                                          emitSubscript(precExpr, prefix0);
-                                        }
-                                        else {
-                                          {
-                                            out = (out + "[");
-                                            bracketDepth = (bracketDepth + 1);
-                                            i = (i + 1);
-                                          }
-                                        }
-                                      }
-                                    }
-                                  }
-                                }
-                                else {
-                                  {
-                                    out = (out + "[");
-                                    bracketDepth = (bracketDepth + 1);
-                                    i = (i + 1);
-                                  }
-                                }
-                              }
+                            let captured  = scanBracketContent(src, (i + 1));
+                            let rawContent  = captured[0];
+                            let newI  = captured[1];
+                            out = (((((prefix + "(subscript ") + precExpr) + " \"") + escapeChunk(rawContent)) + "\")");
+                            i = newI;
+                          }
+                        };
+                        if (isSubscriptTrigger(prevChar)) {
+                          {
+                            let start  = findPrecedingExprStart(out);
+                            if ((start >= 0)) {
+                              emitSubscript(out.slice(start), out.slice(0, start));
                             }
                             else {
                               {
@@ -501,10 +515,58 @@ const readerTransform  = (src) => {
                           }
                         }
                         else {
-                          {
-                            out = (out + "[");
-                            bracketDepth = (bracketDepth + 1);
-                            i = (i + 1);
+                          if (isWhitespace(prevChar)) {
+                            {
+                              let trimmedOut  = out.trimEnd();
+                              if (isSubscriptTrigger(trimmedOut.charAt((trimmedOut.length - 1)))) {
+                                {
+                                  let start  = findPrecedingExprStart(trimmedOut);
+                                  if ((start >= 0)) {
+                                    {
+                                      let precExpr  = trimmedOut.slice(start);
+                                      let prefix0  = trimmedOut.slice(0, start);
+                                      {
+                                        let prefix0Trim  = prefix0.trimEnd();
+                                        {
+                                          let charBefore  = ((prefix0Trim.length > 0) ? prefix0Trim.charAt((prefix0Trim.length - 1)) : "");
+                                          if (((charBefore !== "(") && ((charBefore !== ".") && (((precExpr.length === 0) || (precExpr.charAt(0) !== "[")) && ((!METHOD_MODIFIERS.has(precExpr)) && (!bracketHasTopLevelComma(src, i))))))) {
+                                            emitSubscript(precExpr, prefix0);
+                                          }
+                                          else {
+                                            {
+                                              out = (out + "[");
+                                              bracketDepth = (bracketDepth + 1);
+                                              i = (i + 1);
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                  else {
+                                    {
+                                      out = (out + "[");
+                                      bracketDepth = (bracketDepth + 1);
+                                      i = (i + 1);
+                                    }
+                                  }
+                                }
+                              }
+                              else {
+                                {
+                                  out = (out + "[");
+                                  bracketDepth = (bracketDepth + 1);
+                                  i = (i + 1);
+                                }
+                              }
+                            }
+                          }
+                          else {
+                            {
+                              out = (out + "[");
+                              bracketDepth = (bracketDepth + 1);
+                              i = (i + 1);
+                            }
                           }
                         }
                       }
@@ -515,12 +577,6 @@ const readerTransform  = (src) => {
                       {
                         out = (out + "]");
                         bracketDepth = (bracketDepth - 1);
-                        if (((subscriptStack.length > 0) && (subscriptStack[(subscriptStack.length - 1)] === bracketDepth))) {
-                          {
-                            subscriptStack.pop();
-                            out = (out + ")");
-                          }
-                        }
                         i = (i + 1);
                       }
                     }

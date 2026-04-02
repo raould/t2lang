@@ -204,6 +204,8 @@ statement
     | exceptForm
     | returnForm
     | throwForm
+    | breakForm
+    | continueForm
     | importForm
     | importTypeForm
     | exportForm
@@ -261,11 +263,20 @@ throwForm
     : LPAREN THROW expression RPAREN
     ;
 
+breakForm
+    : LPAREN BREAK RPAREN
+    ;
+
+continueForm
+    : LPAREN CONTINUE RPAREN
+    ;
+
 importForm
     : LPAREN IMPORT objectExpr? STRING RPAREN                           // legacy verbose form
     | LPAREN IMPORT objectDestructPat STRING RPAREN                     // (import {foo bar} "mod")
     | LPAREN IMPORT IDENTIFIER STRING RPAREN                            // (import myLib "mod")   — default
     | LPAREN IMPORT IDENTIFIER objectDestructPat STRING RPAREN          // (import React {useState} "react")
+    | LPAREN IMPORT STAR AS IDENTIFIER STRING RPAREN                    // (import * as ts "typescript")
     ;
 
 // (import-type (named Foo Bar) "./mod")  → import type { Foo, Bar } from "./mod";
@@ -835,7 +846,7 @@ propKey
     | OBJECT | ARRAY | INDEX | QUASI | QUOTE | UNQUOTE_SPLICING | UNQUOTE
     | TYPE_ARRAY
     | NEW | IMPORT | SWITCH | CASE | DEFAULT | FORIN | FOROF | FOR
-    | FORAWAIT | TRY | CATCH | FINALLY | EXCEPT
+    | FORAWAIT | TRY | CATCH | FINALLY | EXCEPT | AS
     | UNION | INTERSECT | TUPLE | TYPEFN | LIT | KEYOF | TYPEOF | INFER | MAPPED | TYPE_TEMPLATE
     | TEMPLATE
     | REST | READONLY | TYPE_AS | TYPE_PARAMS | TYPE_ARGS | TYPE_APP | EXTENDS | RETURNS | TYPE | INTERFACE | ENUM | MODIFIERS
@@ -1051,6 +1062,8 @@ WHILE       : 'while' ;
 THEN        : 'then' ;
 RETURN      : 'return' ;
 THROW       : 'throw' ;
+BREAK       : 'break' ;
+CONTINUE    : 'continue' ;
 SET         : 'set!' ;
 TERNARY     : 'ternary' ;
 COND        : 'cond' ;
@@ -1079,6 +1092,7 @@ TRY         : 'try' ;
 CATCH       : 'catch' ;
 FINALLY     : 'finally' ;
 EXCEPT      : 'except' ;
+AS          : 'as' ;
 FOR         : 'for' ;
 
 // class-system keywords (order matters: longer tokens before shorter prefixes)

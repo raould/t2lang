@@ -90,7 +90,7 @@
 				{
 					"comment": "t2 control-flow and declaration keywords (must appear as s-expr heads)",
 					"name": "keyword.control.t2",
-					"match": "(?<=\\()(?:program|let|let\\*|const|const\\*|var|if|while|for|for-of|for-in|for-await|return|throw|try|catch|finally|except|switch|case|default|set!|begin|cond|then|else)(?=[\\s)])"
+					"match": "(?<=\\()(?:program|let|let\\*|const|const\\*|var|if|while|for|for-of|for-in|for-await|return|break|continue|throw|try|catch|finally|except|switch|case|default|set!|begin|cond|then|else)(?=[\\s)])"
 				},
 				{
 					"comment": "function / class definition forms",

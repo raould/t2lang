@@ -1,5 +1,63 @@
 # t2lang Language Server — Design Document
 
+---
+
+## Quick Start
+
+### 1. Build the LSP module
+
+```sh
+cd stage9
+npm run build-lsp        # compiles Stage9-lsp.s8 → Stage9-lsp.ts
+```
+
+The server entry point (`bin/t2lang-lsp.js`) is hand-authored and does not need to be built.
+
+### 2. Install root dependencies (once)
+
+```sh
+# from repo root
+npm install              # installs vscode-languageserver, vscode-languageserver-textdocument, etc.
+```
+
+### 3. Run the server manually (smoke-test)
+
+The server communicates over stdio and is not meant to be run interactively, but you can verify it starts without crashing:
+
+```sh
+npx tsx bin/t2lang-lsp.js
+# should hang waiting for LSP input — Ctrl-C to exit
+```
+
+### 4. Build and install the VS Code extension
+
+```sh
+cd vscode-t2-formatter
+npm install              # installs vscode-languageclient, typescript, etc.
+npm run build            # compiles src/extension.ts → out/extension.js
+npm run package          # produces vscode-t2-formatter-*.vsix
+
+# Install the .vsix into VS Code:
+code --install-extension vscode-t2-formatter-0.0.4.vsix
+```
+
+Or from the VS Code UI: **Extensions → ⋯ → Install from VSIX…**
+
+### 5. Connect: how the extension finds the server
+
+When a `.t2` or `.s8` file is opened, VS Code activates the extension (`onLanguage:t2`). The extension spawns `t2lang-lsp` (the bin entry from `npm install t2lang`) over stdio. The LSP handshake runs automatically — no manual connection step is needed.
+
+**In-repo development:** the server runs directly from source via `tsx`, so no separate compilation step is required before testing changes to `Stage9-lsp.ts`. Just rebuild with `npm run build-lsp` and reload the extension host (`Ctrl+Shift+P` → *Developer: Restart Extension Host*).
+
+### 6. Evaluate a snippet
+
+1. Open a `.t2` or `.s8` file.
+2. Select some code (any valid t2 expression or `(program ...)` block).
+3. Press `Ctrl+Enter` (Mac: `Cmd+Enter`).
+4. Results appear in the **t2 eval** output panel (stdout, stderr, or compile errors).
+
+---
+
 ## Overview
 
 The t2lang LSP provides editor-agnostic support for:
@@ -16,26 +74,29 @@ The design is intentionally staged so that early versions remain minimal and pre
 
 ---
 
-# Stage 0 — Syntax Highlighting
+# Stage 0 — Syntax Highlighting ✅ DONE
 
 See also: `vscode-t2-formatter`.
 
-Syntax highlighting is provided by a static TextMate grammar (`vscode-t2-formatter/syntaxes/t2.tmLanguage.json`), bundled with the editor extension. This is independent of the LSP server — no server process is required.
-
-**Coverage:**
-- Parentheses (paren depth coloring)
-- t2 keywords (`program`, `lambda`, `const`, `let`, `if`, `while`, etc.)
-- TypeScript/JavaScript keywords (`async`, `await`, `class`, `new`, etc.)
-- Strings (single-quoted, double-quoted, triple-quoted, backtick templates)
-- Comments (`;;`)
+`vscode-t2-formatter` is implemented and published (`.vsix`). Contains `syntaxes/t2.tmLanguage.json` and `language-configuration.json`. Open minor TODOs in the extension (toggle line comment, comment indentation) — tracked in `vscode-t2-formatter/TODO.md`.
 
 **Semantic tokens** (richer highlighting based on resolved types and bindings) are deferred to Future Directions — they require the LSP server and are not part of Stage 0.
 
 ---
 
-# Stage 1 — Minimal Viable LSP
+# Stage 1 — Minimal Viable LSP ✅ DONE
 
 > *Goal: Provide the smallest possible LSP that enables verbatim snippet evaluation.*
+>
+> **Implementation status:** Complete and smoke-tested.
+>
+> **Checklist:**
+> - [x] Add `vscode-languageserver` and `vscode-languageserver-textdocument` to root `package.json` dependencies
+> - [x] Add `"t2lang-lsp": "bin/t2lang-lsp.js"` to `package.json` bin entries
+> - [x] Create `bin/t2lang-lsp.js` (server entry point — hand-authored, like other bin files)
+> - [x] Create `stage9/Stage9-lsp.s8` → `stage9/Stage9-lsp.ts` (`createEvalService`, `handleT2Eval`, helpers)
+> - [x] `Stage9-lsp.s8` compiled by stage9 via `npm run build-lsp` (not stage8 build-compiler)
+> - [x] Smoke-tested: `handleT2Eval` compiles, type-checks, runs JS, returns `{ stdout, ts, js, finalT2 }`
 
 ### Capabilities
 
@@ -74,7 +135,7 @@ document store lookup
   -> extract selection (with character offsets)
   -> pre-flight check (empty selection)
   -> normalize to (program ...)
-  -> compile()
+  -> compileSource()
   -> TypeScript type-check + emit (in-process LanguageService)
   -> run JS (child process)
   -> return results
@@ -218,9 +279,10 @@ Add to root `package.json`:
       getScriptFileNames: (lambda () [EVAL_FILE]),
       getScriptVersion:   (lambda () (String version)),
       getScriptSnapshot:  (lambda ((fn))
-        (if (=== fn EVAL_FILE)
-          (return (ts.ScriptSnapshot.fromString currentSource)))
-        (return (ts.ScriptSnapshot.fromString ((ts.sys.readFile fn) ?? "")))),
+        (return (ts.ScriptSnapshot.fromString
+          (ternary (=== fn EVAL_FILE)
+            currentSource
+            (?? (ts.sys.readFile fn) ""))))),
       getCurrentDirectory:    (lambda () (process.cwd)),
       getCompilationSettings: (lambda () {
         module:        ts.ModuleKind.CommonJS,
@@ -280,7 +342,7 @@ Add to root `package.json`:
       })))
     (child.on "error" (lambda ((err))
       (clearTimeout timer)
-      (const msg (if (=== err.name "AbortError") "execution timed out" err.message))
+      (const msg (ternary (=== err.name "AbortError") "execution timed out" err.message))
       (resolve { stdout: "", stderr: msg, exitCode: 1 }))))))))
 ```
 
@@ -311,8 +373,9 @@ Step 4: t2 compile. On failure, return diagnostics immediately:
 
 ```lisp
   (let ((tsCode "")))
-  (try
-    (set! tsCode (compileSource { source: source }))
+  (except
+    (try
+      (set! tsCode (compileSource { source: source })))
     (catch err
       (const result { stdout: "", stderr: "", diagnostics: [{ message: err.message }] })
       (if (=== params.mode "verbose") (then (set! result.finalT2 source)))
@@ -332,27 +395,34 @@ Step 5: type-check and emit via the persistent LanguageService. On type error, r
       (if (=== params.mode "verbose")
         (then (set! result.finalT2 source) (set! result.ts tsCode)))
       (return result)))
-  (const jsCode (index (. (evalService.emit) outputFiles) 0 . text))
+  (const emitResult (evalService.emit))
+  (if (|| emitResult.emitSkipped (=== emitResult.outputFiles.length 0))
+    (then (return { stdout: "", stderr: "emit failed", exitCode: 1 })))
+  (const jsCode (. (subscript (. emitResult outputFiles) "0") text))
 ```
 
 Step 6: write JS to a temp file and execute. Temp file always cleaned up in `finally`:
 
 ```lisp
-  (const jsPath (join (tmpdir) `t2eval-${(Math.random.toString 36).slice 2}.js`))
-  (try
-    (writeFileSync jsPath jsCode "utf-8")
-    (const runResult (await (spawnAsync process.execPath [jsPath] { timeout: 5000, signal: signal })))
-    (const out (maybeTruncate runResult.stdout))
-    (const result { stdout: out.text, stderr: runResult.stderr })
-    (if out.truncated (then (set! result.truncated true)))
-    (if (=== params.mode "verbose")
-      (then
-        (set! result.finalT2 source)
-        (set! result.ts tsCode)
-        (set! result.js jsCode)))
-    (return result)
+  (const randSuffix ((. ((. ((. Math random)) toString) 36) slice) 2))
+  (const jsPath (join (tmpdir) `t2eval-${randSuffix}.js`))
+  (except
+    (try
+      (writeFileSync jsPath jsCode "utf-8")
+      (const runResult (await (spawnAsync process.execPath [jsPath] { timeout: 5000, signal: signal })))
+      (const out (maybeTruncate runResult.stdout))
+      (const result { stdout: out.text, stderr: runResult.stderr })
+      (if out.truncated (then (set! result.truncated true)))
+      (if (=== params.mode "verbose")
+        (then
+          (set! result.finalT2 source)
+          (set! result.ts tsCode)
+          (set! result.js jsCode)))
+      (return result))
     (finally
-      (try (unlinkSync jsPath) (catch _ undefined)))))) ;; end handleT2Eval
+      (except
+        (try (unlinkSync jsPath))
+        (catch _ undefined)))))) ;; end handleT2Eval
 ```
 
 **Full module structure (`stage9/lsp.s8`)**
@@ -365,6 +435,7 @@ Step 6: write JS to a temp file and execute. Temp file always cleaned up in `fin
   (import {spawn} "node:child_process")
   (import * as ts "typescript")
   (import {compileSource} "./index")
+  ;; Stage 2 adds: (import {readerTransform} "./Stage9-reader")
 
   (const MAX_OUTPUT #{1024 * 1024})
 
@@ -380,16 +451,27 @@ Step 6: write JS to a temp file and execute. Temp file always cleaned up in `fin
 
 ---
 
-# Stage 2 — Import Inference
+# Stage 2 — Import Inference ✅ DONE
 
 > *Goal: Allow snippet evaluation to behave like a standalone module by injecting top-level static imports from the file.*
+>
+> **Implementation status:** Complete and smoke-tested.
+>
+> **Checklist:**
+> - [x] `scanToMatchingParen` — depth-tracking scan to find end of a paren form
+> - [x] `extractTopLevelImports` — runs `readerTransform`, scans depth-1 children of `(program ...)` for `(import ...)` / `(import-type ...)` forms
+> - [x] `extractModuleSpecifier` — extracts the last string token (module path) from an import form
+> - [x] `injectImports` — inserts deduplicated imports after `(program` opener, skipping any whose specifier is already in the snippet
+> - [x] `handleT2Eval` updated — Step 3 extracts file imports and injects them before compiling
+> - [x] Import of `readerTransform` from `./Stage9-reader` added
+> - [x] Smoke-tested: snippet with no imports compiles/runs correctly; imports from file are injected into `finalT2`
 
 ### New Capabilities
 
 1. **Top-Level Static Import Extraction**
-   - The server parses the full file text from its document store.
-   - It collects all top-level, static `(import ...)` forms from the entire file (imports are hoisted; position does not matter).
-   - It excludes dynamic imports, conditional imports, and imports inside function bodies or macros.
+   - The server runs `readerTransform()` on the full file text, then does a single linear scan to collect all `(import ...)` and `(import-type ...)` forms at paren depth 1 (direct children of `(program ...)`).
+   - Because `readerTransform()` has already consumed strings, comments, and backtick templates, the depth counter is not confused by parens inside those constructs.
+   - It excludes dynamic imports, conditional imports, and imports inside function bodies or macros (those appear at depth > 1).
 
 2. **Import Injection**
    - Extracted imports are injected into the `(program ...)` wrapper, before the user's code, preserving file order.
@@ -397,19 +479,54 @@ Step 6: write JS to a temp file and execute. Temp file always cleaned up in `fin
 
 3. **Updated `t2/eval`**
    - The pipeline now includes import extraction and injection.
-   - Verbose mode returns `finalT2` — the t2 source passed to `compile()`, after all LSP transformations. In Stage 2 this includes the injected imports. This field is present in verbose mode for all stages and always represents "what was actually compiled."
+   - Verbose mode returns `finalT2` — the t2 source passed to `compileSource()`, after all LSP transformations. In Stage 2 this includes the injected imports. This field is present in verbose mode for all stages and always represents "what was actually compiled."
+
+### Import extraction — implementation sketch
+
+```lisp
+(const extractTopLevelImports (lambda ((fileText : string))
+  (const transformed (readerTransform fileText))
+  (const imports [])
+  (let ((depth 0) (i 0) (n transformed.length)))
+  (while (< i n)
+    (const ch (transformed[i]))
+    (if (=== ch "(")
+      (then
+        (set! depth (+ depth 1))
+        (if (=== depth 2)
+          (then
+            ;; Check if this form starts with 'import' or 'import-type'
+            (const rest (transformed.slice i))
+            (if (|| (rest.startsWith "(import ") (rest.startsWith "(import-type "))
+              (then
+                ;; Capture the full form by scanning to the matching close paren
+                (const end (scanToMatchingParen transformed i))
+                (imports.push (transformed.slice i end))
+                (set! i end)
+                (set! depth (- depth 1))
+                continue)))))
+      (if (=== ch ")")
+        (then (set! depth (- depth 1)))))
+    (set! i (+ i 1)))
+  (return imports)))
+```
+
+`scanToMatchingParen` is a simple depth-tracking scan (similar to `scanExprUntilClose` in the reader) that returns the index after the closing `)`.
+
+Deduplication by module specifier — extract the last string token of each `(import ...)` form (the path), skip any form whose specifier already appears in the snippet's own imports.
 
 ### Pipeline (Stage 2)
 
 ```
 document store lookup
+  -> cancel any in-flight eval
   -> extract selection (with character offsets)
-  -> pre-flight checks (empty, paren balance)
+  -> pre-flight check (empty selection)
   -> normalize to (program ...)
-  -> extract static imports from full file (all positions)
+  -> readerTransform full file → extract top-level imports
   -> inject imports into program (dedup by module specifier)
-  -> compile()
-  -> tsc (TypeScript type checking + transpile to JS)
+  -> compileSource()
+  -> TypeScript type-check + emit (in-process LanguageService)
   -> run JS (child process)
   -> return results
 ```
@@ -431,7 +548,7 @@ It also establishes the core invariant:
 
 ---
 
-# Future Directions
+# Future Directions 🔲 TODO (not yet actionable)
 
 ## 'Go To' Features
 
@@ -442,7 +559,7 @@ It also establishes the core invariant:
   - Go to implementations.
   - Go to references.
 
-## State Injection
+## State Injection 🔲 TODO (not yet actionable)
 
 > *Goal: Provide Postman-style reusable runtime state that scopes bindings around evaluated snippets.*
 >
@@ -484,14 +601,15 @@ The server assembles:
 
 ```
 document store lookup
+  -> cancel any in-flight eval
   -> extract selection (with character offsets)
-  -> pre-flight checks (empty, paren balance)
+  -> pre-flight check (empty selection)
   -> normalize to (program ...)
-  -> extract static imports from full file (all positions)
+  -> readerTransform full file → extract top-level imports
   -> inject imports into program (dedup by module specifier)
   -> wrap snippet body in let with state bindings
-  -> compile()
-  -> tsc (TypeScript type checking + transpile to JS)
+  -> compileSource()
+  -> TypeScript type-check + emit (in-process LanguageService)
   -> run JS (child process)
   -> return results
 ```
@@ -540,11 +658,12 @@ interface T2EvalResult {
   stdout: string;   // "" if pipeline stopped before execution
   stderr: string;   // "" if pipeline stopped before execution
   truncated?: boolean;
+  exitCode?: number; // present when node child process ran
 
   // present when mode is "verbose"
-  finalT2?: string; // the t2 source passed to compile(), after all LSP transformations ("what was actually compiled")
-  ts?: string;      // TypeScript output from compile()
-  js?: string;      // JavaScript output from tsc
+  finalT2?: string; // the t2 source passed to compileSource(), after all LSP transformations ("what was actually compiled")
+  ts?: string;      // TypeScript output from compileSource()
+  js?: string;      // JavaScript output from getEmitOutput()
 
   // present on t2 compilation failure
   diagnostics?: Diagnostic[];
@@ -588,3 +707,132 @@ The LSP server is part of the `t2lang` npm package:
 - **Install:** `npm install t2lang` makes the `t2lang-lsp` command available
 - **Editor extensions** spawn `t2lang-lsp` as a child process via stdio transport
 - **In-repo development** works against the local source
+
+---
+
+# Appendix — VS Code Extension Integration ✅ DONE
+
+The `vscode-t2-formatter` extension currently provides only syntax highlighting (grammar + language configuration). Integrating the LSP client requires adding an extension entry point.
+
+### Dependencies
+
+Add to `vscode-t2-formatter/package.json`:
+```json
+"dependencies": {
+  "vscode-languageclient": "^9.x"
+},
+"devDependencies": {
+  "@types/vscode": "^1.60.0",
+  "typescript": "^5.x"
+}
+```
+
+### `package.json` additions
+
+```json
+{
+  "main": "./out/extension.js",
+  "activationEvents": ["onLanguage:t2"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "t2",
+        "aliases": ["t2"],
+        "extensions": [".t2", ".s8"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "t2lang.eval",
+        "title": "t2: Evaluate Selection"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "t2lang.eval",
+        "key": "ctrl+enter",
+        "mac": "cmd+enter",
+        "when": "editorLangId == t2 && editorHasSelection"
+      }
+    ]
+  }
+}
+```
+
+Note: `.s8` is added to `extensions` so compiler source files get t2 highlighting and LSP support automatically.
+
+### Extension entry point (`src/extension.ts`)
+
+```typescript
+import * as vscode from 'vscode';
+import { LanguageClient, TransportKind } from 'vscode-languageclient/node';
+
+let client: LanguageClient;
+
+export function activate(context: vscode.ExtensionContext) {
+  const outputChannel = vscode.window.createOutputChannel('t2 eval');
+
+  client = new LanguageClient(
+    't2lang',
+    'T2 Language Server',
+    {
+      run:   { command: 't2lang-lsp', transport: TransportKind.stdio },
+      debug: { command: 't2lang-lsp', transport: TransportKind.stdio }
+    },
+    {
+      documentSelector: [{ scheme: 'file', language: 't2' }]
+    }
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('t2lang.eval', async () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) return;
+
+      const result: any = await client.sendRequest('t2/eval', {
+        textDocument: { uri: editor.document.uri.toString() },
+        selection: editor.selection,
+        mode: 'normal'
+      });
+
+      outputChannel.clear();
+      if (result.diagnostics?.length) {
+        outputChannel.appendLine('[t2 compile error]');
+        for (const d of result.diagnostics) outputChannel.appendLine(d.message);
+      } else {
+        if (result.stdout) outputChannel.append(result.stdout);
+        if (result.stderr) { outputChannel.appendLine('[stderr]'); outputChannel.append(result.stderr); }
+        if (result.truncated) outputChannel.appendLine('[output truncated]');
+      }
+      outputChannel.show(true);
+    })
+  );
+
+  client.start();
+}
+
+export function deactivate() {
+  return client?.stop();
+}
+```
+
+### How it works
+
+1. VS Code activates the extension when a `.t2` or `.s8` file is opened (`onLanguage:t2`).
+2. `LanguageClient` spawns `t2lang-lsp` via stdio and handles the LSP handshake.
+3. Document sync (`didOpen`, `didChange`) is handled automatically by the client library — the server's document store stays current.
+4. When the user presses `Ctrl+Enter` (or `Cmd+Enter` on Mac) with a selection, the `t2lang.eval` command fires, sends the `t2/eval` request, and displays the result in the **t2 eval** output panel.
+
+### Result display
+
+Results appear in a dedicated output channel ("t2 eval") that is shown automatically after each eval. This is the simplest approach. A richer alternative (syntax-highlighted webview panel showing stdout/stderr/ts/js in tabs) is straightforward to add later without changing the server protocol.
+
+### In-repo development
+
+During development, point the server command at the local source instead of the installed bin:
+
+```typescript
+run:   { command: 'node', args: ['../bin/t2lang-lsp.js'], transport: TransportKind.stdio },
+debug: { command: 'node', args: ['../bin/t2lang-lsp.js'], transport: TransportKind.stdio, options: { execArgv: ['--inspect=6009'] } }
+```

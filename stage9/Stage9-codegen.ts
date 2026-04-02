@@ -260,6 +260,12 @@ const emitStmt  = (stmt) => {
       return "return;";
     }
   }
+  if ((stmt.tag === "break-stmt")) {
+    return "break;";
+  }
+  if ((stmt.tag === "continue-stmt")) {
+    return "continue;";
+  }
   if ((stmt.tag === "throw-stmt")) {
     return (("throw " + emitExpr(stmt.expr)) + ";");
   }
@@ -526,7 +532,7 @@ const emitExpr  = (expr) => {
     return (((emitExpr(expr.object) + "[") + emitExpr(expr.index)) + "]");
   }
   if ((expr.tag === "subscript-access-expr")) {
-    return ((emitExpr(expr.object) + "[") + expr.rawIndex + "]");
+    return (((emitExpr(expr.object) + "[") + expr.rawIndex) + "]");
   }
   if ((expr.tag === "raw-template")) {
     return (("`" + expr.content) + "`");

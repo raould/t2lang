@@ -12,7 +12,7 @@
         "clean": "npm run clean-grammar; npm run clean-compiled",
         "build": "npm run build-grammar && npm run build-compiler",
         "build-compiler": "npx tsx ../stage8/index.ts Stage9-spans.s8 > /tmp/_s9_spans.ts && mv /tmp/_s9_spans.ts Stage9-spans.ts && npx tsx ../stage8/index.ts Stage9-ast.s8 > /tmp/_s9_ast.ts && mv /tmp/_s9_ast.ts Stage9-ast.ts && npx tsx ../stage8/index.ts Stage9-sugar.s8 > /tmp/_s9_sugar.ts && mv /tmp/_s9_sugar.ts Stage9-sugar.ts && npx tsx ../stage8/index.ts Stage9-lower.s8 > /tmp/_s9_lower.ts && mv /tmp/_s9_lower.ts Stage9-lower.ts && npx tsx ../stage8/index.ts Stage9-codegen.s8 > /tmp/_s9_codegen.ts && mv /tmp/_s9_codegen.ts Stage9-codegen.ts && npx tsx ../stage8/index.ts Stage9-macro-env.s8 > /tmp/_s9_macro_env.ts && mv /tmp/_s9_macro_env.ts Stage9-macro-env.ts && npx tsx ../stage8/index.ts Stage9-macro-expand.s8 > /tmp/_s9_macro_expand.ts && mv /tmp/_s9_macro_expand.ts Stage9-macro-expand.ts && npx tsx ../stage8/index.ts Stage9-scope-resolve.s8 > /tmp/_s9_scope_resolve.ts && mv /tmp/_s9_scope_resolve.ts Stage9-scope-resolve.ts && npx tsx ../stage8/index.ts Stage9-reader.s8 > /tmp/_s9_reader.ts && mv /tmp/_s9_reader.ts Stage9-reader.ts && npx tsx ../stage8/index.ts Stage9.s8 > /tmp/_s9_main.ts && mv /tmp/_s9_main.ts ./index.ts",
-        "build-grammar": "antlr-ng -Dlanguage=TypeScript Stage9.g4",
+"build-grammar": "antlr-ng -Dlanguage=TypeScript Stage9.g4",
         "test": "npm run build && npx vitest --typecheck run",
         "testnow": "npx vitest --typecheck run",
         "lint": "echo 'disabled on purpose'"

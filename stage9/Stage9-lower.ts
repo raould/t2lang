@@ -675,6 +675,20 @@ const lowerStmt  = (node) => {
       expr: (node.expr ? lowerExpr(node.expr) : undefined)
     });
   }
+  if ((node.tag === "break")) {
+    return ({
+      node: node,
+      id: node.id,
+      tag: "break-stmt"
+    });
+  }
+  if ((node.tag === "continue")) {
+    return ({
+      node: node,
+      id: node.id,
+      tag: "continue-stmt"
+    });
+  }
   if ((node.tag === "assign")) {
     return ({
       node: node,
@@ -988,7 +1002,7 @@ const lowerImport  = (node) => {
       id: node.id,
       tag: "import-stmt",
       defaultName: node.defaultName,
-      namespaceName: undefined,
+      namespaceName: node.namespaceName,
       named: node.named,
       source: node.source
     });

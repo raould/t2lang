@@ -2,12 +2,16 @@
     "name": "vscode-t2-formatter",
     "displayName": "T2 S-expression Support",
     "publisher": "local",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "engines": {
         "vscode": "^1.60.0"
     },
     "categories": [
         "Programming Languages"
+    ],
+    "main": "./out/extension.js",
+    "activationEvents": [
+        "onLanguage:t2"
     ],
     "contributes": {
         "languages": [
@@ -17,7 +21,8 @@
                     "t2"
                 ],
                 "extensions": [
-                    ".t2"
+                    ".t2",
+                    ".s8"
                 ],
                 "configuration": "./language-configuration.json"
             }
@@ -28,6 +33,20 @@
                 "scopeName": "source.t2",
                 "path": "./syntaxes/t2.tmLanguage.json"
             }
+        ],
+        "commands": [
+            {
+                "command": "t2lang.eval",
+                "title": "t2: Evaluate Selection"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "t2lang.eval",
+                "key": "ctrl+enter",
+                "mac": "cmd+enter",
+                "when": "editorLangId == t2 && editorHasSelection"
+            }
         ]
     },
     "repository": {
@@ -36,9 +55,16 @@
     },
     "license": "MIT",
     "scripts": {
-        "package": "vsce package"
+        "build": "tsc -p tsconfig.json",
+        "watch": "tsc -p tsconfig.json --watch",
+        "package": "npm run build && vsce package"
+    },
+    "dependencies": {
+        "vscode-languageclient": "^9.0.1"
     },
     "devDependencies": {
+        "@types/vscode": "^1.60.0",
+        "typescript": "^5.0.0",
         "vsce": "^2.15.0"
     }
 }

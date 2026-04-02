@@ -730,6 +730,12 @@ const astStatement  = (ctx) => {
   if (ctx.throwForm()) {
     return astThrow(ctx.throwForm());
   }
+  if (ctx.breakForm()) {
+    return astBreak(ctx.breakForm());
+  }
+  if (ctx.continueForm()) {
+    return astContinue(ctx.continueForm());
+  }
   if (ctx.importForm()) {
     return astImport(ctx.importForm());
   }
@@ -800,6 +806,15 @@ const astImport  = (ctx) => {
           source: source
         });
       }
+    }
+    if (ctx.STAR()) {
+      return ({
+        id: registerSpan(nextNodeId(), ctx),
+        text: ctx.getText(),
+        tag: "import",
+        namespaceName: ctx.IDENTIFIER().getText(),
+        source: source
+      });
     }
     if (ctx.IDENTIFIER()) {
       return ({
@@ -1385,6 +1400,20 @@ const astReturn  = (ctx) => {
       expr: expr
     });
   }
+};
+const astBreak  = (ctx) => {
+  return ({
+    id: registerSpan(nextNodeId(), ctx),
+    text: ctx.getText(),
+    tag: "break"
+  });
+};
+const astContinue  = (ctx) => {
+  return ({
+    id: registerSpan(nextNodeId(), ctx),
+    text: ctx.getText(),
+    tag: "continue"
+  });
 };
 const astObjectExpr  = (ctx) => {
   {

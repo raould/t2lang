@@ -472,6 +472,10 @@
         (return (astReturn ((. ctx returnForm)))))
       (if ((. ctx throwForm))
         (return (astThrow ((. ctx throwForm)))))
+      (if ((. ctx breakForm))
+        (return (astBreak ((. ctx breakForm)))))
+      (if ((. ctx continueForm))
+        (return (astContinue ((. ctx continueForm)))))
       (if ((. ctx importForm))
         (return (astImport ((. ctx importForm)))))
       (if ((. ctx importTypeForm))
@@ -510,6 +514,10 @@
                  (defaultName (ternary idTok ((. idTok getText)) undefined)))
             (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText)))
               (tag 'import') (named named) (defaultName defaultName) (source source)))))
+        ;; Sugar: (import * as ts "mod") — namespace import
+        (if ((. ctx STAR))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText)))
+            (tag 'import') (namespaceName ((. ((. ctx IDENTIFIER)) getText))) (source source))))
         ;; Sugar: (import myLib "mod") — default import only
         (if ((. ctx IDENTIFIER))
           (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText)))
@@ -770,6 +778,14 @@
     (lambda ((ctx))
       (let ((expr (ternary ((. ctx expression)) (astExpression ((. ctx expression))) undefined)))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'return') (expr expr))))))
+
+  (const astBreak
+    (lambda ((ctx))
+      (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'break')))))
+
+  (const astContinue
+    (lambda ((ctx))
+      (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'continue')))))
 
   (const astObjectExpr
     (lambda ((ctx))

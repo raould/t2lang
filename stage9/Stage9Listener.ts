@@ -48,6 +48,8 @@ import { ElseBlockContext } from "./Stage9Parser.js";
 import { WhileFormContext } from "./Stage9Parser.js";
 import { ReturnFormContext } from "./Stage9Parser.js";
 import { ThrowFormContext } from "./Stage9Parser.js";
+import { BreakFormContext } from "./Stage9Parser.js";
+import { ContinueFormContext } from "./Stage9Parser.js";
 import { ImportFormContext } from "./Stage9Parser.js";
 import { ImportTypeFormContext } from "./Stage9Parser.js";
 import { ImportTypeSpecContext } from "./Stage9Parser.js";
@@ -648,6 +650,26 @@ export class Stage9Listener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitThrowForm?: (ctx: ThrowFormContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage9Parser.breakForm`.
+     * @param ctx the parse tree
+     */
+    enterBreakForm?: (ctx: BreakFormContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage9Parser.breakForm`.
+     * @param ctx the parse tree
+     */
+    exitBreakForm?: (ctx: BreakFormContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage9Parser.continueForm`.
+     * @param ctx the parse tree
+     */
+    enterContinueForm?: (ctx: ContinueFormContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage9Parser.continueForm`.
+     * @param ctx the parse tree
+     */
+    exitContinueForm?: (ctx: ContinueFormContext) => void;
     /**
      * Enter a parse tree produced by `Stage9Parser.importForm`.
      * @param ctx the parse tree

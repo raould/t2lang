@@ -49,10 +49,10 @@ describe('3a: valid identifiers are accepted', () => {
 
 // ── 3b: JS reserved words used as binding names → throws ────────────────────
 // Only words that are NOT T2 grammar keywords can appear as IDENTIFIER tokens.
-// (Grammar keywords like `return`, `class`, `if` fail at parse time anyway.)
+// (Grammar keywords like `return`, `class`, `if`, `break`, `continue` fail at parse time anyway.)
 
 describe('3b: JS reserved words as binding names are rejected', () => {
-  for (const word of ['void', 'break', 'delete', 'in', 'with']) {
+  for (const word of ['void', 'delete', 'in', 'with']) {
     it(`rejects reserved word '${word}' as const binding`, () => {
       const r = callCompiler(`(program (const ${word} 1))`);
       expect(r.status).not.toBe(0);

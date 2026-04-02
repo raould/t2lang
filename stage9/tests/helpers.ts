@@ -1,8 +1,11 @@
+/// <reference types="node" />
 import { readFileSync } from 'fs';
 import path from 'path';
 import ts from 'typescript';
 import vm from 'vm';
 import _ from 'lodash';
+import { createRequire } from 'node:module';
+const _nodeRequire = createRequire(import.meta.url);
 import { diff } from 'deep-object-diff';
 import { compileSource } from '../index';
 
@@ -92,7 +95,7 @@ function runJs(js: string) {
     exports: mod.exports,
     require: (id: string) => {
       if (id === './helpers' || id.endsWith('/helpers')) return helperExports;
-      return (globalThis as any).require(id);
+      return _nodeRequire(id);
     },
   };
   try {

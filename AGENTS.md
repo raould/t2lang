@@ -4,7 +4,8 @@ A bootstrapping compiler chain (stage3 → ... → stage9) that compiles s-expre
 
 ## Code Style & Conventions
 
-Read STYLE_GUIDE.md
+- Read STYLE_GUIDE.md.
+- use Stage9/Stage9/g4 syntax.
 
 ## Project Structure
 
