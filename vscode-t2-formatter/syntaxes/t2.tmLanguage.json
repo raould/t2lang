@@ -17,7 +17,7 @@
 
 		"comment": {
 			"name": "comment.line.semicolon.t2",
-			"match": ";;.*$"
+			"match": ";+.*$"
 		},
 
 		"triple-string": {
