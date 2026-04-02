@@ -60,30 +60,61 @@ Syntax highlighting is provided by a static TextMate grammar (`vscode-t2-formatt
 
 ### Selection Pre-flight
 
-Before the pipeline runs, two checks are applied to the raw selection text:
+One check is applied to the raw selection text before the pipeline runs:
 
 - **Empty selection:** Return immediately with `diagnostics: [{ message: "empty selection" }]`. No compile invoked.
-- **Paren imbalance:** Return immediately with `diagnostics: [{ message: "selection has unmatched parentheses" }]`. Catches sloppy region selection before the compiler sees it.
+
+Paren balance is not checked here — `compileSource()` already throws with a clear error on imbalance, which surfaces as `diagnostics`. A separate pre-flight check would need to skip string contents to be correct, and the cost saving over an in-process compile is negligible.
 
 ### Pipeline (Stage 1)
 
 ```
 document store lookup
+  -> cancel any in-flight eval (kill child process, discard result)
   -> extract selection (with character offsets)
-  -> pre-flight checks (empty, paren balance)
+  -> pre-flight check (empty selection)
   -> normalize to (program ...)
   -> compile()
-  -> tsc (TypeScript type checking + transpile to JS)
+  -> TypeScript type-check + emit (in-process LanguageService)
   -> run JS (child process)
   -> return results
 ```
 
+### Cancellation
+
+Only one `t2/eval` runs at a time. If a new request arrives while a previous eval is still executing (waiting on the Node child process), the in-flight child is killed immediately and the new request proceeds. The cancelled request's promise is never resolved — the connection handler discards it and returns the new result.
+
+This is simpler than LSP's `$/cancelRequest` protocol (which requires the client to send a cancellation notification and the server to check a token). Instead, the server keeps a single `currentAbort: AbortController | null`. Each incoming `t2/eval` aborts the previous controller before starting. This means the server serialises evals and the latest request always wins.
+
+The `compileSource()` and `LanguageService` calls are synchronous and fast enough that cancellation only matters for the `spawnAsync` step (the Node child process). The `AbortController` passed to `spawnAsync` handles that: `ac.abort()` sends SIGTERM and the promise resolves immediately with `exitCode: 1`.
+
+### TypeScript compilation — persistent LanguageService
+
+Rather than spawning `tsc` as a child process per eval, the server creates a single `ts.LanguageService` instance at startup and reuses it for the lifetime of the process.
+
+The service uses an in-memory virtual host: a single virtual file (e.g. `__eval__.ts`) whose content is swapped out before each type-check/emit. The TypeScript compiler caches parsed lib files and node_modules types across invocations, so the cold-start cost (loading `lib.es2022.full.d.ts` etc.) is paid once. Subsequent evals run in ~5–15ms in-process with no process spawning, no temp files, and no disk I/O.
+
+```
+createLanguageService() — once at server startup
+  per eval:
+    update virtual file content + increment version
+    getSemanticDiagnostics()  → type errors
+    getEmitOutput()           → JS string
+```
+
+The virtual host implements the minimal `LanguageServiceHost` interface:
+- `getScriptFileNames` — returns `["__eval__.ts"]`
+- `getScriptVersion` — returns a counter incremented on each update
+- `getScriptSnapshot` — returns `ts.ScriptSnapshot.fromString(currentSource)` for the eval file; delegates to `ts.sys` for everything else (lib files, node_modules)
+- `getCompilationSettings` — `{ module: CommonJS, target: ES2022, lib: ["lib.es2022.full.d.ts"], skipLibCheck: true }`
+- `getDefaultLibFileName`, `fileExists`, `readFile`, `readDirectory` — delegate to `ts.sys`
+
 ### Runner Constraints
 
-- **Execution model:** Compiled TypeScript is transpiled via `tsc` (for full type checking) then executed in a child Node process via async `spawn`. Evaluated code runs with full privileges — no sandboxing is applied. This is intentional: t2lang is a single-user developer tool, not a multi-tenant service.
-- **Unique temp files:** Each invocation writes to a unique temp file (random suffix) to avoid clobbering under concurrent evals. Temp files are deleted after execution completes, whether or not execution succeeded. Best-effort cleanup runs on server shutdown.
+- **Execution model:** JS output from `getEmitOutput()` is written to a temp file and executed via `child_process.spawn(process.execPath, [jsPath])`. Evaluated code runs with full privileges — no sandboxing. This is intentional: t2lang is a single-user developer tool, not a multi-tenant service.
+- **Unique temp files:** Each invocation writes to a unique temp file (random suffix). Temp files are deleted after execution completes whether or not execution succeeded. Best-effort cleanup runs on server shutdown.
 - **Timeout:** Default 5-second timeout on JS execution. Configurable later.
-- **Output limits:** Max output size (e.g., 1MB). If exceeded, output is truncated and the response includes a `truncated: true` flag.
+- **Output limits:** Max output size (e.g. 1MB). If exceeded, output is truncated and the response includes a `truncated: true` flag.
 
 ### Error Handling
 
@@ -91,11 +122,11 @@ There are three distinct failure modes. `stdout` and `stderr` are always present
 
 | Stage | Failure | `stdout` | `stderr` | `diagnostics` |
 |---|---|---|---|---|
-| `compile()` throws | t2 compile error | `""` | `""` | populated |
-| `tsc` exits non-zero | TypeScript type error | `""` | tsc output | absent |
+| `compileSource()` throws | t2 compile error | `""` | `""` | populated |
+| `getSemanticDiagnostics` non-empty | TypeScript type error | `""` | formatted diags | absent |
 | `node` exits non-zero | Runtime error | partial | error message | absent |
 
-- **Rule:** If `diagnostics` is present and non-empty, the pipeline stopped at t2 compilation. If `stderr` is non-empty and `diagnostics` is absent, the failure was either a `tsc` type error or a runtime error (distinguish by exit code or a `stage` field if needed later).
+- **Rule:** If `diagnostics` is present and non-empty, the pipeline stopped at t2 compilation. If `stderr` is non-empty and `diagnostics` is absent, the failure was a TypeScript type error or a runtime error.
 
 ### Non-Goals
 
@@ -113,74 +144,106 @@ This is the pure baseline that everything else builds on.
 
 ### Implementation
 
-The LSP server is implemented in t2lang (`.t2` files) — dogfooding the compiler and surfacing any missing features.
+The LSP server is implemented in t2lang source files — dogfooding the compiler and surfacing any missing features.
 
 #### Dependencies
 
 Add to root `package.json`:
 ```json
 "vscode-languageserver": "^9.x",
-"vscode-languageserver-textdocument": "^1.x"
+"vscode-languageserver-textdocument": "^1.x",
+"typescript": "^5.x"
 ```
+
+(`typescript` is already a dependency; it is used here via its programmatic API, not as a CLI tool.)
 
 #### New files
 
-- `bin/t2lang-lsp.t2` — server entry point (compiled to `bin/t2lang-lsp.js`)
-- `stage9/lsp.t2` — `t2/eval` handler and helpers
+- `bin/t2lang-lsp.s8` — server entry point (compiled to `bin/t2lang-lsp.js`)
+- `stage9/lsp.s8` — `t2/eval` handler and helpers
 
 #### New bin entry in `package.json`
 
-The bin entry points to the compiled JS output:
 ```json
 "bin": {
   "t2lang-lsp": "bin/t2lang-lsp.js"
 }
 ```
 
-#### Server initialization (`bin/t2lang-lsp.t2`)
+#### Server initialization (`bin/t2lang-lsp.s8`)
 
 ```lisp
 (program
   (import {createConnection ProposedFeatures TextDocumentSyncKind} "vscode-languageserver/node")
   (import {TextDocuments} "vscode-languageserver")
   (import {TextDocument} "vscode-languageserver-textdocument")
-  (import {handleT2Eval} "../stage9/lsp")
+  (import {createEvalService handleT2Eval} "../stage9/lsp")
 
   (const connection (createConnection ProposedFeatures.all))
   (const documents (new TextDocuments TextDocument))
+  (const evalService (createEvalService))
+  (let ((currentAbort null)))  ;; tracks the in-flight eval's AbortController
 
   (connection.onInitialize (lambda ()
     (return { capabilities: { textDocumentSync: TextDocumentSyncKind.Incremental } })))
 
   (connection.onRequest "t2/eval" (async-lambda ((params))
-    (const (doc) (documents.get params.textDocument.uri))
+    ;; Cancel any in-flight eval before starting a new one
+    (if currentAbort (then (currentAbort.abort)))
+    (const ac (new AbortController))
+    (set! currentAbort ac)
+    (const doc (documents.get params.textDocument.uri))
     (if (! doc)
       (then (return { stdout: "", stderr: "", diagnostics: [{ message: "document not found" }] })))
-    (return (await (handleT2Eval doc params)))))
+    (const result (await (handleT2Eval evalService ac.signal doc params)))
+    ;; Only clear currentAbort if this request is still current (wasn't superseded)
+    (if (=== currentAbort ac) (then (set! currentAbort null)))
+    (return result)))
 
   (documents.listen connection)
   (connection.listen))
 ```
 
-#### `t2/eval` handler (`stage9/lsp.t2`)
+#### `t2/eval` handler (`stage9/lsp.s8`)
 
-**Helpers**
-
-`isParenBalanced` — lightweight depth counter, raw character scan, sufficient for pre-flight (not the full ANTLR pass):
+**`createEvalService`** — called once at server startup. Creates and returns the persistent TypeScript `LanguageService` with an in-memory virtual host. The virtual file `__eval__.ts` is the only script file; its content and version are updated per eval. All other file access (lib files, node_modules types) delegates to `ts.sys`.
 
 ```lisp
-(const isParenBalanced (lambda ((text : string)) : boolean
-  (let (depth) 0)
-  (for-of ch text
-    (if (=== ch "(")
-      (then (+= depth 1))
-      (else (if (=== ch ")")
-        (then
-          (-= depth 1)
-          (if (< depth 0)
-            (then (return false))))))))
-  (return (=== depth 0))))
+(const EVAL_FILE "__eval__.ts")
+
+(const createEvalService (lambda ()
+  (let ((currentSource "")
+        (version 0))
+    (const host {
+      getScriptFileNames: (lambda () [EVAL_FILE]),
+      getScriptVersion:   (lambda () (String version)),
+      getScriptSnapshot:  (lambda ((fn))
+        (if (=== fn EVAL_FILE)
+          (return (ts.ScriptSnapshot.fromString currentSource)))
+        (return (ts.ScriptSnapshot.fromString ((ts.sys.readFile fn) ?? "")))),
+      getCurrentDirectory:    (lambda () (process.cwd)),
+      getCompilationSettings: (lambda () {
+        module:        ts.ModuleKind.CommonJS,
+        target:        ts.ScriptTarget.ES2022,
+        lib:           ["lib.es2022.full.d.ts"],
+        skipLibCheck:  true
+      }),
+      getDefaultLibFileName: (lambda ((opts)) (ts.getDefaultLibFilePath opts)),
+      fileExists:     ts.sys.fileExists,
+      readFile:       ts.sys.readFile,
+      readDirectory:  ts.sys.readDirectory
+    })
+    (const svc (ts.createLanguageService host))
+    (return {
+      update: (lambda ((src))
+        (set! currentSource src)
+        (set! version (+ version 1))),
+      getDiagnostics: (lambda () (svc.getSemanticDiagnostics EVAL_FILE)),
+      emit:           (lambda () (svc.getEmitOutput EVAL_FILE))
+    }))))
 ```
+
+**Helpers**
 
 `maybeTruncate`:
 
@@ -193,124 +256,126 @@ The bin entry points to the compiled JS output:
   (return { text: (s.slice 0 MAX_OUTPUT), truncated: true })))
 ```
 
-`spawnAsync` — wraps `child_process.spawn` with stdout/stderr capture and timeout via `AbortController`. On timeout, `ac.abort()` sends SIGTERM; the `error` event fires with an `AbortError`, returned as a stderr message:
+`spawnAsync` — wraps `child_process.spawn` with stdout/stderr capture and timeout. `opts.signal` is the server-level `AbortSignal` from the request handler; `opts.timeout` drives a local per-process timeout. Either abort source kills the child. The promise always resolves (never rejects):
 
 ```lisp
-(const spawnAsync (lambda ((cmd : string) (args : (type-array string)) (opts : (Object (timeout number))))
+(const spawnAsync (lambda ((cmd : string) (args : (type-array string)) (opts : (Object (timeout number) (signal AbortSignal))))
   (return (new Promise (lambda ((resolve))
-    (const (ac) (new AbortController))
-    (const (timer) (setTimeout (lambda () (ac.abort)) opts.timeout))
-    (const (child) (spawn cmd args { signal: ac.signal }))
-    (const (outChunks) [])
-    (const (errChunks) [])
+    (const ac (new AbortController))
+    (const timer (setTimeout (lambda () (ac.abort)) opts.timeout))
+    ;; Link server-level signal: if the outer request is cancelled, abort this child too
+    (if (&& opts.signal (! opts.signal.aborted))
+      (then (opts.signal.addEventListener "abort" (lambda () (ac.abort)) { once: true })))
+    (const child (spawn cmd args { signal: ac.signal }))
+    (const outChunks [])
+    (const errChunks [])
     (child.stdout.on "data" (lambda ((d)) (outChunks.push d)))
     (child.stderr.on "data" (lambda ((d)) (errChunks.push d)))
     (child.on "close" (lambda ((code))
       (clearTimeout timer)
       (resolve {
-        stdout: ((Buffer.concat outChunks).toString "utf-8"),
-        stderr: ((Buffer.concat errChunks).toString "utf-8"),
+        stdout:   ((Buffer.concat outChunks).toString "utf-8"),
+        stderr:   ((Buffer.concat errChunks).toString "utf-8"),
         exitCode: (?? code 1)
       })))
     (child.on "error" (lambda ((err))
       (clearTimeout timer)
-      (resolve { stdout: "", stderr: err.message, exitCode: 1 }))))))))
+      (const msg (if (=== err.name "AbortError") "execution timed out" err.message))
+      (resolve { stdout: "", stderr: msg, exitCode: 1 }))))))))
 ```
 
 **`handleT2Eval`**
 
-Steps 1–2: extract selection (`TextDocument.getText(range)` handles line/character offset arithmetic) and pre-flight:
+Takes the server's `AbortSignal` and passes it to `spawnAsync`. If the signal fires before the child process finishes, the child is killed and the promise resolves with a timeout/cancelled error — the caller discards this result since `currentAbort` will already have been replaced.
+
+Steps 1–2: extract and pre-flight:
 
 ```lisp
-(const handleT2Eval (async-lambda ((doc) (params))
-  (const (text) ((doc.getText params.selection).trim))
+(const handleT2Eval (async-lambda ((evalService) (signal) (doc) (params))
+  (const text ((doc.getText params.selection).trim))
   (if (=== text.length 0)
     (then (return { stdout: "", stderr: "", diagnostics: [{ message: "empty selection" }] })))
-  (if (! (isParenBalanced text))
-    (then (return { stdout: "", stderr: "", diagnostics: [{ message: "selection has unmatched parentheses" }] })))
 ```
 
 Step 3: normalize to `(program ...)`:
 
 ```lisp
-  (const (trimmed) (text.trimStart))
-  (const (source) (ternary
+  (const trimmed (text.trimStart))
+  (const source (ternary
     (|| (trimmed.startsWith "(program ") (trimmed.startsWith "(program\n"))
     text
     `(program\n${text}\n)`))
 ```
 
-Step 4: compile. On failure, return diagnostics immediately:
+Step 4: t2 compile. On failure, return diagnostics immediately:
 
 ```lisp
-  (let (tsCode) "")
-  ;; try/catch #1: compile only — returns on error, falls through on success
+  (let ((tsCode "")))
   (try
-    (set! tsCode (compile { filePath: "-", input: source }))
+    (set! tsCode (compileSource { source: source }))
     (catch err
-      (const (result) { stdout: "", stderr: "", diagnostics: [{ message: err.message }] })
-      (if (=== params.mode "verbose")
-        (then (set! result.finalT2 source)))
+      (const result { stdout: "", stderr: "", diagnostics: [{ message: err.message }] })
+      (if (=== params.mode "verbose") (then (set! result.finalT2 source)))
       (return result)))
 ```
 
-Steps 5–7: write temp files, transpile with `tsc`, execute. Temp dir always cleaned up in `finally`:
+Step 5: type-check and emit via the persistent LanguageService. On type error, return formatted diagnostics as `stderr`:
 
 ```lisp
-  ;; compile succeeded — now transpile and execute
-  (const (dir) (mkdtempSync (join (tmpdir) "t2eval-")))
-  (const (tsPath) (join dir "eval.ts"))
-  (const (jsPath) (join dir "eval.js"))
-  ;; try/finally #2: temp dir cleanup guaranteed regardless of outcome
+  (evalService.update tsCode)
+  (const tsDiags (evalService.getDiagnostics))
+  (if (> tsDiags.length 0)
+    (then
+      (const stderr ((tsDiags.map (lambda ((d))
+        (ts.flattenDiagnosticMessageText d.messageText "\n"))).join "\n"))
+      (const result { stdout: "", stderr: stderr })
+      (if (=== params.mode "verbose")
+        (then (set! result.finalT2 source) (set! result.ts tsCode)))
+      (return result)))
+  (const jsCode (index (. (evalService.emit) outputFiles) 0 . text))
+```
+
+Step 6: write JS to a temp file and execute. Temp file always cleaned up in `finally`:
+
+```lisp
+  (const jsPath (join (tmpdir) `t2eval-${(Math.random.toString 36).slice 2}.js`))
   (try
-    (writeFileSync tsPath `${tsCode}\n` "utf-8")
-
-    (const (tscResult) (await (spawnAsync "npx"
-      ["tsc" "--skipLibCheck" "--module" "ESNext" "--target" "ES2022" tsPath]
-      { timeout: 30000 })))
-    (if (!== tscResult.exitCode 0)
-      (then
-        (const (result) { stdout: "", stderr: tscResult.stderr })
-        (if (=== params.mode "verbose")
-          (then
-            (set! result.finalT2 source)
-            (set! result.ts tsCode)))
-        (return result)))
-
-    (const (runResult) (await (spawnAsync process.execPath [jsPath] { timeout: 5000 })))
-    (const (out) (maybeTruncate runResult.stdout))
-    (const (result) { stdout: out.text, stderr: runResult.stderr })
-    (if out.truncated
-      (then (set! result.truncated true)))
+    (writeFileSync jsPath jsCode "utf-8")
+    (const runResult (await (spawnAsync process.execPath [jsPath] { timeout: 5000, signal: signal })))
+    (const out (maybeTruncate runResult.stdout))
+    (const result { stdout: out.text, stderr: runResult.stderr })
+    (if out.truncated (then (set! result.truncated true)))
     (if (=== params.mode "verbose")
       (then
         (set! result.finalT2 source)
         (set! result.ts tsCode)
-        (set! result.js (readFileSync jsPath "utf-8"))))
+        (set! result.js jsCode)))
     (return result)
-
     (finally
-      (rmSync dir { recursive: true, force: true }))))) ;; end handleT2Eval
+      (try (unlinkSync jsPath) (catch _ undefined)))))) ;; end handleT2Eval
 ```
 
-**Full module structure (`stage9/lsp.t2`)**
+**Full module structure (`stage9/lsp.s8`)**
 
 ```lisp
 (program
-  (import {mkdtempSync writeFileSync rmSync readFileSync} "node:fs")
+  (import {writeFileSync unlinkSync} "node:fs")
   (import {tmpdir} "node:os")
   (import {join} "node:path")
   (import {spawn} "node:child_process")
-  (import {compile} "./index")
+  (import * as ts "typescript")
+  (import {compileSource} "./index")
 
   (const MAX_OUTPUT #{1024 * 1024})
 
-  (const isParenBalanced ...)
+  (const EVAL_FILE ...)
+  (const createEvalService ...)
   (const maybeTruncate ...)
   (const spawnAsync ...)
   (const handleT2Eval ...)
 
-  (export-named (handleT2Eval)))
+  ;; handleT2Eval: (evalService, signal, doc, params) -> Promise<T2EvalResult>
+  (export-named (createEvalService handleT2Eval)))
 ```
 
 ---
@@ -495,6 +560,7 @@ interface T2EvalResult {
 - Provide: document identifier, selection range, optional state name
 - Display: stdout, stderr, verbose artifacts, diagnostics
 - Spawn the server via the `t2lang-lsp` bin command
+- **Associate files with the t2lang LSP** — file extension mapping (`.t2`, `.s8`, or any other) is entirely the client's responsibility
 
 ### Client must not:
 
@@ -504,8 +570,13 @@ interface T2EvalResult {
 - inject state
 - compile
 - run
+- make assumptions about what the server accepts based on file extension
 
 The client is a thin UI shell. The server is the semantic engine.
+
+### File extension is not the server's concern
+
+The LSP server treats every document it receives as t2lang source, regardless of filename or extension. If the editor has routed a document to the t2lang LSP, that routing decision was already made correctly by the client's language association configuration. The server never inspects `textDocument.uri` for extension or path — it simply processes the text.
 
 ---
 
