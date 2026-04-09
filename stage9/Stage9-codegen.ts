@@ -146,6 +146,9 @@ const emitStmt  = (stmt) => {
   if ((stmt.tag === "anon-class-def")) {
     return emitAnonClassDef(stmt);
   }
+  if ((stmt.tag === "mixin-stmt")) {
+    return emitMixinStmt(stmt);
+  }
   if ((stmt.tag === "let-stmt")) {
     {
       let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : " ");
@@ -911,7 +914,8 @@ const emitFieldDef  = (node) => {
     let pub  = (node.modifiers.includes("public") ? "public " : "");
     let staticStr  = (node.modifiers.includes("static") ? "static " : "");
     let rdonly  = (node.modifiers.includes("readonly") ? "readonly " : "");
-    let prefix  = ((((priv + prot) + pub) + staticStr) + rdonly);
+    let declStr  = (node.modifiers.includes("declare") ? "declare " : "");
+    let prefix  = (((((priv + prot) + pub) + staticStr) + rdonly) + declStr);
     return ((((prefix + node.name) + typeStr) + initStr) + ";");
   }
 };
@@ -1304,6 +1308,74 @@ const emitTemplateExpr  = (expr) => {
     });
     out = (out + "`");
     return out;
+  }
+};
+const emitMixinStmt  = (node) => {
+  {
+    let target  = node.target;
+    let mixins  = node.mixins;
+    let filter  = node.filter;
+    let lines  = [];
+    {
+      let guardArgs  = mixins.map((m) => {
+        return (("_MixinGuard<" + m) + ">");
+      }).join(", ");
+      lines.push("type _MixinGuard<T extends MixinBase> = true");
+      lines.push((((("declare const _mixinCheck_" + target) + ": [") + guardArgs) + "]"));
+    }
+    mixins.forEach((m) => {
+      lines.push(((((("if (!(" + m) + ".prototype instanceof MixinBase))\n") + "  throw new Error('mixin: ") + m) + " is not a MixinBase subclass')"));
+    });
+    if ((!filter)) {
+      mixins.forEach((m) => {
+        lines.push((((("Object.assign(" + target) + ".prototype, ") + m) + ".prototype);"));
+      });
+    }
+    else {
+      if ((filter.kind === "only")) {
+        {
+          let keyList  = (("[" + filter.names.map((n) => {
+            return (("\"" + n) + "\"");
+          }).join(", ")) + "]");
+          mixins.forEach((m) => {
+            lines.push((((((((((("for (const key of " + keyList) + ") {\n") + "  if (key in ") + m) + ".prototype) ") + target) + ".prototype[key] = ") + m) + ".prototype[key];\n") + "}"));
+          });
+        }
+      }
+      else {
+        {
+          let excludeList  = (("[" + filter.names.map((n) => {
+            return (("\"" + n) + "\"");
+          }).join(", ")) + "]");
+          mixins.forEach((m) => {
+            lines.push((((((((((("for (const key of Object.keys(" + m) + ".prototype)) {\n") + "  if (!") + excludeList) + ".includes(key)) ") + target) + ".prototype[key] = ") + m) + ".prototype[key];\n") + "}"));
+          });
+        }
+      }
+    }
+    {
+      let extendsClause  = "";
+      if ((!filter)) {
+        extendsClause = mixins.join(", ");
+      }
+      else {
+        {
+          let nameUnion  = (("\"" + filter.names.join("\" | \"")) + "\"");
+          if ((filter.kind === "only")) {
+            extendsClause = mixins.map((m) => {
+              return (((("Pick<" + m) + ", ") + nameUnion) + ">");
+            }).join(", ");
+          }
+          else {
+            extendsClause = mixins.map((m) => {
+              return (((("Omit<" + m) + ", ") + nameUnion) + ">");
+            }).join(", ");
+          }
+        }
+      }
+      lines.push((((("interface " + target) + " extends ") + extendsClause) + " {}"));
+    }
+    return lines.join("\n");
   }
 };
 const emitEnumDef  = (node) => {

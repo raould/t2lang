@@ -36,6 +36,7 @@
   "dependencies": {
     "commander": "^14.0.3",
     "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.12"
   }

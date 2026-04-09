@@ -27,6 +27,7 @@ topLevel
     | interfaceDef
     | enumDef
     | classDef
+    | mixinForm
     | exportDeclForm
     | statement
     ;
@@ -114,6 +115,17 @@ enumMember
     : LPAREN IDENTIFIER (NUMBER | NEG_NUMBER | STRING)? RPAREN
     ;
 
+// ─── mixin form ───────────────────────────────
+
+mixinForm
+    : LPAREN MIXIN IDENTIFIER IDENTIFIER+ mixinFilter? RPAREN
+    ;
+
+mixinFilter
+    : COLON IDENTIFIER LPAREN IDENTIFIER* RPAREN   // :only  — IDENTIFIER must be "only"
+    | COLON EXCEPT     LPAREN IDENTIFIER* RPAREN   // :except — reuses existing EXCEPT token
+    ;
+
 // ─── class system ─────────────────────────────
 
 classDef
@@ -150,7 +162,7 @@ classElement
     ;
 
 modifier
-    : PUBLIC | PRIVATE | PROTECTED | STATIC | ABSTRACT | OVERRIDE | ASYNC | GENERATOR | READONLY
+    : PUBLIC | PRIVATE | PROTECTED | STATIC | ABSTRACT | OVERRIDE | ASYNC | GENERATOR | READONLY | DECLARE
     ;
 
 fieldDef
@@ -854,7 +866,7 @@ propKey
     | EXPORT | EXPORT_DEFAULT | EXPORT_NAMED | EXPORT_NS_FROM | EXPORT_FROM | EXPORT_ALL_FROM
     | IMPORT_TYPE | EXPORT_TYPE | EXPORT_TYPE_FROM | EXPORT_TYPE_ALL_FROM
     | CLASS | CLASS_BODY | FIELD | CONSTRUCTOR_O | CONSTRUCTOR | THIS | SUPER | SUPER_METHOD
-    | GET | SETPROP | ABSTRACT_METHOD_O | ABSTRACT_METHOD | IMPLEMENTS
+    | GET | SETPROP | ABSTRACT_METHOD_O | ABSTRACT_METHOD | IMPLEMENTS | MIXIN | DECLARE
     | ASYNC_GENERATOR_FN_O | ASYNC_GENERATOR_FN | ASYNC_LAMBDA_O | ASYNC_LAMBDA | ASYNC_FN_O | ASYNC_FN | GENERATOR_FN_O | GENERATOR_FN
     | YIELD_STAR | YIELD | AWAIT | CARET
     | PUBLIC | PRIVATE | PROTECTED | STATIC | ABSTRACT | OVERRIDE | ASYNC | GENERATOR | ELSE | THEN
@@ -1109,6 +1121,8 @@ SUPER           : 'super' ;
 GET             : 'get' ;
 SETPROP         : 'set' ;
 IMPLEMENTS      : 'implements' ;
+MIXIN           : 'mixin' ;
+DECLARE         : 'declare' ;
 
 // type-system keywords
 UNION       : 'union' ;

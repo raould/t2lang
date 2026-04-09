@@ -4,8 +4,10 @@
   (import {join} "node:path")
   (import {spawn} "node:child_process")
   (import * as ts "typescript")
-  (import {compileSource} "./stage9/index")
-  (import {readerTransform} "./stage9/Stage9-reader")
+  (import {createRequire} "node:module")
+  (const _require (createRequire (. import.meta url)))
+  (const {compileSource} (_require "./stage9/index"))
+  (const {readerTransform} (_require "./stage9/Stage9-reader"))
 
   ;; ---- constants ----
 

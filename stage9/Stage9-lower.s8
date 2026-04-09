@@ -43,6 +43,11 @@
         (return (lowerEnumDef node)))
       (if (=== (. node tag) 'class-def')
         (return (lowerClassDef node)))
+      (if (=== (. node tag) 'mixin-form')
+        (return (object (node node) (id (. node id)) (tag 'mixin-stmt')
+                        (target (. node target))
+                        (mixins (. node mixins))
+                        (filter (. node filter)))))
       (if (=== (. node tag) 'export-decl')
         (return (lowerExportDecl node)))
       (return (lowerStmt node))))
@@ -218,6 +223,16 @@
 
   (const lowerClassDef
     (lambda ((node))
+      ;; MixinBase subclasses may not own fields — all fields must carry 'declare'
+      (if (&& (. node extendsType)
+              (=== (. (. node extendsType) name) 'MixinBase'))
+        ((. (. (. node body) elements) forEach)
+          (lambda ((member))
+            (if (&& (=== (. member tag) 'field-def')
+                    (! ((. (. member modifiers) includes) 'declare')))
+              (throw (new Error (+ "mixin class field '" (. member name)
+                                   "' must use 'declare' — mixin classes cannot own fields, only declare requirements"
+                                   " (at " (formatSpan (. member id)) ")")))))))
       (let ((tparams ((. (. node typeParams) map) (lambda ((p))
                         (return (object (name (. p name))
                                         (constraint (ternary (. p constraint) (lowerTypeExpr (. p constraint)) undefined))

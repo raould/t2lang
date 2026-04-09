@@ -57,6 +57,16 @@ const lowerTopLevel  = (node, isMacroMode) => {
   if ((node.tag === "class-def")) {
     return lowerClassDef(node);
   }
+  if ((node.tag === "mixin-form")) {
+    return ({
+      node: node,
+      id: node.id,
+      tag: "mixin-stmt",
+      target: node.target,
+      mixins: node.mixins,
+      filter: node.filter
+    });
+  }
   if ((node.tag === "export-decl")) {
     return lowerExportDecl(node);
   }
@@ -329,6 +339,13 @@ const lowerClassElement  = (node) => {
   throw new Error(((("lowerClassElement: unexpected tag >" + node.tag) + "< at ") + formatSpan(node.id)));
 };
 const lowerClassDef  = (node) => {
+  if ((node.extendsType && (node.extendsType.name === "MixinBase"))) {
+    node.body.elements.forEach((member) => {
+      if (((member.tag === "field-def") && (!member.modifiers.includes("declare")))) {
+        throw new Error(((((("mixin class field '" + member.name) + "' must use 'declare' — mixin classes cannot own fields, only declare requirements") + " (at ") + formatSpan(member.id)) + ")"));
+      }
+    });
+  }
   {
     let tparams  = node.typeParams.map((p) => {
       return ({

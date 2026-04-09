@@ -734,6 +734,9 @@ const resolveTopLevel  = (node, chain) => {
       }
     }
   }
+  if ((node.tag === "mixin-form")) {
+    return node;
+  }
   return resolveStmt(node, chain);
 };
 const resolveNames  = (programNode) => {

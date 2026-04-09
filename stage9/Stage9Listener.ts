@@ -21,6 +21,8 @@ import { InterfaceDefContext } from "./Stage9Parser.js";
 import { InterfaceExtendsContext } from "./Stage9Parser.js";
 import { EnumDefContext } from "./Stage9Parser.js";
 import { EnumMemberContext } from "./Stage9Parser.js";
+import { MixinFormContext } from "./Stage9Parser.js";
+import { MixinFilterContext } from "./Stage9Parser.js";
 import { ClassDefContext } from "./Stage9Parser.js";
 import { AnonClassDefContext } from "./Stage9Parser.js";
 import { ClassExtendsContext } from "./Stage9Parser.js";
@@ -380,6 +382,26 @@ export class Stage9Listener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitEnumMember?: (ctx: EnumMemberContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage9Parser.mixinForm`.
+     * @param ctx the parse tree
+     */
+    enterMixinForm?: (ctx: MixinFormContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage9Parser.mixinForm`.
+     * @param ctx the parse tree
+     */
+    exitMixinForm?: (ctx: MixinFormContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage9Parser.mixinFilter`.
+     * @param ctx the parse tree
+     */
+    enterMixinFilter?: (ctx: MixinFilterContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage9Parser.mixinFilter`.
+     * @param ctx the parse tree
+     */
+    exitMixinFilter?: (ctx: MixinFilterContext) => void;
     /**
      * Enter a parse tree produced by `Stage9Parser.classDef`.
      * @param ctx the parse tree

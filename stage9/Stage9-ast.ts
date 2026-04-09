@@ -173,6 +173,9 @@ const astTopLevel  = (ctx) => {
   if (ctx.classDef()) {
     return astClassDef(ctx.classDef());
   }
+  if (ctx.mixinForm()) {
+    return astMixinForm(ctx.mixinForm());
+  }
   if (ctx.exportDeclForm()) {
     return astExportDecl(ctx.exportDeclForm());
   }
@@ -920,6 +923,55 @@ const astExportNsFrom  = (ctx) => {
       tag: "export-ns-from",
       ns: ns,
       source: source
+    });
+  }
+};
+const astMixinForm  = (ctx) => {
+  {
+    let ids  = ctx.IDENTIFIER();
+    let target  = ids["0"].getText();
+    let mixinIds  = ids.slice(1);
+    let mixins  = mixinIds.map((id) => {
+      return id.getText();
+    });
+    let fctx  = ctx.mixinFilter();
+    let filter  = null;
+    if (fctx) {
+      if (fctx.EXCEPT()) {
+        {
+          let names  = fctx.IDENTIFIER().map((id) => {
+            return id.getText();
+          });
+          filter = ({
+            kind: "except",
+            names: names
+          });
+        }
+      }
+      else {
+        {
+          let allIds  = fctx.IDENTIFIER();
+          let keyword  = allIds["0"].getText();
+          let filterNames  = allIds.slice(1).map((id) => {
+            return id.getText();
+          });
+          if ((keyword !== "only")) {
+            throw new Error(("mixin: expected :only or :except, got :" + keyword));
+          }
+          filter = ({
+            kind: "only",
+            names: filterNames
+          });
+        }
+      }
+    }
+    return ({
+      id: registerSpan(nextNodeId(), ctx),
+      text: ctx.getText(),
+      tag: "mixin-form",
+      target: target,
+      mixins: mixins,
+      filter: filter
     });
   }
 };

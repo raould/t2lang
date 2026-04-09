@@ -2,9 +2,7 @@
 import { createConnection, ProposedFeatures, TextDocumentSyncKind } from 'vscode-languageserver/node';
 import { TextDocuments } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
-import lsp from '../lsp.ts';
-
-const { createEvalService, handleT2Eval } = lsp;
+import { createEvalService, handleT2Eval } from '../lsp.ts';
 
 const connection = createConnection(ProposedFeatures.all);
 const documents = new TextDocuments(TextDocument);

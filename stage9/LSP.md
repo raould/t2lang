@@ -7,8 +7,7 @@
 ### 1. Build the LSP module
 
 ```sh
-cd stage9
-npm run build-lsp        # compiles Stage9-lsp.s8 → Stage9-lsp.ts
+npm run build-lsp        # compiles lsp.t2 → lsp.ts
 ```
 
 The server entry point (`bin/t2lang-lsp.js`) is hand-authored and does not need to be built.

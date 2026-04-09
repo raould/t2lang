@@ -2293,6 +2293,9 @@ const expandTopLevel  = (node, env) => {
       init: expandExpr(node.init, env)
     });
   }
+  if ((node.tag === "mixin-form")) {
+    return node;
+  }
   return expandStmt(node, env);
 };
 const formatExpansionErrors  = (errors) => {

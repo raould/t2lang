@@ -1559,6 +1559,9 @@
           (typeAnnotation (. node typeAnnotation))
           (meta (. node meta))
           (init (expandExpr (. node init) env)))))
+      ;; mixin-form: no expressions to expand
+      (if (=== (. node tag) 'mixin-form')
+        (return node))
       ;; everything else: treat as a statement
       (return (expandStmt node env))))
 

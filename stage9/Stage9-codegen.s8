@@ -169,6 +169,8 @@
         (return (emitClassDef stmt)))
       (if (=== (. stmt tag) 'anon-class-def')
         (return (emitAnonClassDef stmt)))
+      (if (=== (. stmt tag) 'mixin-stmt')
+        (return (emitMixinStmt stmt)))
       (if (=== (. stmt tag) 'let-stmt')
         (let ((typeStr (ternary (. stmt typeAnnotation) (+ ': ' (emitTypeExpr (. stmt typeAnnotation))) ' ')))
           (if (isDefined (. stmt init))
@@ -715,7 +717,8 @@
              (pub (ternary ((. (. node modifiers) includes) 'public') 'public ' ''))
              (staticStr (ternary ((. (. node modifiers) includes) 'static') 'static ' ''))
              (rdonly (ternary ((. (. node modifiers) includes) 'readonly') 'readonly ' ''))
-             (prefix (+ priv prot pub staticStr rdonly)))
+             (declStr (ternary ((. (. node modifiers) includes) 'declare') 'declare ' ''))
+             (prefix (+ priv prot pub staticStr rdonly declStr)))
         (return (+ prefix (. node name) typeStr initStr ';')))))
 
   (const emitConstructorParam
@@ -1017,6 +1020,56 @@
             (set! out (+ out '${' (emitExpr (. part expr)) '}')))))
         (set! out (+ out '`'))
         (return out))))
+
+  (const emitMixinStmt
+    (lambda ((node))
+      (let ((target (. node target))
+             (mixins (. node mixins))
+             (filter (. node filter))
+             (lines  (array)))
+        ;; --- static MixinBase checks (erased by tsc) ---
+        (let ((guardArgs ((. ((. mixins map) (lambda ((m)) (return (+ '_MixinGuard<' m '>')))) join) ', ')))
+          ((. lines push) 'type _MixinGuard<T extends MixinBase> = true')
+          ((. lines push) (+ 'declare const _mixinCheck_' target ': [' guardArgs ']')))
+        ;; --- dynamic MixinBase checks (module load time) ---
+        ((. mixins forEach)
+          (lambda ((m))
+            ((. lines push)
+              (+ 'if (!(' m '.prototype instanceof MixinBase))\n'
+                 "  throw new Error('mixin: " m " is not a MixinBase subclass')"))))
+        ;; --- runtime prototype copies ---
+        (if (! filter)
+          ;; plain: Object.assign per mixin
+          ((. mixins forEach)
+            (lambda ((m))
+              ((. lines push) (+ 'Object.assign(' target '.prototype, ' m '.prototype);'))))
+          (if (=== (. filter kind) 'only')
+            ;; :only — keyed loop per mixin
+            (let ((keyList (+ '[' ((. ((. (. filter names) map) (lambda ((n)) (return (+ '"' n '"')))) join) ', ') ']')))
+              ((. mixins forEach)
+                (lambda ((m))
+                  ((. lines push)
+                    (+ 'for (const key of ' keyList ') {\n'
+                       '  if (key in ' m '.prototype) ' target '.prototype[key] = ' m '.prototype[key];\n'
+                       '}')))))
+            ;; :except — exclusion loop per mixin
+            (let ((excludeList (+ '[' ((. ((. (. filter names) map) (lambda ((n)) (return (+ '"' n '"')))) join) ', ') ']')))
+              ((. mixins forEach)
+                (lambda ((m))
+                  ((. lines push)
+                    (+ 'for (const key of Object.keys(' m '.prototype)) {\n'
+                       '  if (!' excludeList '.includes(key)) ' target '.prototype[key] = ' m '.prototype[key];\n'
+                       '}')))))))
+        ;; --- TypeScript interface merge declaration ---
+        (let ((extendsClause ''))
+          (if (! filter)
+            (set! extendsClause ((. mixins join) ', '))
+            (let ((nameUnion (+ '"' ((. (. filter names) join) '" | "') '"')))
+              (if (=== (. filter kind) 'only')
+                (set! extendsClause ((. ((. mixins map) (lambda ((m)) (return (+ 'Pick<' m ', ' nameUnion '>')))) join) ', '))
+                (set! extendsClause ((. ((. mixins map) (lambda ((m)) (return (+ 'Omit<' m ', ' nameUnion '>')))) join) ', ')))))
+          ((. lines push) (+ 'interface ' target ' extends ' extendsClause ' {}')))
+        (return ((. lines join) '\n')))))
 
   (const emitEnumDef
     (lambda ((node))

@@ -504,6 +504,9 @@
               (restType (. node restType))
               (returnType (. node returnType))
               (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
+      ;; mixin-form: no variable references to resolve
+      (if (=== (. node tag) 'mixin-form')
+        (return node))
       ;; everything else: treat as statement
       (return (resolveStmt node chain))))
 
