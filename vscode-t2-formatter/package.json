@@ -55,8 +55,8 @@
     },
     "license": "MIT",
     "scripts": {
-        "build": "tsc -p tsconfig.json",
-        "watch": "tsc -p tsconfig.json --watch",
+        "build": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
+        "watch": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --watch",
         "package": "npm run build && vsce package"
     },
     "dependencies": {
@@ -64,6 +64,7 @@
     },
     "devDependencies": {
         "@types/vscode": "^1.60.0",
+        "esbuild": "^0.20.2",
         "typescript": "^5.0.0",
         "vsce": "^2.15.0"
     }
