@@ -273,7 +273,7 @@ const handleT2Eval  = async function(evalService, signal, doc, params) {
   const jsPath  = join(tmpdir(), `t2eval-${randSuffix}.js`);
   try {
     writeFileSync(jsPath, jsCode, "utf-8");
-    const runResult  = (await spawnAsync(process.execPath[jsPath], ({
+    const runResult  = (await spawnAsync(process.execPath, [jsPath], ({
       timeout: 5000,
       signal: signal
     })));
