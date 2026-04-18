@@ -1963,6 +1963,12 @@ const astExpression  = (ctx) => {
   if (ctx.generatorFn()) {
     return astGeneratorFn(ctx.generatorFn());
   }
+  if (ctx.iifeForm()) {
+    return astIifeForm(ctx.iifeForm());
+  }
+  if (ctx.iifeAsyncForm()) {
+    return astIifeAsyncForm(ctx.iifeAsyncForm());
+  }
   if (ctx.asyncGeneratorFn()) {
     return astAsyncGeneratorFn(ctx.asyncGeneratorFn());
   }
@@ -2260,6 +2266,28 @@ const astFn  = (ctx) => {
       rest: sig.rest,
       restType: sig.restType,
       returnType: sig.returnType,
+      body: body
+    });
+  }
+};
+const astIifeForm  = (ctx) => {
+  {
+    let body  = ctx.statement().map(astStatement);
+    return ({
+      id: registerSpan(nextNodeId(), ctx),
+      text: ctx.getText(),
+      tag: "iife",
+      body: body
+    });
+  }
+};
+const astIifeAsyncForm  = (ctx) => {
+  {
+    let body  = ctx.statement().map(astStatement);
+    return ({
+      id: registerSpan(nextNodeId(), ctx),
+      text: ctx.getText(),
+      tag: "iife-async",
       body: body
     });
   }

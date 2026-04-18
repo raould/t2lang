@@ -1046,6 +1046,10 @@
         (return (astAsyncFn ((. ctx asyncFn)))))
       (if ((. ctx generatorFn))
         (return (astGeneratorFn ((. ctx generatorFn)))))
+      (if ((. ctx iifeForm))
+        (return (astIifeForm ((. ctx iifeForm)))))
+      (if ((. ctx iifeAsyncForm))
+        (return (astIifeAsyncForm ((. ctx iifeAsyncForm)))))
       (if ((. ctx asyncGeneratorFn))
         (return (astAsyncGeneratorFn ((. ctx asyncGeneratorFn)))))
       (if ((. ctx fnO))
@@ -1215,6 +1219,16 @@
           (let ((name ((. ((. ctx IDENTIFIER)) getText))))
             (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'fn-decl') (name name) (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body) (meta undefined)))))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'fn') (params (. sig params)) (rest (. sig rest)) (restType (. sig restType)) (returnType (. sig returnType)) (body body))))))
+
+  (const astIifeForm
+    (lambda ((ctx))
+      (let ((body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'iife') (body body))))))
+
+  (const astIifeAsyncForm
+    (lambda ((ctx))
+      (let ((body ((. ((. ctx statement)) map) astStatement)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'iife-async') (body body))))))
 
   (const astAsyncLambda
     (lambda ((ctx))

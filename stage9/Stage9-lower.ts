@@ -1183,6 +1183,22 @@ const lowerExpr  = (node) => {
       body: node.body.map(lowerStmt)
     });
   }
+  if ((node.tag === "iife")) {
+    return ({
+      node: node,
+      id: node.id,
+      tag: "iife",
+      body: node.body.map(lowerStmt)
+    });
+  }
+  if ((node.tag === "iife-async")) {
+    return ({
+      node: node,
+      id: node.id,
+      tag: "iife-async",
+      body: node.body.map(lowerStmt)
+    });
+  }
   if ((node.tag === "async-fn")) {
     return ({
       node: node,

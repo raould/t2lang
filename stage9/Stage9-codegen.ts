@@ -605,6 +605,18 @@ const emitExpr  = (expr) => {
   if ((expr.tag === "fn")) {
     return emitFn(expr);
   }
+  if ((expr.tag === "iife")) {
+    {
+      let body  = expr.body.map(emitStmt);
+      return (("(() => {\n" + indent(body.join("\n"))) + "\n})()");
+    }
+  }
+  if ((expr.tag === "iife-async")) {
+    {
+      let body  = expr.body.map(emitStmt);
+      return (("(async () => {\n" + indent(body.join("\n"))) + "\n})()");
+    }
+  }
   if ((expr.tag === "async-lambda")) {
     {
       let params  = emitParams(expr);

@@ -126,6 +126,8 @@ import { AsyncLambdaContext } from "./Stage9Parser.js";
 import { AsyncFnContext } from "./Stage9Parser.js";
 import { GeneratorFnContext } from "./Stage9Parser.js";
 import { AsyncGeneratorFnContext } from "./Stage9Parser.js";
+import { IifeFormContext } from "./Stage9Parser.js";
+import { IifeAsyncFormContext } from "./Stage9Parser.js";
 import { FnOContext } from "./Stage9Parser.js";
 import { LambdaOContext } from "./Stage9Parser.js";
 import { AsyncFnOContext } from "./Stage9Parser.js";
@@ -1432,6 +1434,26 @@ export class Stage9Listener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitAsyncGeneratorFn?: (ctx: AsyncGeneratorFnContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage9Parser.iifeForm`.
+     * @param ctx the parse tree
+     */
+    enterIifeForm?: (ctx: IifeFormContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage9Parser.iifeForm`.
+     * @param ctx the parse tree
+     */
+    exitIifeForm?: (ctx: IifeFormContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage9Parser.iifeAsyncForm`.
+     * @param ctx the parse tree
+     */
+    enterIifeAsyncForm?: (ctx: IifeAsyncFormContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage9Parser.iifeAsyncForm`.
+     * @param ctx the parse tree
+     */
+    exitIifeAsyncForm?: (ctx: IifeAsyncFormContext) => void;
     /**
      * Enter a parse tree produced by `Stage9Parser.fnO`.
      * @param ctx the parse tree

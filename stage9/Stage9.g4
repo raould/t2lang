@@ -656,6 +656,8 @@ expression
     | superConstructorCall
     | superMethodCall
     | infixExpr
+    | iifeForm
+    | iifeAsyncForm
     | macroExprCall
     | opSymbol
     | call // if no previous form matches, assume callable.
@@ -707,6 +709,14 @@ generatorFn
 
 asyncGeneratorFn
     : LPAREN ASYNC_GENERATOR_FN fnSignature statement* RPAREN
+    ;
+
+iifeForm
+    : LPAREN IIFE statement* RPAREN
+    ;
+
+iifeAsyncForm
+    : LPAREN IIFE_ASYNC statement* RPAREN
     ;
 
 fnO
@@ -1162,6 +1172,8 @@ ASYNC_GENERATOR_FN_O : 'async-generator-fn-o' ;
 ASYNC_GENERATOR_FN : 'async-generator-fn' ;
 ASYNC_LAMBDA_O   : 'async-lambda-o' ;
 ASYNC_LAMBDA       : 'async-lambda' ;
+IIFE_ASYNC         : 'iife-async' ;
+IIFE               : 'iife' ;
 ASYNC_FN_O       : 'async-fn-o' ;
 ASYNC_FN           : 'async-fn' ;
 GENERATOR_FN_O   : 'generator-fn-o' ;
