@@ -2,6 +2,7 @@
 import { spawnSync } from 'child_process';
 import { readFileSync, writeFileSync, unlinkSync, existsSync, mkdirSync } from 'fs';
 import { resolve, dirname, basename, relative } from 'path';
+import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
 import { Command } from 'commander';
 import { checkSource } from './t2helpers.js';
@@ -32,7 +33,8 @@ program
     (v, prev) => [...prev, v.replace(/^\./, '')], [])
   .option('--debug', 'enable debug output for all pipeline stages (written to stderr)')
   .option('--debug-stage <stage>', 'enable debug output for a specific pipeline stage (may be repeated)',
-    (v, prev) => [...prev, v], []);
+    (v, prev) => [...prev, v], [])
+  .option('--tsconfig <path>', 'path to a tsconfig.json to pass to the TypeScript compiler');
 
 program.parse();
 
@@ -43,6 +45,7 @@ const t2mexts = ['t2m', ...opts.t2mext];
 const outDir = opts.outDir ? resolve(opts.outDir) : undefined;
 const rootDir = opts.rootDir ? resolve(opts.rootDir) : undefined;
 const macroRoots = new Map(opts.macroRoot);
+const tsconfig = opts.tsconfig ? resolve(opts.tsconfig) : undefined;
 const debug = makeDebugContextFromOptions({
   debugAll: opts.debug,
   debugStages: opts.debugStage,
@@ -59,16 +62,24 @@ function ensureOutDir(dirPath) {
 }
 
 function runTsc(tsPath) {
-  const result = spawnSync('npx', [
-    'tsc',
-    '--skipLibCheck',
-    '--module', 'ESNext',
-    '--target', 'ES2022',
-    tsPath,
-  ], {
+  let tscArgs;
+  let tempTsconfig;
+  if (tsconfig) {
+    tempTsconfig = resolve(tmpdir(), `t2run_${Date.now()}.tsconfig.json`);
+    writeFileSync(tempTsconfig, JSON.stringify({
+      extends: tsconfig,
+      files: [tsPath],
+      compilerOptions: { outDir: dirname(tsPath) },
+    }), 'utf-8');
+    tscArgs = ['tsc', '--project', tempTsconfig];
+  } else {
+    tscArgs = ['tsc', '--skipLibCheck', '--module', 'ESNext', '--target', 'ES2022', tsPath];
+  }
+  const result = spawnSync('npx', tscArgs, {
     encoding: 'utf-8',
     stdio: ['ignore', 'inherit', 'inherit'],
   });
+  if (tempTsconfig && existsSync(tempTsconfig)) unlinkSync(tempTsconfig);
   if (opts.verbose) {
     console.log(result.stdout);
   }

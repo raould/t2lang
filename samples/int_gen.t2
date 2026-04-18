@@ -2,6 +2,5 @@
   (let ((int_gen (async-generator-fn ((start) (end))
     (for (let ((i start))) (<= i end) (set! i (+ i 1))
       (yield i))))))
-  (export-named (int_gen)))
-
-(program (console.log 1))
+  (console.log (int_gen 1 3)))
+  
