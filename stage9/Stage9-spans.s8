@@ -28,6 +28,8 @@
 
   (const registerSpan
     (lambda ((id) (ctx))
+      (if (! (&&  ctx (. ctx start)))
+        (return id))
       (let ((start (. ctx start))
              (stop  (. ctx stop))
              (endLine  (ternary stop (. stop line)   (. start line)))

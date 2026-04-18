@@ -6,6 +6,9 @@ const nextNodeId  = () => {
   return nodeIdCounter_;
 };
 const registerSpan  = (id, ctx) => {
+  if ((!(ctx && ctx.start))) {
+    return id;
+  }
   {
     let start  = ctx.start;
     let stop  = ctx.stop;
