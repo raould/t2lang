@@ -56,6 +56,18 @@
         (throw (new Error (+ "Invalid identifier '" name "' at " (formatSpan spanId)))))
       (return name)))
 
+  ;; checkDottedId: like checkId but allows dotted namespace paths (e.g. Foo.Bar.Baz).
+  ;; Used for expression-position identifiers and new-expr constructor names where
+  ;; a dotted path is valid JS/TS. Binding positions still use checkId.
+  ;; Reserved-word check applies only to the simple (non-dotted) case — Foo.void is fine.
+  (const checkDottedId
+    (lambda ((name) (spanId))
+      (if (! ((. (new RegExp "^[a-zA-Z_$][a-zA-Z0-9_$]*(\\.[a-zA-Z_$][a-zA-Z0-9_$]*)*$") test) name))
+        (throw (new Error (+ "Invalid identifier '" name "' at " (formatSpan spanId)))))
+      (if (&& (! ((. name includes) '.')) ((. JS_RESERVED has) name))
+        (throw (new Error (+ "Invalid identifier '" name "' at " (formatSpan spanId)))))
+      (return name)))
+
   ;; ========== Import path rewriting ==========
   ;; Set once by main() before the emit loop; null = no rewriting context.
   (const _importCtx (object (inputFile null) (rootDir null) (outDir null)))
@@ -428,7 +440,7 @@
       (if (=== (. expr tag) 'literal')
         (return (ternary (=== (. expr value) undefined) 'undefined' ((. JSON stringify) (. expr value)))))
       (if (=== (. expr tag) 'identifier')
-        (return (ternary ((. (. expr name) startsWith) '...') (. expr name) (checkId (. expr name) (. expr id)))))
+        (return (ternary ((. (. expr name) startsWith) '...') (. expr name) (checkDottedId (. expr name) (. expr id)))))
       (if (=== (. expr tag) 'object-expr')
         (return (+ '({\n' (indent ((. ((. (. expr fields) map) (lambda ((f))
           (if (. f computed)
@@ -536,7 +548,7 @@
                     ''
                 ))
                (argsStr ((. ((. (. expr args) map) emitExpr) join) ', ')))
-          (return (+ 'new ' (checkId (. expr name) (. expr id)) tstr '(' argsStr ')'))))
+          (return (+ 'new ' (checkDottedId (. expr name) (. expr id)) tstr '(' argsStr ')'))))
       (if (=== (. expr tag) 'opt-chain-expr')
         (return (+ (emitExpr (. expr "object")) '?.' (. expr key))))
       (if (=== (. expr tag) 'opt-chain-index-expr')

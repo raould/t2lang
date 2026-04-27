@@ -33,6 +33,15 @@ const checkId  = (name, spanId) => {
   }
   return name;
 };
+const checkDottedId  = (name, spanId) => {
+  if ((!new RegExp("^[a-zA-Z_$][a-zA-Z0-9_$]*(\\.[a-zA-Z_$][a-zA-Z0-9_$]*)*$").test(name))) {
+    throw new Error(((("Invalid identifier '" + name) + "' at ") + formatSpan(spanId)));
+  }
+  if (((!name.includes(".")) && JS_RESERVED.has(name))) {
+    throw new Error(((("Invalid identifier '" + name) + "' at ") + formatSpan(spanId)));
+  }
+  return name;
+};
 const _importCtx  = ({
   inputFile: null,
   rootDir: null,
@@ -547,7 +556,7 @@ const emitExpr  = (expr) => {
     return ((expr.value === undefined) ? "undefined" : JSON.stringify(expr.value));
   }
   if ((expr.tag === "identifier")) {
-    return (expr.name.startsWith("...") ? expr.name : checkId(expr.name, expr.id));
+    return (expr.name.startsWith("...") ? expr.name : checkDottedId(expr.name, expr.id));
   }
   if ((expr.tag === "object-expr")) {
     return (("({\n" + indent(expr.fields.map((f) => {
@@ -717,7 +726,7 @@ const emitExpr  = (expr) => {
     {
       let tstr  = ((expr.typeArgs && (expr.typeArgs.length > 0)) ? (("<" + expr.typeArgs.map(emitTypeExpr).join(", ")) + ">") : "");
       let argsStr  = expr.args.map(emitExpr).join(", ");
-      return ((((("new " + checkId(expr.name, expr.id)) + tstr) + "(") + argsStr) + ")");
+      return ((((("new " + checkDottedId(expr.name, expr.id)) + tstr) + "(") + argsStr) + ")");
     }
   }
   if ((expr.tag === "opt-chain-expr")) {
