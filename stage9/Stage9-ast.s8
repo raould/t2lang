@@ -882,7 +882,7 @@
                    (return (object (computed true) (keyExpr keyExpr) (isMethod false) (isShorthand false) (value value)))))
                ;; Keyed: "key": value  or  ident: value
                (if ((. f COLON))
-                 (let ((rawKey (ternary ((. f STRING)) ((. ((. f STRING)) getText)) ((. ((. f IDENTIFIER)) getText))))
+                 (let ((rawKey ((. ((. f propKey)) getText)))
                         (key (ternary (|| ((. rawKey startsWith) '"') ((. rawKey startsWith) "'"))
                                (parseString rawKey)
                                rawKey))

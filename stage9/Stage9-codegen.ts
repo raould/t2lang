@@ -109,6 +109,9 @@ const emitTopLevel  = (node) => {
       return (("module.exports = { " + specs.join(", ")) + " };");
     }
   }
+  if (((node.tag === "block-stmt") && node.noBody)) {
+    return node.body.map(emitTopLevel).join("\n");
+  }
   return emitStmt(node);
 };
 const mangleIdentifier  = (name) => {
@@ -219,7 +222,7 @@ const emitStmt  = (stmt) => {
     return emitWhile(stmt);
   }
   if ((stmt.tag === "block-stmt")) {
-    return emitBlock(stmt);
+    return (stmt.noBody ? stmt.body.map(emitStmt).join("\n") : emitBlock(stmt));
   }
   if ((stmt.tag === "try-stmt")) {
     {

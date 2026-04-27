@@ -838,7 +838,7 @@ braceObjectExpr
     ;
 
 braceObjectField
-    : (STRING | IDENTIFIER) COLON expression
+    : propKey COLON expression
     | LBRACK expression RBRACK COLON expression
     | IDENTIFIER
     ;

@@ -1615,7 +1615,7 @@ const astBraceObjectExpr  = (ctx) => {
       }
       if (f.COLON()) {
         {
-          let rawKey  = (f.STRING() ? f.STRING().getText() : f.IDENTIFIER().getText());
+          let rawKey  = f.propKey().getText();
           let key  = ((rawKey.startsWith("\"") || rawKey.startsWith("'")) ? parseString(rawKey) : rawKey);
           let value  = astExpression(f.expression(0));
           return ({

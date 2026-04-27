@@ -131,6 +131,8 @@
       (if (=== (. node tag) 'macro-export-decl')
         (let ((specs ((. (. node specs) map) mangleIdentifier)))
            (return (+ 'module.exports = { ' ((. specs join) ', ') ' };'))))
+      (if (&& (=== (. node tag) 'block-stmt') (. node noBody))
+        (return ((. ((. (. node body) map) emitTopLevel) join) '\n')))
       (return (emitStmt node))))
 
   (const mangleIdentifier
@@ -215,7 +217,9 @@
       (if (=== (. stmt tag) 'while-stmt')
         (return (emitWhile stmt)))
       (if (=== (. stmt tag) 'block-stmt')
-        (return (emitBlock stmt)))
+        (return (ternary (. stmt noBody)
+          ((. ((. (. stmt body) map) emitStmt) join) '\n')
+          (emitBlock stmt))))
       (if (=== (. stmt tag) 'try-stmt')
         (let ((lines (array)))
           ((. lines push) 'try {')

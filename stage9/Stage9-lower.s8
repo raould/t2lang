@@ -483,6 +483,8 @@
           ((. stmts push) (lowerStmt s))))
         (if (&& (=== (. (. node body) length) 0) (=== (. stmts length) 1))
           (return (index stmts 0)))
+        (if (=== (. (. node body) length) 0)
+          (return (object (node node) (id (. node id)) (tag 'block-stmt') (body stmts) (noBody true))))
         (return (object (node node) (id (. node id)) (tag 'block-stmt') (body stmts))))))
 
   (const lowerVarStar
@@ -494,6 +496,8 @@
           ((. stmts push) (lowerStmt s))))
         (if (&& (=== (. (. node body) length) 0) (=== (. stmts length) 1))
           (return (index stmts 0)))
+        (if (=== (. (. node body) length) 0)
+          (return (object (node node) (id (. node id)) (tag 'block-stmt') (body stmts) (noBody true))))
         (return (object (node node) (id (. node id)) (tag 'block-stmt') (body stmts))))))
 
   (const lowerConstStar
@@ -503,6 +507,8 @@
           ((. stmts push) (object (node node) (tag 'const-stmt') (name (. b name)) (typeAnnotation (ternary (. b typeAnnotation) (lowerTypeExpr (. b typeAnnotation)) undefined)) (init (cond (. b init) (lowerExpr (. b init)) else undefined))))))
         ((. (. node body) forEach) (lambda ((s))
           ((. stmts push) (lowerStmt s))))
+        (if (=== (. (. node body) length) 0)
+          (return (object (node node) (id (. node id)) (tag 'block-stmt') (body stmts) (noBody true))))
         (return (object (node node) (id (. node id)) (tag 'block-stmt') (body stmts))))))
 
   (const lowerImport

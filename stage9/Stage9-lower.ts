@@ -955,6 +955,15 @@ const lowerLetStar  = (node) => {
     if (((node.body.length === 0) && (stmts.length === 1))) {
       return stmts[0];
     }
+    if ((node.body.length === 0)) {
+      return ({
+        node: node,
+        id: node.id,
+        tag: "block-stmt",
+        body: stmts,
+        noBody: true
+      });
+    }
     return ({
       node: node,
       id: node.id,
@@ -981,6 +990,15 @@ const lowerVarStar  = (node) => {
     if (((node.body.length === 0) && (stmts.length === 1))) {
       return stmts[0];
     }
+    if ((node.body.length === 0)) {
+      return ({
+        node: node,
+        id: node.id,
+        tag: "block-stmt",
+        body: stmts,
+        noBody: true
+      });
+    }
     return ({
       node: node,
       id: node.id,
@@ -1004,6 +1022,15 @@ const lowerConstStar  = (node) => {
     node.body.forEach((s) => {
       stmts.push(lowerStmt(s));
     });
+    if ((node.body.length === 0)) {
+      return ({
+        node: node,
+        id: node.id,
+        tag: "block-stmt",
+        body: stmts,
+        noBody: true
+      });
+    }
     return ({
       node: node,
       id: node.id,
