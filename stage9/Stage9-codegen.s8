@@ -316,7 +316,10 @@
       (if (=== (. stmt tag) 'for-await-stmt')
         (return (emitForAwait stmt)))
       (if (=== (. stmt tag) 'expr-stmt')
-        (return (+ (emitExpr (. stmt expr)) ';')))
+        ;; Object literals at statement position need parens to avoid being parsed as a block.
+        (if (=== (. (. stmt expr) tag) 'object-expr')
+          (return (+ '(' (emitExpr (. stmt expr)) ')' ';'))
+          (return (+ (emitExpr (. stmt expr)) ';'))))
       (throw (new Error (+ 'emitStmt: unexpected tag >' (. stmt tag) '< at ' (formatSpan (. stmt id)))))))
 
   (const emitIf
@@ -445,8 +448,12 @@
         (return (ternary (=== (. expr value) undefined) 'undefined' ((. JSON stringify) (. expr value)))))
       (if (=== (. expr tag) 'identifier')
         (return (ternary ((. (. expr name) startsWith) '...') (. expr name) (checkDottedId (. expr name) (. expr id)))))
+      ;; No parens here: object literals in expression position never need them.
+      ;; Block arrow bodies are used exclusively (concise arrow bodies are omitted by design —
+      ;; they are semantically identical and add no expressive power).
+      ;; The only place parens are required is expr-stmt position; handled in emitStmt.
       (if (=== (. expr tag) 'object-expr')
-        (return (+ '({\n' (indent ((. ((. (. expr fields) map) (lambda ((f))
+        (return (+ '{\n' (indent ((. ((. (. expr fields) map) (lambda ((f))
           (if (. f computed)
             (let ((keyStr (+ '[' (emitExpr (. f keyExpr)) ']')))
               (if (. f isMethod)
@@ -462,7 +469,7 @@
           (if (. f isShorthand)
             (return (. f key)))
           (let ((keyStr (ternary (isValidId (. f key)) (. f key) (+ '"' (. f key) '"'))))
-            (return (+ keyStr ': ' (emitExpr (. f value))))))) join) ',\n')) '\n})')))
+            (return (+ keyStr ': ' (emitExpr (. f value))))))) join) ',\n')) '\n}')))
       (if (=== (. expr tag) 'array-expr')
         (return (+ '[' ((. ((. (. expr elements) map) emitExpr) join) ', ') ']')))
       (if (=== (. expr tag) 'quasi-expr')

@@ -392,7 +392,12 @@ const emitStmt  = (stmt) => {
     return emitForAwait(stmt);
   }
   if ((stmt.tag === "expr-stmt")) {
-    return (emitExpr(stmt.expr) + ";");
+    if ((stmt.expr.tag === "object-expr")) {
+      return ((("(" + emitExpr(stmt.expr)) + ")") + ";");
+    }
+    else {
+      return (emitExpr(stmt.expr) + ";");
+    }
   }
   throw new Error(((("emitStmt: unexpected tag >" + stmt.tag) + "< at ") + formatSpan(stmt.id)));
 };
@@ -562,7 +567,7 @@ const emitExpr  = (expr) => {
     return (expr.name.startsWith("...") ? expr.name : checkDottedId(expr.name, expr.id));
   }
   if ((expr.tag === "object-expr")) {
-    return (("({\n" + indent(expr.fields.map((f) => {
+    return (("{\n" + indent(expr.fields.map((f) => {
       if (f.computed) {
         {
           let keyStr  = (("[" + emitExpr(f.keyExpr)) + "]");
@@ -591,7 +596,7 @@ const emitExpr  = (expr) => {
         let keyStr  = (isValidId(f.key) ? f.key : (("\"" + f.key) + "\""));
         return ((keyStr + ": ") + emitExpr(f.value));
       }
-    }).join(",\n"))) + "\n})");
+    }).join(",\n"))) + "\n}");
   }
   if ((expr.tag === "array-expr")) {
     return (("[" + expr.elements.map(emitExpr).join(", ")) + "]");

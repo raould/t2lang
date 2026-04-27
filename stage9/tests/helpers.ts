@@ -27,7 +27,7 @@ export function prefixLineNumbers(str: string): string {
   ).join('\n');
 }
 
-function compileT2(t2Source: string): string {
+export function compileT2(t2Source: string): string {
   try {
     return compileSource({ source: t2Source });
   } catch (e: any) {
