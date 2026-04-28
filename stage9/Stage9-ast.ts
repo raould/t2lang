@@ -2360,11 +2360,15 @@ const astParseFnoSig  = (sig) => {
   {
     let params  = sig.fnoParam().map((p) => {
       {
+        let mods  = p.modifier().map((m) => {
+          return m.getText();
+        });
         let name  = p.IDENTIFIER().getText();
         let optional  = (p.OPTIONAL() !== null);
         let typeAnn  = (p.typeExpr() ? astTypeExpr(p.typeExpr()) : undefined);
         let defaultExpr  = (p.expression() ? astExpression(p.expression()) : undefined);
         return ({
+          modifiers: mods,
           name: name,
           optional: optional,
           typeAnnotation: typeAnn,

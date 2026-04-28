@@ -123,6 +123,7 @@ const lowerTypedParam  = (node) => {
 };
 const lowerFnoParam  = (param) => {
   return ({
+    modifiers: param.modifiers,
     name: param.name,
     optional: param.optional,
     typeAnnotation: (param.typeAnnotation ? lowerTypeExpr(param.typeAnnotation) : undefined),
@@ -338,6 +339,80 @@ const lowerClassElement  = (node) => {
   }
   throw new Error(((("lowerClassElement: unexpected tag >" + node.tag) + "< at ") + formatSpan(node.id)));
 };
+const expandConstructorOModifiers  = (elements, spanId) => {
+  {
+    let result  = [];
+    elements.forEach((el) => {
+      if ((el.tag !== "constructor-o-def")) {
+        {
+          result.push(el);
+          return;
+        }
+      }
+      {
+        let modifiedParams  = el.params.filter((p) => {
+          return (p.modifiers && (p.modifiers.length > 0));
+        });
+        if ((modifiedParams.length === 0)) {
+          {
+            result.push(el);
+            return;
+          }
+        }
+        modifiedParams.forEach((p) => {
+          result.push(({
+            tag: "field-def",
+            id: spanId,
+            modifiers: p.modifiers,
+            name: p.name,
+            typeAnnotation: p.typeAnnotation,
+            init: undefined
+          }));
+        });
+        {
+          let syntheticStmts  = modifiedParams.map((p) => {
+            return ({
+              tag: "assign-prop-stmt",
+              id: spanId,
+              target: ({
+                tag: "prop-access-expr",
+                object: ({
+                  tag: "this",
+                  id: spanId
+                }),
+                key: p.name
+              }),
+              value: ({
+                tag: "identifier",
+                name: p.name,
+                id: spanId
+              })
+            });
+          });
+          let cleanParams  = el.params.map((p) => {
+            return ({
+              modifiers: [],
+              name: p.name,
+              optional: p.optional,
+              typeAnnotation: p.typeAnnotation,
+              defaultExpr: p.defaultExpr
+            });
+          });
+          result.push(({
+            tag: "constructor-o-def",
+            id: el.id,
+            params: cleanParams,
+            rest: el.rest,
+            restType: el.restType,
+            returnType: el.returnType,
+            body: syntheticStmts.concat(el.body)
+          }));
+        }
+      }
+    });
+    return result;
+  }
+};
 const lowerClassDef  = (node) => {
   if ((node.extendsType && (node.extendsType.name === "MixinBase"))) {
     node.body.elements.forEach((member) => {
@@ -356,7 +431,7 @@ const lowerClassDef  = (node) => {
     });
     let extendsType  = (node.extendsType ? lowerTypeExpr(node.extendsType) : undefined);
     let implementsTypes  = node.implementsTypes.map(lowerTypeExpr);
-    let elements  = node.body.elements.map(lowerClassElement);
+    let elements  = expandConstructorOModifiers(node.body.elements.map(lowerClassElement), node.id);
     return ({
       node: node,
       id: node.id,
@@ -377,7 +452,7 @@ const lowerAnonClassDef  = (node) => {
   {
     let extendsType  = (node.extendsType ? lowerTypeExpr(node.extendsType) : undefined);
     let implementsTypes  = node.implementsTypes.map(lowerTypeExpr);
-    let elements  = node.body.elements.map(lowerClassElement);
+    let elements  = expandConstructorOModifiers(node.body.elements.map(lowerClassElement), node.id);
     return ({
       node: node,
       id: node.id,

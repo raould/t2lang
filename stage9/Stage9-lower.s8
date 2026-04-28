@@ -92,7 +92,8 @@
 
   (const lowerFnoParam
     (lambda ((param))
-      (return (object (name (. param name))
+      (return (object (modifiers (. param modifiers))
+                      (name (. param name))
                       (optional (. param optional))
                       (typeAnnotation (ternary (. param typeAnnotation) (lowerTypeExpr (. param typeAnnotation)) undefined))
                       (defaultExpr (ternary (. param defaultExpr) (lowerExpr (. param defaultExpr)) undefined))))))
@@ -221,6 +222,52 @@
       (if (=== (. node tag) 'constructor-o-def') (return (lowerConstructorODef node)))
       (throw (new Error (+ 'lowerClassElement: unexpected tag >' (. node tag) '< at ' (formatSpan (. node id)))))))
 
+  ;; Tree-to-tree transformation: for each constructor-o-def whose fnoParams carry access
+  ;; modifiers, synthesize field-def nodes (inserted before the constructor in the element
+  ;; list) and this.x = x; assign-prop-stmts (prepended to the constructor body), then
+  ;; strip the modifiers from the params.  Codegen sees a fully-formed tree with no residual
+  ;; modifier metadata — no side channels needed downstream.
+  (const expandConstructorOModifiers
+    (lambda ((elements) (spanId))
+      (let ((result (array)))
+        ((. elements forEach) (lambda ((el))
+          (if (!== (. el tag) 'constructor-o-def')
+            (begin ((. result push) el) (return)))
+          (let ((modifiedParams ((. (. el params) filter)
+                  (lambda ((p)) (return (&& (. p modifiers) (> (. (. p modifiers) length) 0)))))))
+            (if (=== (. modifiedParams length) 0)
+              (begin ((. result push) el) (return)))
+            ;; Synthesize field-def for each modified param, inserted before the constructor
+            ((. modifiedParams forEach) (lambda ((p))
+              ((. result push) (object (tag 'field-def')
+                                       (id spanId)
+                                       (modifiers (. p modifiers))
+                                       (name (. p name))
+                                       (typeAnnotation (. p typeAnnotation))
+                                       (init undefined)))))
+            ;; Synthesize this.name = name; prepended to constructor body
+            (let ((syntheticStmts ((. modifiedParams map) (lambda ((p))
+                    (return (object (tag 'assign-prop-stmt')
+                                    (id spanId)
+                                    (target (object (tag 'prop-access-expr')
+                                                    ("object" (object (tag 'this') (id spanId)))
+                                                    (key (. p name))))
+                                    (value (object (tag 'identifier') (name (. p name)) (id spanId))))))))
+                 (cleanParams ((. (. el params) map) (lambda ((p))
+                    (return (object (modifiers (array))
+                                    (name (. p name))
+                                    (optional (. p optional))
+                                    (typeAnnotation (. p typeAnnotation))
+                                    (defaultExpr (. p defaultExpr))))))))
+              ((. result push) (object (tag 'constructor-o-def')
+                                       (id (. el id))
+                                       (params cleanParams)
+                                       (rest (. el rest))
+                                       (restType (. el restType))
+                                       (returnType (. el returnType))
+                                       (body ((. syntheticStmts concat) (. el body)))))))))
+        (return result))))
+
   (const lowerClassDef
     (lambda ((node))
       ;; MixinBase subclasses may not own fields — all fields must carry 'declare'
@@ -239,7 +286,9 @@
                                         ("default" (ternary (. p "default") (lowerTypeExpr (. p "default")) undefined)))))))
              (extendsType (ternary (. node extendsType) (lowerTypeExpr (. node extendsType)) undefined))
              (implementsTypes ((. (. node implementsTypes) map) lowerTypeExpr))
-             (elements ((. (. (. node body) elements) map) lowerClassElement)))
+             (elements (expandConstructorOModifiers
+                          ((. (. (. node body) elements) map) lowerClassElement)
+                          (. node id))))
         (return (object (node node) (id (. node id)) (tag 'class-def')
                         (modifiers (. node modifiers))
                         (name (. node name))
@@ -252,7 +301,9 @@
     (lambda ((node))
       (let ((extendsType (ternary (. node extendsType) (lowerTypeExpr (. node extendsType)) undefined))
              (implementsTypes ((. (. node implementsTypes) map) lowerTypeExpr))
-             (elements ((. (. (. node body) elements) map) lowerClassElement)))
+             (elements (expandConstructorOModifiers
+                          ((. (. (. node body) elements) map) lowerClassElement)
+                          (. node id))))
         (return (object (node node) (id (. node id)) (tag 'anon-class-def')
                         (modifiers (. node modifiers))
                         (extendsType extendsType)

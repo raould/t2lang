@@ -35,6 +35,7 @@ npm test
 npm run testnow
 
 # Run tests directly
+# Do not run "vitest --typecheck" from any other directory.
 cd stage9 && npx vitest --typecheck run
 ```
 

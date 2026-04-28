@@ -1259,11 +1259,12 @@
   (const astParseFnoSig
     (lambda ((sig))
       (let ((params ((. ((. sig fnoParam)) map) (lambda ((p))
-                      (let ((name ((. ((. p IDENTIFIER)) getText)))
+                      (let ((mods ((. ((. p modifier)) map) (lambda ((m)) (return ((. m getText))))))
+                             (name ((. ((. p IDENTIFIER)) getText)))
                              (optional (!== ((. p OPTIONAL)) null))
                              (typeAnn (ternary ((. p typeExpr)) (astTypeExpr ((. p typeExpr))) undefined))
                              (defaultExpr (ternary ((. p expression)) (astExpression ((. p expression))) undefined)))
-                        (return (object (name name) (optional optional) (typeAnnotation typeAnn) (defaultExpr defaultExpr)))))))
+                        (return (object (modifiers mods) (name name) (optional optional) (typeAnnotation typeAnn) (defaultExpr defaultExpr)))))))
              (rp ((. sig fnoRestParam)))
              (restName (ternary rp ((. ((. rp IDENTIFIER)) getText)) undefined))
              (restType (ternary rp

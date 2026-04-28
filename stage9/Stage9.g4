@@ -760,7 +760,7 @@ fnoSignature
     ;
 
 fnoParam
-    : LPAREN IDENTIFIER OPTIONAL? (COLON typeExpr)? (LPAREN DEFAULT expression RPAREN)? RPAREN
+    : LPAREN modifier* IDENTIFIER OPTIONAL? (COLON typeExpr)? (LPAREN DEFAULT expression RPAREN)? RPAREN
     ;
 
 fnoRestParam

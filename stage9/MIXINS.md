@@ -463,7 +463,7 @@ Six test cases:
 cd stage9
 npm run build-grammar    # regenerate lexer/parser from .g4
 npm run build-compiler   # recompile .s8 → .ts
-npx vitest --typecheck run
+npx vitest --typecheck run # Do not run "vitest --typecheck" from any other directory.
 ```
 
 All 124+ existing tests must continue to pass.
