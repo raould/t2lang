@@ -4,8 +4,9 @@ import { fromSourceEndToEnd } from './helpers';
 it('lambda.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
       (import {asrt} "./helpers")
+
       ;; lambda with params and body
-      (const add (lambda ((a) (b))
+      (const (add) (lambda ((a) (b))
         (return (+ a b))))
 
       ;; lambda with no params

@@ -1,5 +1,19 @@
 import { it, expect } from 'vitest';
 import { compileSource as compile } from '../index';
+import { fromSourceEndToEnd } from './helpers';
+
+it('infix spacing', () => {
+  fromSourceEndToEnd(`(program
+    (import {asrt} "./helpers")
+    (const (gFoo) 10)
+    (const (y) 2)
+    (const (f) (lambda ((x)) x))
+    ;; this will fail as #{gFoo/y}, spaces are required.
+    (asrt (f (/ gFoo y)) (f #{gFoo / y}))
+  )
+`);
+}, 30_000);
+
 
 function callCompiler(src: string): { stdout: string; stderr: string; status: number } {
   try {
