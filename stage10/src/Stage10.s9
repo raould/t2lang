@@ -1,0 +1,284 @@
+(program
+  (import (object (named (array (object (name "CharStream")) (object (name "CommonTokenStream"))))) "antlr4ng")
+  (import (object (named (array (object (name "Stage10Lexer"))))) "./Stage10Lexer")
+  (import (object (named (array (object (name "Stage10Parser"))))) "./Stage10Parser")
+  (import (object (default "fs")) "node:fs")
+  (import (object (default "path")) "node:path")
+  (import (object (default "vm")) "node:vm")
+  (import (object (named (array (object (name "astTopLevel")) (object (name "setAstDebugContext"))))) "./Stage10-ast")
+  (import (object (named (array (object (name "sugarTopLevel"))))) "./Stage10-sugar")
+  (import (object (named (array (object (name "lowerTopLevel"))))) "./Stage10-lower")
+  (import (object (named (array (object (name "emitTopLevel")) (object (name "setImportContext"))))) "./Stage10-codegen")
+  (import (object (named (array (object (name "makeMacroEnv")) (object (name "gensym"))))) "./Stage10-macro-env")
+  (import (object (named (array (object (name "expandAll")) (object (name "evalMacroExpr")) (object (name "formatExpansionErrors"))))) "./Stage10-macro-expand")
+  (import (object (named (array (object (name "resolveTopLevel")) (object (name "addBinding"))))) "./Stage10-scope-resolve")
+  (import (object (named (array (object (name "resetSpans")) (object (name "formatSpan"))))) "./Stage10-spans")
+  (import (object (named (array (object (name "readerTransform"))))) "./Stage10-reader")
+  (import (object (named (array (object (name "nullDebugContext"))))) "./Stage10-debug")
+
+  ;; ========== checkParenBalance: verify LPAREN/RPAREN are balanced ==========
+  ;; Runs post-lex so parens inside strings and comments are never counted.
+  (const checkParenBalance
+    (lambda ((tokenStream) (filePath))
+      
+        ((. tokenStream fill))
+        (let ((tokens (. tokenStream tokens))
+               (depth 0)
+               (ok true))
+          ((. tokens forEach)
+            (lambda ((tok))
+              (if (=== (. tok type) (. Stage10Lexer LPAREN))
+                (then (set! depth (+ depth 1))))
+              (if (=== (. tok type) (. Stage10Lexer RPAREN))
+                (then (set! depth (- depth 1))
+                  (if (< depth 0)
+                    (then
+                      (set! ok false)
+                      (set! depth 0)))))))
+          (if (! ok)
+            (then (throw (new Error (+ filePath ': unmatched closing parenthesis')))))
+          (if (> depth 0)
+            (then (throw (new Error (+ filePath ': ' depth ' unclosed parenthes' (ternary (=== depth 1) 'is' 'es'))))))))  )
+
+  ;; ========== parseFile: parse a .t2 source, return AST program node ==========
+  (const parseFile
+    (lambda ((filePath) (sourceText))
+      (let ((rawInput (ternary sourceText sourceText ((. fs readFileSync) filePath 'utf-8')))
+             (input (readerTransform rawInput))
+             (inputStream ((. CharStream fromString) input))
+             (lexer (new Stage10Lexer inputStream))
+             (tokenStream (new CommonTokenStream lexer))
+             (_ (checkParenBalance tokenStream filePath))
+             (parser (new Stage10Parser tokenStream))
+             (tree ((. parser "program")))
+             (rawBody ((. ((. tree topLevel)) map) astTopLevel))
+             (body ((. rawBody map) sugarTopLevel)))
+        (if (> (. parser numberOfSyntaxErrors) 0)
+          (then (throw (new Error (+ filePath ': ' (. parser numberOfSyntaxErrors) ' parse error' (ternary (=== (. parser numberOfSyntaxErrors) 1) '' 's'))))))
+        (return (object (tag 'program') (text ((. tree getText))) (body body))))))
+
+  ;; ========== compileMacroModule: compile a .t2m to CJS source string ==========
+
+  ;; Shared ref to loadMacroModule to break recursion cycle
+  (const _macroLoaderRef (object (loader null)))
+
+  ;; Cache for loaded macro modules to handle diamond dependencies and cycles
+  (const _macroModuleCache (new Map))
+  (const _macroLoadingSet (new Set))
+  ;; Map from scope name → absolute root path, populated by --macro-root flags.
+  (const _macroRoots (new Map))
+
+  (const compileMacroModule
+    (lambda ((filePath))
+      (let ((input ((. fs readFileSync) filePath 'utf-8'))
+             (_spans (resetSpans filePath))
+             (programNode (parseFile filePath))
+             ;; macro module compilation mode
+             (macroEnv (makeMacroEnv true))
+             ;; Pass loader through ref for transitive loading
+             (expandedResult (expandAll programNode macroEnv (. _macroLoaderRef loader))))
+        ;; Check errors
+        (if (> (. (. expandedResult errors) length) 0)
+          (then (throw (new Error (+ 'Errors in macro module ' filePath ':\n' (formatExpansionErrors (. expandedResult errors)))))))
+
+        (let ((output (array))
+               (chain (array)))
+          ((. (. (. expandedResult ast) body) forEach)
+            (lambda ((expandedNode))
+              (let ((resolvedNode (resolveTopLevel expandedNode chain)))
+                (if (|| (=== (. resolvedNode tag) 'let-decl') (=== (. resolvedNode tag) 'const-decl'))
+                  (then (set! chain (addBinding chain (. resolvedNode name) (new Set)))))
+                (let ((loweredNode (lowerTopLevel resolvedNode true))
+                       (emittedStr (emitTopLevel loweredNode)))
+                  ((. output push) emittedStr)))))
+          (return ((. output join) '\n'))))))
+
+  ;; ========== resolveMacroPath: resolve a macro-import path string ==========
+  ;; Relative paths (./foo) resolve against CWD (caller's responsibility to set).
+  ;; @scope/rest paths resolve against the configured root for that scope.
+  (const resolveMacroPath
+    (lambda ((relPath))
+      (if (! ((. relPath startsWith) '@'))
+        (then (return ((. path resolve) relPath))))
+      (let ((slashIdx ((. relPath indexOf) '/')))
+        (if (=== slashIdx -1)
+          (then (throw (new Error (+ 'error: macro-import @-path must include "/" after the scope name: ' relPath)))))
+        (let ((scope ((. relPath slice) 1 slashIdx))
+               (restPath ((. relPath slice) (+ slashIdx 1)))
+               (root ((. _macroRoots get) scope)))
+          (if (! root)
+            (then (throw (new Error (+ 'error: unknown macro scope "@' scope '" in macro-import; pass --macro-root ' scope '=<path>')))))
+          (return ((. path resolve) root restPath))))))
+
+  ;; ========== loadMacroModule: interpreter-based macro module loader ==========
+  ;; Registers exported macros from the module into env.macroNamespaces[namespace].
+  (const loadMacroModule
+    (lambda ((relPath) (namespace) (env))
+      (let ((absPath (ternary (&& ((. relPath startsWith) '.') (. env sourceDir))
+                        ((. path resolve) (. env sourceDir) relPath)
+                        (resolveMacroPath relPath))))
+        (if (! ((. fs existsSync) absPath))
+          (then (throw (new Error (+ "Macro module not found: " absPath)))))
+        ;; Return early if already cached — still create namespace map from cached exports
+        (if ((. _macroModuleCache has) absPath)
+          (then (let ((cached ((. _macroModuleCache get) absPath))
+                 (exports (. cached _exports))
+                 (nsMap (new Map)))
+            ((. (. env macroNamespaces) set) namespace nsMap)
+            ((. exports forEach)
+              (lambda ((exportName))
+                (if ((. (. cached macros) has) exportName)
+                  (then ((. nsMap set) exportName ((. (. cached macros) get) exportName))))))
+            ((. (. cached moduleVars) forEach)
+              (lambda ((varVal) (varKey))
+                ((. (. env moduleVars) set) varKey varVal)))
+            (return))))
+        ;; Parse and expand the module file
+        (let ((_spans (resetSpans absPath))
+               (programNode (parseFile absPath))
+               ;; Child env for this module (macro compilation mode)
+               (childEnv (makeMacroEnv true)))
+          (set! (. childEnv sourceDir) ((. path dirname) absPath))
+          (let ((expandedResult (expandAll programNode childEnv loadMacroModule)))
+          (if (> (. (. expandedResult errors) length) 0)
+            (then (throw (new Error (+ 'Errors in macro module ' absPath ':\n' (formatExpansionErrors (. expandedResult errors)))))))
+          ;; Register macros, eval const/let inits, collect macro-export/reexport specs
+          (let ((exports (array))
+                 (reexports (array)))
+            ((. (. (. expandedResult ast) body) forEach)
+              (lambda ((node))
+                (if (|| (=== (. node tag) 'defmacro') (=== (. node tag) 'macro-def'))
+                  (then ((. (. childEnv macros) set) (. node name)
+                    (object
+                      (name (. node name))
+                      (params (. node params))
+                      (rest (. node rest))
+                      (body (. node body))
+                      (scopeId (. node scopeId))))))
+                (if (|| (=== (. node tag) 'const-decl') (=== (. node tag) 'let-decl'))
+                  (then (let ((val (evalMacroExpr (. node init) (new Map) childEnv)))
+                    ((. (. childEnv moduleVars) set) (. node name) val))))
+                (if (=== (. node tag) 'macro-time-fn-def')
+                  (then ((. (. childEnv moduleVars) set) (. node name) (. node init))))
+                (if (=== (. node tag) 'macro-export')
+                  (then (set! exports (. node specs))))
+                (if (=== (. node tag) 'macro-reexport')
+                  (then (let ((srcNs (. node namespace))
+                         (names (. node names))
+                         (srcMap ((. (. childEnv macroNamespaces) get) srcNs)))
+                    (if srcMap
+                      (then (let ((targetNames (ternary (=== (. names length) 0)
+                                            ((. Array from) ((. srcMap keys)))
+                                            names)))
+                        ((. targetNames forEach)
+                          (lambda ((macName))
+                            (if ((. srcMap has) macName)
+                              (then ((. (. childEnv macros) set) macName ((. srcMap get) macName))
+                                ((. reexports push) macName)))))))))))))
+            ;; Attach merged export list to childEnv for cache reuse, then cache
+            (set! (. childEnv _exports) ((. exports concat) reexports))
+            ((. _macroModuleCache set) absPath childEnv)
+            ;; Register exported macros (explicit + re-exported) into the namespace map
+            (let ((nsMap (new Map)))
+              ((. (. env macroNamespaces) set) namespace nsMap)
+              ((. (. childEnv _exports) forEach)
+                (lambda ((exportName))
+                  (if ((. (. childEnv macros) has) exportName)
+                    (then ((. nsMap set) exportName ((. (. childEnv macros) get) exportName))))))
+              ((. (. childEnv moduleVars) forEach)
+                (lambda ((varVal) (varKey))
+                  ((. (. env moduleVars) set) varKey varVal))))))))))
+  ;; Initialize transitive loader
+  (set! (. _macroLoaderRef loader) loadMacroModule)
+
+  ;; ========== validateFileTypeConstraints ==========
+  ;; Pre-expansion check enforcing .t2 / .t2m file-type rules.
+  ;; Rule 1 (.t2): macro-export and macro-reexport are forbidden.
+  ;; Rule 2 (.t2m): only macro-related top-level forms are allowed.
+  (const validateFileTypeConstraints
+    (lambda ((programNode) (isMacroCompilation))
+      (let ((macroTags (new Set (array 'defmacro' 'macro-time-fn-def' 'macro-import' 'macro-export' 'macro-reexport'))))
+        (if isMacroCompilation
+          (then ((. (. programNode body) forEach)
+            (lambda ((node))
+              (if (! ((. macroTags has) (. node tag)))
+                (then (throw (new Error (+ (formatSpan (. node id)) ': .t2m files may only contain macro definitions, #[macro-time] bindings, macro-import, macro-export, and macro-reexport'))))))))
+          (else ((. (. programNode body) forEach)
+            (lambda ((node))
+              (if (|| (=== (. node tag) 'macro-export') (=== (. node tag) 'macro-reexport'))
+                (then (throw (new Error (+ (formatSpan (. node id)) ': macro-export is not allowed in .t2 files; use a .t2m file to export macros'))))))))))))
+
+  ;; ========== compileCore: shared compilation logic ==========
+  ;; filePath: absolute path (for import resolution, error spans, .t2m detection) or null for string input
+  ;; source: source text (already read); if null, read from filePath
+  ;; config: { rootDir?, outDir?, t2exts?, t2mexts?, macroRoots?: Map, debug?: DebugContext }
+  (const compileCore
+    (lambda ((filePath) (source) (config))
+      (let ((rootDir (. config rootDir))
+             (outDir (. config outDir))
+             (t2exts (|| (. config t2exts) (array 't2')))
+             (t2mexts (|| (. config t2mexts) (array 't2m')))
+             (macroRoots (. config macroRoots))
+             (dbg (|| (. config debug) nullDebugContext)))
+        ;; Set debug context
+        (setAstDebugContext dbg)
+        ;; Reset module-level state for fresh compilation
+        ((. _macroRoots clear))
+        ((. _macroModuleCache clear))
+        ((. _macroLoadingSet clear))
+        (if macroRoots
+          (then ((. macroRoots forEach) (lambda ((v) (k)) ((. _macroRoots set) k v)))))
+        ;; Resolve rootDir/outDir only when we have a real file path
+        (if filePath
+          (then (if (=== rootDir undefined)
+              (then (set! rootDir ((. path dirname) filePath))))
+            (set! rootDir ((. path resolve) rootDir))
+            (if (=== outDir undefined)
+              (then (set! outDir rootDir))
+              (else (set! outDir ((. path resolve) outDir))))))
+        (setImportContext filePath rootDir outDir)
+        (let ((isMacroCompilation (&& filePath ((. t2mexts some) (lambda ((ext)) (return ((. filePath endsWith) (+ '.' ext)))))))
+               (macroEnv (makeMacroEnv isMacroCompilation))
+               (displayName (|| filePath '<stdin>')))
+          (if filePath
+            (then (set! (. macroEnv sourceDir) ((. path dirname) filePath))))
+          (let ((_spans (resetSpans displayName))
+                 (programNode (parseFile displayName source)))
+            (validateFileTypeConstraints programNode isMacroCompilation)
+            (let ((expandResult (expandAll programNode macroEnv loadMacroModule dbg)))
+              (if (> (. (. macroEnv errors) length) 0)
+                (then (throw (new Error (formatExpansionErrors (. macroEnv errors))))))
+              (let ((output (array))
+                     (chain (array)))
+                ((. (. (. expandResult ast) body) forEach)
+                  (lambda ((expandedNode))
+                    (except (try
+                      (let ((resolvedNode (resolveTopLevel expandedNode chain)))
+                        (if (|| (=== (. resolvedNode tag) 'let-decl') (=== (. resolvedNode tag) 'const-decl'))
+                          (then (set! chain (addBinding chain (. resolvedNode name) (new Set)))))
+                        (let ((loweredNode (lowerTopLevel resolvedNode isMacroCompilation))
+                               (emittedStr (emitTopLevel loweredNode)))
+                          ((. output push) emittedStr))))
+                      (catch e
+                        (throw (new Error (+ 'error at ' (formatSpan (|| (. expandedNode callSiteId) (. expandedNode id))) ': ' (. e message))))))))
+                (return ((. output join) '\n')))))))))
+
+  ;; ========== compile: programmatic API — file input ==========
+  ;; config: { filePath: string, rootDir?, outDir?, t2exts?, t2mexts?, macroRoots?: Map, debug?: DebugContext }
+  ;; Reads the file from disk. Returns compiled TypeScript source as a string. Throws on error.
+  (const compile
+    (lambda ((config))
+      (let ((filePath ((. path resolve) (. config filePath))))
+        (return (compileCore filePath null config)))))
+
+  ;; ========== compileSource: programmatic API — string input ==========
+  ;; config: { source: string, filePath?: string, rootDir?, outDir?, t2exts?, t2mexts?, macroRoots?: Map, debug?: DebugContext }
+  ;; filePath is optional: when provided it is used for import path resolution and error display.
+  ;; Returns compiled TypeScript source as a string. Throws on error.
+  (const compileSource
+    (lambda ((config))
+      (let ((filePath (ternary (. config filePath) ((. path resolve) (. config filePath)) null)))
+        (return (compileCore filePath (. config source) config)))))
+
+  (export-named (compile) (compileSource))
+)

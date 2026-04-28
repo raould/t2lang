@@ -1,0 +1,426 @@
+(program
+  ;; Pre-parser reader: transforms backtick template literals into
+  ;; (template ...) forms before ANTLR parsing.
+  ;;
+  ;; `foo ${b} bar`  →  (template "foo " b " bar")
+  ;; `${b}`          →  (template b)
+  ;; `hello`         →  "hello"
+  ;; ``              →  ""
+
+  ;; ---- skipToEndOfLine ----
+  ;; Scans from i past the end-of-line newline. Returns new i.
+  (const skipToEndOfLine
+    (lambda ((src) (i))
+      (while (< i (. src length))
+        (if (=== ((. src charAt) i) "\n")
+          (then (return (+ i 1))))
+        (set! i (+ i 1)))
+      (return i)))
+
+  ;; ---- skipSingleQuoteString ----
+  ;; Called with i = position AFTER opening '. Returns i after closing '.
+  (const skipSingleQuoteString
+    (lambda ((src) (i))
+      (while (< i (. src length))
+        (let ((ch ((. src charAt) i)))
+          (set! i (+ i 1))
+          (if (=== ch "\\")
+            (then (set! i (+ i 1)))
+            (else (if (=== ch "'")
+              (then (return i)))))))
+      (return i)))
+
+  ;; ---- skipDoubleQuoteString ----
+  ;; Called with i = position AFTER opening ". Returns i after closing ".
+  (const skipDoubleQuoteString
+    (lambda ((src) (i))
+      (while (< i (. src length))
+        (let ((ch ((. src charAt) i)))
+          (set! i (+ i 1))
+          (if (=== ch "\\")
+            (then (set! i (+ i 1)))
+            (else (if (=== ch '"')
+              (then (return i)))))))
+      (return i)))
+
+  ;; ---- skipTripleString ----
+  ;; Called with i = position AFTER opening """. Returns i after closing """.
+  (const skipTripleString
+    (lambda ((src) (i))
+      (while (< i (. src length))
+        (if (&& (=== ((. src charAt) i) '"')
+                (&& (=== ((. src charAt) (+ i 1)) '"')
+                    (=== ((. src charAt) (+ i 2)) '"')))
+          (then (return (+ i 3))))
+        (set! i (+ i 1)))
+      (return i)))
+
+  ;; ---- escapeChunk ----
+  ;; Escape raw text for embedding as a double-quoted t2 string body.
+  (const escapeChunk
+    (lambda ((text))
+      (let ((s1 ((. ((. text split) '\\') join) '\\\\'))
+             (s2 ((. ((. s1 split) '"') join) '\\"'))
+             (s3 ((. ((. s2 split) "\n") join) '\\n'))
+             (s4 ((. ((. s3 split) "\r") join) '\\r'))
+             (s5 ((. ((. s4 split) "\t") join) '\\t')))
+        (return s5))))
+
+  ;; ---- scanExprUntilClose ----
+  ;; Scan a ${...} expression body, tracking nested braces and skipping strings.
+  ;; i: position AFTER the opening { (brace depth starts at 1).
+  ;; Returns [exprText, newI].
+  (const scanExprUntilClose
+    (lambda ((src) (i))
+      (let ((depth 1)
+             (buf ""))
+        (while (&& (< i (. src length)) (> depth 0))
+          (let ((ch ((. src charAt) i)))
+            ;; Triple-quoted string
+            (if (&& (=== ch '"')
+                    (&& (=== ((. src charAt) (+ i 1)) '"')
+                        (=== ((. src charAt) (+ i 2)) '"')))
+              (then (let ((end (skipTripleString src (+ i 3))))
+                (set! buf (+ buf ((. src slice) i end)))
+                (set! i end)))
+              ;; Single-quoted string
+              (else (if (=== ch "'")
+                (then (let ((end (skipSingleQuoteString src (+ i 1))))
+                  (set! buf (+ buf ((. src slice) i end)))
+                  (set! i end)))
+                ;; Double-quoted string
+                (else (if (=== ch '"')
+                  (then (let ((end (skipDoubleQuoteString src (+ i 1))))
+                    (set! buf (+ buf ((. src slice) i end)))
+                    (set! i end)))
+                  ;; Comment
+                  (else (if (&& (=== ch ";") (=== ((. src charAt) (+ i 1)) ";"))
+                    (then (let ((end (skipToEndOfLine src (+ i 2))))
+                      (set! buf (+ buf ((. src slice) i end)))
+                      (set! i end)))
+                    ;; Open brace
+                    (else (if (=== ch "{")
+                      (then
+                        (set! depth (+ depth 1))
+                        (set! buf (+ buf ch))
+                        (set! i (+ i 1)))
+                      ;; Close brace
+                      (else (if (=== ch "}")
+                        (then
+                          (set! depth (- depth 1))
+                          (if (> depth 0)
+                            (then
+                              (set! buf (+ buf ch))
+                              (set! i (+ i 1)))
+                            (else (set! i (+ i 1)))))
+                        ;; Everything else
+                        (else
+                          (set! buf (+ buf ch))
+                          (set! i (+ i 1))))))))))))))))
+        (return (array buf i)))))
+
+  ;; ---- scanTemplate ----
+  ;; Scan a backtick template from i (position AFTER opening backtick).
+  ;; Returns [parts, newI] where parts is array of {type, value} objects.
+  (const scanTemplate
+    (lambda ((src) (i))
+      (let ((parts (array))
+             (textBuf ""))
+        (while (< i (. src length))
+          (let ((ch ((. src charAt) i)))
+            ;; Escaped backtick: \`
+            (if (&& (=== ch "\\") (=== ((. src charAt) (+ i 1)) '`'))
+              (then
+                (set! textBuf (+ textBuf '`'))
+                (set! i (+ i 2)))
+              ;; Interpolation hole: ${
+              (else (if (&& (=== ch "$") (=== ((. src charAt) (+ i 1)) "{"))
+                (then
+                  (if (!== textBuf "")
+                    (then ((. parts push) (object (type 'str') (value textBuf)))))
+                  (set! textBuf "")
+                  (let ((result (scanExprUntilClose src (+ i 2)))
+                         (exprText (index result 0))
+                         (newI (index result 1)))
+                    ((. parts push) (object (type 'expr') (value exprText)))
+                    (set! i newI)))
+                ;; Closing backtick
+                (else (if (=== ch '`')
+                  (then
+                    (if (!== textBuf "")
+                      (then ((. parts push) (object (type 'str') (value textBuf)))))
+                    (return (array parts (+ i 1))))
+                  ;; Regular character (including literal $)
+                  (else
+                    (set! textBuf (+ textBuf ch))
+                    (set! i (+ i 1))))))))))
+        ;; Unterminated template — flush remainder
+        (if (!== textBuf "")
+          (then ((. parts push) (object (type 'str') (value textBuf)))))
+        (return (array parts i)))))
+
+  ;; ---- buildTemplateForm ----
+  ;; Convert parts array to a t2 source string.
+  (const buildTemplateForm
+    (lambda ((parts))
+      ;; Empty template → empty string literal
+      (if (=== (. parts length) 0)
+        (then (return '""')))
+      ;; Single string part → plain double-quoted string
+      (if (&& (=== (. parts length) 1) (=== (. (index parts 0) type) 'str'))
+        (then (return (+ '"' (escapeChunk (. (index parts 0) value)) '"'))))
+      ;; General case → (template part ...)
+      (let ((inner ""))
+        ((. parts forEach)
+          (lambda ((part))
+            (if (=== (. part type) 'str')
+              (then (set! inner (+ inner ' "' (escapeChunk (. part value)) '"')))
+              (else (set! inner (+ inner ' ' (. part value)))))))
+        (return (+ '(template' inner ')')))))
+
+  ;; ---- isWhitespace ----
+  (const isWhitespace
+    (lambda ((ch))
+      (return (|| (=== ch ' ') (|| (=== ch '\t') (|| (=== ch '\n') (=== ch '\r')))))))
+
+  ;; ---- isSubscriptTrigger ----
+  ;; Returns true if ch signals subscript access (identifier/word chars, ')', ']').
+  ;; NOT triggered by whitespace or opening delimiters.
+  (const isSubscriptTrigger
+    (lambda ((ch))
+      (if (=== ch undefined) (then (return false)))
+      (let ((nonTrigger " \t\n\r([,;{#["))
+        (return (=== ((. nonTrigger indexOf) ch) -1)))))
+
+  ;; ---- METHOD_MODIFIERS ----
+  ;; Words that appear as method-declaration modifiers; they must never be
+  ;; treated as the subscripted object when followed by whitespace + '['.
+  (const METHOD_MODIFIERS (new Set (array 'static' 'async' 'generator' 'abstract' 'override' 'readonly')))
+
+  ;; ---- scanBracketContent ----
+  ;; Scan from i (position AFTER opening '[') to the matching ']', skipping strings/comments/nesting.
+  ;; Returns [content, newI] where content is the raw text and newI is position after ']'.
+  (const scanBracketContent
+    (lambda ((src) (i))
+      (let ((depth 1)
+             (buf "")
+             (j i))
+        (while (&& (< j (. src length)) (> depth 0))
+          (let ((ch ((. src charAt) j)))
+            (if (=== ch "'")
+              (then (let ((end (skipSingleQuoteString src (+ j 1))))
+                (set! buf (+ buf ((. src slice) j end)))
+                (set! j end)))
+              (else (if (&& (=== ch '"') (&& (=== ((. src charAt) (+ j 1)) '"') (=== ((. src charAt) (+ j 2)) '"')))
+                (then (let ((end (skipTripleString src (+ j 3))))
+                  (set! buf (+ buf ((. src slice) j end)))
+                  (set! j end)))
+                (else (if (=== ch '"')
+                  (then (let ((end (skipDoubleQuoteString src (+ j 1))))
+                    (set! buf (+ buf ((. src slice) j end)))
+                    (set! j end)))
+                  (else (if (&& (=== ch ";") (=== ((. src charAt) (+ j 1)) ";"))
+                    (then (let ((end (skipToEndOfLine src (+ j 2))))
+                      (set! buf (+ buf ((. src slice) j end)))
+                      (set! j end)))
+                    (else (if (=== ch '[')
+                      (then
+                        (set! depth (+ depth 1))
+                        (set! buf (+ buf ch))
+                        (set! j (+ j 1)))
+                      (else (if (=== ch ']')
+                        (then
+                          (set! depth (- depth 1))
+                          (if (> depth 0)
+                            (then (set! buf (+ buf ch)) (set! j (+ j 1)))
+                            (else (set! j (+ j 1)))))
+                        (else
+                          (set! buf (+ buf ch))
+                          (set! j (+ j 1))))))))))))))))
+        (return (array buf j)))))
+
+  ;; ---- bracketHasTopLevelComma ----
+  ;; Returns true if the '[' at src[i] contains a top-level comma before its matching ']'.
+  ;; Used to distinguish array literals ([1, 2, 3]) from subscript indices ([expr])
+  ;; when whitespace precedes '['.
+  (const bracketHasTopLevelComma
+    (lambda ((src) (i))
+      (let ((depth 1)
+             (j (+ i 1)))
+        (while (&& (< j (. src length)) (> depth 0))
+          (let ((ch ((. src charAt) j)))
+            (if (=== ch "'")
+              (then (set! j (skipSingleQuoteString src (+ j 1))))
+              (else (if (&& (=== ch '"') (&& (=== ((. src charAt) (+ j 1)) '"') (=== ((. src charAt) (+ j 2)) '"')))
+                (then (set! j (skipTripleString src (+ j 3))))
+                (else (if (=== ch '"')
+                  (then (set! j (skipDoubleQuoteString src (+ j 1))))
+                  (else (if (|| (=== ch '[') (|| (=== ch '(') (=== ch '{')))
+                    (then (set! depth (+ depth 1)) (set! j (+ j 1)))
+                    (else (if (|| (=== ch ']') (|| (=== ch ')') (=== ch '}')))
+                      (then (set! depth (- depth 1)) (set! j (+ j 1)))
+                      (else (if (&& (=== ch ',') (=== depth 1))
+                        (then (return true))
+                        (else (set! j (+ j 1))))))))))))))))
+        (return false))))
+
+  ;; ---- findPrecedingExprStart ----
+  ;; Scan backward in `text` to find the start index of the last complete expression:
+  ;;   - ')' ending: scan to matching '('
+  ;;   - ']' ending: scan to matching '['
+  ;;   - word char ending: scan back while not a delimiter
+  ;; Returns the start index, or -1 if text is empty.
+  (const findPrecedingExprStart
+    (lambda ((text))
+      (let ((j (- (. text length) 1)))
+        (if (< j 0) (then (return -1)))
+        (let ((last ((. text charAt) j)))
+          ;; Paren group: scan back to matching '('
+          (if (=== last ')')
+            (then (let ((depth 1))
+              (set! j (- j 1))
+              (while (&& (>= j 0) (> depth 0))
+                (let ((c ((. text charAt) j)))
+                  (if (=== c ')') (then (set! depth (+ depth 1))))
+                  (if (=== c '(') (then (set! depth (- depth 1)))))
+                (if (> depth 0) (then (set! j (- j 1)))))
+              (return j))))
+          ;; Bracket group: scan back to matching '['
+          (if (=== last ']')
+            (then (let ((depth 1))
+              (set! j (- j 1))
+              (while (&& (>= j 0) (> depth 0))
+                (let ((c ((. text charAt) j)))
+                  (if (=== c ']') (then (set! depth (+ depth 1))))
+                  (if (=== c '[') (then (set! depth (- depth 1)))))
+                (if (> depth 0) (then (set! j (- j 1)))))
+              (return j))))
+          ;; Word / identifier: scan back while not a delimiter
+          (while (>= j 0)
+            (let ((c ((. text charAt) j)))
+              (if (&& (!== c ' ') (!== c '\t') (!== c '\n') (!== c '\r')
+                      (!== c '(') (!== c ')') (!== c '[') (!== c ']')
+                      (!== c '{') (!== c '}') (!== c ',') (!== c ';'))
+                (then (set! j (- j 1)))
+                (else (return (+ j 1))))))
+          (return (+ j 1))))))
+
+  ;; ---- readerTransform ----
+  ;; Main entry point. Scans src, applying:
+  ;;   - Backtick template literals → (template ...) forms
+  ;;   - Subscript sugar: foo[i] → (. foo [i])  (no whitespace before '[' only)
+  ;; Skips over quoted strings and ;; comments verbatim.
+  (const readerTransform
+    (lambda ((src))
+      (let ((out "")
+             (i 0)
+             (n (. src length))
+             ;; bracketDepth: current '[' nesting level (for all brackets)
+             (bracketDepth 0)
+             ;; subscriptStack: bracket depths at which we must close a subscript with ')'
+             (subscriptStack (array)))
+        (while (< i n)
+          (let ((ch ((. src charAt) i)))
+            ;; Triple-quoted string: copy verbatim
+            (if (&& (=== ch '"')
+                    (&& (=== ((. src charAt) (+ i 1)) '"')
+                        (=== ((. src charAt) (+ i 2)) '"')))
+              (then (let ((end (skipTripleString src (+ i 3))))
+                (set! out (+ out ((. src slice) i end)))
+                (set! i end)))
+              ;; Single-quoted string: copy verbatim
+              (else (if (=== ch "'")
+                (then (let ((end (skipSingleQuoteString src (+ i 1))))
+                  (set! out (+ out ((. src slice) i end)))
+                  (set! i end)))
+                ;; Double-quoted string: copy verbatim
+                (else (if (=== ch '"')
+                  (then (let ((end (skipDoubleQuoteString src (+ i 1))))
+                    (set! out (+ out ((. src slice) i end)))
+                    (set! i end)))
+                  ;; Comment: copy verbatim
+                  (else (if (&& (=== ch ";") (=== ((. src charAt) (+ i 1)) ";"))
+                    (then (let ((end (skipToEndOfLine src (+ i 2))))
+                      (set! out (+ out ((. src slice) i end)))
+                      (set! i end)))
+                    ;; Backtick template
+                    (else (if (=== ch '`')
+                      (then (let ((result (scanTemplate src (+ i 1)))
+                             (parts (index result 0))
+                             (newI (index result 1)))
+                        (set! out (+ out (buildTemplateForm parts)))
+                        (set! i newI)))
+                      ;; '[': subscript sugar or plain bracket
+                      (else (if (=== ch '[')
+                        (then (let ((prevChar (ternary (> i 0) ((. src charAt) (- i 1)) undefined)))
+                          ;; emitSubscript: capture raw bracket content, emit (subscript precExpr "raw")
+                          (let ((emitSubscript
+                                  (lambda ((precExpr) (prefix))
+                                    (let ((captured (scanBracketContent src (+ i 1)))
+                                           (rawContent (index captured 0))
+                                           (newI (index captured 1)))
+                                      (set! out (+ prefix '(subscript ' precExpr ' "' (escapeChunk rawContent) '")'))
+                                      (set! i newI)))))
+                            (if (isSubscriptTrigger prevChar)
+                              ;; No whitespace before [: direct trigger
+                              (then (let ((start (findPrecedingExprStart out)))
+                                (if (>= start 0)
+                                  (then (emitSubscript ((. out slice) start) ((. out slice) 0 start)))
+                                  (else
+                                    (set! out (+ out '['))
+                                    (set! bracketDepth (+ bracketDepth 1))
+                                    (set! i (+ i 1))))))
+                              ;; Whitespace before [: trigger subscript if trimmedOut ends
+                              ;; with a subscript-triggering character, but NOT if:
+                              ;;   - charBefore (char before the preceding expr) is '(' or '.'
+                              ;;   - the preceding expr starts with '[' (it's a bracket pattern)
+                              ;;   - the preceding expr is a method modifier keyword
+                              ;;   - the bracket contains a top-level comma (array literal)
+                              (else (if (isWhitespace prevChar)
+                                (then (let ((trimmedOut ((. out trimEnd))))
+                                  (if (isSubscriptTrigger ((. trimmedOut charAt) (- (. trimmedOut length) 1)))
+                                    (then (let ((start (findPrecedingExprStart trimmedOut)))
+                                      (if (>= start 0)
+                                        (then (let ((precExpr ((. trimmedOut slice) start))
+                                               (prefix0 ((. trimmedOut slice) 0 start)))
+                                          (let ((prefix0Trim ((. prefix0 trimEnd))))
+                                            (let ((charBefore (ternary (> (. prefix0Trim length) 0)
+                                                                ((. prefix0Trim charAt) (- (. prefix0Trim length) 1))
+                                                                "")))
+                                              (if (&& (!== charBefore '(')
+                                                      (&& (!== charBefore '.')
+                                                          (&& (|| (=== (. precExpr length) 0) (!== ((. precExpr charAt) 0) '['))
+                                                              (&& (! ((. METHOD_MODIFIERS has) precExpr))
+                                                                  (! (bracketHasTopLevelComma src i))))))
+                                                (then (emitSubscript precExpr prefix0))
+                                                (else
+                                                  (set! out (+ out '['))
+                                                  (set! bracketDepth (+ bracketDepth 1))
+                                                  (set! i (+ i 1))))))))
+                                        (else
+                                          (set! out (+ out '['))
+                                          (set! bracketDepth (+ bracketDepth 1))
+                                          (set! i (+ i 1))))))
+                                    (else
+                                      (set! out (+ out '['))
+                                      (set! bracketDepth (+ bracketDepth 1))
+                                      (set! i (+ i 1))))))
+                                ;; Non-trigger, non-whitespace: plain bracket
+                                (else
+                                  (set! out (+ out '['))
+                                  (set! bracketDepth (+ bracketDepth 1))
+                                  (set! i (+ i 1)))))))))
+                        ;; ']': plain bracket close (subscripts are now self-closing)
+                        (else (if (=== ch ']')
+                          (then
+                            (set! out (+ out ']'))
+                            (set! bracketDepth (- bracketDepth 1))
+                            (set! i (+ i 1)))
+                          ;; Regular character
+                          (else
+                            (set! out (+ out ch))
+                            (set! i (+ i 1))))))))))))))))))
+        (return out))))
+
+  (export-named (readerTransform))
+)
