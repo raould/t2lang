@@ -163,7 +163,7 @@ const emitStmt  = (stmt) => {
   }
   if ((stmt.tag === "let-stmt")) {
     {
-      let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : " ");
+      let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : "");
       if (isDefined(stmt.init)) {
         return ((((("let " + checkId(stmt.name, stmt.id)) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
       }
@@ -174,7 +174,7 @@ const emitStmt  = (stmt) => {
   }
   if ((stmt.tag === "var-stmt")) {
     {
-      let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : " ");
+      let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : "");
       if (isDefined(stmt.init)) {
         return ((((("var " + checkId(stmt.name, stmt.id)) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
       }
@@ -189,7 +189,7 @@ const emitStmt  = (stmt) => {
     }
     else {
       {
-        let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : " ");
+        let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : "");
         if (isDefined(stmt.init)) {
           return ((((("const " + checkId(stmt.name, stmt.id)) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
         }

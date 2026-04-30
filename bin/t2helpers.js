@@ -19,7 +19,7 @@ export function checkSource(source, label) {
 // Derive the keyword list from Stage10-tags.ts: any AST tag that contains a
 // hyphen could be accidentally written with underscores by TypeScript users.
 // We read the file as text so we don't need tsx to import it.
-const tagsSource = readFileSync(resolve(__dirname, '../stage10/Stage10-tags.ts'), 'utf-8');
+const tagsSource = readFileSync(resolve(__dirname, '../stage10/src/Stage10-tags.ts'), 'utf-8');
 const HYPHENATED_KEYWORDS = [...tagsSource.matchAll(/"([a-z][a-z0-9]*(?:-[a-z0-9]+)+)"/g)]
   .map(m => m[1]);
 

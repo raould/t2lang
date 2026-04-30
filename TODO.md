@@ -6,6 +6,7 @@
     - destructuring support.
 - [ ] require infix spacing.
 - [ ] stageN/src/** duh.
+    - [ ] also t2src -> src ? -> dist
 - [ ] keep updating the style guide.
 - [ ] omfg version numbers.
 - [ ] error reporting unification, and the error glossary.

@@ -129,7 +129,7 @@ describe('Decision 6: spans infrastructure', () => {
   it('a successful program emits no span-related noise', () => {
     const result = callCompiler('(program (const ((x 42))))');
     expect(result.status).toBe(0);
-    expect(result.stdout).toBe('const x  = 42;\n');
+    expect(result.stdout).toBe('const x = 42;\n');
   }, T);
 
   // ── 2. Span table API ──────────────────────────────────────────────────────
