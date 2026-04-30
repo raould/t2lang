@@ -87,6 +87,7 @@ topLevelVar
 
 topLevelConst
     : LPAREN CONST metaAnnotation* LPAREN starBinding RPAREN RPAREN
+    | LPAREN CONST LPAREN IDENTIFIER (COLON typeExpr)? RPAREN expression RPAREN
     ;
 
 
@@ -244,7 +245,7 @@ varStmt
 
 constStar
     : LPAREN CONST LPAREN starBinding+ RPAREN statement* RPAREN
-    | LPAREN CONST singleBinding expression RPAREN
+    | LPAREN CONST LPAREN IDENTIFIER (COLON typeExpr)? RPAREN expression RPAREN
     ;
 
 ifForm

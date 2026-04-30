@@ -330,6 +330,23 @@ const astTopLevelVar  = (ctx) => {
   }
 };
 const astTopLevelConst  = (ctx) => {
+  if ((!ctx.starBinding())) {
+    {
+      let name  = ctx.IDENTIFIER(0).getText();
+      let init  = astExpression(ctx.expression());
+      let typeAnnotation  = (ctx.typeExpr() ? astTypeExpr(ctx.typeExpr()) : undefined);
+      let meta  = astParseMeta(ctx);
+      return {
+        id: registerSpan(nextNodeId(), ctx),
+        text: ctx.getText(),
+        tag: "const-decl",
+        name: name,
+        init: init,
+        typeAnnotation: typeAnnotation,
+        meta: meta
+      };
+    }
+  }
   {
     let b  = ctx.starBinding();
     let meta  = astParseMeta(ctx);
@@ -1221,55 +1238,6 @@ const astFor  = (ctx) => {
     };
   }
 };
-const astObjectDestructPat  = (ctx) => {
-  {
-    let fields  = ctx.IDENTIFIER().map((id) => {
-      return id.getText();
-    });
-    return {
-      id: registerSpan(nextNodeId(), ctx),
-      text: ctx.getText(),
-      tag: "destruct-object",
-      fields: fields
-    };
-  }
-};
-const astArrayDestructPat  = (ctx) => {
-  {
-    let elements  = ctx.IDENTIFIER().map((id) => {
-      return id.getText();
-    });
-    return {
-      id: registerSpan(nextNodeId(), ctx),
-      text: ctx.getText(),
-      tag: "destruct-array",
-      elements: elements
-    };
-  }
-};
-const astSingleBindingPattern  = (bindCtx) => {
-  if (bindCtx.objectDestructPat()) {
-    return {
-      isDestruct: true,
-      pattern: astObjectDestructPat(bindCtx.objectDestructPat())
-    };
-  }
-  if (bindCtx.arrayDestructPat()) {
-    return {
-      isDestruct: true,
-      pattern: astArrayDestructPat(bindCtx.arrayDestructPat())
-    };
-  }
-  {
-    let name  = bindCtx.IDENTIFIER().getText();
-    let typeAnnotation  = (bindCtx.typeExpr() ? astTypeExpr(bindCtx.typeExpr()) : undefined);
-    return {
-      isDestruct: false,
-      name: name,
-      typeAnnotation: typeAnnotation
-    };
-  }
-};
 const astForIn  = (ctx) => {
   {
     let name  = ctx.IDENTIFIER().getText();
@@ -1364,30 +1332,19 @@ const astVarStar  = (ctx) => {
   }
 };
 const astConstStar  = (ctx) => {
-  if (ctx.singleBinding()) {
+  if ((ctx.starBinding().length === 0)) {
     {
-      let bindCtx  = ctx.singleBinding();
-      let parsed  = astSingleBindingPattern(bindCtx);
+      let name  = ctx.IDENTIFIER(0).getText();
       let init  = astExpression(ctx.expression());
-      if (parsed.isDestruct) {
-        return {
-          id: registerSpan(nextNodeId(), ctx),
-          text: ctx.getText(),
-          tag: "const",
-          pattern: parsed.pattern,
-          init: init
-        };
-      }
-      else {
-        return {
-          id: registerSpan(nextNodeId(), ctx),
-          text: ctx.getText(),
-          tag: "const",
-          name: parsed.name,
-          typeAnnotation: parsed.typeAnnotation,
-          init: init
-        };
-      }
+      let typeAnnotation  = (ctx.typeExpr() ? astTypeExpr(ctx.typeExpr()) : undefined);
+      return {
+        id: registerSpan(nextNodeId(), ctx),
+        text: ctx.getText(),
+        tag: "const",
+        name: name,
+        typeAnnotation: typeAnnotation,
+        init: init
+      };
     }
   }
   {
@@ -1411,32 +1368,6 @@ const astConstStar  = (ctx) => {
       bindings: bindings,
       body: body
     };
-  }
-};
-const astConstStmt  = (ctx) => {
-  {
-    let bindCtx  = ctx.singleBinding();
-    let parsed  = astSingleBindingPattern(bindCtx);
-    let init  = astExpression(ctx.expression());
-    if (parsed.isDestruct) {
-      return {
-        id: registerSpan(nextNodeId(), ctx),
-        text: ctx.getText(),
-        tag: "const",
-        pattern: parsed.pattern,
-        init: init
-      };
-    }
-    else {
-      return {
-        id: registerSpan(nextNodeId(), ctx),
-        text: ctx.getText(),
-        tag: "const",
-        name: parsed.name,
-        typeAnnotation: parsed.typeAnnotation,
-        init: init
-      };
-    }
   }
 };
 const astIf  = (ctx) => {
