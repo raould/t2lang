@@ -14,7 +14,7 @@ test('macro loading and execution', () => {
   const inputFile = path.join(tempDir, 'input.t2');
 
   // 1. Define a macro in .t2m
-  // The macro 'my_const' expands to (const name value)
+  // The macro 'my_const' expands to (const ((name value)))
   // Since quasiquotes are not yet fully supported in compiled macros (Phase 3 limitation),
   // we manually construct the AST node for 'const-stmt'.
   // Note: parameters must be parenthesized -> ((name) (value))

@@ -10,18 +10,18 @@ it('call.test.t2 end-to-end', () => {
     ((. console log) (* 4 5))
 
     ;; call with named function
-    (const double (lambda ((x)) (return (* x 2))))
+    (const ((double (lambda ((x)) (return (* x 2))))))
     (asrt (double 21) 42)
 
     ;; call with no args
-    (const now (lambda () (return 0)))
+    (const ((now (lambda () (return 0)))))
     (asrt (now) 0)
 
     ;; nested calls
     (asrt (+ (double 3) (double 4)) 14)
 
     ;; call with explicit type arguments
-    (const id (lambda ((x)) (return x)))
+    (const ((id (lambda ((x)) (return x)))))
     (asrt (id 123) 123)
 
     ;; new expression with type arguments on built-in Map

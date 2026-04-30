@@ -399,20 +399,10 @@ function parseFormImpl(sform: any, spanId: number, env: any): any {
           body,
         });
       }
-    } else {
-      // Top-level form: (let name init) or (const name init)
-      const name = isOpaque(nameForm)
-        ? nameForm.node.name ?? String(nameForm.node.value ?? "?")
-        : typeof nameForm === "string"
-        ? nameForm
-        : "?";
-      const init =
-        tail[1] != null
-          ? parseFormImpl(tail[1], spanId, env)
-          : mk("literal", { value: undefined });
-      const tag = headStr === "let" ? "let-decl" : "const-decl";
-      return mk(tag, { name, init, meta: undefined });
     }
+
+    return pushError(env, spanId,
+      `legacy top-level '${headStr}' form is not supported; use wrapped binding syntax like (${headStr} ((name init)))`);
   }
 
   if (headStr === "const*") {

@@ -196,7 +196,7 @@
 
   (const astTopLevelLet
     (lambda ((ctx))
-      (let ((b (index ((. ctx starBinding)) 0))
+      (let ((b ((. ctx starBinding)))
              (meta (astParseMeta ctx)))
         (let ((name ((. ((. b IDENTIFIER)) getText)))
                (init (astExpression ((. b expression))))
@@ -205,7 +205,7 @@
 
   (const astTopLevelVar
     (lambda ((ctx))
-      (let ((b (index ((. ctx starBinding)) 0))
+      (let ((b ((. ctx starBinding)))
              (meta (astParseMeta ctx)))
         (let ((name ((. ((. b IDENTIFIER)) getText)))
                (init (astExpression ((. b expression))))
@@ -214,10 +214,12 @@
 
   (const astTopLevelConst
     (lambda ((ctx))
-      (let ((name ((. ((. ctx IDENTIFIER)) getText)))
-             (init (astExpression ((. ctx expression))))
+      (let ((b ((. ctx starBinding)))
              (meta (astParseMeta ctx)))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const-decl') (name name) (init init) (meta meta))))))
+        (let ((name ((. ((. b IDENTIFIER)) getText)))
+               (init (astExpression ((. b expression))))
+               (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const-decl') (name name) (init init) (typeAnnotation typeAnnotation) (meta meta)))))))
 
 
   (const astTypeAlias
@@ -453,10 +455,8 @@
         (then (return (astLetStar ((. ctx letStmt))))))
       (if ((. ctx varStmt))
         (then (return (astVarStar ((. ctx varStmt))))))
-      (if ((. ctx constStar))
-        (then (return (astConstStar ((. ctx constStar))))))
       (if ((. ctx constStmt))
-        (then (return (astConstStmt ((. ctx constStmt))))))
+        (then (return (astConstStar ((. ctx constStmt))))))
       (if ((. ctx ifForm))
         (then (return (astIf ((. ctx ifForm))))))
       (if ((. ctx whileForm))
@@ -696,33 +696,6 @@
              (body ((. ((. ctx statement)) map) astStatement)))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'for') (initName initName) (initExpr initExpr) (test test) (updateName updateName) (updateExpr updateExpr) (body body))))))
 
-  ;; ---- Destructuring patterns (Phase 1: plain names only) ----
-
-  (const astObjectDestructPat
-    (lambda ((ctx))
-      (let ((fields ((. ((. ctx IDENTIFIER)) map) (lambda ((id)) (return ((. id getText)))))))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText)))
-          (tag 'destruct-object') (fields fields))))))
-
-  (const astArrayDestructPat
-    (lambda ((ctx))
-      (let ((elements ((. ((. ctx IDENTIFIER)) map) (lambda ((id)) (return ((. id getText)))))))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText)))
-          (tag 'destruct-array') (elements elements))))))
-
-  (const astSingleBindingPattern
-    (lambda ((bindCtx))
-      ;; Returns { isDestruct, pattern, name, typeAnnotation }
-      ;; isDestruct = true → use pattern field; false → use name field
-      (if ((. bindCtx objectDestructPat))
-        (then (return (object (isDestruct true) (pattern (astObjectDestructPat ((. bindCtx objectDestructPat))))))))
-      (if ((. bindCtx arrayDestructPat))
-        (then (return (object (isDestruct true) (pattern (astArrayDestructPat ((. bindCtx arrayDestructPat))))))))
-      ;; plain identifier
-      (let ((name ((. ((. bindCtx IDENTIFIER)) getText)))
-             (typeAnnotation (ternary ((. bindCtx typeExpr)) (astTypeExpr ((. bindCtx typeExpr))) undefined)))
-        (return (object (isDestruct false) (name name) (typeAnnotation typeAnnotation))))))
-
   (const astForIn
     (lambda ((ctx))
       (let ((name ((. ((. ctx IDENTIFIER)) getText)))
@@ -773,17 +746,6 @@
                  (return (object (name id) (init init) (typeAnnotation typeAnnotation)))))))
              (body ((. ((. ctx statement)) map) astStatement)))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const*') (bindings bindings) (body body))))))
-
-  (const astConstStmt
-    (lambda ((ctx))
-      (let ((bindCtx ((. ctx singleBinding)))
-             (parsed (astSingleBindingPattern bindCtx))
-             (init (astExpression ((. ctx expression)))))
-        (if (. parsed isDestruct)
-          (then (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText)))
-            (tag 'const') (pattern (. parsed pattern)) (init init))))
-          (else (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText)))
-            (tag 'const') (name (. parsed name)) (typeAnnotation (. parsed typeAnnotation)) (init init))))))))
 
   (const astIf
     (lambda ((ctx))

@@ -78,15 +78,15 @@ macroReexport
     ;
 
 topLevelLet
-    : LPAREN LET metaAnnotation* LPAREN starBinding+ RPAREN RPAREN
+    : LPAREN LET metaAnnotation* LPAREN starBinding RPAREN RPAREN
     ;
 
 topLevelVar
-    : LPAREN VAR metaAnnotation* LPAREN starBinding+ RPAREN RPAREN
+    : LPAREN VAR metaAnnotation* LPAREN starBinding RPAREN RPAREN
     ;
 
 topLevelConst
-    : LPAREN CONST metaAnnotation* IDENTIFIER expression RPAREN
+    : LPAREN CONST metaAnnotation* LPAREN starBinding RPAREN RPAREN
     ;
 
 
@@ -209,7 +209,6 @@ methodKey
 statement
     : letStmt
     | varStmt
-    | constStar
     | constStmt
     | ifForm
     | whileForm
@@ -235,7 +234,7 @@ statement
 
 
 
-letStmt
+letStmt // was letStar
     : LPAREN LET LPAREN starBinding+ RPAREN statement* RPAREN
     ;
 
@@ -243,12 +242,8 @@ varStmt
     : LPAREN VAR LPAREN starBinding+ RPAREN statement* RPAREN
     ;
 
-constStar
-    : LPAREN CONSTSTAR LPAREN starBinding* RPAREN statement* RPAREN
-    ;
-
 constStmt
-    : LPAREN CONST singleBinding expression RPAREN
+    : LPAREN CONST LPAREN starBinding+ RPAREN statement* RPAREN
     ;
 
 ifForm
@@ -863,7 +858,7 @@ propKey
     : IDENTIFIER
     | STRING
     | NUMBER
-    | PROGRAM | LET | VAR | CONSTSTAR | CONST | LAMBDA_O | LAMBDA | FN_O | FN | METHOD_O | METHOD | BIND | METHOD_CALL
+    | PROGRAM | LET | VAR | CONST | LAMBDA_O | LAMBDA | FN_O | FN | METHOD_O | METHOD | BIND | METHOD_CALL
     | DEFMACRO | MACRO_IMPORT | MACRO_EXPORT | MACRO_REEXPORT | MACRO_TIME_ATTR | MACRO_ERROR | IF | WHILE | THEN | RETURN | THROW | SET | TERNARY | COND
     | OBJECT | ARRAY | INDEX | QUASI | QUOTE | UNQUOTE_SPLICING | UNQUOTE
     | TYPE_ARRAY
@@ -1066,7 +1061,6 @@ PROGRAM     : 'program' ;
 // LETSTAR     : 'let*' ; // deprecated
 LET         : 'let' ;
 VAR         : 'var' ;
-CONSTSTAR   : 'const*' ;
 CONST       : 'const' ;
 LAMBDA_O    : 'lambda-o' ;
 LAMBDA      : 'lambda' ;

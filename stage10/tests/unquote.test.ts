@@ -28,7 +28,7 @@ it('~ tilde unquote sugar works inside a macro body', () => {
       (import {asrt} "./helpers")
       (defmacro double (x)
         (return (quasi (+ ~x ~x))))
-      (const result (double 21))
+      (const ((result (double 21))))
       (asrt result 42)
   )
 `);

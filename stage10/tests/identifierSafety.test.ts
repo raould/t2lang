@@ -23,25 +23,25 @@ function callCompiler(source: string): { stdout: string; stderr: string; status:
 
 describe('3a: valid identifiers are accepted', () => {
   it('plain single-letter name', () => {
-    const r = callCompiler(`(program (const x 1))`);
+    const r = callCompiler(`(program (const ((x 1))))`);
     expect(r.status).toBe(0);
     expect(r.stdout).toContain('x');
   }, T);
 
   it('underscore-prefixed name', () => {
-    const r = callCompiler(`(program (const _foo 1))`);
+    const r = callCompiler(`(program (const ((_foo 1))))`);
     expect(r.status).toBe(0);
     expect(r.stdout).toContain('_foo');
   }, T);
 
   it('dollar-prefixed name', () => {
-    const r = callCompiler(`(program (const $bar 1))`);
+    const r = callCompiler(`(program (const (($bar 1))))`);
     expect(r.status).toBe(0);
     expect(r.stdout).toContain('$bar');
   }, T);
 
   it('alphanumeric name with digits after first char', () => {
-    const r = callCompiler(`(program (const abc123 1))`);
+    const r = callCompiler(`(program (const ((abc123 1))))`);
     expect(r.status).toBe(0);
     expect(r.stdout).toContain('abc123');
   }, T);
@@ -54,7 +54,7 @@ describe('3a: valid identifiers are accepted', () => {
 describe('3b: JS reserved words as binding names are rejected', () => {
   for (const word of ['void', 'delete', 'in', 'with']) {
     it(`rejects reserved word '${word}' as const binding`, () => {
-      const r = callCompiler(`(program (const ${word} 1))`);
+      const r = callCompiler(`(program (const ((${word} 1))))`);
       expect(r.status).not.toBe(0);
       const combined = r.stderr + r.stdout;
       expect(combined).toMatch(new RegExp(`Invalid identifier '${word}'`));
@@ -97,7 +97,7 @@ describe('3c: digit-leading identifier is rejected by checkId at codegen', () =>
 describe('3d: TS contextual keywords are valid identifiers', () => {
   for (const word of ['of', 'from', 'target']) {
     it(`accepts TS contextual keyword '${word}'`, () => {
-      const r = callCompiler(`(program (const ${word} 1))`);
+      const r = callCompiler(`(program (const ((${word} 1))))`);
       expect(r.status).toBe(0);
       expect(r.stdout).toContain(word);
     }, T);
@@ -108,7 +108,7 @@ describe('3d: TS contextual keywords are valid identifiers', () => {
 
 describe('3e: spread / rest params are not checked by checkId', () => {
   it('...args rest param is accepted', () => {
-    const r = callCompiler(`(program (const f (lambda ((rest args)) args)))`);
+    const r = callCompiler(`(program (const ((f (lambda ((rest args)) args)))))`);
     expect(r.status).toBe(0);
     expect(r.stdout).toContain('...args');
   }, T);
@@ -119,7 +119,7 @@ describe('3e: spread / rest params are not checked by checkId', () => {
 describe('Phase 4: checkId error includes source location', () => {
   it('error for reserved word contains "at <file>:<line>:<col>"', () => {
     const r = callCompiler(`(program
-  (const void 1)
+  (const ((void 1)))
 )`);
     expect(r.status).not.toBe(0);
     const combined = r.stderr + r.stdout;
@@ -130,7 +130,7 @@ describe('Phase 4: checkId error includes source location', () => {
 
   it('error for identifier expr contains span', () => {
     const r = callCompiler(`(program
-  (const x void)
+  (const ((x void)))
 )`);
     expect(r.status).not.toBe(0);
     const combined = r.stderr + r.stdout;

@@ -42,7 +42,6 @@ import { MethodKeyContext } from "./Stage10Parser.js";
 import { StatementContext } from "./Stage10Parser.js";
 import { LetStmtContext } from "./Stage10Parser.js";
 import { VarStmtContext } from "./Stage10Parser.js";
-import { ConstStarContext } from "./Stage10Parser.js";
 import { ConstStmtContext } from "./Stage10Parser.js";
 import { IfFormContext } from "./Stage10Parser.js";
 import { ThenBlockContext } from "./Stage10Parser.js";
@@ -594,16 +593,6 @@ export class Stage10Listener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitVarStmt?: (ctx: VarStmtContext) => void;
-    /**
-     * Enter a parse tree produced by `Stage10Parser.constStar`.
-     * @param ctx the parse tree
-     */
-    enterConstStar?: (ctx: ConstStarContext) => void;
-    /**
-     * Exit a parse tree produced by `Stage10Parser.constStar`.
-     * @param ctx the parse tree
-     */
-    exitConstStar?: (ctx: ConstStarContext) => void;
     /**
      * Enter a parse tree produced by `Stage10Parser.constStmt`.
      * @param ctx the parse tree

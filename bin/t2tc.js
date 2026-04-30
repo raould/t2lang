@@ -3,10 +3,10 @@ import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { resolve, dirname, basename, relative } from 'path';
 import { Command } from 'commander';
 import { checkSource } from './t2helpers.js';
-import stage9 from '../stage9/index.ts';
-import stage9debug from '../stage9/Stage9-debug.ts';
-const { compile, compileSource } = stage9;
-const { makeDebugContextFromOptions } = stage9debug;
+import stage10 from '../stage10/index.ts';
+import stage10debug from '../stage10/src/Stage10-debug.ts';
+const { compile, compileSource } = stage10;
+const { makeDebugContextFromOptions } = stage10debug;
 
 const program = new Command();
 program

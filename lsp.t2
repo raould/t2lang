@@ -6,8 +6,8 @@
   (import * as ts "typescript")
   (import {createRequire} "node:module")
   (const _require (createRequire (. import.meta url)))
-  (const {compileSource} (_require "./stage9/index"))
-  (const {readerTransform} (_require "./stage9/Stage9-reader"))
+  (const {compileSource} (_require "./stage10/index"))
+  (const {readerTransform} (_require "./stage10/Stage9-reader"))
 
   ;; ---- constants ----
 

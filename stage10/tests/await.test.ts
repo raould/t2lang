@@ -27,8 +27,8 @@ const runTs = (tsSource: string) => {
 
 it('unary await inside async fn compiles and runs', () => {
   const result = compile(`(program
-    (const run (async-fn () (return (await ((. Promise resolve) 7)))))
-    (const value (await (run)))
+    (const ((run (async-fn () (return (await ((. Promise resolve) 7)))))))
+    (const ((value (await (run)))))
     ((. console log) value)
   )`);
   if (result.errors.length > 0) { console.error(result.errors); }
@@ -40,9 +40,9 @@ it('unary await inside async fn compiles and runs', () => {
 
 it('for-await over async generator accumulates values', () => {
   const result = compile(`(program
-    (const makeGen (async-generator-fn ()
+    (const ((makeGen (async-generator-fn ()
       (yield (await ((. Promise resolve) 3)))
-      (yield 4)))
+      (yield 4)))))
     (let ((sum 0)))
     (for-await x (makeGen)
       (set! sum (+ sum x)))
@@ -57,7 +57,7 @@ it('for-await over async generator accumulates values', () => {
 
 it('top-level await works in ESM output', () => {
   const result = compile(`(program
-    (const v (await ((. Promise resolve) 41)))
+    (const ((v (await ((. Promise resolve) 41)))))
     ((. console log) v)
   )`);
   if (result.errors.length > 0) { console.error(result.errors); }

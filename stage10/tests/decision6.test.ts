@@ -52,13 +52,13 @@ describe('Decision 6 Phase 2: file name in spans', () => {
   it('errors from a named file include the file path', () => {
     // Compile with a named file path — the span should contain the file name
     const tmpFile = '/tmp/test-span-file.s3d';
-    const result = callCompilerFile(tmpFile, '(program (const x 42))');
+    const result = callCompilerFile(tmpFile, '(program (const ((x 42))))');
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('const x');
   }, T);
 
   it('stdin compilation uses <stdin> as file name (no crash)', () => {
-    const result = callCompiler('(program (const y 99))');
+    const result = callCompiler('(program (const ((y 99))))');
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('const y');
   }, T);
@@ -67,31 +67,31 @@ describe('Decision 6 Phase 2: file name in spans', () => {
 // ── Phase 2: error location smoke tests ───────────────────────────────────────
 
 describe('Decision 6 Phase 2: error location smoke tests', () => {
-  // Trigger: (export-default (const name non-fn)) fires lowerExportDefaultDef.
+  // Trigger: (export-default (const ((name non-fn)))) fires lowerExportDefaultDef.
   // The error is thrown with the source location of the offending initializer.
 
   it('lower error includes file~line~col in "file:line:col" format', () => {
-    const result = callCompiler('(program (export-default (const myFn 42)))');
+    const result = callCompiler('(program (export-default (const ((myFn 42)))))');
     expect(result.status).not.toBe(0);
     // Error message must match file~line~col — e.g. "<stdin>:1:36"
     expect(result.stderr).toMatch(/<stdin>:\d+:\d+/);
   }, T);
 
   it('lower error from stdin uses <stdin> as the file name', () => {
-    const result = callCompiler('(program (export-default (const myFn 42)))');
+    const result = callCompiler('(program (export-default (const ((myFn 42)))))');
     expect(result.stderr).toContain('<stdin>:');
   }, T);
 
   it('lower error from a named file includes the file path', () => {
     const tmpFile = '/tmp/test-span-error.s3d';
-    const result = callCompilerFile(tmpFile, '(program (export-default (const myFn 42)))');
+    const result = callCompilerFile(tmpFile, '(program (export-default (const ((myFn 42)))))');
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain(tmpFile + ':');
   }, T);
 
   it('line number in error is correct for single-line source', () => {
     // The offending node (42) is on line 1
-    const result = callCompiler('(program (export-default (const myFn 42)))');
+    const result = callCompiler('(program (export-default (const ((myFn 42)))))');
     expect(result.stderr).toContain('<stdin>:1:');
   }, T);
 
@@ -99,8 +99,8 @@ describe('Decision 6 Phase 2: error location smoke tests', () => {
     // The offending node (42) is on line 3
     const src = [
       '(program',
-      '  (const a 1)',
-      '  (export-default (const myFn 42))',
+      '  (const ((a 1)))',
+      '  (export-default (const ((myFn 42))))',
       ')',
     ].join('\n');
     const result = callCompiler(src);
@@ -112,9 +112,9 @@ describe('Decision 6 Phase 2: error location smoke tests', () => {
     // Same construct on line 4 instead of line 3
     const src = [
       '(program',
-      '  (const a 1)',
-      '  (const b 2)',
-      '  (export-default (const myFn 42))',
+      '  (const ((a 1)))',
+      '  (const ((b 2)))',
+      '  (export-default (const ((myFn 42))))',
       ')',
     ].join('\n');
     const result = callCompiler(src);
@@ -127,9 +127,9 @@ describe('Decision 6 Phase 2: error location smoke tests', () => {
 
 describe('Decision 6: spans infrastructure', () => {
   it('a successful program emits no span-related noise', () => {
-    const result = callCompiler('(program (const x 42))');
+    const result = callCompiler('(program (const ((x 42))))');
     expect(result.status).toBe(0);
-    expect(result.stdout).toBe('const x  = 42;\n');
+    expect(result.stdout).toBe('const x = 42;\n');
   }, T);
 
   // ── 2. Span table API ──────────────────────────────────────────────────────
@@ -176,8 +176,8 @@ describe('Decision 6: spans infrastructure', () => {
   it('compiled output includes id field on AST nodes (smoke via lower error)', () => {
     // A well-formed program succeeds: the span plumbing does not break anything.
     const result = callCompiler(`(program
-  (const greeting "hello")
-  (const n 42)
+  (const ((greeting "hello")))
+  (const ((n 42)))
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('const greeting');

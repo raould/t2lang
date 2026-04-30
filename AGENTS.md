@@ -1,6 +1,6 @@
 # t2lang
 
-A bootstrapping compiler chain (stage3 → ... → stage9) that compiles s-expression source files (`.s8`, `.s7`, `.s6`, `.s5`) to TypeScript.
+A bootstrapping compiler chain (stage3 → ... → stage100) that compiles s-expression source files (`.s8`, `.s7`, `.s6`, `.s5`) to TypeScript.
 
 ## Code Style & Conventions
 
@@ -9,14 +9,14 @@ A bootstrapping compiler chain (stage3 → ... → stage9) that compiles s-expre
 
 ## Project Structure
 
-- `stage9/` — current compiler stage (`.s8` sources → `.ts` outputs)
-- `stage8/` — previous stage compiler (used to build stage9)
-- `stage9/Stage9*.s8` — compiler source files (edit these, not the `.ts` outputs)
-- `stage9/Stage9-tags.ts`, `Stage9-debug.ts`, `Stage9-parse-form.ts` — hand-authored TypeScript (not compiled)
-- `stage9/index.ts` — compiled from `Stage9.s8` (main entry point)
-- `stage9/tests/` — test suite (Vitest)
+- `stage100/` — current compiler stage (`.s8` sources → `.ts` outputs)
+- `stage8/` — previous stage compiler (used to build stage100)
+- `stage100/Stage9*.s8` — compiler source files (edit these, not the `.ts` outputs)
+- `stage100/Stage9-tags.ts`, `Stage9-debug.ts`, `Stage9-parse-form.ts` — hand-authored TypeScript (not compiled)
+- `stage100/index.ts` — compiled from `Stage9.s8` (main entry point)
+- `stage100/tests/` — test suite (Vitest)
 - `bin/t2tc.js`, `bin/t2jc.js`, `bin/t2run.js` — CLI wrappers
-- `index.ts` — root re-export: `export { compile } from "./stage9/index.ts"`
+- `index.ts` — root re-export: `export { compile } from "./stage100/index.ts"`
 - `build.shk` — MiniShake build file
 
 ## Build & Commands
@@ -36,7 +36,7 @@ npm run testnow
 
 # Run tests directly
 # Do not run "vitest --typecheck" from any other directory.
-cd stage9 && npx vitest --typecheck run
+cd stage100 && npx vitest --typecheck run
 ```
 
 Always run vitest as `npx vitest --typecheck run` — never bare `vitest run`.
@@ -52,7 +52,7 @@ Always run vitest as `npx vitest --typecheck run` — never bare `vitest run`.
 ## Testing
 
 - Framework: Vitest (with `--typecheck`)
-- Tests live in `stage9/tests/`
+- Tests live in `stage100/tests/`
 - Tests call `compile()` programmatically — no subprocess spawning
 - Helper pattern:
   ```typescript

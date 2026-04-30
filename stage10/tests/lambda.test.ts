@@ -6,12 +6,12 @@ it('lambda.test.t2 end-to-end', () => {
       (import {asrt} "./helpers")
 
       ;; lambda with params and body
-      (const (add) (lambda ((a) (b))
-        (return (+ a b))))
+      (const ((add (lambda ((a) (b))
+        (return (+ a b))))))
 
       ;; lambda with no params
-      (const greet (lambda ()
-        (return "hi")))
+      (const ((greet (lambda ()
+        (return "hi")))))
 
       ;; lambda as inline expression
       (let ((result ((lambda ((x)) (return (* x x))) 5))))

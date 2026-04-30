@@ -5,8 +5,8 @@ import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import * as ts from "typescript";
 const _require  = createRequire(import.meta.url);
-const { compileSource }  = _require("./stage9/index");
-const { readerTransform }  = _require("./stage9/Stage9-reader");
+const { compileSource }  = _require("./stage10/index");
+const { readerTransform }  = _require("./stage10/Stage9-reader");
 const EVAL_FILE  = "__eval__.ts";
 const MAX_OUTPUT  = 1024 * 1024;
 const createEvalService  = function() {

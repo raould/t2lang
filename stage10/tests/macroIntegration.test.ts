@@ -43,7 +43,7 @@ describe('Step 7: macro expansion in the compiler pipeline', () => {
   (import {asrt} "./helpers")
   (defmacro const42 ()
     (return (quasi 42)))
-  (const result (const42))
+  (const ((result (const42))))
   (asrt result 42)
 )`);
   }, T);
@@ -55,7 +55,7 @@ describe('Step 7: macro expansion in the compiler pipeline', () => {
   (import {asrt} "./helpers")
   (defmacro double (x)
     (return (quasi (+ (unquote x) (unquote x)))))
-  (const result (double 21))
+  (const ((result (double 21))))
   (asrt result 42)
 )`);
   }, T);
@@ -65,8 +65,8 @@ describe('Step 7: macro expansion in the compiler pipeline', () => {
   (import {asrt} "./helpers")
   (defmacro negate (x)
     (return (quasi (- 0 (unquote x)))))
-  (const a (negate 5))
-  (const b (negate 10))
+  (const ((a (negate 5))))
+  (const ((b (negate 10))))
   (asrt a -5)
   (asrt b -10)
 )`);
@@ -76,7 +76,7 @@ describe('Step 7: macro expansion in the compiler pipeline', () => {
     const result = callCompiler(`(program
   (defmacro myMacro (x)
     (return (quasi (unquote x))))
-  (const y (myMacro 99))
+  (const ((y (myMacro 99))))
 )`);
     expect(result.status).toBe(0);
     // The defmacro should appear as a comment like "// macro: myMacro"
@@ -89,7 +89,7 @@ describe('Step 7: macro expansion in the compiler pipeline', () => {
     const result = callCompiler(`(program
   (defmacro identityMacro (x)
     (return (quasi (unquote x))))
-  (const val (identityMacro 77))
+  (const ((val (identityMacro 77))))
 )`);
     expect(result.status).toBe(0);
     // The macro call form should be gone; the number literal should appear
@@ -110,8 +110,8 @@ describe('Step 7: macro expansion in the compiler pipeline', () => {
   (defmacro negateFresh (x)
     (let ((tmp (gensym "tmp")))
       (return (quasi (- 0 (unquote x))))))
-  (const tmp 5)
-  (const result (negateFresh tmp))
+  (const ((tmp 5)))
+  (const ((result (negateFresh tmp))))
   (asrt result -5)
   (asrt tmp 5)
 )`);
@@ -125,7 +125,7 @@ describe('Step 7: compiler pipeline error handling', () => {
     const result = callCompiler(`(program
   (defmacro takesOne (x)
     (return (quasi (unquote x))))
-  (const v (takesOne 1 2))
+  (const ((v (takesOne 1 2))))
 )`);
     expect(result.status).toBe(1);
   }, T);
@@ -134,7 +134,7 @@ describe('Step 7: compiler pipeline error handling', () => {
     const result = callCompiler(`(program
   (defmacro needsTwo (a b)
     (return (quasi (+ (unquote a) (unquote b)))))
-  (const v (needsTwo 1))
+  (const ((v (needsTwo 1))))
 )`);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('needsTwo');
@@ -145,7 +145,7 @@ describe('Step 7: compiler pipeline error handling', () => {
     const result = callCompiler(`(program
   (defmacro m (x)
     (return (quasi (unquote x))))
-  (const v (m 1 2 3))
+  (const ((v (m 1 2 3))))
 )`);
     expect(result.status).toBe(1);
     // In streaming mode, forms emitted before the error-causing form are allowed.
@@ -158,7 +158,7 @@ describe('Step 7: compiler pipeline error handling', () => {
     const result = callCompiler(`(program
   (defmacro alwaysBad ()
     (macro-error "deliberate error from macro"))
-  (const v (alwaysBad))
+  (const ((v (alwaysBad))))
 )`);
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('deliberate error from macro');
@@ -166,7 +166,7 @@ describe('Step 7: compiler pipeline error handling', () => {
 
   it('macro-export in a .t2 file causes compiler to exit with code 1', () => {
     const result = callCompiler(`(program
-  (const x 1)
+  (const ((x 1)))
   (macro-export x)
 )`);
     expect(result.status).toBe(1);
@@ -177,8 +177,8 @@ describe('Step 7: compiler pipeline error handling', () => {
     const result = callCompiler(`(program
   (defmacro m (x)
     (return (quasi (unquote x))))
-  (const a (m 1 2))
-  (const b (m))
+  (const ((a (m 1 2))))
+  (const ((b (m))))
 )`);
     expect(result.status).toBe(1);
     // Both error sites for macro "m" should appear in stderr
@@ -195,7 +195,7 @@ describe('Step 7: tilde reader-macro sugar (~, ~@)', () => {
   (import {asrt} "./helpers")
   (defmacro double (x)
     (return (quasi (+ ~x ~x))))
-  (const result (double 21))
+  (const ((result (double 21))))
   (asrt result 42)
 )`);
   }, T);
@@ -219,7 +219,7 @@ describe('Step 7: tilde reader-macro sugar (~, ~@)', () => {
   ;; rest param collects extra args; ~tag unquotes, ~@items splices
   (defmacro wrap (tag rest items)
     (return (quasi (array ~tag ~@items))))
-  (const result (wrap "head" 10 20 30))
+  (const ((result (wrap "head" 10 20 30))))
   (asrt (. result length) 4)
   (asrt (index result 0) "head")
   (asrt (index result 1) 10)
@@ -233,7 +233,7 @@ describe('Step 7: tilde reader-macro sugar (~, ~@)', () => {
   ;; prepend: returns (array prefix item1 item2 ...)
   (defmacro prepend (prefix rest items)
     (return (quasi (array ~prefix ~@items))))
-  (const r (prepend 0 1 2 3))
+  (const ((r (prepend 0 1 2 3))))
   (asrt (. r length) 4)
   (asrt (index r 0) 0)
   (asrt (index r 3) 3)
@@ -244,12 +244,12 @@ describe('Step 7: tilde reader-macro sugar (~, ~@)', () => {
     const explicit = callCompiler(`(program
   (defmacro double (x)
     (return (quasi (+ (unquote x) (unquote x)))))
-  (const result (double 21))
+  (const ((result (double 21))))
 )`);
     const sugared = callCompiler(`(program
   (defmacro double (x)
     (return (quasi (+ ~x ~x))))
-  (const result (double 21))
+  (const ((result (double 21))))
 )`);
     expect(explicit.status).toBe(0);
     expect(sugared.status).toBe(0);
@@ -267,15 +267,15 @@ describe('Step 7: macro top-level splicing', () => {
   (import {asrt} "./helpers")
   (defmacro emitMixed ()
     (return (array
-      (quasi (let fromMacro 5))
-      (quasi (const constFromMacro 17))
+      (quasi (let ((fromMacro 5))))
+      (quasi (const ((constFromMacro 17))))
       (quasi (class Generated
         (class-body
           (field (total : number))
           (constructor ()
             (set! (. this total) (+ 5 17)))))))))
   (emitMixed)
-  (const instance (new Generated))
+  (const ((instance (new Generated))))
   (asrt fromMacro 5)
   (asrt constFromMacro 17)
   (asrt (. instance total) 22)
@@ -291,7 +291,7 @@ describe('Step 7: macro top-level splicing', () => {
       (quasi (defmacro emitted (x)
         (return (quasi (+ (unquote x) 100))))))))
   (produceMacro)
-  (const value (emitted 1))
+  (const ((value (emitted 1))))
   (asrt value 101)
 )
 `);
@@ -300,8 +300,8 @@ describe('Step 7: macro top-level splicing', () => {
   it('array results in expression position emit macro error', () => {
     const result = callCompiler(`(program
   (defmacro emitTop ()
-    (return (array (quasi (const fromMacro 1)))))
-  (const value (+ (emitTop) 1))
+    (return (array (quasi (const ((fromMacro 1)))))))
+  (const ((value (+ (emitTop) 1))))
 )
 `);
     expect(result.status).toBe(1);

@@ -5,7 +5,7 @@ it('this — passed as argument to a helper fn', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
     ;; this passed explicitly to a plain fn — the fn receives the object
-    (const getName (fn ((obj)) (return (. obj name))))
+    (const ((getName (fn ((obj)) (return (. obj name))))))
     (let ((person (object
         (name "Alice")
         (greet (method () (return (getName this))))))))
@@ -44,9 +44,9 @@ it('this — fn constructor with multiple this assignments', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
     ;; fn with two set! statements — exercises multi-statement fn body
-    (const Point (fn ((x) (y))
+    (const ((Point (fn ((x) (y))
       (set! (. this x) x)
-      (set! (. this y) y)))
+      (set! (. this y) y)))))
     (let ((p (new Point 3 4))))
     (asrt (. p x) 3)
     (asrt (. p y) 4)
@@ -57,8 +57,8 @@ it('this — fn constructor with computed method on prototype', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
     ;; attach a method to fn prototype via assignment
-    (const Counter (fn ()
-      (set! (. this count) 0)))
+    (const ((Counter (fn ()
+      (set! (. this count) 0)))))
     (set! (. (. Counter prototype) inc) (fn ()
       (set! (. this count) (+ (. this count) 1))))
     (set! (. (. Counter prototype) get) (fn ()

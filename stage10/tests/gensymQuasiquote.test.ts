@@ -49,7 +49,7 @@ describe('Section 2 Step 4: gensym bound outside quasi template', () => {
   (defmacro refTwice (x)
     (let ((s (gensym "v")))
       (return (quasi (+ (unquote s) (unquote s))))))
-  (const r (refTwice 0))
+  (const ((r (refTwice 0))))
 )`);
     expect(result.status).toBe(0);
     const matches = result.stdout.match(/v_\d+/g) ?? [];
@@ -64,7 +64,7 @@ describe('Section 2 Step 4: gensym bound outside quasi template', () => {
   (defmacro refThree (x)
     (let ((s (gensym "k")))
       (return (quasi (+ (unquote s) (+ (unquote s) (unquote s)))))))
-  (const r (refThree 0))
+  (const ((r (refThree 0))))
 )`);
     expect(result.status).toBe(0);
     const matches = result.stdout.match(/k_\d+/g) ?? [];
@@ -79,8 +79,8 @@ describe('Section 2 Step 4: gensym bound outside quasi template', () => {
   (defmacro oneSym ()
     (let ((s (gensym "v")))
       (return (quasi (unquote s)))))
-  (const a (oneSym))
-  (const b (oneSym))
+  (const ((a (oneSym))))
+  (const ((b (oneSym))))
 )`);
     expect(result.status).toBe(0);
     const matches = result.stdout.match(/v_\d+/g) ?? [];
@@ -95,7 +95,7 @@ describe('Section 2 Step 4: gensym bound outside quasi template', () => {
     const result = callCompiler(`(program
   (defmacro twoSyms ()
     (return (quasi (+ (unquote (gensym "w")) (unquote (gensym "w"))))))
-  (const r (twoSyms))
+  (const ((r (twoSyms))))
 )`);
     expect(result.status).toBe(0);
     const matches = result.stdout.match(/w_\d+/g) ?? [];
