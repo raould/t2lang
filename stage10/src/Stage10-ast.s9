@@ -214,13 +214,6 @@
 
   (const astTopLevelConst
     (lambda ((ctx))
-      (if (! ((. ctx starBinding)))
-        (then
-          (let ((name ((. ((. ctx IDENTIFIER) 0) getText)))
-                 (init (astExpression ((. ctx expression))))
-                 (typeAnnotation (ternary ((. ctx typeExpr)) (astTypeExpr ((. ctx typeExpr))) undefined))
-                 (meta (astParseMeta ctx)))
-            (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const-decl') (name name) (init init) (typeAnnotation typeAnnotation) (meta meta))))))
       (let ((b ((. ctx starBinding)))
              (meta (astParseMeta ctx)))
         (let ((name ((. ((. b IDENTIFIER)) getText)))
@@ -746,13 +739,6 @@
 
   (const astConstStar
     (lambda ((ctx))
-      (if (=== (. ((. ctx starBinding)) length) 0)
-        (then
-          (let ((name ((. ((. ctx IDENTIFIER) 0) getText)))
-                 (init (astExpression ((. ctx expression))))
-                 (typeAnnotation (ternary ((. ctx typeExpr)) (astTypeExpr ((. ctx typeExpr))) undefined)))
-            (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText)))
-              (tag 'const') (name name) (typeAnnotation typeAnnotation) (init init))))))
       (let ((bindings ((. ((. ctx starBinding)) map) (lambda ((b))
                (let ((id ((. ((. b IDENTIFIER)) getText)))
                       (init (astExpression ((. b expression))))

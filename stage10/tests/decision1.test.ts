@@ -43,7 +43,7 @@ describe('Decision 1: BACKTICK_STRING removed — no raw-template output', () =>
     // A single-quoted string literal — the canonical replacement.
     // raw-template nodes would appear in the AST dump if BACKTICK_STRING were still live.
     const result = callCompiler(`(program
-  (const (s) 'hello')
+  (const ((s 'hello')))
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).not.toContain('raw-template');

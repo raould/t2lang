@@ -32,7 +32,7 @@ describe('const destructuring is currently unsupported', () => {
 it('object destruct — plain identifier binding still works', { timeout: 15000 }, () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const (z) 42)
+    (const ((z 42)))
     (asrt z 42)
   )`);
 });

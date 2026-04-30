@@ -52,13 +52,13 @@ describe('Decision 6 Phase 2: file name in spans', () => {
   it('errors from a named file include the file path', () => {
     // Compile with a named file path — the span should contain the file name
     const tmpFile = '/tmp/test-span-file.s3d';
-    const result = callCompilerFile(tmpFile, '(program (const (x) 42))');
+    const result = callCompilerFile(tmpFile, '(program (const ((x 42))))');
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('const x');
   }, T);
 
   it('stdin compilation uses <stdin> as file name (no crash)', () => {
-    const result = callCompiler('(program (const (y) 99))');
+    const result = callCompiler('(program (const ((y 99))))');
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('const y');
   }, T);
@@ -99,7 +99,7 @@ describe('Decision 6 Phase 2: error location smoke tests', () => {
     // The offending node (42) is on line 3
     const src = [
       '(program',
-      '  (const (a) 1)',
+      '  (const ((a 1)))',
       '  (export-default (const ((myFn 42))))',
       ')',
     ].join('\n');
@@ -112,8 +112,8 @@ describe('Decision 6 Phase 2: error location smoke tests', () => {
     // Same construct on line 4 instead of line 3
     const src = [
       '(program',
-      '  (const (a) 1)',
-      '  (const (b) 2)',
+      '  (const ((a 1)))',
+      '  (const ((b 2)))',
       '  (export-default (const ((myFn 42))))',
       ')',
     ].join('\n');
@@ -127,7 +127,7 @@ describe('Decision 6 Phase 2: error location smoke tests', () => {
 
 describe('Decision 6: spans infrastructure', () => {
   it('a successful program emits no span-related noise', () => {
-    const result = callCompiler('(program (const (x) 42))');
+    const result = callCompiler('(program (const ((x 42))))');
     expect(result.status).toBe(0);
     expect(result.stdout).toBe('const x  = 42;\n');
   }, T);
@@ -176,8 +176,8 @@ describe('Decision 6: spans infrastructure', () => {
   it('compiled output includes id field on AST nodes (smoke via lower error)', () => {
     // A well-formed program succeeds: the span plumbing does not break anything.
     const result = callCompiler(`(program
-  (const (greeting) "hello")
-  (const (n) 42)
+  (const ((greeting "hello")))
+  (const ((n 42)))
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('const greeting');

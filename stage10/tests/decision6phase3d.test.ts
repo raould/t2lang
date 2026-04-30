@@ -160,7 +160,7 @@ describe('Decision 6 Phase 3D: CLI error location smoke tests', () => {
     const src = [
       '(program',
       '  (defmacro boom (x) (macro-error "bad"))',
-      '  (const (a) 1)',
+      '  (const ((a 1)))',
       '  (boom a)',
       ')',
     ].join('\n');

@@ -16,7 +16,7 @@ test('macro splicing in object', () => {
   const mainT2 = `
     (program
       (macro-import m "./splicing-macro.t2m")
-      (const (o) (m/makeObj))
+      (const ((o (m/makeObj))))
       (console.log (+ "A: " (. o a)))
       (console.log (+ "X: " (. o x))))
   `;

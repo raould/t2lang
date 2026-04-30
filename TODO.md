@@ -1,3 +1,4 @@
+- [ ] migrate to stage10
 - [ ] fix topLevelConst
     - and all related const/var/let.
     - constStmt.

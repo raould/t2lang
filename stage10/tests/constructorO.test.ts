@@ -35,7 +35,7 @@ describe('constructor-o', () => {
       (constructor-o ((x : number) (y : number))
         (set! (. this x) x)
         (set! (. this y) y))))
-  (const (p) (new Point { x: 3, y: 4 }))
+  (const ((p (new Point { x: 3, y: 4 }))))
   (asrt (. p x) 3)
   (asrt (. p y) 4)
 )`, T);
@@ -51,10 +51,10 @@ describe('constructor-o', () => {
       (constructor-o ((name : string) (loud? : boolean (default false)))
         (set! (. this name) name)
         (set! (. this loud) loud))))
-  (const (g1) (new Greeter { name: "Alice" }))
+  (const ((g1 (new Greeter { name: "Alice" }))))
   (asrt (. g1 name) "Alice")
   (asrt (. g1 loud) false)
-  (const (g2) (new Greeter { name: "Bob", loud: true }))
+  (const ((g2 (new Greeter { name: "Bob", loud: true }))))
   (asrt (. g2 name) "Bob")
   (asrt (. g2 loud) true)
 )`, T);
@@ -72,7 +72,7 @@ describe('constructor-o', () => {
         (set! (. this h) h))
       (method area () : number
         (return (* (. this w) (. this h))))))
-  (const (r) (new Rect { w: 5, h: 6 }))
+  (const ((r (new Rect { w: 5, h: 6 }))))
   (asrt ((. r area)) 30)
 )`, T);
   }, T);
@@ -92,7 +92,7 @@ describe('constructor-o', () => {
       (constructor-o ((name : string) (breed : string))
         (super name)
         (set! (. this breed) breed))))
-  (const (d) (new Dog { name: "Rex", breed: "Labrador" }))
+  (const ((d (new Dog { name: "Rex", breed: "Labrador" }))))
   (asrt (. d name) "Rex")
   (asrt (. d breed) "Labrador")
 )`, T);
@@ -119,7 +119,7 @@ describe('constructor-o access modifiers', () => {
   (class Point
     (class-body
       (constructor-o ((public x : number) (public y : number)))))
-  (const (p) (new Point { x: 3, y: 4 }))
+  (const ((p (new Point { x: 3, y: 4 }))))
   (asrt (. p x) 3)
   (asrt (. p y) 4)
 )`, T);
@@ -133,7 +133,7 @@ describe('constructor-o access modifiers', () => {
       (field (greeting : string))
       (constructor-o ((public name : string) (greeting : string))
         (set! (. this greeting) greeting))))
-  (const (g) (new Greeter { name: "World", greeting: "Hello" }))
+  (const ((g (new Greeter { name: "World", greeting: "Hello" }))))
   (asrt (. g name) "World")
   (asrt (. g greeting) "Hello")
 )`, T);
@@ -156,10 +156,10 @@ describe('constructor-o access modifiers', () => {
   (class Server
     (class-body
       (constructor-o ((public host : string) (public port? : number (default 8080))))))
-  (const (s1) (new Server { host: "localhost" }))
+  (const ((s1 (new Server { host: "localhost" }))))
   (asrt (. s1 host) "localhost")
   (asrt (. s1 port) 8080)
-  (const (s2) (new Server { host: "example.com", port: 443 }))
+  (const ((s2 (new Server { host: "example.com", port: 443 }))))
   (asrt (. s2 host) "example.com")
   (asrt (. s2 port) 443)
 )`, T);
@@ -173,7 +173,7 @@ describe('constructor-o access modifiers', () => {
       (field (doubled : number))
       (constructor-o ((public count : number))
         (set! (. this doubled) (* (. this count) 2)))))
-  (const (c) (new Counter { count: 5 }))
+  (const ((c (new Counter { count: 5 }))))
   (asrt (. c count) 5)
   (asrt (. c doubled) 10)
 )`, T);

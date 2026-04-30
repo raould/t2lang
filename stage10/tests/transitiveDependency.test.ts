@@ -26,7 +26,7 @@ test('transitive macro import', () => {
   const mainPath = path.join(tempDir, 'main.t2');
 
   // b.t2m: exports a macro 'def_value'
-  // (def_value name val) -> (const (name) val)
+  // (def_value name val) -> (const ((name val)))
   // We constructs a const-decl AST node manually
   const bSource = `(program
     (defmacro def_value (nameNode valNode)
@@ -60,7 +60,7 @@ test('transitive macro import', () => {
   // main.t2: imports a.t2m (qualified)
   const mainSource = `(program
     (macro-import a "${aPath}")
-    (const (x) (a/get_const))
+    (const ((x (a/get_const))))
     ((. console log) (+ "Result: " x)))`;
 
   fs.writeFileSync(mainPath, mainSource);

@@ -59,7 +59,7 @@ describe('Decision 2: (type-template ...) in type position', () => {
 describe('Decision 2: (template ...) in value position', () => {
   it('simple string-only template emits a backtick string', () => {
     const result = callCompiler(`(program
-  (const (s) (template "hello world"))
+  (const ((s (template "hello world"))))
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('`hello world`');
@@ -68,8 +68,8 @@ describe('Decision 2: (template ...) in value position', () => {
   it('template with an expression hole interpolates correctly', () => {
     fromSourceEndToEnd(`(program
       (import {asrt} "./helpers")
-      (const (name) "World")
-      (const (greeting) (template "Hello " name "!"))
+      (const ((name "World")))
+      (const ((greeting (template "Hello " name "!"))))
       (asrt greeting "Hello World!")
     )`);
   }, T);
@@ -77,9 +77,9 @@ describe('Decision 2: (template ...) in value position', () => {
   it('template with multiple holes interleaves correctly', () => {
     fromSourceEndToEnd(`(program
       (import {asrt} "./helpers")
-      (const (a) "foo")
-      (const (b) "bar")
-      (const (result) (template a "-" b))
+      (const ((a "foo")))
+      (const ((b "bar")))
+      (const ((result (template a "-" b))))
       (asrt result "foo-bar")
     )`);
   }, T);
@@ -87,15 +87,15 @@ describe('Decision 2: (template ...) in value position', () => {
   it('template with numeric expression', () => {
     fromSourceEndToEnd(`(program
       (import {asrt} "./helpers")
-      (const (n) 42)
-      (const (msg) (template "answer=" n))
+      (const ((n 42)))
+      (const ((msg (template "answer=" n))))
       (asrt msg "answer=42")
     )`);
   }, T);
 
   it('template output does not contain raw-template', () => {
     const result = callCompiler(`(program
-  (const (s) (template "hello"))
+  (const ((s (template "hello"))))
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).not.toContain('raw-template');

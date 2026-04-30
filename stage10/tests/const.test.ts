@@ -4,11 +4,11 @@ import { fromSourceEndToEnd } from './helpers';
 it('const.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
   ;; basic const
-  (const (x) 42)
+  (const ((x 42)))
   ((. console log) x)
 
   ;; const with expression
-  (const (greeting) (+ "hello" " world"))
+  (const ((greeting (+ "hello" " world"))))
   ((. console log) greeting)
 
   ;; const with multiple bindings

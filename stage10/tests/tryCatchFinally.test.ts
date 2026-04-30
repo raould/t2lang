@@ -64,13 +64,13 @@ it('finally runs even when returning from try', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
     (let ((events (array))))
-    (const (run) (lambda ()
+    (const ((run (lambda ()
       (except
         (try
           ((. events push) "try")
           (return "value"))
         (finally
-          ((. events push) "finally")))))
+          ((. events push) "finally")))))))
     (asrt (run) "value")
     (asrt ((. events join) ",") "try,finally")
   )`);

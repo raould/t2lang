@@ -330,23 +330,6 @@ const astTopLevelVar  = (ctx) => {
   }
 };
 const astTopLevelConst  = (ctx) => {
-  if ((!ctx.starBinding())) {
-    {
-      let name  = ctx.IDENTIFIER(0).getText();
-      let init  = astExpression(ctx.expression());
-      let typeAnnotation  = (ctx.typeExpr() ? astTypeExpr(ctx.typeExpr()) : undefined);
-      let meta  = astParseMeta(ctx);
-      return {
-        id: registerSpan(nextNodeId(), ctx),
-        text: ctx.getText(),
-        tag: "const-decl",
-        name: name,
-        init: init,
-        typeAnnotation: typeAnnotation,
-        meta: meta
-      };
-    }
-  }
   {
     let b  = ctx.starBinding();
     let meta  = astParseMeta(ctx);
@@ -1332,21 +1315,6 @@ const astVarStar  = (ctx) => {
   }
 };
 const astConstStar  = (ctx) => {
-  if ((ctx.starBinding().length === 0)) {
-    {
-      let name  = ctx.IDENTIFIER(0).getText();
-      let init  = astExpression(ctx.expression());
-      let typeAnnotation  = (ctx.typeExpr() ? astTypeExpr(ctx.typeExpr()) : undefined);
-      return {
-        id: registerSpan(nextNodeId(), ctx),
-        text: ctx.getText(),
-        tag: "const",
-        name: name,
-        typeAnnotation: typeAnnotation,
-        init: init
-      };
-    }
-  }
   {
     let bindings  = ctx.starBinding().map((b) => {
       {

@@ -31,7 +31,7 @@ describe('constructor parameter shorthand', () => {
   (class Point
     (class-body
       (constructor ((public x : number) (public y : number)))))
-  (const (p) (new Point 3 4))
+  (const ((p (new Point 3 4))))
   (asrt (. p x) 3)
   (asrt (. p y) 4)
 )`, T);
@@ -63,7 +63,7 @@ describe('constructor parameter shorthand', () => {
   (class Box
     (class-body
       (constructor ((public width : number) (public height : number)))))
-  (const (b) (new Box 10 20))
+  (const ((b (new Box 10 20))))
   (asrt (. b width) 10)
   (asrt (. b height) 20)
 )`, T);

@@ -7,7 +7,7 @@ it('typeAnnotation.test.t2 end-to-end', () => {
       (import {asrtDeep} "./helpers")
       (let ((x : number 42)))
       (let ((name : string "hello")))
-      (const (pi : number) 3.14)
+      (const ((pi : number 3.14)))
       (let ((pair : (tuple number string) (array 42 "foo"))))
 
       (asrt x 42)

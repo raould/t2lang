@@ -1,18 +1,18 @@
 /**
  * Acceptance tests for Phase 3 — (export-default (class ...)) and
- * (export-default (const (name) (lambda ...)))
+ * (export-default (const ((name (lambda ...)))))
  *
  * These tests will fail until:
  *   - Stage 3E is patched to support anonymous classes (anonClassDef)
  *   - Stage 3F extends exportDefault to accept classDef / anonClassDef / def
- *   - The lowering pass performs declaration lifting for (const (name) (lambda ...))
+ *   - The lowering pass performs declaration lifting for (const ((name (lambda ...))))
  *
  * Syntax:
  *   (export-default (class Name (class-body ...)))   → export default class Name { ... }
  *   (export-default (class (class-body ...)))        → export default class { ... }
- *   (export-default (const (name) (lambda ...)))         → export default function name(...) { ... }
+ *   (export-default (const ((name (lambda ...)))))         → export default function name(...) { ... }
  *
- * Note: (export-default (const (name) non-function)) must produce a compile-time error.
+ * Note: (export-default (const ((name non-function)))) must produce a compile-time error.
  * That case is NOT tested here because a compile-time error would fail the test runner.
  */
 import { it } from 'vitest';

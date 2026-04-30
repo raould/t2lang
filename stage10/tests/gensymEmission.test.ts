@@ -34,7 +34,7 @@ describe('Section 2 Step 3: gensym identifier emission', () => {
   (defmacro makeSym ()
     (let ((s (gensym "g")))
       (return (quasi (unquote s)))))
-  (const (x) (makeSym))
+  (const ((x (makeSym))))
 )`);
     expect(result.status).toBe(0);
     // The TypeScript output must contain the gensym name in the form g_<digits>
@@ -50,8 +50,8 @@ describe('Section 2 Step 3: gensym identifier emission', () => {
   (defmacro makeSym ()
     (let ((s (gensym "g")))
       (return (quasi (unquote s)))))
-  (const (a) (makeSym))
-  (const (b) (makeSym))
+  (const ((a (makeSym))))
+  (const ((b (makeSym))))
 )`);
     expect(result.status).toBe(0);
     // Both distinct gensym names must appear
@@ -65,7 +65,7 @@ describe('Section 2 Step 3: gensym identifier emission', () => {
   (defmacro useTmp ()
     (let ((s (gensym "myprefix")))
       (return (quasi (unquote s)))))
-  (const (x) (useTmp))
+  (const ((x (useTmp))))
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).toMatch(/myprefix_\d+/);
@@ -78,7 +78,7 @@ describe('Section 2 Step 3: gensym identifier emission', () => {
   (defmacro passthru (x)
     (let ((tmp (gensym "tmp")))
       (return (quasi (unquote x)))))
-  (const (val) (passthru 99))
+  (const ((val (passthru 99))))
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('99');
