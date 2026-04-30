@@ -244,7 +244,7 @@ varStmt
     ;
 
 constStar
-    : LPAREN CONSTSTAR LPAREN starBinding* RPAREN statement* RPAREN
+    : LPAREN CONSTSTAR LPAREN starBinding+ RPAREN statement* RPAREN
     ;
 
 constStmt
