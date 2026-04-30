@@ -29,7 +29,7 @@ it('~@ tilde splice sugar works inside a variadic macro', () => {
       ;; rest param collects extra args; ~@args splices them into an array literal
       (defmacro toArray (rest args)
         (return (quasi (array ~@args))))
-      (const arr (toArray 1 2 3 4))
+      (const (arr) (toArray 1 2 3 4))
       (asrt ((. arr reduce) (lambda ((acc) (n)) (return (+ acc n))) 0) 10)
   )
 `);
@@ -41,7 +41,7 @@ it('~ and ~@ sugar together in one macro', () => {
       ;; wrap: returns array [tag, ...items] using ~ for tag and ~@ to splice items
       (defmacro wrap (tag rest items)
         (return (quasi (array ~tag ~@items))))
-      (const result (wrap "x" 1 2 3))
+      (const (result) (wrap "x" 1 2 3))
       (asrt (. result length) 4)
       (asrt (index result 0) "x")
       (asrt (index result 1) 1)

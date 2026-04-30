@@ -1,4 +1,7 @@
-- [ ] fix topLevelConst.
+- [ ] fix topLevelConst
+    - and all related const/var/let
+    - constStmt
+    - re-support multi-pair forms (macro?)
 - [ ] require infix spacing.
 - [ ] stageN/src/** duh.
 - [ ] keep updating the style guide.

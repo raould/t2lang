@@ -10,7 +10,7 @@ it('lambda.test.t2 end-to-end', () => {
         (return (+ a b))))
 
       ;; lambda with no params
-      (const greet (lambda ()
+      (const (greet) (lambda ()
         (return "hi")))
 
       ;; lambda as inline expression

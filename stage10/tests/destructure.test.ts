@@ -70,7 +70,7 @@ it('object destruct — plain identifier binding still works', { timeout: 15000 
 it('object destruct — from function return value', { timeout: 15000 }, () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const getPoint (lambda () (return { x: 3, y: 4 })))
+    (const (getPoint) (lambda () (return { x: 3, y: 4 })))
     (const {x y} (getPoint))
     (asrt x 3)
     (asrt y 4)
@@ -80,7 +80,7 @@ it('object destruct — from function return value', { timeout: 15000 }, () => {
 it('array destruct — from function return value', { timeout: 15000 }, () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const getArr (lambda () (return [9 8 7])))
+    (const (getArr) (lambda () (return [9 8 7])))
     (const [first second] (getArr))
     (asrt first 9)
     (asrt second 8)

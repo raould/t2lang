@@ -14,7 +14,7 @@ it('macro import/export syntax', { timeout: 30000 }, () => {
 
     fromSourceEndToEnd(`(program
       (macro-import m "${macroPath}")
-      (const x (m/identity 42))
+      (const (x) (m/identity 42))
       (console.log x))`);
 
     console.log(tmpDir);

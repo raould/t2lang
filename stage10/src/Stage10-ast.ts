@@ -293,35 +293,19 @@ const astTopLevelLet  = (ctx) => {
   {
     let b  = ctx.starBinding();
     let meta  = astParseMeta(ctx);
-    if (b) {
-      {
-        let name  = b.IDENTIFIER().getText();
-        let init  = astExpression(b.expression());
-        let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
-        return {
-          id: registerSpan(nextNodeId(), ctx),
-          text: ctx.getText(),
-          tag: "let-decl",
-          name: name,
-          init: init,
-          typeAnnotation: typeAnnotation,
-          meta: meta
-        };
-      }
-    }
-    else {
-      {
-        let name  = ctx.IDENTIFIER().getText();
-        let init  = astExpression(ctx.expression());
-        return {
-          id: registerSpan(nextNodeId(), ctx),
-          text: ctx.getText(),
-          tag: "let-decl",
-          name: name,
-          init: init,
-          meta: meta
-        };
-      }
+    {
+      let name  = b.IDENTIFIER().getText();
+      let init  = astExpression(b.expression());
+      let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
+      return {
+        id: registerSpan(nextNodeId(), ctx),
+        text: ctx.getText(),
+        tag: "let-decl",
+        name: name,
+        init: init,
+        typeAnnotation: typeAnnotation,
+        meta: meta
+      };
     }
   }
 };
@@ -329,35 +313,19 @@ const astTopLevelVar  = (ctx) => {
   {
     let b  = ctx.starBinding();
     let meta  = astParseMeta(ctx);
-    if (b) {
-      {
-        let name  = b.IDENTIFIER().getText();
-        let init  = astExpression(b.expression());
-        let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
-        return {
-          id: registerSpan(nextNodeId(), ctx),
-          text: ctx.getText(),
-          tag: "var-decl",
-          name: name,
-          init: init,
-          typeAnnotation: typeAnnotation,
-          meta: meta
-        };
-      }
-    }
-    else {
-      {
-        let name  = ctx.IDENTIFIER().getText();
-        let init  = astExpression(ctx.expression());
-        return {
-          id: registerSpan(nextNodeId(), ctx),
-          text: ctx.getText(),
-          tag: "var-decl",
-          name: name,
-          init: init,
-          meta: meta
-        };
-      }
+    {
+      let name  = b.IDENTIFIER().getText();
+      let init  = astExpression(b.expression());
+      let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
+      return {
+        id: registerSpan(nextNodeId(), ctx),
+        text: ctx.getText(),
+        tag: "var-decl",
+        name: name,
+        init: init,
+        typeAnnotation: typeAnnotation,
+        meta: meta
+      };
     }
   }
 };
@@ -365,35 +333,19 @@ const astTopLevelConst  = (ctx) => {
   {
     let b  = ctx.starBinding();
     let meta  = astParseMeta(ctx);
-    if (b) {
-      {
-        let name  = b.IDENTIFIER().getText();
-        let init  = astExpression(b.expression());
-        let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
-        return {
-          id: registerSpan(nextNodeId(), ctx),
-          text: ctx.getText(),
-          tag: "const-decl",
-          name: name,
-          init: init,
-          typeAnnotation: typeAnnotation,
-          meta: meta
-        };
-      }
-    }
-    else {
-      {
-        let name  = ctx.IDENTIFIER().getText();
-        let init  = astExpression(ctx.expression());
-        return {
-          id: registerSpan(nextNodeId(), ctx),
-          text: ctx.getText(),
-          tag: "const-decl",
-          name: name,
-          init: init,
-          meta: meta
-        };
-      }
+    {
+      let name  = b.IDENTIFIER().getText();
+      let init  = astExpression(b.expression());
+      let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
+      return {
+        id: registerSpan(nextNodeId(), ctx),
+        text: ctx.getText(),
+        tag: "const-decl",
+        name: name,
+        init: init,
+        typeAnnotation: typeAnnotation,
+        meta: meta
+      };
     }
   }
 };

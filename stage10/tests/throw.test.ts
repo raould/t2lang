@@ -8,8 +8,7 @@ it('throw form end-to-end', () => {
     ;; (throw expr) compiles to a throw statement.
     ;; This tests that throw is correctly emitted by placing it on a branch that
     ;; is never reached — the non-throwing path is exercised and asserted.
-    (const safeDivide
-      (lambda ((a) (b))
+    (const (safeDivide) (lambda ((a) (b))
         (if (=== b 0)
           (then (throw (new Error "division by zero"))))
         (return (/ a b))))
@@ -19,8 +18,7 @@ it('throw form end-to-end', () => {
     (asrt (safeDivide 0 5) 0)
 
     ;; throw inside a nested block — smoke test
-    (const validate
-      (lambda ((x))
+    (const (validate) (lambda ((x))
         (if (< x 0)
           (then (throw (new Error (+ "negative: " x)))))
         (return x)))

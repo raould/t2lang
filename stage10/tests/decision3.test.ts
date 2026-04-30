@@ -31,9 +31,9 @@ function callCompiler(source: string): { stdout: string; stderr: string; status:
 describe('Decision 3: (optchain-index ...) emit shape', () => {
   it('emits optional index access syntax ?.[...]', () => {
     const result = callCompiler(`(program
-  (const obj (object (a 1)))
-  (const key "a")
-  (const val (optchain-index obj key))
+  (const (obj) (object (a 1)))
+  (const (key) "a")
+  (const (val) (optchain-index obj key))
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('?.[');
@@ -46,9 +46,9 @@ describe('Decision 3: (optchain-index ...) runtime', () => {
   it('returns the value when the object exists', () => {
     fromSourceEndToEnd(`(program
       (import {asrt} "./helpers")
-      (const arr (array 10 20 30))
-      (const idx 1)
-      (const val (optchain-index arr idx))
+      (const (arr) (array 10 20 30))
+      (const (idx) 1)
+      (const (val) (optchain-index arr idx))
       (asrt val 20)
     )`);
   }, T);
@@ -56,9 +56,9 @@ describe('Decision 3: (optchain-index ...) runtime', () => {
   it('returns undefined when the object is null', () => {
     fromSourceEndToEnd(`(program
       (import {asrt} "./helpers")
-      (const arr null)
-      (const idx 0)
-      (const val (optchain-index arr idx))
+      (const (arr) null)
+      (const (idx) 0)
+      (const (val) (optchain-index arr idx))
       (asrt val undefined)
     )`);
   }, T);
@@ -66,9 +66,9 @@ describe('Decision 3: (optchain-index ...) runtime', () => {
   it('works with a string key on a plain object', () => {
     fromSourceEndToEnd(`(program
       (import {asrt} "./helpers")
-      (const obj (object (x 42)))
-      (const key "x")
-      (const val (optchain-index obj key))
+      (const (obj) (object (x 42)))
+      (const (key) "x")
+      (const (val) (optchain-index obj key))
       (asrt val 42)
     )`);
   }, T);

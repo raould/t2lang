@@ -32,7 +32,7 @@ describe('Invariant 1: macro calls are fully erased from TypeScript output', () 
     const result = callCompiler(`(program
   (defmacro incByOne (x)
     (return (quasi (+ (unquote x) 1))))
-  (const v (incByOne 41))
+  (const (v) (incByOne 41))
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).not.toContain('incByOne(');
@@ -43,7 +43,7 @@ describe('Invariant 1: macro calls are fully erased from TypeScript output', () 
     const result = callCompiler(`(program
   (defmacro neg (x)
     (return (quasi (- 0 (unquote x)))))
-  (const v (+ 1 (neg 5)))
+  (const (v) (+ 1 (neg 5)))
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).not.toContain('neg(');
@@ -55,7 +55,7 @@ describe('Invariant 1: macro calls are fully erased from TypeScript output', () 
     (return (quasi (unquote x))))
   (defmacro double (x)
     (return (quasi (+ (unquote x) (unquote x)))))
-  (const v (wrap (double 5)))
+  (const (v) (wrap (double 5)))
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).not.toContain('wrap(');
@@ -68,8 +68,8 @@ describe('Invariant 1: macro calls are fully erased from TypeScript output', () 
 describe('Invariant 2: #[macro-time] fn defs emit as comments, not runtime code', () => {
   it('#[macro-time] fn definition emits a comment line, not a function declaration', () => {
     const result = callCompiler(`(program
-  (#[macro-time] (const helper (lambda ((x)) x)))
-  (const y 1)
+  (#[macro-time] (const ((helper (lambda ((x)) x)))))
+  (const (y) 1)
 )`);
     expect(result.status).toBe(0);
     // Must appear as a comment
@@ -82,10 +82,10 @@ describe('Invariant 2: #[macro-time] fn defs emit as comments, not runtime code'
     // A #[macro-time] fn that is also used by a macro.
     // The final TypeScript output has only the macro's expansion result.
     const result = callCompiler(`(program
-  (#[macro-time] (const doubleVal (lambda ((n)) (+ n n))))
+  (#[macro-time] (const ((doubleVal (lambda ((n)) (+ n n))))))
   (defmacro useHelper (x)
     (return (quasi (unquote x))))
-  (const r (useHelper 7))
+  (const (r) (useHelper 7))
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).not.toMatch(/let doubleVal|function doubleVal/);
@@ -102,8 +102,8 @@ describe('Invariant 3: resolveNames is called in the pipeline (no regression)', 
 
   it('pipeline produces correct output for a simple program (smoke test)', () => {
     const result = callCompiler(`(program
-  (const x 1)
-  (const y 2)
+  (const (x) 1)
+  (const (y) 2)
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('x');
@@ -114,7 +114,7 @@ describe('Invariant 3: resolveNames is called in the pipeline (no regression)', 
     const result = callCompiler(`(program
   (defmacro add (a b)
     (return (quasi (+ (unquote a) (unquote b)))))
-  (const r (add 3 4))
+  (const (r) (add 3 4))
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('3');
@@ -127,7 +127,7 @@ describe('Invariant 3: resolveNames is called in the pipeline (no regression)', 
   (defmacro withFresh (x)
     (let ((s (gensym "k")))
       (return (quasi (unquote x)))))
-  (const v (withFresh 99))
+  (const (v) (withFresh 99))
 )`);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('99');
@@ -142,7 +142,7 @@ describe('Invariant 4: gensym counter is not persisted across compilations', () 
   (defmacro firstSym ()
     (let ((s (gensym "c")))
       (return (quasi (unquote s)))))
-  (const x (firstSym))
+  (const (x) (firstSym))
 )`;
     const r1 = callCompiler(src);
     const r2 = callCompiler(src);

@@ -18,9 +18,9 @@ const compile = (t2Source: string) => {
 it('dotted sugar emits nested prop-access', () => {
   const result = compile(`(program
     (import {asrt} "./helpers")
-    (const arr1 (array 1))
-    (const arr2 (array 2))
-    (const merged (Array.prototype.concat.call arr1 arr2))
+    (const (arr1) (array 1))
+    (const (arr2) (array 2))
+    (const (merged) (Array.prototype.concat.call arr1 arr2))
     (asrt (. merged length) 2)
   )`);
   if (result.errors.length > 0) { console.error(result.errors); }
@@ -30,9 +30,9 @@ it('dotted sugar emits nested prop-access', () => {
 
 it('dotted sugar folds multiple segments and numeric keys', () => {
   const result = compile(`(program
-    (const obj (object (a (object (b 1))) ("0" (object (x 5)))) )
-    (const plain (obj.a.b))
-    (const numeric (obj.0.x))
+    (const (obj) (object (a (object (b 1))) ("0" (object (x 5)))) )
+    (const (plain) (obj.a.b))
+    (const (numeric) (obj.0.x))
   )`);
   if (result.errors.length > 0) { console.error(result.errors); }
   expect(result.status).toBe(0);
@@ -44,7 +44,7 @@ it('macro expansion sees prop-access from dotted sugar', () => {
   const result = compile(`(program
     (import {asrt} "./helpers")
     (defmacro identity (x) (return x))
-    (const obj (object (x 41)))
+    (const (obj) (object (x 41)))
     (asrt (identity obj.x) 41)
   )`);
   if (result.errors.length > 0) { console.error(result.errors); }
@@ -54,7 +54,7 @@ it('macro expansion sees prop-access from dotted sugar', () => {
 
 it('malformed dotted identifiers fail fast', () => {
   const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-  const result = compile(`(program (const bad foo.))`);
+  const result = compile(`(program (const (bad) foo.))`);
   if (result.errors.length > 0) { console.error(result.errors); }
   errorSpy.mockRestore();
   expect(result.status).not.toBe(0);
@@ -64,7 +64,7 @@ it('malformed dotted identifiers fail fast', () => {
 it('zero-arg chained method call runs end-to-end', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const s "hello")
+    (const (s) "hello")
     (asrt (s.toUpperCase) "HELLO")
   )`);
 }, 30_000);
@@ -72,7 +72,7 @@ it('zero-arg chained method call runs end-to-end', () => {
 it('chained method call with args runs end-to-end', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const arr (array 1 2 3))
+    (const (arr) (array 1 2 3))
     (asrt (arr.join ", ") "1, 2, 3")
   )`);
 }, 30_000);
@@ -80,7 +80,7 @@ it('chained method call with args runs end-to-end', () => {
 it('three-segment chain with args runs end-to-end', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const arr (array 1 2 3))
+    (const (arr) (array 1 2 3))
     (asrt (Array.prototype.join.call arr "-") "1-2-3")
   )`);
 }, 30_000);
@@ -88,7 +88,7 @@ it('three-segment chain with args runs end-to-end', () => {
 it('chained property access as value (not call) runs end-to-end', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const arr (array 10 20 30))
+    (const (arr) (array 10 20 30))
     (asrt arr.length 3)
   )`);
 }, 30_000);
@@ -97,7 +97,7 @@ it('desugar guard rejects unknown tag via whitelist', () => {
   const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   const res = spawnSync('npx', ['tsx', 'tests/nonCoreRunner.ts', '-'], {
     cwd: path.join(__dirname, '..'),
-    input: `(program (const x foo.bar))`,
+    input: `(program (const (x) foo.bar))`,
     encoding: 'utf-8',
   });
   const errors: string[] = [];
