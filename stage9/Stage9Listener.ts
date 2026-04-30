@@ -173,8 +173,10 @@ import { TildeUnquoteSpliceContext } from "./Stage9Parser.js";
 import { OptChainContext } from "./Stage9Parser.js";
 import { OptChainIndexContext } from "./Stage9Parser.js";
 import { NullCoalesceContext } from "./Stage9Parser.js";
+import { QualifiedIdentContext } from "./Stage9Parser.js";
 import { InfixExprContext } from "./Stage9Parser.js";
 import { InfixBodyContext } from "./Stage9Parser.js";
+import { InfixBodyTailContext } from "./Stage9Parser.js";
 import { InfixAtomContext } from "./Stage9Parser.js";
 import { InfixArgsContext } from "./Stage9Parser.js";
 import { InfixUnaryOpContext } from "./Stage9Parser.js";
@@ -1905,6 +1907,16 @@ export class Stage9Listener implements ParseTreeListener {
      */
     exitNullCoalesce?: (ctx: NullCoalesceContext) => void;
     /**
+     * Enter a parse tree produced by `Stage9Parser.qualifiedIdent`.
+     * @param ctx the parse tree
+     */
+    enterQualifiedIdent?: (ctx: QualifiedIdentContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage9Parser.qualifiedIdent`.
+     * @param ctx the parse tree
+     */
+    exitQualifiedIdent?: (ctx: QualifiedIdentContext) => void;
+    /**
      * Enter a parse tree produced by `Stage9Parser.infixExpr`.
      * @param ctx the parse tree
      */
@@ -1924,6 +1936,16 @@ export class Stage9Listener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitInfixBody?: (ctx: InfixBodyContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage9Parser.infixBodyTail`.
+     * @param ctx the parse tree
+     */
+    enterInfixBodyTail?: (ctx: InfixBodyTailContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage9Parser.infixBodyTail`.
+     * @param ctx the parse tree
+     */
+    exitInfixBodyTail?: (ctx: InfixBodyTailContext) => void;
     /**
      * Enter a parse tree produced by `Stage9Parser.infixAtom`.
      * @param ctx the parse tree

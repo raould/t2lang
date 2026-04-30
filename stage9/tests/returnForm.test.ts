@@ -5,13 +5,11 @@ it('returnForm.test.t2 end-to-end', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
     ;; return with expression
-    (const getVal
-      (lambda ()
+    (const (getVal) (lambda ()
         (return 42)))
 
     ;; return without expression
-    (const doNothing
-      (lambda ()
+    (const (doNothing) (lambda ()
         (return)))
 
     (asrt (getVal) 42)

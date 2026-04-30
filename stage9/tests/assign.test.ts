@@ -43,7 +43,7 @@ describe('= operator is rejected as a syntax error', () => {
   }, T);
 
   it('rejects (= a b) in expression position', () => {
-    const r = callCompiler(`(program (const x (= 1 2)))`);
+    const r = callCompiler(`(program (const (x) (= 1 2)))`);
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/syntax error/);
   }, T);

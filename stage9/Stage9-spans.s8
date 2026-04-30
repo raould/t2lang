@@ -17,17 +17,16 @@
   ;;   resetSpans(file)      → switches current file; does NOT clear table or reset counter
   ;;                           so spans from preludes remain visible for error reporting
 
-  (const spanTable (new Map))
+  (const (spanTable) (new Map))
   (let nodeIdCounter_ 0)
   (let currentFile_ '<stdin>')
 
-  (const nextNodeId
+  (const (nextNodeId)
     (lambda ()
       (set! nodeIdCounter_ (+ nodeIdCounter_ 1))
       (return nodeIdCounter_)))
 
-  (const registerSpan
-    (lambda ((id) (ctx))
+  (const (registerSpan) (lambda ((id) (ctx))
       (if (! (&&  ctx (. ctx start)))
         (return id))
       (let ((start (. ctx start))
@@ -42,14 +41,12 @@
           (endCol    endCol)))
         (return id))))
 
-  (const formatSpan
-    (lambda ((id))
+  (const (formatSpan) (lambda ((id))
       (let ((span ((. spanTable get) id)))
         (if (! span) (return undefined))
         (return (+ (. span file) ':' (. span startLine) ':' (+ (. span startCol) 1))))))
 
-  (const resetSpans
-    (lambda ((file))
+  (const (resetSpans) (lambda ((file))
       (set! currentFile_ (ternary (=== file undefined) '<stdin>' file))))
 
   (export-named (spanTable) (nextNodeId) (registerSpan) (formatSpan) (resetSpans))

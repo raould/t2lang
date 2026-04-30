@@ -25,7 +25,7 @@
     "testnow": "npm --prefix stage9 run testnow",
     "vscode:build": "npm --prefix vscode-t2-formatter run build",
     "vscode:package": "npm --prefix vscode-t2-formatter run package",
-    "vscode:build-and-package": "npm run vscode:build && npm run vscode:package",
+    "vscode:build-and-package": "npm run vscode:build && npm run vscode:package"
   },
   "bin": {
     "t2tc": "bin/t2tc.js",

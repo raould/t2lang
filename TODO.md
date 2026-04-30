@@ -1,5 +1,8 @@
 - [ ] fix topLevelConst.
-- [ ] require infix spacing.
+- [x] require infix spacing. (DONE: spacing now optional for all operators; #{gWidth/2}, #{w-2} etc. all parse correctly)
+- [ ] define/document infix syntax, e.g. #{(Math.random) * 0xff}
+- [ ] support hex, octal, etc. numeric constant syntax.
+- [ ] shorthand syntax for "this."?
 - [ ] stageN/src/** duh.
 - [ ] keep updating the style guide.
 - [ ] omfg version numbers.

@@ -9,8 +9,7 @@
 
   ;; ---- skipToEndOfLine ----
   ;; Scans from i past the end-of-line newline. Returns new i.
-  (const skipToEndOfLine
-    (lambda ((src) (i))
+  (const (skipToEndOfLine) (lambda ((src) (i))
       (while (< i (. src length))
         (if (=== ((. src charAt) i) "\n")
           (return (+ i 1)))
@@ -19,8 +18,7 @@
 
   ;; ---- skipSingleQuoteString ----
   ;; Called with i = position AFTER opening '. Returns i after closing '.
-  (const skipSingleQuoteString
-    (lambda ((src) (i))
+  (const (skipSingleQuoteString) (lambda ((src) (i))
       (while (< i (. src length))
         (let ((ch ((. src charAt) i)))
           (set! i (+ i 1))
@@ -32,8 +30,7 @@
 
   ;; ---- skipDoubleQuoteString ----
   ;; Called with i = position AFTER opening ". Returns i after closing ".
-  (const skipDoubleQuoteString
-    (lambda ((src) (i))
+  (const (skipDoubleQuoteString) (lambda ((src) (i))
       (while (< i (. src length))
         (let ((ch ((. src charAt) i)))
           (set! i (+ i 1))
@@ -45,8 +42,7 @@
 
   ;; ---- skipTripleString ----
   ;; Called with i = position AFTER opening """. Returns i after closing """.
-  (const skipTripleString
-    (lambda ((src) (i))
+  (const (skipTripleString) (lambda ((src) (i))
       (while (< i (. src length))
         (if (&& (=== ((. src charAt) i) '"')
                 (&& (=== ((. src charAt) (+ i 1)) '"')
@@ -57,8 +53,7 @@
 
   ;; ---- escapeChunk ----
   ;; Escape raw text for embedding as a double-quoted t2 string body.
-  (const escapeChunk
-    (lambda ((text))
+  (const (escapeChunk) (lambda ((text))
       (let ((s1 ((. ((. text split) '\\') join) '\\\\'))
              (s2 ((. ((. s1 split) '"') join) '\\"'))
              (s3 ((. ((. s2 split) "\n") join) '\\n'))
@@ -70,8 +65,7 @@
   ;; Scan a ${...} expression body, tracking nested braces and skipping strings.
   ;; i: position AFTER the opening { (brace depth starts at 1).
   ;; Returns [exprText, newI].
-  (const scanExprUntilClose
-    (lambda ((src) (i))
+  (const (scanExprUntilClose) (lambda ((src) (i))
       (let ((depth 1)
              (buf ""))
         (while (&& (< i (. src length)) (> depth 0))
@@ -122,8 +116,7 @@
   ;; ---- scanTemplate ----
   ;; Scan a backtick template from i (position AFTER opening backtick).
   ;; Returns [parts, newI] where parts is array of {type, value} objects.
-  (const scanTemplate
-    (lambda ((src) (i))
+  (const (scanTemplate) (lambda ((src) (i))
       (let ((parts (array))
              (textBuf ""))
         (while (< i (. src length))
@@ -161,8 +154,7 @@
 
   ;; ---- buildTemplateForm ----
   ;; Convert parts array to a t2 source string.
-  (const buildTemplateForm
-    (lambda ((parts))
+  (const (buildTemplateForm) (lambda ((parts))
       ;; Empty template → empty string literal
       (if (=== (. parts length) 0)
         (return '""'))
@@ -179,15 +171,13 @@
         (return (+ '(template' inner ')')))))
 
   ;; ---- isWhitespace ----
-  (const isWhitespace
-    (lambda ((ch))
+  (const (isWhitespace) (lambda ((ch))
       (return (|| (=== ch ' ') (|| (=== ch '\t') (|| (=== ch '\n') (=== ch '\r')))))))
 
   ;; ---- isSubscriptTrigger ----
   ;; Returns true if ch signals subscript access (identifier/word chars, ')', ']').
   ;; NOT triggered by whitespace or opening delimiters.
-  (const isSubscriptTrigger
-    (lambda ((ch))
+  (const (isSubscriptTrigger) (lambda ((ch))
       (if (=== ch undefined) (return false))
       (let ((nonTrigger " \t\n\r([,;{#["))
         (return (=== ((. nonTrigger indexOf) ch) -1)))))
@@ -195,13 +185,12 @@
   ;; ---- METHOD_MODIFIERS ----
   ;; Words that appear as method-declaration modifiers; they must never be
   ;; treated as the subscripted object when followed by whitespace + '['.
-  (const METHOD_MODIFIERS (new Set (array 'static' 'async' 'generator' 'abstract' 'override' 'readonly')))
+  (const (METHOD_MODIFIERS) (new Set (array 'static' 'async' 'generator' 'abstract' 'override' 'readonly')))
 
   ;; ---- scanBracketContent ----
   ;; Scan from i (position AFTER opening '[') to the matching ']', skipping strings/comments/nesting.
   ;; Returns [content, newI] where content is the raw text and newI is position after ']'.
-  (const scanBracketContent
-    (lambda ((src) (i))
+  (const (scanBracketContent) (lambda ((src) (i))
       (let ((depth 1)
              (buf "")
              (j i))
@@ -243,8 +232,7 @@
   ;; Returns true if the '[' at src[i] contains a top-level comma before its matching ']'.
   ;; Used to distinguish array literals ([1, 2, 3]) from subscript indices ([expr])
   ;; when whitespace precedes '['.
-  (const bracketHasTopLevelComma
-    (lambda ((src) (i))
+  (const (bracketHasTopLevelComma) (lambda ((src) (i))
       (let ((depth 1)
              (j (+ i 1)))
         (while (&& (< j (. src length)) (> depth 0))
@@ -270,8 +258,7 @@
   ;;   - ']' ending: scan to matching '['
   ;;   - word char ending: scan back while not a delimiter
   ;; Returns the start index, or -1 if text is empty.
-  (const findPrecedingExprStart
-    (lambda ((text))
+  (const (findPrecedingExprStart) (lambda ((text))
       (let ((j (- (. text length) 1)))
         (if (< j 0) (return -1))
         (let ((last ((. text charAt) j)))
@@ -310,8 +297,7 @@
   ;;   - Backtick template literals → (template ...) forms
   ;;   - Subscript sugar: foo[i] → (. foo [i])  (no whitespace before '[' only)
   ;; Skips over quoted strings and ;; comments verbatim.
-  (const readerTransform
-    (lambda ((src))
+  (const (readerTransform) (lambda ((src))
       (let ((out "")
              (i 0)
              (n (. src length))

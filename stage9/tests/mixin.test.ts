@@ -45,7 +45,7 @@ describe('mixin form', () => {
     expect(result.stdout).toContain('declare const _mixinCheck_A: [_MixinGuard<M1>, _MixinGuard<M2>]');
     expect(result.stdout).toContain('M1.prototype instanceof MixinBase');
     expect(result.stdout).toContain('M2.prototype instanceof MixinBase');
-    expect(result.stdout).toContain('for (const key of ["foo", "bar"])');
+    expect(result.stdout).toContain('for (const (key) of ["foo", "bar"])');
     expect(result.stdout).toContain('if (key in M1.prototype)');
     expect(result.stdout).toContain('if (key in M2.prototype)');
     expect(result.stdout).toContain('interface A extends Pick<M1, "foo" | "bar">, Pick<M2, "foo" | "bar"> {}');

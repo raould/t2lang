@@ -8,8 +8,7 @@
   ;; Pipeline slot: astTopLevel → sugarTopLevel → expandTopLevel → ...
 
   ;; ---- sugarNode: recursive tree walker ----
-  (const sugarNode
-    (lambda ((node))
+  (const (sugarNode) (lambda ((node))
       ;; primitives and null: return as-is
       (if (|| (=== node null) (!== (typeof node) 'object'))
         (return node))
@@ -27,13 +26,11 @@
 
   ;; ---- sugarEntry: per-entry helper for the generic walk ----
   ;; Processes one [key, value] pair from Object.entries, recursing into value.
-  (const sugarEntry
-    (lambda ((entry))
+  (const (sugarEntry) (lambda ((entry))
       (return (array (index entry 0) (sugarNode (index entry 1))))))
 
   ;; ---- sugarTopLevel: entry point for pipeline ----
-  (const sugarTopLevel
-    (lambda ((node))
+  (const (sugarTopLevel) (lambda ((node))
       (return (sugarNode node))))
 
   (export-named (sugarTopLevel))

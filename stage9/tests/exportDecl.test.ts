@@ -15,21 +15,21 @@ import { it } from 'vitest';
 import { fromSourceEndToEnd } from './helpers';
 
 it('export decl — export a def (constant)', () => {
-    // (export (const PI 3.14)) emits: export const PI = 3.14;
+    // (export (const (PI) 3.14)) emits: export const PI = 3.14;
     // PI is still accessible in the same file.
     fromSourceEndToEnd(`(program
         (import {asrt} "./helpers")
-        (export (const PI 3.14))
+        (export (const (PI) 3.14))
         (asrt PI 3.14)
     )`);
 }, 30_000);
 
 it('export decl — export a def (fn)', () => {
-    // (export (const double (lambda ((x)) (return (* x 2))))) emits:
+    // (export (const (double) (lambda ((x)) (return (* x 2))))) emits:
     //   export const double = (x) => { return x * 2; };
     fromSourceEndToEnd(`(program
         (import {asrt} "./helpers")
-        (export (const double (lambda ((x)) (return (* x 2)))))
+        (export (const (double) (lambda ((x)) (return (* x 2)))))
         (asrt (double 7) 14)
     )`);
 }, 30_000);

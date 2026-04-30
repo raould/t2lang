@@ -60,7 +60,7 @@ describe('.t2 files: macro-export is forbidden', () => {
       (macro-export idMacro))`, (macroPath) => {
       const r = compileStdin(`(program
         (macro-import m "${macroPath}")
-        (const x 1))`);
+        (const (x) 1))`);
       expect(r.status).toBe(0);
     });
   });
@@ -68,7 +68,7 @@ describe('.t2 files: macro-export is forbidden', () => {
   it('allows defmacro in a .t2 file (local use, no export)', () => {
     const r = compileStdin(`(program
       (defmacro double (x) (return x))
-      (const y 1))`);
+      (const (y) 1))`);
     expect(r.status).toBe(0);
   });
 });
@@ -94,7 +94,7 @@ describe('.t2m files: only macro-related forms allowed', () => {
 
   it('allows #[macro-time] bindings', () => {
     withTempFile('.t2m', `(program
-      (#[macro-time] (const helper (lambda ((x)) (return x))))
+      (#[macro-time] (const (helper) (lambda ((x)) (return x))))
       (defmacro wrap (x) (return (helper x)))
       (macro-export wrap))`, (p) => {
       expect(compileFile(p).status).toBe(0);
@@ -103,7 +103,7 @@ describe('.t2m files: only macro-related forms allowed', () => {
 
   it('errors on bare const in .t2m', () => {
     withTempFile('.t2m', `(program
-      (const foo 42))`, (p) => {
+      (const (foo) 42))`, (p) => {
       const r = compileFile(p);
       expect(r.status).not.toBe(0);
       expect(r.stderr).toMatch(/\.t2m files may only contain/);
@@ -139,7 +139,7 @@ describe('.t2m files: only macro-related forms allowed', () => {
 
   it('error message names the offending span', () => {
     withTempFile('.t2m', `(program
-      (const x 1))`, (p) => {
+      (const (x) 1))`, (p) => {
       const r = compileFile(p);
       expect(r.status).not.toBe(0);
       // span info appears before the error message
@@ -160,7 +160,7 @@ describe('@scope macro-import paths', () => {
         (macro-export idMacro))`);
       withTempFile('.t2', `(program
         (macro-import m "@myScope/helpers.t2m")
-        (const x 1))`, (p) => {
+        (const (x) 1))`, (p) => {
         const r = compileFile(p, ['--macro-root', `myScope=${macroDir}`]);
         expect(r.status).toBe(0);
       });
@@ -172,7 +172,7 @@ describe('@scope macro-import paths', () => {
   it('errors on unknown @scope with helpful message', () => {
     withTempFile('.t2', `(program
       (macro-import m "@unknown/helpers.t2m")
-      (const x 1))`, (p) => {
+      (const (x) 1))`, (p) => {
       const r = compileFile(p);
       expect(r.status).not.toBe(0);
       expect(r.stderr).toMatch(/unknown macro scope "@unknown"/);
@@ -183,7 +183,7 @@ describe('@scope macro-import paths', () => {
   it('errors on @-path with no slash', () => {
     withTempFile('.t2', `(program
       (macro-import m "@noslash")
-      (const x 1))`, (p) => {
+      (const (x) 1))`, (p) => {
       const r = compileFile(p);
       expect(r.status).not.toBe(0);
       expect(r.stderr).toMatch(/must include "\/"/);
@@ -203,7 +203,7 @@ describe('@scope macro-import paths', () => {
       withTempFile('.t2', `(program
         (macro-import ma "@scopeA/a.t2m")
         (macro-import mb "@scopeB/b.t2m")
-        (const x 1))`, (p) => {
+        (const (x) 1))`, (p) => {
         const r = compileFile(p, [
           '--macro-root', `scopeA=${dirA}`,
           '--macro-root', `scopeB=${dirB}`,

@@ -183,6 +183,22 @@ const emitStmt  = (stmt) => {
       }
     }
   }
+  if ((stmt.tag === "const-decl")) {
+    if (stmt.pattern) {
+      return (((("const " + emitDestructPattern(stmt.pattern)) + " = ") + emitExpr(stmt.init)) + ";");
+    }
+    else {
+      {
+        let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : " ");
+        if (isDefined(stmt.init)) {
+          return ((((("const " + checkId(stmt.name, stmt.id)) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
+        }
+        else {
+          return ((("const " + checkId(stmt.name, stmt.id)) + typeStr) + ";");
+        }
+      }
+    }
+  }
   if ((stmt.tag === "const-stmt")) {
     if (stmt.pattern) {
       return (((("const " + emitDestructPattern(stmt.pattern)) + " = ") + emitExpr(stmt.init)) + ";");
@@ -1367,7 +1383,7 @@ const emitMixinStmt  = (node) => {
             return (("\"" + n) + "\"");
           }).join(", ")) + "]");
           mixins.forEach((m) => {
-            lines.push((((((((((("for (const key of " + keyList) + ") {\n") + "  if (key in ") + m) + ".prototype) ") + target) + ".prototype[key] = ") + m) + ".prototype[key];\n") + "}"));
+            lines.push((((((((((("for (const (key) of " + keyList) + ") {\n") + "  if (key in ") + m) + ".prototype) ") + target) + ".prototype[key] = ") + m) + ".prototype[key];\n") + "}"));
           });
         }
       }
@@ -1377,7 +1393,7 @@ const emitMixinStmt  = (node) => {
             return (("\"" + n) + "\"");
           }).join(", ")) + "]");
           mixins.forEach((m) => {
-            lines.push((((((((((("for (const key of Object.keys(" + m) + ".prototype)) {\n") + "  if (!") + excludeList) + ".includes(key)) ") + target) + ".prototype[key] = ") + m) + ".prototype[key];\n") + "}"));
+            lines.push((((((((((("for (const (key) of Object.keys(" + m) + ".prototype)) {\n") + "  if (!") + excludeList) + ".includes(key)) ") + target) + ".prototype[key] = ") + m) + ".prototype[key];\n") + "}"));
           });
         }
       }

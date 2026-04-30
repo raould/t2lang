@@ -86,7 +86,7 @@ topLevelVar
     ;
 
 topLevelConst
-    : LPAREN CONST metaAnnotation* IDENTIFIER expression RPAREN
+    : LPAREN CONST metaAnnotation* singleBinding expression RPAREN
     ;
 
 
@@ -610,6 +610,7 @@ finallyClause
 
 expression
     : literal
+    | qualifiedIdent             // macro namespace call: m/identity
     | IDENTIFIER
     | MACRO_ERROR
     | MINUS
@@ -958,6 +959,12 @@ nullCoalesce
     : LPAREN NULLCOAL expression expression RPAREN
     ;
 
+// ─── qualified identifier (macro namespace: m/identity) ─────────────────────
+
+qualifiedIdent
+    : IDENTIFIER SLASH IDENTIFIER
+    ;
+
 // ─── infix expressions ───────────────────────
 
 infixExpr
@@ -965,7 +972,14 @@ infixExpr
     ;
 
 infixBody
-    : infixAtom (infixBinOp infixAtom)*
+    : infixAtom infixBodyTail*
+    ;
+
+// infixBodyTail separates the operator-operand pair from the leading atom so
+// that NEG_NUMBER tokens (e.g. -2 in w-2) can be treated as implied minus.
+infixBodyTail
+    : infixBinOp infixAtom   // explicit operator: w + x, w / 2
+    | NEG_NUMBER             // implied minus: w-2 → w - 2
     ;
 
 infixAtom
@@ -982,7 +996,7 @@ infixArgs
     ;
 
 infixUnaryOp
-    : MINUS | BANG | TILDE
+    : PLUS | MINUS | BANG | TILDE
     ;
 
 infixBinOp
@@ -1272,11 +1286,10 @@ MINUS
 TILDE_AT    : '~@' ;
 TILDE       : '~' ;
 
-// Note: '/' is intentionally NOT excluded — it is used as a namespace separator
-// in macro calls (e.g. m/identity). Division in infix requires spaces: #{a / b}.
-// Standalone '/' (preceded/followed by whitespace) tokenizes as SLASH via rule priority.
+// Note: '/' is excluded — macro namespace calls (m/identity) are handled by
+// the qualifiedIdent parser rule (IDENTIFIER SLASH IDENTIFIER).
 IDENTIFIER
-    : ~[() \n\t\r:;\-~\u005B\u005D\u007B\u007D,\u0060?=+*%<>!&|^]+
+    : ~[() \n\t\r:;\-~\u005B\u005D\u007B\u007D,\u0060?=+*%<>!&|^/]+
     ;
 
 WS

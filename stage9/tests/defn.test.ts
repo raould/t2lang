@@ -53,7 +53,7 @@ it('function decl — hoisted (callable before definition)', () => {
 it('function expr — anonymous, assigned to const', () => {
     fromSourceEndToEnd(`(program
         (import {asrt} "./helpers")
-        (const square (fn ((x)) (return (* x x))))
+        (const (square) (fn ((x)) (return (* x x))))
         (asrt (square 6) 36)
     )`);
 }, 30_000);

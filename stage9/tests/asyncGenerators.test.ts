@@ -4,7 +4,7 @@ import { fromSourceEndToEnd } from './helpers';
 it('async-lambda returns a Promise', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const asyncAdd (async-lambda ((a) (b))
+    (const (asyncAdd) (async-lambda ((a) (b))
       (return (+ a b))))
     (asrt (typeof asyncAdd) "function")
     ;; calling an async function returns a Promise (has .then)
@@ -15,7 +15,7 @@ it('async-lambda returns a Promise', () => {
 it('async-fn returns a Promise', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const asyncDouble (async-fn ((n))
+    (const (asyncDouble) (async-fn ((n))
       (return (* n 2))))
     (asrt (typeof asyncDouble) "function")
     (asrt (typeof (. (asyncDouble 5) then)) "function")
@@ -25,11 +25,11 @@ it('async-fn returns a Promise', () => {
 it('generator-fn with yield', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const counter (generator-fn ()
+    (const (counter) (generator-fn ()
       (yield 10)
       (yield 20)
       (yield 30)))
-    (const it (counter))
+    (const (it) (counter))
     (asrt (. ((. it next)) value) 10)
     (asrt (. ((. it next)) value) 20)
     (asrt (. ((. it next)) value) 30)
@@ -40,13 +40,13 @@ it('generator-fn with yield', () => {
 it('generator-fn with yield* (delegation)', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const inner (generator-fn ()
+    (const (inner) (generator-fn ()
       (yield 1)
       (yield 2)))
-    (const outer (generator-fn ()
+    (const (outer) (generator-fn ()
       (yield* (inner))
       (yield 3)))
-    (const it (outer))
+    (const (it) (outer))
     (asrt (. ((. it next)) value) 1)
     (asrt (. ((. it next)) value) 2)
     (asrt (. ((. it next)) value) 3)
@@ -57,10 +57,10 @@ it('generator-fn with yield* (delegation)', () => {
 it('async-generator-fn is iterable', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const asyncGen (async-generator-fn ()
+    (const (asyncGen) (async-generator-fn ()
       (yield 100)
       (yield 200)))
-    (const it (asyncGen))
+    (const (it) (asyncGen))
     ;; next() returns a Promise
     (asrt (typeof (. ((. it next)) then)) "function")
   )`);
@@ -69,7 +69,7 @@ it('async-generator-fn is iterable', () => {
 it('rest param in lambda collects extra args', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const sum (lambda ((first) (rest args))
+    (const (sum) (lambda ((first) (rest args))
       (let ((total first))
         ((. args forEach) (lambda ((n))
           (set! total (+ total n))))
@@ -83,7 +83,7 @@ it('rest param in lambda collects extra args', () => {
 it('rest param in fn collects extra args', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const join (fn ((sep) (rest parts))
+    (const (join) (fn ((sep) (rest parts))
       (return ((. parts join) sep))))
     (asrt (join "-" "a" "b" "c") "a-b-c")
     (asrt (join "," "x") "x")
@@ -94,7 +94,7 @@ it('rest param in fn collects extra args', () => {
 it('rest-only param in async-lambda', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const asyncAll (async-lambda ((rest args))
+    (const (asyncAll) (async-lambda ((rest args))
       (return (. args length))))
     (asrt (typeof asyncAll) "function")
     (asrt (typeof (. (asyncAll 1 2 3) then)) "function")

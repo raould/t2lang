@@ -333,17 +333,31 @@ const astTopLevelVar  = (ctx) => {
 };
 const astTopLevelConst  = (ctx) => {
   {
-    let name  = ctx.IDENTIFIER().getText();
+    let bindCtx  = ctx.singleBinding();
+    let parsed  = astSingleBindingPattern(bindCtx);
     let init  = astExpression(ctx.expression());
     let meta  = astParseMeta(ctx);
-    return ({
-      id: registerSpan(nextNodeId(), ctx),
-      text: ctx.getText(),
-      tag: "const-decl",
-      name: name,
-      init: init,
-      meta: meta
-    });
+    if (parsed.isDestruct) {
+      return ({
+        id: registerSpan(nextNodeId(), ctx),
+        text: ctx.getText(),
+        tag: "const-decl",
+        pattern: parsed.pattern,
+        init: init,
+        meta: meta
+      });
+    }
+    else {
+      return ({
+        id: registerSpan(nextNodeId(), ctx),
+        text: ctx.getText(),
+        tag: "const-decl",
+        name: parsed.name,
+        typeAnnotation: parsed.typeAnnotation,
+        init: init,
+        meta: meta
+      });
+    }
   }
 };
 const astTypeAlias  = (ctx) => {
@@ -1921,6 +1935,21 @@ const astExpression  = (ctx) => {
       });
     }
   }
+  if (ctx.qualifiedIdent()) {
+    {
+      let qCtx  = ctx.qualifiedIdent();
+      let idents  = qCtx.IDENTIFIER().map((t) => {
+        return t.getText();
+      });
+      let name  = ((idents[0] + "/") + idents[1]);
+      return ({
+        id: registerSpan(nextNodeId(), ctx),
+        text: ctx.getText(),
+        tag: "identifier",
+        name: name
+      });
+    }
+  }
   if (ctx.MACRO_ERROR()) {
     return ({
       id: registerSpan(nextNodeId(), ctx),
@@ -3242,32 +3271,55 @@ const astInfixAtom  = (ctx) => {
 };
 const astInfixBody  = (ctx) => {
   {
-    let atoms  = ctx.infixAtom().map(astInfixAtom);
-    let ops  = ctx.infixBinOp().map((op) => {
-      return op.getText();
-    });
-    if ((atoms.length === 1)) {
-      return atoms[0];
+    let firstAtom  = astInfixAtom(ctx.infixAtom());
+    let tails  = ctx.infixBodyTail();
+    if ((tails.length === 0)) {
+      return firstAtom;
     }
     {
-      let firstOp  = ops[0];
-      ops.forEach((op) => {
-        if ((op !== firstOp)) {
-          throw new Error(((((("mixed operators in #{}: '" + firstOp) + "' and '") + op) + "' at ") + ctx.getText()));
-        }
-      });
-      return atoms.reduce((acc, cur, i) => {
-        {
-          let id  = registerSpan(nextNodeId(), ctx);
+      let pairs  = tails.map((tail) => {
+        if (tail.infixBinOp()) {
           return ({
-            id: id,
-            tag: "binary-op",
-            op: ops[(i - 1)],
-            left: acc,
-            right: cur
+            op: tail.infixBinOp().getText(),
+            right: astInfixAtom(tail.infixAtom())
           });
         }
+        else {
+          {
+            let negText  = tail.NEG_NUMBER().getText();
+            let posNum  = Number(negText.slice(1));
+            return ({
+              op: "-",
+              right: ({
+                id: registerSpan(nextNodeId(), tail),
+                text: negText.slice(1),
+                tag: "literal",
+                value: posNum
+              })
+            });
+          }
+        }
       });
+      {
+        let firstOp  = pairs[0].op;
+        pairs.forEach((pair) => {
+          if ((pair.op !== firstOp)) {
+            throw new Error(((((("mixed operators in #{}: '" + firstOp) + "' and '") + pair.op) + "' at ") + ctx.getText()));
+          }
+        });
+        return pairs.reduce((acc, pair) => {
+          {
+            let id  = registerSpan(nextNodeId(), ctx);
+            return ({
+              id: id,
+              tag: "binary-op",
+              op: pair.op,
+              left: acc,
+              right: pair.right
+            });
+          }
+        }, firstAtom);
+      }
     }
   }
 };

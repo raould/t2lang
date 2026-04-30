@@ -4,7 +4,7 @@ import { fromSourceEndToEnd } from './helpers';
 it('iife basic return value', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const x (iife
+    (const (x) (iife
       (const (y) 10)
       (return (+ y 5))))
     (asrt x 15)
@@ -14,7 +14,7 @@ it('iife basic return value', () => {
 it('iife multiple statements', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const result (iife
+    (const (result) (iife
       (const (a) 20)
       (const (b) 22)
       (return (+ a b))))
@@ -25,7 +25,7 @@ it('iife multiple statements', () => {
 it('iife-async returns a promise', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
-    (const p (iife-async
+    (const (p) (iife-async
       (return 99)))
     (asrt (typeof (. p then)) "function")
   )`);

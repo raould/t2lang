@@ -26,8 +26,7 @@
   ;; Maintained innermost-last (appended, so the last entry is innermost).
 
   ;; isSubsetOf(a, b): returns true if every element of Set a is in Set b.
-  (const isSubsetOf
-    (lambda ((a) (b))
+  (const (isSubsetOf) (lambda ((a) (b))
       (let ((result true))
         ((. a forEach) (lambda ((x))
           (if (! ((. b has) x))
@@ -35,8 +34,7 @@
         (return result))))
 
   ;; addBinding: append a binding to the chain (non-mutating).
-  (const addBinding
-    (lambda ((chain) (name) (scopes))
+  (const (addBinding) (lambda ((chain) (name) (scopes))
       (return ((. chain concat) (array (object (name name) (scopes scopes)))))))
 
   ;; resolveIdent: find the most-specific visible binding for `ident` in `chain`.
@@ -45,8 +43,7 @@
   ;; In a flat user program (all binding scopes = ∅), ties are broken in favour
   ;; of the LAST matched entry (innermost), because we iterate the whole chain
   ;; and overwrite `best` when |SB| >= |best.SB|.
-  (const resolveIdent
-    (lambda ((ident) (chain))
+  (const (resolveIdent) (lambda ((ident) (chain))
       (let ((identScopes (. ident scopes))
              (name (. ident name))
              (best null))
@@ -60,8 +57,7 @@
         (return best))))
 
   ;; resolveExpr: walk an expression, resolving identifiers.
-  (const resolveExpr
-    (lambda ((node) (chain))
+  (const (resolveExpr) (lambda ((node) (chain))
       (if (|| (=== node null) (=== node undefined))
         (return node))
       ;; identifier: annotate with resolvedScopes if a binding is found
@@ -206,8 +202,7 @@
       ;; leaf nodes (literal, keyword, this, super, quasi, etc.)
       (return node)))
 
-  (const resolveClassElement
-    (lambda ((node) (chain))
+  (const (resolveClassElement) (lambda ((node) (chain))
       (if (=== (. node tag) 'field-def')
         (return (object (tag 'field-def') (text (. node text))
           (modifiers (. node modifiers))
@@ -304,13 +299,11 @@
               (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
       (throw (new Error (+ 'resolveClassElement: unexpected tag >' (. node tag) '<')))))
 
-  (const resolveClassBody
-    (lambda ((node) (chain))
+  (const (resolveClassBody) (lambda ((node) (chain))
       (return (object (tag 'class-body') (text (. node text))
         (elements ((. (. node elements) map) (lambda ((el)) (return (resolveClassElement el chain)))))))))
 
-  (const resolveClassDef
-    (lambda ((node) (chain))
+  (const (resolveClassDef) (lambda ((node) (chain))
       (return (object (tag 'class-def') (text (. node text))
         (modifiers (. node modifiers))
         (name (. node name))
@@ -319,8 +312,7 @@
         (implementsTypes (. node implementsTypes))
         (body (resolveClassBody (. node body) chain))))))
 
-  (const resolveAnonClassDef
-    (lambda ((node) (chain))
+  (const (resolveAnonClassDef) (lambda ((node) (chain))
       (return (object (tag 'anon-class-def') (text (. node text))
         (modifiers (. node modifiers))
         (extendsType (. node extendsType))
@@ -328,8 +320,7 @@
         (body (resolveClassBody (. node body) chain))))))
 
   ;; resolveStmt: walk a statement, resolving identifiers.
-  (const resolveStmt
-    (lambda ((node) (chain))
+  (const (resolveStmt) (lambda ((node) (chain))
       (if (|| (=== node null) (=== node undefined))
         (return node))
       ;; expr-stmt
@@ -457,8 +448,7 @@
       (return node)))
 
   ;; resolveTopLevel: walk a top-level node.
-  (const resolveTopLevel
-    (lambda ((node) (chain))
+  (const (resolveTopLevel) (lambda ((node) (chain))
       ;; macro defs: skip (they are compile-time only)
       (if (|| (=== (. node tag) 'defmacro') (=== (. node tag) 'macro-time-fn-def'))
         (return node))
@@ -514,8 +504,7 @@
   ;; Walks the entire program AST, resolving identifiers using the KFFD
   ;; subset rule.  Returns { ast: ProgramNode, errors: [] }.
   ;; (errors are reserved for future hygiene-violation reporting)
-  (const resolveNames
-    (lambda ((programNode))
+  (const (resolveNames) (lambda ((programNode))
       (let ((chain (array))
              (resolvedBody (array)))
         ((. (. programNode body) forEach) (lambda ((node))

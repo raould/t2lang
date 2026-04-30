@@ -69,7 +69,7 @@ topLevelLet
     ;
 
 topLevelConst
-    : LPAREN CONST metaAnnotation* IDENTIFIER expression RPAREN
+    : LPAREN CONST metaAnnotation* singleBinding expression RPAREN
     ;
 
 

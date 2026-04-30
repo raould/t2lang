@@ -262,7 +262,9 @@ const astTopLevelLet  = (ctx) => {
 };
 const astTopLevelConst  = (ctx) => {
   {
-    let name  = ctx.IDENTIFIER().getText();
+    let bindCtx  = ctx.singleBinding();
+    let name  = bindCtx.IDENTIFIER().getText();
+    let typeAnnotation  = (bindCtx.typeExpr() ? astTypeExpr(bindCtx.typeExpr()) : undefined);
     let init  = astExpression(ctx.expression());
     let meta  = astParseMeta(ctx);
     return ({
@@ -270,6 +272,7 @@ const astTopLevelConst  = (ctx) => {
       text: ctx.getText(),
       tag: "const-decl",
       name: name,
+      typeAnnotation: typeAnnotation,
       init: init,
       meta: meta
     });

@@ -863,7 +863,7 @@ export class Stage8Parser extends antlr.Parser {
                 _la = this.tokenStream.LA(1);
             }
             this.state = 381;
-            this.match(Stage8Parser.IDENTIFIER);
+            this.singleBinding();
             this.state = 382;
             this.expression();
             this.state = 383;
@@ -7302,7 +7302,7 @@ export class Stage8Parser extends antlr.Parser {
         124,0,0,370,371,3,196,98,0,371,372,5,3,0,0,372,17,1,0,0,0,373,374,
         5,2,0,0,374,378,5,11,0,0,375,377,3,20,10,0,376,375,1,0,0,0,377,380,
         1,0,0,0,378,376,1,0,0,0,378,379,1,0,0,0,379,381,1,0,0,0,380,378,
-        1,0,0,0,381,382,5,124,0,0,382,383,3,196,98,0,383,384,5,3,0,0,384,
+        1,0,0,0,381,382,3,118,59,0,382,383,3,196,98,0,383,384,5,3,0,0,384,
         19,1,0,0,0,385,386,5,97,0,0,386,387,5,124,0,0,387,21,1,0,0,0,388,
         389,5,2,0,0,389,390,5,81,0,0,390,392,5,124,0,0,391,393,3,166,83,
         0,392,391,1,0,0,0,392,393,1,0,0,0,393,394,1,0,0,0,394,395,3,120,
@@ -8113,8 +8113,8 @@ export class TopLevelConstContext extends antlr.ParserRuleContext {
     public CONST(): antlr.TerminalNode {
         return this.getToken(Stage8Parser.CONST, 0)!;
     }
-    public IDENTIFIER(): antlr.TerminalNode {
-        return this.getToken(Stage8Parser.IDENTIFIER, 0)!;
+    public singleBinding(): SingleBindingContext {
+        return this.getRuleContext(0, SingleBindingContext)!;
     }
     public expression(): ExpressionContext {
         return this.getRuleContext(0, ExpressionContext)!;

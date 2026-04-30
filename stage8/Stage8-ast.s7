@@ -177,10 +177,12 @@
 
   (const astTopLevelConst
     (lambda ((ctx))
-      (let* ((name ((. ((. ctx IDENTIFIER)) getText)))
+      (let* ((bindCtx ((. ctx singleBinding)))
+             (name ((. ((. bindCtx IDENTIFIER)) getText)))
+             (typeAnnotation (ternary ((. bindCtx typeExpr)) (astTypeExpr ((. bindCtx typeExpr))) undefined))
              (init (astExpression ((. ctx expression))))
              (meta (astParseMeta ctx)))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const-decl') (name name) (init init) (meta meta))))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const-decl') (name name) (typeAnnotation typeAnnotation) (init init) (meta meta))))))
 
 
   (const astTypeAlias

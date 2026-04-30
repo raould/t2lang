@@ -3,20 +3,17 @@
   (import (object (named (array (object (name "parseForm"))))) "./Stage9-parse-form")
 
   ;; ========== helpers (Phase B) ==========
-  (const isOperator
-    (lambda ((name))
+  (const (isOperator) (lambda ((name))
       (let ((ops (array "<" ">" "<=" ">=" "&&" "||" "!=" "!==" "==" "==="
                 "+" "-" "*" "/" "%" "^" "!")))
       (return ((. ops includes) name)))))
 
   ;; ========== Phase B: Lowering ==========
-  (const lowerProgram
-    (lambda ((node))
+  (const (lowerProgram) (lambda ((node))
       (let ((body ((. (. node body) map) lowerTopLevel)))
         (return (object (node node) (id (. node id)) (tag 'program') (body body))))))
 
-  (const lowerTopLevel
-    (lambda ((node) (isMacroMode))
+  (const (lowerTopLevel) (lambda ((node) (isMacroMode))
       (if (=== (. node tag) 'defmacro')
         (return (lowerDefmacro node isMacroMode)))
       (if (=== (. node tag) 'macro-time-fn-def')
@@ -52,8 +49,7 @@
         (return (lowerExportDecl node)))
       (return (lowerStmt node))))
 
-  (const lowerTypeAlias
-    (lambda ((node))
+  (const (lowerTypeAlias) (lambda ((node))
       (return (object (node node) (id (. node id)) (tag 'type-alias')
                       (name (. node name))
                       (typeParams (ternary (&& (. node typeParams) (> (. (. node typeParams) length) 0))
@@ -64,8 +60,7 @@
                                     (array)))
                       (type (lowerTypeExpr (. node "type")))))))
 
-  (const lowerInterfaceDef
-    (lambda ((node))
+  (const (lowerInterfaceDef) (lambda ((node))
       (return (object (node node) (id (. node id)) (tag 'interface-def')
                       (name (. node name))
                       (typeParams (ternary (&& (. node typeParams) (> (. (. node typeParams) length) 0))
@@ -77,45 +72,39 @@
                       ("extends" ((. (. node "extends") map) lowerTypeExpr))
                       (body (lowerTypeExpr (. node body)))))))
 
-  (const lowerEnumDef
-    (lambda ((node))
+  (const (lowerEnumDef) (lambda ((node))
       (return (object (node node) (id (. node id)) (tag 'enum-def')
                       (name (. node name))
                       (members (. node members))))))
 
   ;; ========== Class element lowering ==========
-  (const lowerTypedParam
-    (lambda ((node))
+  (const (lowerTypedParam) (lambda ((node))
       (return (object (name (. node name))
                       (optional (. node optional))
                       (typeAnnotation (ternary (. node typeAnnotation) (lowerTypeExpr (. node typeAnnotation)) undefined))))))
 
-  (const lowerFnoParam
-    (lambda ((param))
+  (const (lowerFnoParam) (lambda ((param))
       (return (object (modifiers (. param modifiers))
                       (name (. param name))
                       (optional (. param optional))
                       (typeAnnotation (ternary (. param typeAnnotation) (lowerTypeExpr (. param typeAnnotation)) undefined))
                       (defaultExpr (ternary (. param defaultExpr) (lowerExpr (. param defaultExpr)) undefined))))))
 
-  (const lowerFieldDef
-    (lambda ((node))
+  (const (lowerFieldDef) (lambda ((node))
       (return (object (node node) (id (. node id)) (tag 'field-def')
                       (modifiers (. node modifiers))
                       (name (. node name))
                       (typeAnnotation (ternary (. node typeAnnotation) (lowerTypeExpr (. node typeAnnotation)) undefined))
                       (init (ternary (. node init) (lowerExpr (. node init)) undefined))))))
 
-  (const lowerConstructorParam
-    (lambda ((node))
+  (const (lowerConstructorParam) (lambda ((node))
       (return (object (id (. node id))
                       (name (. node name))
                       (optional (. node optional))
                       (typeAnnotation (ternary (. node typeAnnotation) (lowerTypeExpr (. node typeAnnotation)) undefined))
                       (modifiers (. node modifiers))))))
 
-  (const lowerConstructorDef
-    (lambda ((node))
+  (const (lowerConstructorDef) (lambda ((node))
       (let ((params ((. (. (. node sig) params) map) lowerConstructorParam))
              (returnType (ternary (. (. node sig) returnType) (lowerTypeExpr (. (. node sig) returnType)) undefined))
              (body ((. (. node body) map) lowerStmt)))
@@ -123,8 +112,7 @@
                         (sig (object (params params) (returnType returnType)))
                         (body body))))))
 
-  (const lowerClassMethodDef
-    (lambda ((node))
+  (const (lowerClassMethodDef) (lambda ((node))
       (let ((params ((. (. (. node sig) params) map) lowerTypedParam))
              (returnType (ternary (. (. node sig) returnType) (lowerTypeExpr (. (. node sig) returnType)) undefined))
              (body ((. (. node body) map) lowerStmt)))
@@ -136,8 +124,7 @@
                         (sig (object (params params) (returnType returnType)))
                         (body body))))))
 
-  (const lowerAbstractMethodDef
-    (lambda ((node))
+  (const (lowerAbstractMethodDef) (lambda ((node))
       (let ((params ((. (. (. node sig) params) map) lowerTypedParam))
              (returnType (ternary (. (. node sig) returnType) (lowerTypeExpr (. (. node sig) returnType)) undefined)))
         (return (object (node node) (id (. node id)) (tag 'abstract-method-def')
@@ -147,8 +134,7 @@
                         (key (ternary (. node key) (lowerExpr (. node key)) undefined))
                         (sig (object (params params) (returnType returnType))))))))
 
-  (const lowerGetterDef
-    (lambda ((node))
+  (const (lowerGetterDef) (lambda ((node))
       (let ((params ((. (. (. node sig) params) map) lowerTypedParam))
              (returnType (ternary (. (. node sig) returnType) (lowerTypeExpr (. (. node sig) returnType)) undefined))
              (body ((. (. node body) map) lowerStmt)))
@@ -160,8 +146,7 @@
                         (sig (object (params params) (returnType returnType)))
                         (body body))))))
 
-  (const lowerSetterDef
-    (lambda ((node))
+  (const (lowerSetterDef) (lambda ((node))
       (let ((params ((. (. (. node sig) params) map) lowerTypedParam))
              (returnType (ternary (. (. node sig) returnType) (lowerTypeExpr (. (. node sig) returnType)) undefined))
              (body ((. (. node body) map) lowerStmt)))
@@ -173,8 +158,7 @@
                         (sig (object (params params) (returnType returnType)))
                         (body body))))))
 
-  (const lowerMethodODef
-    (lambda ((node))
+  (const (lowerMethodODef) (lambda ((node))
       (let ((params ((. (. node params) map) lowerFnoParam))
              (restType (ternary (. node restType) (lowerTypeExpr (. node restType)) undefined))
              (returnType (ternary (. node returnType) (lowerTypeExpr (. node returnType)) undefined))
@@ -187,8 +171,7 @@
                         (params params) (rest (. node rest)) (restType restType) (returnType returnType)
                         (body body))))))
 
-  (const lowerAbstractMethodODef
-    (lambda ((node))
+  (const (lowerAbstractMethodODef) (lambda ((node))
       (let ((params ((. (. node params) map) lowerFnoParam))
              (restType (ternary (. node restType) (lowerTypeExpr (. node restType)) undefined))
              (returnType (ternary (. node returnType) (lowerTypeExpr (. node returnType)) undefined)))
@@ -199,8 +182,7 @@
                         (key (ternary (. node key) (lowerExpr (. node key)) undefined))
                         (params params) (rest (. node rest)) (restType restType) (returnType returnType))))))
 
-  (const lowerConstructorODef
-    (lambda ((node))
+  (const (lowerConstructorODef) (lambda ((node))
       (let ((params ((. (. node params) map) lowerFnoParam))
              (restType (ternary (. node restType) (lowerTypeExpr (. node restType)) undefined))
              (returnType (ternary (. node returnType) (lowerTypeExpr (. node returnType)) undefined))
@@ -209,8 +191,7 @@
                         (params params) (rest (. node rest)) (restType restType) (returnType returnType)
                         (body body))))))
 
-  (const lowerClassElement
-    (lambda ((node))
+  (const (lowerClassElement) (lambda ((node))
       (if (=== (. node tag) 'field-def') (return (lowerFieldDef node)))
       (if (=== (. node tag) 'constructor-def') (return (lowerConstructorDef node)))
       (if (=== (. node tag) 'class-method-def') (return (lowerClassMethodDef node)))
@@ -227,8 +208,7 @@
   ;; list) and this.x = x; assign-prop-stmts (prepended to the constructor body), then
   ;; strip the modifiers from the params.  Codegen sees a fully-formed tree with no residual
   ;; modifier metadata — no side channels needed downstream.
-  (const expandConstructorOModifiers
-    (lambda ((elements) (spanId))
+  (const (expandConstructorOModifiers) (lambda ((elements) (spanId))
       (let ((result (array)))
         ((. elements forEach) (lambda ((el))
           (if (!== (. el tag) 'constructor-o-def')
@@ -268,8 +248,7 @@
                                        (body ((. syntheticStmts concat) (. el body)))))))))
         (return result))))
 
-  (const lowerClassDef
-    (lambda ((node))
+  (const (lowerClassDef) (lambda ((node))
       ;; MixinBase subclasses may not own fields — all fields must carry 'declare'
       (if (&& (. node extendsType)
               (=== (. (. node extendsType) name) 'MixinBase'))
@@ -297,8 +276,7 @@
                         (implementsTypes implementsTypes)
                         (body (object (tag 'class-body') (elements elements))))))))
 
-  (const lowerAnonClassDef
-    (lambda ((node))
+  (const (lowerAnonClassDef) (lambda ((node))
       (let ((extendsType (ternary (. node extendsType) (lowerTypeExpr (. node extendsType)) undefined))
              (implementsTypes ((. (. node implementsTypes) map) lowerTypeExpr))
              (elements (expandConstructorOModifiers
@@ -310,8 +288,7 @@
                         (implementsTypes implementsTypes)
                         (body (object (tag 'class-body') (elements elements))))))))
 
-  (const lowerExportDefaultClass
-    (lambda ((node))
+  (const (lowerExportDefaultClass) (lambda ((node))
       (let ((classNode (. node classNode)))
         (if (=== (. classNode tag) 'class-def')
           (return (object (node node) (id (. node id)) (tag 'export-default-class-stmt') (classNode (lowerClassDef classNode)))))
@@ -319,8 +296,7 @@
           (return (object (node node) (id (. node id)) (tag 'export-default-class-stmt') (classNode (lowerAnonClassDef classNode)))))
         (throw (new Error (+ 'lowerExportDefaultClass: unexpected tag >' (. classNode tag) '< at ' (formatSpan (. classNode id))))))))
 
-  (const lowerExportDefaultDef
-    (lambda ((node))
+  (const (lowerExportDefaultDef) (lambda ((node))
       (let ((defNode (. node defNode))
              (init (. defNode init)))
         (if (&& (!== (. init tag) 'lambda') (!== (. init tag) 'fn'))
@@ -334,44 +310,36 @@
                           (returnType (ternary (. init returnType) (lowerTypeExpr (. init returnType)) undefined))
                           (body body)))))))
 
-  (const lowerMacroImport
-    (lambda ((node))
+  (const (lowerMacroImport) (lambda ((node))
       (return (object (node node) (id (. node id)) (tag 'macro-import-decl') (path (. node path))))))
 
-  (const lowerMacroExport
-    (lambda ((node))
+  (const (lowerMacroExport) (lambda ((node))
       (return (object (node node) (id (. node id)) (tag 'macro-export-decl') (specs (. node specs))))))
 
-  (const lowerDefmacro
-    (lambda ((node) (isMacroMode))
+  (const (lowerDefmacro) (lambda ((node) (isMacroMode))
       (return (object (node node) (id (. node id)) (tag 'macro-def')
         (name (. node name)) (params (. node params)) (rest (. node rest)) (scopeId (. node scopeId))
         (body (array))))))
 
-  (const lowerMacroTimeFnDef
-    (lambda ((node))
+  (const (lowerMacroTimeFnDef) (lambda ((node))
       (let ((init (lowerExpr (. node init))))
         (return (object (node node) (id (. node id)) (tag 'macro-time-fn-def') (name (. node name)) (init init))))))
 
-  (const lowerLetDecl
-    (lambda ((node))
+  (const (lowerLetDecl) (lambda ((node))
       (let ((init (lowerExpr (. node init)))
              (typeAnnotation (ternary (. node typeAnnotation) (lowerTypeExpr (. node typeAnnotation)) undefined)))
         (return (object (node node) (id (. node id)) (tag 'let-stmt') (name (. node name)) (typeAnnotation typeAnnotation) (init init) (meta (. node meta)))))))
 
-  (const lowerVarDecl
-    (lambda ((node))
+  (const (lowerVarDecl) (lambda ((node))
       (let ((init (lowerExpr (. node init)))
              (typeAnnotation (ternary (. node typeAnnotation) (lowerTypeExpr (. node typeAnnotation)) undefined)))
         (return (object (node node) (id (. node id)) (tag 'var-stmt') (name (. node name)) (typeAnnotation typeAnnotation) (init init) (meta (. node meta)))))))
 
-  (const lowerConstDecl
-    (lambda ((node))
+  (const (lowerConstDecl) (lambda ((node))
       (let ((init (lowerExpr (. node init))))
         (return (object (node node) (id (. node id)) (tag 'const-stmt') (name (. node name)) (init init) (meta (. node meta)))))))
 
-  (const lowerFnDecl
-    (lambda ((node))
+  (const (lowerFnDecl) (lambda ((node))
       (let ((params ((. (. node params) map) lowerTypedParam))
              (restType (ternary (. node restType) (lowerTypeExpr (. node restType)) undefined))
              (returnType (ternary (. node returnType) (lowerTypeExpr (. node returnType)) undefined))
@@ -385,8 +353,7 @@
                         (returnType returnType)
                         (body body))))))
 
-  (const lowerFnODecl
-    (lambda ((node))
+  (const (lowerFnODecl) (lambda ((node))
       (let ((params ((. (. node params) map) lowerFnoParam))
              (restType (ternary (. node restType) (lowerTypeExpr (. node restType)) undefined))
              (returnType (ternary (. node returnType) (lowerTypeExpr (. node returnType)) undefined))
@@ -399,8 +366,7 @@
                         (returnType returnType)
                         (body body))))))
 
-  (const lowerExportDecl
-    (lambda ((node))
+  (const (lowerExportDecl) (lambda ((node))
       (let ((inner (. node decl)))
         (if (=== (. inner tag) 'let-decl')
           (return (object (node node) (id (. node id)) (tag 'export-decl-stmt') (decl (lowerLetDecl inner)))))
@@ -418,8 +384,7 @@
           (return (object (node node) (id (. node id)) (tag 'export-decl-stmt') (decl (lowerTypeAlias inner)))))
         (throw (new Error (+ 'lowerExportDecl: unknown inner tag >' (. inner tag) '< at ' (formatSpan (. inner id))))))))
 
-  (const lowerStmt
-    (lambda ((node))
+  (const (lowerStmt) (lambda ((node))
       (if (=== (. node tag) 'let')
         (return (lowerLetStar node)))
       (if (=== (. node tag) 'var')
@@ -525,8 +490,7 @@
         (throw (new Error (+ 'macro-body-call (=&) was not expanded at ' (formatSpan (. node id))))))
       (throw (new Error (+ 'lowerStmt: unexpected tag >' (. node tag) '< at ' (formatSpan (. node id)))))))
 
-  (const lowerLetStar
-    (lambda ((node))
+  (const (lowerLetStar) (lambda ((node))
       (let ((stmts (array)))
         ((. (. node bindings) forEach) (lambda ((b))
           ((. stmts push) (object (node node) (tag 'let-stmt') (name (. b name)) (typeAnnotation (ternary (. b typeAnnotation) (lowerTypeExpr (. b typeAnnotation)) undefined)) (init (cond (. b init) (lowerExpr (. b init)) else undefined))))))
@@ -538,8 +502,7 @@
           (return (object (node node) (id (. node id)) (tag 'block-stmt') (body stmts) (noBody true))))
         (return (object (node node) (id (. node id)) (tag 'block-stmt') (body stmts))))))
 
-  (const lowerVarStar
-    (lambda ((node))
+  (const (lowerVarStar) (lambda ((node))
       (let ((stmts (array)))
         ((. (. node bindings) forEach) (lambda ((b))
           ((. stmts push) (object (node node) (tag 'var-stmt') (name (. b name)) (typeAnnotation (ternary (. b typeAnnotation) (lowerTypeExpr (. b typeAnnotation)) undefined)) (init (cond (. b init) (lowerExpr (. b init)) else undefined))))))
@@ -551,8 +514,7 @@
           (return (object (node node) (id (. node id)) (tag 'block-stmt') (body stmts) (noBody true))))
         (return (object (node node) (id (. node id)) (tag 'block-stmt') (body stmts))))))
 
-  (const lowerConstStar
-    (lambda ((node))
+  (const (lowerConstStar) (lambda ((node))
       (let ((stmts (array)))
         ((. (. node bindings) forEach) (lambda ((b))
           ((. stmts push) (object (node node) (tag 'const-stmt') (name (. b name)) (typeAnnotation (ternary (. b typeAnnotation) (lowerTypeExpr (. b typeAnnotation)) undefined)) (init (cond (. b init) (lowerExpr (. b init)) else undefined))))))
@@ -562,8 +524,7 @@
           (return (object (node node) (id (. node id)) (tag 'block-stmt') (body stmts) (noBody true))))
         (return (object (node node) (id (. node id)) (tag 'block-stmt') (body stmts))))))
 
-  (const lowerImport
-    (lambda ((node))
+  (const (lowerImport) (lambda ((node))
       ;; Sugar path: named/defaultName already set directly by astImport
       (if (! (. node spec))
         (return (object (node node) (id (. node id)) (tag 'import-stmt')
@@ -594,16 +555,14 @@
                   (return (object (name nm) ("alias" al)))))))))))
         (return (object (node node) (id (. node id)) (tag 'import-stmt') (defaultName defaultName) (namespaceName namespaceName) (named named) (source (. node source)))))))
 
-  (const lowerSwitch
-    (lambda ((node))
+  (const (lowerSwitch) (lambda ((node))
       (let ((discriminant (lowerExpr (. node discriminant)))
              (cases ((. (. node cases) map) (lambda ((c))
                (return (object (test (lowerExpr (. c test))) (body ((. (. c body) map) lowerStmt)))))))
              (defaultCase (ternary (. node defaultCase) (object (body ((. (. (. node defaultCase) body) map) lowerStmt))) undefined)))
         (return (object (node node) (id (. node id)) (tag 'switch-stmt') (discriminant discriminant) (cases cases) (defaultCase defaultCase))))))
 
-  (const lowerExpr
-    (lambda ((node))
+  (const (lowerExpr) (lambda ((node))
       (if (=== (. node tag) 'prop-access')
         (return (object (node node) (id (. node id)) (tag 'prop-access-expr') ("object" (lowerExpr (. node "object"))) (key (. node key)))))
       (if (=== (. node tag) 'index-access')
@@ -729,8 +688,7 @@
         (throw (new Error (+ 'macro-expr-call (=>) was not expanded at ' (formatSpan (. node id))))))
       (throw (new Error (+ 'lowerExpr: unexpected tag >' (. node tag) '< at ' (formatSpan (. node id)))))))
 
-  (const lowerCall
-    (lambda ((node))
+  (const (lowerCall) (lambda ((node))
       (if (&& (=== (. (. node fn) tag) 'identifier') (isOperator (. (. node fn) name)))
         (let ((op (. (. node fn) name))
                (args ((. (. node args) map) lowerExpr)))
@@ -748,8 +706,7 @@
              (args ((. (. node args) map) lowerExpr)))
         (return (object (node node) (id (. node id)) (tag 'call') (fn (lowerExpr (. node fn))) (args args) (typeArgs typeArgs))))))
 
-  (const lowerCond
-    (lambda ((node))
+  (const (lowerCond) (lambda ((node))
       (let ((clauses (. node clauses))
              (i (- (. clauses length) 1))
              (result (ternary (!== (. node elseExpr) undefined)
@@ -762,8 +719,7 @@
         (return result))))
 
   ;; ========== Phase B: Type Expression Lowering ==========
-  (const lowerTypeExpr
-    (lambda ((node))
+  (const (lowerTypeExpr) (lambda ((node))
       (if (=== (. node tag) 'type-id')
         (return node))
       (if (=== (. node tag) 'type-union')

@@ -19,8 +19,7 @@
   ;;       errors:            ExpansionError[] (accumulated during expandAll) }
 
   ;; Create an empty MacroEnv.
-  (const makeMacroEnv
-    (lambda ((isMacroCompilation))
+  (const (makeMacroEnv) (lambda ((isMacroCompilation))
       (return (object
         (macros (new Map))
         (macroNamespaces (new Map))
@@ -36,8 +35,7 @@
 
   ;; freshScope: allocate a fresh KFFD scope label (unique integer).
   ;; Used by the expander to stamp use-site scopes on expanded output.
-  (const freshScope
-    (lambda ((env))
+  (const (freshScope) (lambda ((env))
       (let ((s (. env scopeCounter)))
         (set! (. env scopeCounter) (+ (. env scopeCounter) 1))
         (return s))))
@@ -45,8 +43,7 @@
   ;; gensym: produce a fresh IdentifierNode guaranteed not to collide with
   ;; any user-written identifier.  prefix defaults to "g".
   ;; scopes starts empty; the expander (Step 5) stamps the KFFD labels.
-  (const gensym
-    (lambda ((env) (prefix))
+  (const (gensym) (lambda ((env) (prefix))
       (let ((pfx (ternary (!== prefix undefined) prefix 'g'))
              (id (. env gensymCounter)))
         (set! (. env gensymCounter) (+ (. env gensymCounter) 1))
@@ -62,8 +59,7 @@
   ;; collectMacros: walk a program AST (surface or lowered) and register
   ;; every defmacro/macro-def, macro-time-fn-def, and annotated binding
   ;; into env.  Returns env.
-  (const collectMacros
-    (lambda ((programNode) (env))
+  (const (collectMacros) (lambda ((programNode) (env))
       ((. (. programNode body) forEach)
         (lambda ((node))
           ;; surface tag ('defmacro') or lowered tag ('macro-def') — both accepted
@@ -92,8 +88,7 @@
 
   ;; registerTopLevelNode: register a single top-level node into env.
   ;; Used in the streaming pipeline instead of collectMacros.
-  (const registerTopLevelNode
-    (lambda ((node) (env))
+  (const (registerTopLevelNode) (lambda ((node) (env))
       (if (|| (=== (. node tag) 'defmacro') (=== (. node tag) 'macro-def'))
         ((. (. env macros) set) (. node name)
           (object

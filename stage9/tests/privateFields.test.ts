@@ -37,7 +37,7 @@ describe('private field naming (#foo)', () => {
         (set! (. this #count) (+ (. this #count) 1)))
       (method value ()
         (return (. this #count)))))
-  (const c (new Counter))
+  (const (c) (new Counter))
   ((. c increment))
   ((. c increment))
   ((. c increment))
