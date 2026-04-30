@@ -457,8 +457,6 @@
         (then (return (astVarStar ((. ctx varStmt))))))
       (if ((. ctx constStar))
         (then (return (astConstStar ((. ctx constStar))))))
-      (if ((. ctx constStmt))
-        (then (return (astConstStmt ((. ctx constStmt))))))
       (if ((. ctx ifForm))
         (then (return (astIf ((. ctx ifForm))))))
       (if ((. ctx whileForm))
@@ -768,6 +766,16 @@
 
   (const astConstStar
     (lambda ((ctx))
+      (if ((. ctx singleBinding))
+        (then
+          (let ((bindCtx ((. ctx singleBinding)))
+                 (parsed (astSingleBindingPattern bindCtx))
+                 (init (astExpression ((. ctx expression)))))
+            (if (. parsed isDestruct)
+              (then (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText)))
+                (tag 'const') (pattern (. parsed pattern)) (init init))))
+              (else (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText)))
+                (tag 'const') (name (. parsed name)) (typeAnnotation (. parsed typeAnnotation)) (init init))))))))
       (let ((bindings ((. ((. ctx starBinding)) map) (lambda ((b))
                (let ((id ((. ((. b IDENTIFIER)) getText)))
                       (init (astExpression ((. b expression))))

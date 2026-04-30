@@ -709,9 +709,6 @@ const astStatement  = (ctx) => {
   if (ctx.constStar()) {
     return astConstStar(ctx.constStar());
   }
-  if (ctx.constStmt()) {
-    return astConstStmt(ctx.constStmt());
-  }
   if (ctx.ifForm()) {
     return astIf(ctx.ifForm());
   }
@@ -1367,6 +1364,32 @@ const astVarStar  = (ctx) => {
   }
 };
 const astConstStar  = (ctx) => {
+  if (ctx.singleBinding()) {
+    {
+      let bindCtx  = ctx.singleBinding();
+      let parsed  = astSingleBindingPattern(bindCtx);
+      let init  = astExpression(ctx.expression());
+      if (parsed.isDestruct) {
+        return {
+          id: registerSpan(nextNodeId(), ctx),
+          text: ctx.getText(),
+          tag: "const",
+          pattern: parsed.pattern,
+          init: init
+        };
+      }
+      else {
+        return {
+          id: registerSpan(nextNodeId(), ctx),
+          text: ctx.getText(),
+          tag: "const",
+          name: parsed.name,
+          typeAnnotation: parsed.typeAnnotation,
+          init: init
+        };
+      }
+    }
+  }
   {
     let bindings  = ctx.starBinding().map((b) => {
       {

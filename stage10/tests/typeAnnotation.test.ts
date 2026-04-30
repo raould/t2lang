@@ -29,7 +29,7 @@ it('typeAnnotation.test.t2 end-to-end', () => {
         (asrt b "world")
         (asrt (typeof b) "string"))
 
-      (const* ((flag : boolean true))
+      (const ((flag : boolean true))
         (asrt flag true)
         (asrt (typeof flag) "boolean"))
   )

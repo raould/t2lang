@@ -11,14 +11,14 @@ it('const.test.t2 end-to-end', () => {
   (const (greeting) (+ "hello" " world"))
   ((. console log) greeting)
 
-  ;; const* with multiple bindings
-  (const* ((a 10)
+  ;; const with multiple bindings
+  (const ((a 10)
            (b 20)
            (c (+ a b)))
     ((. console log) c))
 
-  ;; const* with body
-  (const* ((name "Alice"))
+  ;; const with body
+  (const ((name "Alice"))
     ((. console log) (+ "Hi " name))))
 `);
 }, 30_000);

@@ -210,7 +210,6 @@ statement
     : letStmt
     | varStmt
     | constStar
-    | constStmt
     | ifForm
     | whileForm
     | exceptForm
@@ -244,11 +243,8 @@ varStmt
     ;
 
 constStar
-    : LPAREN CONSTSTAR LPAREN starBinding+ RPAREN statement* RPAREN
-    ;
-
-constStmt
-    : LPAREN CONST singleBinding expression RPAREN
+    : LPAREN CONST LPAREN starBinding+ RPAREN statement* RPAREN
+    | LPAREN CONST singleBinding expression RPAREN
     ;
 
 ifForm
@@ -863,7 +859,7 @@ propKey
     : IDENTIFIER
     | STRING
     | NUMBER
-    | PROGRAM | LET | VAR | CONSTSTAR | CONST | LAMBDA_O | LAMBDA | FN_O | FN | METHOD_O | METHOD | BIND | METHOD_CALL
+    | PROGRAM | LET | VAR | CONST | LAMBDA_O | LAMBDA | FN_O | FN | METHOD_O | METHOD | BIND | METHOD_CALL
     | DEFMACRO | MACRO_IMPORT | MACRO_EXPORT | MACRO_REEXPORT | MACRO_TIME_ATTR | MACRO_ERROR | IF | WHILE | THEN | RETURN | THROW | SET | TERNARY | COND
     | OBJECT | ARRAY | INDEX | QUASI | QUOTE | UNQUOTE_SPLICING | UNQUOTE
     | TYPE_ARRAY
@@ -1066,7 +1062,6 @@ PROGRAM     : 'program' ;
 // LETSTAR     : 'let*' ; // deprecated
 LET         : 'let' ;
 VAR         : 'var' ;
-CONSTSTAR   : 'const*' ;
 CONST       : 'const' ;
 LAMBDA_O    : 'lambda-o' ;
 LAMBDA      : 'lambda' ;
