@@ -196,28 +196,48 @@
 
   (const astTopLevelLet
     (lambda ((ctx))
-      (let ((b (index ((. ctx starBinding)) 0))
+      (let ((b ((. ctx starBinding)))
              (meta (astParseMeta ctx)))
-        (let ((name ((. ((. b IDENTIFIER)) getText)))
-               (init (astExpression ((. b expression))))
-               (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
-          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'let-decl') (name name) (init init) (typeAnnotation typeAnnotation) (meta meta)))))))
+        (if b
+          (then
+            (let ((name ((. ((. b IDENTIFIER)) getText)))
+                   (init (astExpression ((. b expression))))
+                   (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
+              (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'let-decl') (name name) (init init) (typeAnnotation typeAnnotation) (meta meta)))))
+          (else
+            (let ((name ((. ((. ctx IDENTIFIER)) getText)))
+                   (init (astExpression ((. ctx expression)))))
+              (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'let-decl') (name name) (init init) (meta meta)))))))))
 
   (const astTopLevelVar
     (lambda ((ctx))
-      (let ((b (index ((. ctx starBinding)) 0))
+      (let ((b ((. ctx starBinding)))
              (meta (astParseMeta ctx)))
-        (let ((name ((. ((. b IDENTIFIER)) getText)))
-               (init (astExpression ((. b expression))))
-               (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
-          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'var-decl') (name name) (init init) (typeAnnotation typeAnnotation) (meta meta)))))))
+        (if b
+          (then
+            (let ((name ((. ((. b IDENTIFIER)) getText)))
+                   (init (astExpression ((. b expression))))
+                   (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
+              (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'var-decl') (name name) (init init) (typeAnnotation typeAnnotation) (meta meta)))))
+          (else
+            (let ((name ((. ((. ctx IDENTIFIER)) getText)))
+                   (init (astExpression ((. ctx expression)))))
+              (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'var-decl') (name name) (init init) (meta meta)))))))))
 
   (const astTopLevelConst
     (lambda ((ctx))
-      (let ((name ((. ((. ctx IDENTIFIER)) getText)))
-             (init (astExpression ((. ctx expression))))
+      (let ((b ((. ctx starBinding)))
              (meta (astParseMeta ctx)))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const-decl') (name name) (init init) (meta meta))))))
+        (if b
+          (then
+            (let ((name ((. ((. b IDENTIFIER)) getText)))
+                   (init (astExpression ((. b expression))))
+                   (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
+              (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const-decl') (name name) (init init) (typeAnnotation typeAnnotation) (meta meta)))))
+          (else
+            (let ((name ((. ((. ctx IDENTIFIER)) getText)))
+                   (init (astExpression ((. ctx expression)))))
+              (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const-decl') (name name) (init init) (meta meta)))))))))
 
 
   (const astTypeAlias

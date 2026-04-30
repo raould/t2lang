@@ -78,15 +78,18 @@ macroReexport
     ;
 
 topLevelLet
-    : LPAREN LET metaAnnotation* LPAREN starBinding+ RPAREN RPAREN
+    : LPAREN LET metaAnnotation* LPAREN starBinding RPAREN RPAREN
+    | LPAREN LET metaAnnotation* IDENTIFIER expression RPAREN
     ;
 
 topLevelVar
-    : LPAREN VAR metaAnnotation* LPAREN starBinding+ RPAREN RPAREN
+    : LPAREN VAR metaAnnotation* LPAREN starBinding RPAREN RPAREN
+    | LPAREN VAR metaAnnotation* IDENTIFIER expression RPAREN
     ;
 
 topLevelConst
-    : LPAREN CONST metaAnnotation* IDENTIFIER expression RPAREN
+    : LPAREN CONST metaAnnotation* LPAREN starBinding RPAREN RPAREN
+    | LPAREN CONST metaAnnotation* IDENTIFIER expression RPAREN
     ;
 
 
