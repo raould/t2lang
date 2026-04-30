@@ -224,7 +224,7 @@ export class Stage10Parser extends antlr.Parser {
     public static readonly RULE_statement = 37;
     public static readonly RULE_letStmt = 38;
     public static readonly RULE_varStmt = 39;
-    public static readonly RULE_constStar = 40;
+    public static readonly RULE_constStmt = 40;
     public static readonly RULE_ifForm = 41;
     public static readonly RULE_thenBlock = 42;
     public static readonly RULE_elseBlock = 43;
@@ -443,7 +443,7 @@ export class Stage10Parser extends antlr.Parser {
         "classImplements", "classBody", "classElement", "modifier", "fieldDef", 
         "constructorParam", "constructorSignature", "constructorDef", "classMethodDef", 
         "abstractMethodDef", "getterDef", "setterDef", "methodKey", "statement", 
-        "letStmt", "varStmt", "constStar", "ifForm", "thenBlock", "elseBlock", 
+        "letStmt", "varStmt", "constStmt", "ifForm", "thenBlock", "elseBlock", 
         "whileForm", "returnForm", "throwForm", "breakForm", "continueForm", 
         "importForm", "importTypeForm", "importTypeSpec", "importTypeName", 
         "exportForm", "exportBinding", "exportDefault", "exportNamed", "exportNamePair", 
@@ -2488,7 +2488,7 @@ export class Stage10Parser extends antlr.Parser {
                 this.enterOuterAlt(localContext, 3);
                 {
                 this.state = 815;
-                this.constStar();
+                this.constStmt();
                 }
                 break;
             case 4:
@@ -2766,9 +2766,9 @@ export class Stage10Parser extends antlr.Parser {
         }
         return localContext;
     }
-    public constStar(): ConstStarContext {
-        let localContext = new ConstStarContext(this.context, this.state);
-        this.enterRule(localContext, 80, Stage10Parser.RULE_constStar);
+    public constStmt(): ConstStmtContext {
+        let localContext = new ConstStmtContext(this.context, this.state);
+        this.enterRule(localContext, 80, Stage10Parser.RULE_constStmt);
         let _la: number;
         try {
             this.enterOuterAlt(localContext, 1);
@@ -12298,8 +12298,8 @@ export class StatementContext extends antlr.ParserRuleContext {
     public varStmt(): VarStmtContext | null {
         return this.getRuleContext(0, VarStmtContext);
     }
-    public constStar(): ConstStarContext | null {
-        return this.getRuleContext(0, ConstStarContext);
+    public constStmt(): ConstStmtContext | null {
+        return this.getRuleContext(0, ConstStmtContext);
     }
     public ifForm(): IfFormContext | null {
         return this.getRuleContext(0, IfFormContext);
@@ -12495,7 +12495,7 @@ export class VarStmtContext extends antlr.ParserRuleContext {
 }
 
 
-export class ConstStarContext extends antlr.ParserRuleContext {
+export class ConstStmtContext extends antlr.ParserRuleContext {
     public constructor(parent: antlr.ParserRuleContext | null, invokingState: number) {
         super(parent, invokingState);
     }
@@ -12539,16 +12539,16 @@ export class ConstStarContext extends antlr.ParserRuleContext {
         return this.getRuleContext(i, StatementContext);
     }
     public override get ruleIndex(): number {
-        return Stage10Parser.RULE_constStar;
+        return Stage10Parser.RULE_constStmt;
     }
     public override enterRule(listener: Stage10Listener): void {
-        if(listener.enterConstStar) {
-             listener.enterConstStar(this);
+        if(listener.enterConstStmt) {
+             listener.enterConstStmt(this);
         }
     }
     public override exitRule(listener: Stage10Listener): void {
-        if(listener.exitConstStar) {
-             listener.exitConstStar(this);
+        if(listener.exitConstStmt) {
+             listener.exitConstStmt(this);
         }
     }
 }

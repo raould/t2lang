@@ -209,7 +209,7 @@ methodKey
 statement
     : letStmt
     | varStmt
-    | constStar
+    | constStmt
     | ifForm
     | whileForm
     | exceptForm
@@ -242,7 +242,7 @@ varStmt
     : LPAREN VAR LPAREN starBinding+ RPAREN statement* RPAREN
     ;
 
-constStar
+constStmt
     : LPAREN CONST LPAREN starBinding+ RPAREN statement* RPAREN
     ;
 

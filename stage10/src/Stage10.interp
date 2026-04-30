@@ -395,7 +395,7 @@ methodKey
 statement
 letStmt
 varStmt
-constStar
+constStmt
 ifForm
 thenBlock
 elseBlock

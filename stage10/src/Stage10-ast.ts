@@ -706,8 +706,8 @@ const astStatement  = (ctx) => {
   if (ctx.varStmt()) {
     return astVarStar(ctx.varStmt());
   }
-  if (ctx.constStar()) {
-    return astConstStar(ctx.constStar());
+  if (ctx.constStmt()) {
+    return astConstStar(ctx.constStmt());
   }
   if (ctx.ifForm()) {
     return astIf(ctx.ifForm());
