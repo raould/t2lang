@@ -15,6 +15,33 @@ const addBinding  = (chain, name, scopes) => {
     scopes: scopes
   }]);
 };
+const getNamesFromPattern  = (nameOrPattern) => {
+  if ((!nameOrPattern)) {
+    return [];
+  }
+  else {
+    if ((nameOrPattern.tag === "plain")) {
+      return [nameOrPattern.name];
+    }
+    else {
+      if (((nameOrPattern.tag === "object-destruct") || (nameOrPattern.tag === "array-destruct"))) {
+        return nameOrPattern.names;
+      }
+      else {
+        return [];
+      }
+    }
+  }
+};
+const addBindings  = (chain, names, scopes) => {
+  {
+    let result  = chain;
+    names.forEach((name) => {
+      result = addBinding(result, name, scopes);
+    });
+    return result;
+  }
+};
 const resolveIdent  = (ident, chain) => {
   {
     let identScopes  = ident.scopes;
@@ -460,11 +487,11 @@ const resolveStmt  = (node, chain) => {
           let resolvedInit  = resolveExpr(b.init, extChain);
           let bindScopes  = (b.scopes ? b.scopes : new Set());
           resolvedBindings.push({
-            name: b.name,
+            nameOrPattern: b.nameOrPattern,
             init: resolvedInit,
             typeAnnotation: b.typeAnnotation
           });
-          extChain = addBinding(extChain, b.name, bindScopes);
+          extChain = addBindings(extChain, getNamesFromPattern(b.nameOrPattern), bindScopes);
         }
       });
       return {
@@ -486,11 +513,11 @@ const resolveStmt  = (node, chain) => {
           let resolvedInit  = resolveExpr(b.init, extChain);
           let bindScopes  = (b.scopes ? b.scopes : new Set());
           resolvedBindings.push({
-            name: b.name,
+            nameOrPattern: b.nameOrPattern,
             init: resolvedInit,
             typeAnnotation: b.typeAnnotation
           });
-          extChain = addBinding(extChain, b.name, bindScopes);
+          extChain = addBindings(extChain, getNamesFromPattern(b.nameOrPattern), bindScopes);
         }
       });
       return {

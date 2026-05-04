@@ -746,7 +746,8 @@ const evalMacroLetStar  = (node, bindings, env) => {
     node.bindings.forEach((b) => {
       {
         let val  = evalMacroExpr(b.init, extended, env);
-        extended.set(b.name, val);
+        let bindName  = (b.nameOrPattern ? ((b.nameOrPattern.tag === "plain") ? b.nameOrPattern.name : b.nameOrPattern.names["0"]) : b.name);
+        extended.set(bindName, val);
       }
     });
     return evalMacroBody(node.body, extended, env);
@@ -1388,7 +1389,7 @@ const addScopeToNode  = (node, scope) => {
       text: node.text,
       bindings: node.bindings.map((b) => {
         return {
-          name: b.name,
+          nameOrPattern: b.nameOrPattern,
           init: addScopeToNode(b.init, scope),
           typeAnnotation: b.typeAnnotation
         };
@@ -1404,7 +1405,7 @@ const addScopeToNode  = (node, scope) => {
       text: node.text,
       bindings: node.bindings.map((b) => {
         return {
-          name: b.name,
+          nameOrPattern: b.nameOrPattern,
           init: addScopeToNode(b.init, scope),
           typeAnnotation: b.typeAnnotation
         };
@@ -1953,7 +1954,7 @@ const expandStmt  = (node, env) => {
       text: node.text,
       bindings: node.bindings.map((b) => {
         return {
-          name: b.name,
+          nameOrPattern: b.nameOrPattern,
           init: expandExpr(b.init, env),
           typeAnnotation: b.typeAnnotation
         };
@@ -1970,7 +1971,7 @@ const expandStmt  = (node, env) => {
       text: node.text,
       bindings: node.bindings.map((b) => {
         return {
-          name: b.name,
+          nameOrPattern: b.nameOrPattern,
           init: expandExpr(b.init, env),
           typeAnnotation: b.typeAnnotation
         };

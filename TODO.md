@@ -2,7 +2,7 @@
     - and all related const/var/let.
     - [x] constStmt.
     - [x] re-support multi-pair forms.
-    - destructuring support.
+    - destructuring support, and ...rest.
 - [ ] require infix spacing (see aborted commit).
 - [ ] stageN/src/** duh.
     - [ ] also t2src -> src ? -> dist

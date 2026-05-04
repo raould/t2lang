@@ -39,7 +39,27 @@
     (lambda ((chain) (name) (scopes))
       (return ((. chain concat) (array (object (name name) (scopes scopes)))))))
 
-  ;; resolveIdent: find the most-specific visible binding for `ident` in `chain`.
+  ;; Extract variable name(s) from a nameOrPattern object
+  ;; Returns an array of names to add to the binding chain
+  (const getNamesFromPattern
+    (lambda ((nameOrPattern))
+      (if (! nameOrPattern)
+        (then (return (array)))
+        (else
+          (if (=== (. nameOrPattern tag) 'plain')
+            (then (return (array (. nameOrPattern name))))
+            (else
+              (if (|| (=== (. nameOrPattern tag) 'object-destruct') (=== (. nameOrPattern tag) 'array-destruct'))
+                (then (return (. nameOrPattern names)))
+                (else (return (array))))))))))
+
+  ;; Add multiple names to the binding chain
+  (const addBindings
+    (lambda ((chain) (names) (scopes))
+      (let ((result chain))
+        ((. names forEach) (lambda ((name))
+          (set! result (addBinding result name scopes))))
+        (return result))))
   ;; Iterates the chain (which is ordered outermost-to-innermost) and returns
   ;; the matching binding whose scope set has the highest cardinality.
   ;; In a flat user program (all binding scopes = ∅), ties are broken in favour
@@ -346,10 +366,10 @@
                        ;; binding name scope: empty set for user code
                        (bindScopes (ternary (. b scopes) (. b scopes) (new Set))))
                   ((. resolvedBindings push) (object
-                    (name (. b name))
+                    (nameOrPattern (. b nameOrPattern))
                     (init resolvedInit)
                     (typeAnnotation (. b typeAnnotation))))
-                  (set! extChain (addBinding extChain (. b name) bindScopes)))))
+                  (set! extChain (addBindings extChain (getNamesFromPattern (. b nameOrPattern)) bindScopes)))))
             (return (object (tag 'let') (text (. node text))
               (bindings resolvedBindings)
               (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))
@@ -362,10 +382,10 @@
                 (let ((resolvedInit (resolveExpr (. b init) extChain))
                        (bindScopes (ternary (. b scopes) (. b scopes) (new Set))))
                   ((. resolvedBindings push) (object
-                    (name (. b name))
+                    (nameOrPattern (. b nameOrPattern))
                     (init resolvedInit)
                     (typeAnnotation (. b typeAnnotation))))
-                  (set! extChain (addBinding extChain (. b name) bindScopes)))))
+                  (set! extChain (addBindings extChain (getNamesFromPattern (. b nameOrPattern)) bindScopes)))))
             (return (object (tag 'const*') (text (. node text))
               (bindings resolvedBindings)
               (body ((. (. node body) map) (lambda ((s)) (return (resolveStmt s extChain))))))))))

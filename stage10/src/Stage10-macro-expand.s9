@@ -563,8 +563,13 @@
       (let ((extended (new Map bindings)))
         ((. (. node bindings) forEach)
           (lambda ((b))
-            (let ((val (evalMacroExpr (. b init) extended env)))
-              ((. extended set) (. b name) val))))
+            (let ((val (evalMacroExpr (. b init) extended env))
+                   (bindName (ternary (. b nameOrPattern)
+                              (ternary (=== (. (. b nameOrPattern) tag) 'plain')
+                                (. (. b nameOrPattern) name)
+                                (. (. (. b nameOrPattern) names) 0))
+                              (. b name))))
+              ((. extended set) bindName val))))
         (return (evalMacroBody (. node body) extended env)))))
 
   ;; ---- Evaluate a statement in a macro body ----
@@ -1038,7 +1043,7 @@
         (then (return (object (tag (. node tag)) (text (. node text))
           (bindings ((. (. node bindings) map) (lambda ((b))
             (return (object
-              (name (. b name))
+              (nameOrPattern (. b nameOrPattern))
               (init (addScopeToNode (. b init) scope))
               (typeAnnotation (. b typeAnnotation)))))))
           (body ((. (. node body) map) (lambda ((s)) (return (addScopeToNode s scope)))))))))
@@ -1047,7 +1052,7 @@
         (then (return (object (tag (. node tag)) (text (. node text))
           (bindings ((. (. node bindings) map) (lambda ((b))
             (return (object
-              (name (. b name))
+              (nameOrPattern (. b nameOrPattern))
               (init (addScopeToNode (. b init) scope))
               (typeAnnotation (. b typeAnnotation)))))))
           (body ((. (. node body) map) (lambda ((s)) (return (addScopeToNode s scope)))))))))
@@ -1441,7 +1446,7 @@
         (then (return (object (tag 'let') (id (. node id)) (text (. node text))
           (bindings ((. (. node bindings) map) (lambda ((b))
             (return (object
-              (name (. b name))
+              (nameOrPattern (. b nameOrPattern))
               (init (expandExpr (. b init) env))
               (typeAnnotation (. b typeAnnotation)))))))
           (body ((. (. node body) map) (lambda ((s)) (return (expandStmt s env)))))))))
@@ -1450,7 +1455,7 @@
         (then (return (object (tag 'const*') (id (. node id)) (text (. node text))
           (bindings ((. (. node bindings) map) (lambda ((b))
             (return (object
-              (name (. b name))
+              (nameOrPattern (. b nameOrPattern))
               (init (expandExpr (. b init) env))
               (typeAnnotation (. b typeAnnotation)))))))
           (body ((. (. node body) map) (lambda ((s)) (return (expandStmt s env)))))))))
