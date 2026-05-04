@@ -312,6 +312,12 @@
   ;; Skips over quoted strings and ;; comments verbatim.
   (const readerTransform
     (lambda ((src))
+      ;; Preprocess: Replace ...identifier with rest identifier (no parens)
+      ;; This handles spread syntax in destructuring patterns like [a ...rest] → [a rest rest]
+      ;; Use a function-based replacement to avoid issues with $1 backreferences
+      (set! src ((. src replace) (new RegExp "\\.\\.\\.(\\w+)" "g")
+        (lambda ((match) (identifier))
+          (return (+ "rest " identifier)))))
       (let ((out "")
              (i 0)
              (n (. src length))
