@@ -15,7 +15,7 @@
   (const emitDestructPattern
     (lambda ((pattern))
       (if (=== (. pattern tag) 'object-destruct')
-        (then (let ((names ((. (. pattern names) map) (lambda ((n)) (checkId n undefined))))
+        (then (let ((names ((. (. pattern names) map) (lambda ((n)) (return (checkId n undefined)))))
                     (restElem (. pattern rest))
                     (restStr (ternary restElem (+ '...' (checkId restElem undefined)) undefined))
                     (allNames (ternary restElem
@@ -23,7 +23,7 @@
                       ((. names join) ', '))))
               (return (+ '{' allNames '}')))))
       (if (=== (. pattern tag) 'array-destruct')
-        (then (let ((names ((. (. pattern names) map) (lambda ((n)) (checkId n undefined))))
+        (then (let ((names ((. (. pattern names) map) (lambda ((n)) (return (checkId n undefined)))))
                     (restElem (. pattern rest))
                     (restStr (ternary restElem (+ '...' (checkId restElem undefined)) undefined))
                     (allNames (ternary restElem

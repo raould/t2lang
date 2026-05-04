@@ -119,7 +119,7 @@ const desugarDottedIdentifier  = (text, ctx) => {
 const astObjectDestructPattern  = (ctx) => {
   {
     let ids  = ctx.IDENTIFIER().map((id) => {
-      id.getText();
+      return id.getText();
     });
     let hasRest  = ctx.REST();
     let names  = (hasRest ? ids.slice(0, -1) : ids);
@@ -135,7 +135,7 @@ const astObjectDestructPattern  = (ctx) => {
 const astArrayDestructPattern  = (ctx) => {
   {
     let ids  = ctx.IDENTIFIER().map((id) => {
-      id.getText();
+      return id.getText();
     });
     let hasRest  = ctx.REST();
     let names  = (hasRest ? ids.slice(0, -1) : ids);

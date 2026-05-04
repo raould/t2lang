@@ -87,7 +87,7 @@
     (lambda ((ctx))
       ;; Parse {x y z ...rest} or just {x y z}
       ;; Returns: { tag: 'object-destruct', names: [...], rest: undefined|string }
-      (let ((ids ((. ((. ctx IDENTIFIER)) map) (lambda ((id)) ((. id getText)))))
+      (let ((ids ((. ((. ctx IDENTIFIER)) map) (lambda ((id)) (return ((. id getText))))))
              (hasRest ((. ctx REST)))
              (names (ternary hasRest ((. ids slice) 0 -1) ids))
              (lastIdx (- (. ids length) 1))
@@ -98,7 +98,7 @@
     (lambda ((ctx))
       ;; Parse [x y z ...rest] or just [x y z]
       ;; Returns: { tag: 'array-destruct', names: [...], rest: undefined|string }
-      (let ((ids ((. ((. ctx IDENTIFIER)) map) (lambda ((id)) ((. id getText)))))
+      (let ((ids ((. ((. ctx IDENTIFIER)) map) (lambda ((id)) (return ((. id getText))))))
              (hasRest ((. ctx REST)))
              (names (ternary hasRest ((. ids slice) 0 -1) ids))
              (lastIdx (- (. ids length) 1))

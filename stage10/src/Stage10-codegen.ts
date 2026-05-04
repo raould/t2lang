@@ -12,7 +12,7 @@ const emitDestructPattern  = (pattern) => {
   if ((pattern.tag === "object-destruct")) {
     {
       let names  = pattern.names.map((n) => {
-        checkId(n, undefined);
+        return checkId(n, undefined);
       });
       let restElem  = pattern.rest;
       let restStr  = (restElem ? ("..." + checkId(restElem, undefined)) : undefined);
@@ -23,7 +23,7 @@ const emitDestructPattern  = (pattern) => {
   if ((pattern.tag === "array-destruct")) {
     {
       let names  = pattern.names.map((n) => {
-        checkId(n, undefined);
+        return checkId(n, undefined);
       });
       let restElem  = pattern.rest;
       let restStr  = (restElem ? ("..." + checkId(restElem, undefined)) : undefined);

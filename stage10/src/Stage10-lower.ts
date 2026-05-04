@@ -1014,6 +1014,7 @@ const lowerLetStar  = (node) => {
     node.bindings.forEach((b) => {
       stmts.push({
         node: node,
+        id: node.id,
         tag: "let-stmt",
         nameOrPattern: b.nameOrPattern,
         typeAnnotation: (b.typeAnnotation ? lowerTypeExpr(b.typeAnnotation) : undefined),
@@ -1049,6 +1050,7 @@ const lowerVarStar  = (node) => {
     node.bindings.forEach((b) => {
       stmts.push({
         node: node,
+        id: node.id,
         tag: "var-stmt",
         nameOrPattern: b.nameOrPattern,
         typeAnnotation: (b.typeAnnotation ? lowerTypeExpr(b.typeAnnotation) : undefined),
@@ -1084,6 +1086,7 @@ const lowerConstStar  = (node) => {
     node.bindings.forEach((b) => {
       stmts.push({
         node: node,
+        id: node.id,
         tag: "const-stmt",
         nameOrPattern: b.nameOrPattern,
         typeAnnotation: (b.typeAnnotation ? lowerTypeExpr(b.typeAnnotation) : undefined),
