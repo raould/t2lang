@@ -394,16 +394,16 @@ singleBinding
     | arrayDestructPat
     ;
 
-// ──── destructuring patterns (Phase 1: plain names only) ────
+// ──── destructuring patterns ────
 
-// { x  y  z }  — shorthand names only; ...rest in Phase 2+
+// { x  y  z }  or  { x  y  ...rest }
 objectDestructPat
-    : LBRACE IDENTIFIER* RBRACE
+    : LBRACE IDENTIFIER* (REST IDENTIFIER)? RBRACE
     ;
 
-// [ a  b  c ]  — names only; ...rest in Phase 2+
+// [ a  b  c ]  or  [ a  b  ...rest ]
 arrayDestructPat
-    : LBRACK IDENTIFIER* RBRACK
+    : LBRACK IDENTIFIER* (REST IDENTIFIER)? RBRACK
     ;
 
 // ─── type expressions ────────────────────────
