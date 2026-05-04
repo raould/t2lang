@@ -82,6 +82,29 @@
             (set! i (+ i 1)))
           (return current)))))
 
+  ;; ========== Destructuring pattern parsing ==========
+  (const astObjectDestructPattern
+    (lambda ((ctx))
+      ;; Parse {x y z ...rest} or just {x y z}
+      ;; Returns: { tag: 'object-destruct', names: [...], rest: undefined|string }
+      (let ((ids ((. ((. ctx IDENTIFIER)) map) (lambda ((id)) ((. id getText)))))
+             (hasRest ((. ctx REST)))
+             (names (ternary hasRest ((. ids slice) 0 -1) ids))
+             (lastIdx (- (. ids length) 1))
+             (restElem (ternary hasRest (index ids lastIdx) undefined)))
+        (return (object (tag 'object-destruct') (names names) (rest restElem))))))
+
+  (const astArrayDestructPattern
+    (lambda ((ctx))
+      ;; Parse [x y z ...rest] or just [x y z]
+      ;; Returns: { tag: 'array-destruct', names: [...], rest: undefined|string }
+      (let ((ids ((. ((. ctx IDENTIFIER)) map) (lambda ((id)) ((. id getText)))))
+             (hasRest ((. ctx REST)))
+             (names (ternary hasRest ((. ids slice) 0 -1) ids))
+             (lastIdx (- (. ids length) 1))
+             (restElem (ternary hasRest (index ids lastIdx) undefined)))
+        (return (object (tag 'array-destruct') (names names) (rest restElem))))))
+
   ;; ========== Scope ID counter (KFFD: assigned at parse time) ==========
   (let ((macroScopeCounter_ 0)))
 
@@ -197,29 +220,44 @@
   (const astTopLevelLet
     (lambda ((ctx))
       (let ((b ((. ctx starBinding)))
-             (meta (astParseMeta ctx)))
-        (let ((name ((. ((. b IDENTIFIER)) getText)))
-               (init (astExpression ((. b expression))))
-               (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
-          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'let-decl') (name name) (init init) (typeAnnotation typeAnnotation) (meta meta)))))))
+             (meta (astParseMeta ctx))
+             (idToken ((. b IDENTIFIER)))
+             (destructObj ((. b objectDestructPat)))
+             (destructArr ((. b arrayDestructPat))))
+        (if idToken
+          (then (let ((name ((. idToken getText)))
+                      (init (astExpression ((. b expression))))
+                      (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
+                 (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'let-decl') (name name) (init init) (typeAnnotation typeAnnotation) (meta meta)))))
+          (else (throw (new Error "Top-level let declarations do not support destructuring patterns")))))))
 
   (const astTopLevelVar
     (lambda ((ctx))
       (let ((b ((. ctx starBinding)))
-             (meta (astParseMeta ctx)))
-        (let ((name ((. ((. b IDENTIFIER)) getText)))
-               (init (astExpression ((. b expression))))
-               (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
-          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'var-decl') (name name) (init init) (typeAnnotation typeAnnotation) (meta meta)))))))
+             (meta (astParseMeta ctx))
+             (idToken ((. b IDENTIFIER)))
+             (destructObj ((. b objectDestructPat)))
+             (destructArr ((. b arrayDestructPat))))
+        (if idToken
+          (then (let ((name ((. idToken getText)))
+                      (init (astExpression ((. b expression))))
+                      (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
+                 (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'var-decl') (name name) (init init) (typeAnnotation typeAnnotation) (meta meta)))))
+          (else (throw (new Error "Top-level var declarations do not support destructuring patterns")))))))
 
   (const astTopLevelConst
     (lambda ((ctx))
       (let ((b ((. ctx starBinding)))
-             (meta (astParseMeta ctx)))
-        (let ((name ((. ((. b IDENTIFIER)) getText)))
-               (init (astExpression ((. b expression))))
-               (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
-          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const-decl') (name name) (init init) (typeAnnotation typeAnnotation) (meta meta)))))))
+             (meta (astParseMeta ctx))
+             (idToken ((. b IDENTIFIER)))
+             (destructObj ((. b objectDestructPat)))
+             (destructArr ((. b arrayDestructPat))))
+        (if idToken
+          (then (let ((name ((. idToken getText)))
+                      (init (astExpression ((. b expression))))
+                      (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
+                 (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const-decl') (name name) (init init) (typeAnnotation typeAnnotation) (meta meta)))))
+          (else (throw (new Error "Top-level const declarations do not support destructuring patterns")))))))
 
 
   (const astTypeAlias
@@ -720,30 +758,42 @@
   (const astLetStar
     (lambda ((ctx))
       (let ((bindings ((. ((. ctx starBinding)) map) (lambda ((b))
-               (let ((id ((. ((. b IDENTIFIER)) getText)))
-                      (init (astExpression ((. b expression))))
-                      (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
-                 (return (object (name id) (init init) (typeAnnotation typeAnnotation)))))))
+               (let ((init (astExpression ((. b expression))))
+                      (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined))
+                      (nameOrPattern (ternary ((. b objectDestructPat))
+                        (astObjectDestructPattern ((. b objectDestructPat)))
+                        (ternary ((. b arrayDestructPat))
+                          (astArrayDestructPattern ((. b arrayDestructPat)))
+                          (object (tag 'plain') (name ((. ((. b IDENTIFIER)) getText))))))))
+                 (return (object (nameOrPattern nameOrPattern) (init init) (typeAnnotation typeAnnotation)))))))
              (body ((. ((. ctx statement)) map) astStatement)))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'let') (bindings bindings) (body body))))))
 
   (const astVarStar
     (lambda ((ctx))
       (let ((bindings ((. ((. ctx starBinding)) map) (lambda ((b))
-               (let ((id ((. ((. b IDENTIFIER)) getText)))
-                      (init (astExpression ((. b expression))))
-                      (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
-                 (return (object (name id) (init init) (typeAnnotation typeAnnotation)))))))
+               (let ((init (astExpression ((. b expression))))
+                      (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined))
+                      (nameOrPattern (ternary ((. b objectDestructPat))
+                        (astObjectDestructPattern ((. b objectDestructPat)))
+                        (ternary ((. b arrayDestructPat))
+                          (astArrayDestructPattern ((. b arrayDestructPat)))
+                          (object (tag 'plain') (name ((. ((. b IDENTIFIER)) getText))))))))
+                 (return (object (nameOrPattern nameOrPattern) (init init) (typeAnnotation typeAnnotation)))))))
              (body ((. ((. ctx statement)) map) astStatement)))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'var') (bindings bindings) (body body))))))
 
   (const astConstStar
     (lambda ((ctx))
       (let ((bindings ((. ((. ctx starBinding)) map) (lambda ((b))
-               (let ((id ((. ((. b IDENTIFIER)) getText)))
-                      (init (astExpression ((. b expression))))
-                      (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
-                 (return (object (name id) (init init) (typeAnnotation typeAnnotation)))))))
+               (let ((init (astExpression ((. b expression))))
+                      (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined))
+                      (nameOrPattern (ternary ((. b objectDestructPat))
+                        (astObjectDestructPattern ((. b objectDestructPat)))
+                        (ternary ((. b arrayDestructPat))
+                          (astArrayDestructPattern ((. b arrayDestructPat)))
+                          (object (tag 'plain') (name ((. ((. b IDENTIFIER)) getText))))))))
+                 (return (object (nameOrPattern nameOrPattern) (init init) (typeAnnotation typeAnnotation)))))))
              (body ((. ((. ctx statement)) map) astStatement)))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const*') (bindings bindings) (body body))))))
 

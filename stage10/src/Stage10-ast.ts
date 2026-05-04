@@ -116,6 +116,38 @@ const desugarDottedIdentifier  = (text, ctx) => {
     }
   }
 };
+const astObjectDestructPattern  = (ctx) => {
+  {
+    let ids  = ctx.IDENTIFIER().map((id) => {
+      id.getText();
+    });
+    let hasRest  = ctx.REST();
+    let names  = (hasRest ? ids.slice(0, -1) : ids);
+    let lastIdx  = (ids.length - 1);
+    let restElem  = (hasRest ? ids[lastIdx] : undefined);
+    return {
+      tag: "object-destruct",
+      names: names,
+      rest: restElem
+    };
+  }
+};
+const astArrayDestructPattern  = (ctx) => {
+  {
+    let ids  = ctx.IDENTIFIER().map((id) => {
+      id.getText();
+    });
+    let hasRest  = ctx.REST();
+    let names  = (hasRest ? ids.slice(0, -1) : ids);
+    let lastIdx  = (ids.length - 1);
+    let restElem  = (hasRest ? ids[lastIdx] : undefined);
+    return {
+      tag: "array-destruct",
+      names: names,
+      rest: restElem
+    };
+  }
+};
 let macroScopeCounter_  = 0;
 const astProgram  = (ctx) => {
   {
@@ -293,19 +325,27 @@ const astTopLevelLet  = (ctx) => {
   {
     let b  = ctx.starBinding();
     let meta  = astParseMeta(ctx);
-    {
-      let name  = b.IDENTIFIER().getText();
-      let init  = astExpression(b.expression());
-      let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
-      return {
-        id: registerSpan(nextNodeId(), ctx),
-        text: ctx.getText(),
-        tag: "let-decl",
-        name: name,
-        init: init,
-        typeAnnotation: typeAnnotation,
-        meta: meta
-      };
+    let idToken  = b.IDENTIFIER();
+    let destructObj  = b.objectDestructPat();
+    let destructArr  = b.arrayDestructPat();
+    if (idToken) {
+      {
+        let name  = idToken.getText();
+        let init  = astExpression(b.expression());
+        let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
+        return {
+          id: registerSpan(nextNodeId(), ctx),
+          text: ctx.getText(),
+          tag: "let-decl",
+          name: name,
+          init: init,
+          typeAnnotation: typeAnnotation,
+          meta: meta
+        };
+      }
+    }
+    else {
+      throw new Error("Top-level let declarations do not support destructuring patterns");
     }
   }
 };
@@ -313,19 +353,27 @@ const astTopLevelVar  = (ctx) => {
   {
     let b  = ctx.starBinding();
     let meta  = astParseMeta(ctx);
-    {
-      let name  = b.IDENTIFIER().getText();
-      let init  = astExpression(b.expression());
-      let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
-      return {
-        id: registerSpan(nextNodeId(), ctx),
-        text: ctx.getText(),
-        tag: "var-decl",
-        name: name,
-        init: init,
-        typeAnnotation: typeAnnotation,
-        meta: meta
-      };
+    let idToken  = b.IDENTIFIER();
+    let destructObj  = b.objectDestructPat();
+    let destructArr  = b.arrayDestructPat();
+    if (idToken) {
+      {
+        let name  = idToken.getText();
+        let init  = astExpression(b.expression());
+        let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
+        return {
+          id: registerSpan(nextNodeId(), ctx),
+          text: ctx.getText(),
+          tag: "var-decl",
+          name: name,
+          init: init,
+          typeAnnotation: typeAnnotation,
+          meta: meta
+        };
+      }
+    }
+    else {
+      throw new Error("Top-level var declarations do not support destructuring patterns");
     }
   }
 };
@@ -333,19 +381,27 @@ const astTopLevelConst  = (ctx) => {
   {
     let b  = ctx.starBinding();
     let meta  = astParseMeta(ctx);
-    {
-      let name  = b.IDENTIFIER().getText();
-      let init  = astExpression(b.expression());
-      let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
-      return {
-        id: registerSpan(nextNodeId(), ctx),
-        text: ctx.getText(),
-        tag: "const-decl",
-        name: name,
-        init: init,
-        typeAnnotation: typeAnnotation,
-        meta: meta
-      };
+    let idToken  = b.IDENTIFIER();
+    let destructObj  = b.objectDestructPat();
+    let destructArr  = b.arrayDestructPat();
+    if (idToken) {
+      {
+        let name  = idToken.getText();
+        let init  = astExpression(b.expression());
+        let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
+        return {
+          id: registerSpan(nextNodeId(), ctx),
+          text: ctx.getText(),
+          tag: "const-decl",
+          name: name,
+          init: init,
+          typeAnnotation: typeAnnotation,
+          meta: meta
+        };
+      }
+    }
+    else {
+      throw new Error("Top-level const declarations do not support destructuring patterns");
     }
   }
 };
@@ -1270,11 +1326,14 @@ const astLetStar  = (ctx) => {
   {
     let bindings  = ctx.starBinding().map((b) => {
       {
-        let id  = b.IDENTIFIER().getText();
         let init  = astExpression(b.expression());
         let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
+        let nameOrPattern  = (b.objectDestructPat() ? astObjectDestructPattern(b.objectDestructPat()) : (b.arrayDestructPat() ? astArrayDestructPattern(b.arrayDestructPat()) : {
+          tag: "plain",
+          name: b.IDENTIFIER().getText()
+        }));
         return {
-          name: id,
+          nameOrPattern: nameOrPattern,
           init: init,
           typeAnnotation: typeAnnotation
         };
@@ -1294,11 +1353,14 @@ const astVarStar  = (ctx) => {
   {
     let bindings  = ctx.starBinding().map((b) => {
       {
-        let id  = b.IDENTIFIER().getText();
         let init  = astExpression(b.expression());
         let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
+        let nameOrPattern  = (b.objectDestructPat() ? astObjectDestructPattern(b.objectDestructPat()) : (b.arrayDestructPat() ? astArrayDestructPattern(b.arrayDestructPat()) : {
+          tag: "plain",
+          name: b.IDENTIFIER().getText()
+        }));
         return {
-          name: id,
+          nameOrPattern: nameOrPattern,
           init: init,
           typeAnnotation: typeAnnotation
         };
@@ -1318,11 +1380,14 @@ const astConstStar  = (ctx) => {
   {
     let bindings  = ctx.starBinding().map((b) => {
       {
-        let id  = b.IDENTIFIER().getText();
         let init  = astExpression(b.expression());
         let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
+        let nameOrPattern  = (b.objectDestructPat() ? astObjectDestructPattern(b.objectDestructPat()) : (b.arrayDestructPat() ? astArrayDestructPattern(b.arrayDestructPat()) : {
+          tag: "plain",
+          name: b.IDENTIFIER().getText()
+        }));
         return {
-          name: id,
+          nameOrPattern: nameOrPattern,
           init: init,
           typeAnnotation: typeAnnotation
         };

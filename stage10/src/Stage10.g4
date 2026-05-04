@@ -385,7 +385,7 @@ exportDeclForm
 // ──── some bindings ──────────────────────
 
 starBinding
-    : LPAREN IDENTIFIER (COLON typeExpr)? expression RPAREN
+    : LPAREN (IDENTIFIER | objectDestructPat | arrayDestructPat) (COLON typeExpr)? expression RPAREN
     ;
 
 singleBinding

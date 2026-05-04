@@ -9,11 +9,30 @@ const isDefined  = (val) => {
   return (val !== undefined);
 };
 const emitDestructPattern  = (pattern) => {
-  if ((pattern.tag === "destruct-object")) {
-    return (("{ " + pattern.fields.join(", ")) + " }");
+  if ((pattern.tag === "object-destruct")) {
+    {
+      let names  = pattern.names.map((n) => {
+        checkId(n, undefined);
+      });
+      let restElem  = pattern.rest;
+      let restStr  = (restElem ? ("..." + checkId(restElem, undefined)) : undefined);
+      let allNames  = (restElem ? ((names.join(", ") + ((names.length > 0) ? ", " : "")) + restStr) : names.join(", "));
+      return (("{" + allNames) + "}");
+    }
   }
-  if ((pattern.tag === "destruct-array")) {
-    return (("[" + pattern.elements.join(", ")) + "]");
+  if ((pattern.tag === "array-destruct")) {
+    {
+      let names  = pattern.names.map((n) => {
+        checkId(n, undefined);
+      });
+      let restElem  = pattern.rest;
+      let restStr  = (restElem ? ("..." + checkId(restElem, undefined)) : undefined);
+      let allNames  = (restElem ? ((names.join(", ") + ((names.length > 0) ? ", " : "")) + restStr) : names.join(", "));
+      return (("[" + allNames) + "]");
+    }
+  }
+  if ((pattern.tag === "plain")) {
+    return checkId(pattern.name, undefined);
   }
   return "";
 };
@@ -164,38 +183,39 @@ const emitStmt  = (stmt) => {
   if ((stmt.tag === "let-stmt")) {
     {
       let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : "");
+      let nop  = stmt.nameOrPattern;
+      let nameStr  = (nop ? ((nop.tag === "plain") ? checkId(nop.name, stmt.id) : emitDestructPattern(nop)) : "");
       if (isDefined(stmt.init)) {
-        return ((((("let " + checkId(stmt.name, stmt.id)) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
+        return ((((("let " + nameStr) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
       }
       else {
-        return ((("let " + checkId(stmt.name, stmt.id)) + typeStr) + ";");
+        return ((("let " + nameStr) + typeStr) + ";");
       }
     }
   }
   if ((stmt.tag === "var-stmt")) {
     {
       let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : "");
+      let nop  = stmt.nameOrPattern;
+      let nameStr  = (nop ? ((nop.tag === "plain") ? checkId(nop.name, stmt.id) : emitDestructPattern(nop)) : "");
       if (isDefined(stmt.init)) {
-        return ((((("var " + checkId(stmt.name, stmt.id)) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
+        return ((((("var " + nameStr) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
       }
       else {
-        return ((("var " + checkId(stmt.name, stmt.id)) + typeStr) + ";");
+        return ((("var " + nameStr) + typeStr) + ";");
       }
     }
   }
   if ((stmt.tag === "const-stmt")) {
-    if (stmt.pattern) {
-      return (((("const " + emitDestructPattern(stmt.pattern)) + " = ") + emitExpr(stmt.init)) + ";");
-    }
-    else {
-      {
-        let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : "");
-        if (isDefined(stmt.init)) {
-          return ((((("const " + checkId(stmt.name, stmt.id)) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
-        }
-        else {
-          return ((("const " + checkId(stmt.name, stmt.id)) + typeStr) + ";");
-        }
+    {
+      let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : "");
+      let nop  = stmt.nameOrPattern;
+      let nameStr  = (nop ? ((nop.tag === "plain") ? checkId(nop.name, stmt.id) : emitDestructPattern(nop)) : "");
+      if (isDefined(stmt.init)) {
+        return ((((("const " + nameStr) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
+      }
+      else {
+        return ((("const " + nameStr) + typeStr) + ";");
       }
     }
   }
