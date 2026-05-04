@@ -487,11 +487,15 @@ const resolveStmt  = (node, chain) => {
           let resolvedInit  = resolveExpr(b.init, extChain);
           let bindScopes  = (b.scopes ? b.scopes : new Set());
           resolvedBindings.push({
+            name: b.name,
             nameOrPattern: b.nameOrPattern,
             init: resolvedInit,
             typeAnnotation: b.typeAnnotation
           });
-          extChain = addBindings(extChain, getNamesFromPattern(b.nameOrPattern), bindScopes);
+          {
+            let chainNames  = (b.nameOrPattern ? getNamesFromPattern(b.nameOrPattern) : (b.name ? [b.name] : []));
+            extChain = addBindings(extChain, chainNames, bindScopes);
+          }
         }
       });
       return {
@@ -513,11 +517,15 @@ const resolveStmt  = (node, chain) => {
           let resolvedInit  = resolveExpr(b.init, extChain);
           let bindScopes  = (b.scopes ? b.scopes : new Set());
           resolvedBindings.push({
+            name: b.name,
             nameOrPattern: b.nameOrPattern,
             init: resolvedInit,
             typeAnnotation: b.typeAnnotation
           });
-          extChain = addBindings(extChain, getNamesFromPattern(b.nameOrPattern), bindScopes);
+          {
+            let chainNames  = (b.nameOrPattern ? getNamesFromPattern(b.nameOrPattern) : (b.name ? [b.name] : []));
+            extChain = addBindings(extChain, chainNames, bindScopes);
+          }
         }
       });
       return {
@@ -674,6 +682,7 @@ const resolveTopLevel  = (node, chain) => {
       id: node.id,
       text: node.text,
       name: node.name,
+      nameOrPattern: node.nameOrPattern,
       meta: node.meta,
       typeAnnotation: node.typeAnnotation,
       init: resolveExpr(node.init, chain)
@@ -685,6 +694,7 @@ const resolveTopLevel  = (node, chain) => {
       id: node.id,
       text: node.text,
       name: node.name,
+      nameOrPattern: node.nameOrPattern,
       meta: node.meta,
       typeAnnotation: node.typeAnnotation,
       init: resolveExpr(node.init, chain)
@@ -749,7 +759,28 @@ const resolveNames  = (programNode) => {
     programNode.body.forEach((node) => {
       resolvedBody.push(resolveTopLevel(node, chain));
       if (((node.tag === "let-decl") || ((node.tag === "const-decl") || ((node.tag === "fn-decl") || (node.tag === "fn-o-decl"))))) {
-        chain = addBinding(chain, node.name, new Set());
+        {
+          let nop  = node.nameOrPattern;
+          let nodeName  = node.name;
+          if (nop) {
+            if ((nop.tag === "plain")) {
+              chain = addBinding(chain, nop.name, new Set());
+            }
+            else {
+              nop.names.forEach((n) => {
+                chain = addBinding(chain, n, new Set());
+              });
+              if (nop.rest) {
+                chain = addBinding(chain, nop.rest, new Set());
+              }
+            }
+          }
+          else {
+            if (nodeName) {
+              chain = addBinding(chain, nodeName, new Set());
+            }
+          }
+        }
       }
     });
     {

@@ -494,11 +494,12 @@ const lowerExportDefaultDef  = (node) => {
     }
     {
       let body  = init.body.map(lowerStmt);
+      let defName  = (defNode.name ? defNode.name : ((defNode.nameOrPattern && (defNode.nameOrPattern.tag === "plain")) ? defNode.nameOrPattern.name : undefined));
       return {
         node: node,
         id: node.id,
         tag: "export-default-fn-decl",
-        name: defNode.name,
+        name: defName,
         params: init.params.map(lowerTypedParam),
         rest: init.rest,
         restType: (init.restType ? lowerTypeExpr(init.restType) : undefined),
@@ -552,11 +553,15 @@ const lowerLetDecl  = (node) => {
   {
     let init  = lowerExpr(node.init);
     let typeAnnotation  = (node.typeAnnotation ? lowerTypeExpr(node.typeAnnotation) : undefined);
+    let nop  = (node.nameOrPattern ? node.nameOrPattern : (node.name ? {
+      tag: "plain",
+      name: node.name
+    } : undefined));
     return {
       node: node,
       id: node.id,
       tag: "let-stmt",
-      name: node.name,
+      nameOrPattern: nop,
       typeAnnotation: typeAnnotation,
       init: init,
       meta: node.meta
@@ -567,11 +572,15 @@ const lowerVarDecl  = (node) => {
   {
     let init  = lowerExpr(node.init);
     let typeAnnotation  = (node.typeAnnotation ? lowerTypeExpr(node.typeAnnotation) : undefined);
+    let nop  = (node.nameOrPattern ? node.nameOrPattern : (node.name ? {
+      tag: "plain",
+      name: node.name
+    } : undefined));
     return {
       node: node,
       id: node.id,
       tag: "var-stmt",
-      name: node.name,
+      nameOrPattern: nop,
       typeAnnotation: typeAnnotation,
       init: init,
       meta: node.meta
@@ -581,11 +590,17 @@ const lowerVarDecl  = (node) => {
 const lowerConstDecl  = (node) => {
   {
     let init  = lowerExpr(node.init);
+    let typeAnnotation  = (node.typeAnnotation ? lowerTypeExpr(node.typeAnnotation) : undefined);
+    let nop  = (node.nameOrPattern ? node.nameOrPattern : (node.name ? {
+      tag: "plain",
+      name: node.name
+    } : undefined));
     return {
       node: node,
       id: node.id,
       tag: "const-stmt",
-      name: node.name,
+      nameOrPattern: nop,
+      typeAnnotation: typeAnnotation,
       init: init,
       meta: node.meta
     };
@@ -1012,14 +1027,20 @@ const lowerLetStar  = (node) => {
   {
     let stmts  = [];
     node.bindings.forEach((b) => {
-      stmts.push({
-        node: node,
-        id: node.id,
-        tag: "let-stmt",
-        nameOrPattern: b.nameOrPattern,
-        typeAnnotation: (b.typeAnnotation ? lowerTypeExpr(b.typeAnnotation) : undefined),
-        init: (b.init ? lowerExpr(b.init) : undefined)
-      });
+      {
+        let nop  = (b.nameOrPattern ? b.nameOrPattern : (b.name ? {
+          tag: "plain",
+          name: b.name
+        } : undefined));
+        stmts.push({
+          node: node,
+          id: node.id,
+          tag: "let-stmt",
+          nameOrPattern: nop,
+          typeAnnotation: (b.typeAnnotation ? lowerTypeExpr(b.typeAnnotation) : undefined),
+          init: (b.init ? lowerExpr(b.init) : undefined)
+        });
+      }
     });
     node.body.forEach((s) => {
       stmts.push(lowerStmt(s));
@@ -1048,14 +1069,20 @@ const lowerVarStar  = (node) => {
   {
     let stmts  = [];
     node.bindings.forEach((b) => {
-      stmts.push({
-        node: node,
-        id: node.id,
-        tag: "var-stmt",
-        nameOrPattern: b.nameOrPattern,
-        typeAnnotation: (b.typeAnnotation ? lowerTypeExpr(b.typeAnnotation) : undefined),
-        init: (b.init ? lowerExpr(b.init) : undefined)
-      });
+      {
+        let nop  = (b.nameOrPattern ? b.nameOrPattern : (b.name ? {
+          tag: "plain",
+          name: b.name
+        } : undefined));
+        stmts.push({
+          node: node,
+          id: node.id,
+          tag: "var-stmt",
+          nameOrPattern: nop,
+          typeAnnotation: (b.typeAnnotation ? lowerTypeExpr(b.typeAnnotation) : undefined),
+          init: (b.init ? lowerExpr(b.init) : undefined)
+        });
+      }
     });
     node.body.forEach((s) => {
       stmts.push(lowerStmt(s));
@@ -1084,14 +1111,20 @@ const lowerConstStar  = (node) => {
   {
     let stmts  = [];
     node.bindings.forEach((b) => {
-      stmts.push({
-        node: node,
-        id: node.id,
-        tag: "const-stmt",
-        nameOrPattern: b.nameOrPattern,
-        typeAnnotation: (b.typeAnnotation ? lowerTypeExpr(b.typeAnnotation) : undefined),
-        init: (b.init ? lowerExpr(b.init) : undefined)
-      });
+      {
+        let nop  = (b.nameOrPattern ? b.nameOrPattern : (b.name ? {
+          tag: "plain",
+          name: b.name
+        } : undefined));
+        stmts.push({
+          node: node,
+          id: node.id,
+          tag: "const-stmt",
+          nameOrPattern: nop,
+          typeAnnotation: (b.typeAnnotation ? lowerTypeExpr(b.typeAnnotation) : undefined),
+          init: (b.init ? lowerExpr(b.init) : undefined)
+        });
+      }
     });
     node.body.forEach((s) => {
       stmts.push(lowerStmt(s));
@@ -1508,6 +1541,14 @@ const lowerExpr  = (node) => {
       id: node.id,
       tag: "array-expr",
       elements: node.elements.map(lowerExpr)
+    };
+  }
+  if ((node.tag === "spread")) {
+    return {
+      node: node,
+      id: node.id,
+      tag: "spread-expr",
+      expr: lowerExpr(node.expr)
     };
   }
   if ((node.tag === "quasi")) {

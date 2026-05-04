@@ -275,9 +275,10 @@ const evalQuasi  = (node, bindings, env, depth) => {
       text: node.text,
       bindings: node.bindings.map((b) => {
         {
-          let rawName  = ((typeof b.name === "string") ? b.name : extractBindingName(evalQuasi(b.name, bindings, env, depth)));
+          let rawName  = ((typeof b.name === "string") ? b.name : ((b.nameOrPattern && (b.nameOrPattern.tag === "plain")) ? b.nameOrPattern.name : extractBindingName(evalQuasi(b.name, bindings, env, depth))));
           return {
             name: rawName,
+            nameOrPattern: b.nameOrPattern,
             init: evalQuasi(b.init, bindings, env, depth),
             typeAnnotation: b.typeAnnotation
           };
@@ -292,9 +293,10 @@ const evalQuasi  = (node, bindings, env, depth) => {
       text: node.text,
       bindings: node.bindings.map((b) => {
         {
-          let rawName  = ((typeof b.name === "string") ? b.name : extractBindingName(evalQuasi(b.name, bindings, env, depth)));
+          let rawName  = ((typeof b.name === "string") ? b.name : ((b.nameOrPattern && (b.nameOrPattern.tag === "plain")) ? b.nameOrPattern.name : extractBindingName(evalQuasi(b.name, bindings, env, depth))));
           return {
             name: rawName,
+            nameOrPattern: b.nameOrPattern,
             init: evalQuasi(b.init, bindings, env, depth),
             typeAnnotation: b.typeAnnotation
           };
@@ -396,7 +398,7 @@ const evalQuasi  = (node, bindings, env, depth) => {
       tag: node.tag,
       id: node.id,
       text: node.text,
-      name: node.name,
+      nameOrPattern: node.nameOrPattern,
       typeAnnotation: node.typeAnnotation,
       init: evalQuasi(node.init, bindings, env, depth),
       meta: node.meta
@@ -1390,6 +1392,7 @@ const addScopeToNode  = (node, scope) => {
       bindings: node.bindings.map((b) => {
         return {
           nameOrPattern: b.nameOrPattern,
+          name: b.name,
           init: addScopeToNode(b.init, scope),
           typeAnnotation: b.typeAnnotation
         };
@@ -1406,6 +1409,7 @@ const addScopeToNode  = (node, scope) => {
       bindings: node.bindings.map((b) => {
         return {
           nameOrPattern: b.nameOrPattern,
+          name: b.name,
           init: addScopeToNode(b.init, scope),
           typeAnnotation: b.typeAnnotation
         };
@@ -1955,6 +1959,7 @@ const expandStmt  = (node, env) => {
       bindings: node.bindings.map((b) => {
         return {
           nameOrPattern: b.nameOrPattern,
+          name: b.name,
           init: expandExpr(b.init, env),
           typeAnnotation: b.typeAnnotation
         };
@@ -1972,6 +1977,7 @@ const expandStmt  = (node, env) => {
       bindings: node.bindings.map((b) => {
         return {
           nameOrPattern: b.nameOrPattern,
+          name: b.name,
           init: expandExpr(b.init, env),
           typeAnnotation: b.typeAnnotation
         };
@@ -2168,7 +2174,7 @@ const expandTopLevel  = (node, env) => {
       id: node.id,
       callSiteId: node.callSiteId,
       text: node.text,
-      name: node.name,
+      nameOrPattern: node.nameOrPattern,
       typeAnnotation: node.typeAnnotation,
       meta: node.meta,
       init: expandExpr(node.init, env)
@@ -2181,6 +2187,7 @@ const expandTopLevel  = (node, env) => {
       callSiteId: node.callSiteId,
       text: node.text,
       name: node.name,
+      nameOrPattern: node.nameOrPattern,
       typeAnnotation: node.typeAnnotation,
       meta: node.meta,
       init: expandExpr(node.init, env)

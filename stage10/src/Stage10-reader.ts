@@ -219,6 +219,27 @@ const isSubscriptTrigger  = (ch) => {
     return (nonTrigger.indexOf(ch) === -1);
   }
 };
+const isIdentChar  = (ch) => {
+  if ((ch === undefined)) {
+    return false;
+  }
+  {
+    let excluded  = (("() \t\n\r:;-~.[]{}," + "`") + "?=+*%<>!&|^");
+    return (excluded.indexOf(ch) === -1);
+  }
+};
+const isDigit  = (ch) => {
+  return ((ch >= "0") && (ch <= "9"));
+};
+const buildDottedChain  = (precExpr, segments) => {
+  {
+    let result  = precExpr;
+    segments.forEach((seg) => {
+      result = (((("(. " + result) + " ") + seg) + ")");
+    });
+    return result;
+  }
+};
 const METHOD_MODIFIERS  = new Set(["static", "async", "generator", "abstract", "override", "readonly"]);
 const scanBracketContent  = (src, i) => {
   {
@@ -535,8 +556,62 @@ const readerTransform  = (src) => {
                       i = (i + 1);
                     }
                     else {
-                      out = (out + ch);
-                      i = (i + 1);
+                      if ((ch === ".")) {
+                        {
+                          let prevChar  = ((i > 0) ? src.charAt((i - 1)) : undefined);
+                          let nextCh  = src.charAt((i + 1));
+                          if ((isIdentChar(prevChar) && (isIdentChar(nextCh) && (!(isDigit(prevChar) && isDigit(nextCh)))))) {
+                            {
+                              let start  = findPrecedingExprStart(out);
+                              let precExpr  = ((start >= 0) ? out.slice(start) : out);
+                              let prefix  = ((start >= 0) ? out.slice(0, start) : "");
+                              {
+                                let segments  = [];
+                                let j  = (i + 1);
+                                let done  = false;
+                                while (((j < src.length) && (!done))) {
+                                  {
+                                    let segStart  = j;
+                                    while (((j < src.length) && isIdentChar(src.charAt(j)))) {
+                                      j = (j + 1);
+                                    }
+                                    {
+                                      let seg  = src.slice(segStart, j);
+                                      if ((seg.length === 0)) {
+                                        throw new Error("Invalid dotted identifier: empty segment");
+                                      }
+                                      else {
+                                        segments.push(seg);
+                                      }
+                                      if (((j < src.length) && ((src.charAt(j) === ".") && (((j + 1) < src.length) && isIdentChar(src.charAt((j + 1))))))) {
+                                        j = (j + 1);
+                                      }
+                                      else {
+                                        done = true;
+                                      }
+                                    }
+                                  }
+                                }
+                                out = (prefix + buildDottedChain(precExpr, segments));
+                                i = j;
+                              }
+                            }
+                          }
+                          else {
+                            if ((isIdentChar(prevChar) && !(isIdentChar(nextCh)))) {
+                              throw new Error("Invalid dotted identifier: empty segment");
+                            }
+                            else {
+                              out = (out + ".");
+                              i = (i + 1);
+                            }
+                          }
+                        }
+                      }
+                      else {
+                        out = (out + ch);
+                        i = (i + 1);
+                      }
                     }
                   }
                 }

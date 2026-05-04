@@ -122,13 +122,14 @@ const astObjectDestructPattern  = (ctx) => {
       return id.getText();
     });
     let hasRest  = ctx.REST();
-    let names  = (hasRest ? ids.slice(0, -1) : ids);
-    let lastIdx  = (ids.length - 1);
-    let restElem  = (hasRest ? ids[lastIdx] : undefined);
+    let dotTokens  = ctx.DOT();
+    let hasDots  = (dotTokens && (dotTokens.length > 0));
+    let restName  = ((hasDots && hasRest) ? "rest" : ((hasDots || hasRest) ? ids[(ids.length - 1)] : undefined));
+    let names  = ((hasDots && hasRest) ? ids : ((hasDots || hasRest) ? ids.slice(0, -1) : ids));
     return {
       tag: "object-destruct",
       names: names,
-      rest: restElem
+      rest: restName
     };
   }
 };
@@ -138,13 +139,14 @@ const astArrayDestructPattern  = (ctx) => {
       return id.getText();
     });
     let hasRest  = ctx.REST();
-    let names  = (hasRest ? ids.slice(0, -1) : ids);
-    let lastIdx  = (ids.length - 1);
-    let restElem  = (hasRest ? ids[lastIdx] : undefined);
+    let dotTokens  = ctx.DOT();
+    let hasDots  = (dotTokens && (dotTokens.length > 0));
+    let restName  = ((hasDots && hasRest) ? "rest" : ((hasDots || hasRest) ? ids[(ids.length - 1)] : undefined));
+    let names  = ((hasDots && hasRest) ? ids : ((hasDots || hasRest) ? ids.slice(0, -1) : ids));
     return {
       tag: "array-destruct",
       names: names,
-      rest: restElem
+      rest: restName
     };
   }
 };
@@ -316,7 +318,7 @@ const astMacroTimeFnDef  = (ctx) => {
       id: registerSpan(nextNodeId(), ctx),
       text: ctx.getText(),
       tag: "macro-time-fn-def",
-      name: inner.name,
+      name: inner.nameOrPattern.name,
       init: inner.init
     };
   }
@@ -328,25 +330,21 @@ const astTopLevelLet  = (ctx) => {
     let idToken  = b.IDENTIFIER();
     let destructObj  = b.objectDestructPat();
     let destructArr  = b.arrayDestructPat();
-    if (idToken) {
-      {
-        let name  = idToken.getText();
-        let init  = astExpression(b.expression());
-        let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
-        return {
-          id: registerSpan(nextNodeId(), ctx),
-          text: ctx.getText(),
-          tag: "let-decl",
-          name: name,
-          init: init,
-          typeAnnotation: typeAnnotation,
-          meta: meta
-        };
-      }
-    }
-    else {
-      throw new Error("Top-level let declarations do not support destructuring patterns");
-    }
+    let nameOrPattern  = (destructObj ? astObjectDestructPattern(destructObj) : (destructArr ? astArrayDestructPattern(destructArr) : {
+      tag: "plain",
+      name: idToken.getText()
+    }));
+    let init  = astExpression(b.expression());
+    let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
+    return {
+      id: registerSpan(nextNodeId(), ctx),
+      text: ctx.getText(),
+      tag: "let-decl",
+      nameOrPattern: nameOrPattern,
+      init: init,
+      typeAnnotation: typeAnnotation,
+      meta: meta
+    };
   }
 };
 const astTopLevelVar  = (ctx) => {
@@ -356,25 +354,21 @@ const astTopLevelVar  = (ctx) => {
     let idToken  = b.IDENTIFIER();
     let destructObj  = b.objectDestructPat();
     let destructArr  = b.arrayDestructPat();
-    if (idToken) {
-      {
-        let name  = idToken.getText();
-        let init  = astExpression(b.expression());
-        let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
-        return {
-          id: registerSpan(nextNodeId(), ctx),
-          text: ctx.getText(),
-          tag: "var-decl",
-          name: name,
-          init: init,
-          typeAnnotation: typeAnnotation,
-          meta: meta
-        };
-      }
-    }
-    else {
-      throw new Error("Top-level var declarations do not support destructuring patterns");
-    }
+    let nameOrPattern  = (destructObj ? astObjectDestructPattern(destructObj) : (destructArr ? astArrayDestructPattern(destructArr) : {
+      tag: "plain",
+      name: idToken.getText()
+    }));
+    let init  = astExpression(b.expression());
+    let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
+    return {
+      id: registerSpan(nextNodeId(), ctx),
+      text: ctx.getText(),
+      tag: "var-decl",
+      nameOrPattern: nameOrPattern,
+      init: init,
+      typeAnnotation: typeAnnotation,
+      meta: meta
+    };
   }
 };
 const astTopLevelConst  = (ctx) => {
@@ -384,25 +378,21 @@ const astTopLevelConst  = (ctx) => {
     let idToken  = b.IDENTIFIER();
     let destructObj  = b.objectDestructPat();
     let destructArr  = b.arrayDestructPat();
-    if (idToken) {
-      {
-        let name  = idToken.getText();
-        let init  = astExpression(b.expression());
-        let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
-        return {
-          id: registerSpan(nextNodeId(), ctx),
-          text: ctx.getText(),
-          tag: "const-decl",
-          name: name,
-          init: init,
-          typeAnnotation: typeAnnotation,
-          meta: meta
-        };
-      }
-    }
-    else {
-      throw new Error("Top-level const declarations do not support destructuring patterns");
-    }
+    let nameOrPattern  = (destructObj ? astObjectDestructPattern(destructObj) : (destructArr ? astArrayDestructPattern(destructArr) : {
+      tag: "plain",
+      name: idToken.getText()
+    }));
+    let init  = astExpression(b.expression());
+    let typeAnnotation  = (b.typeExpr() ? astTypeExpr(b.typeExpr()) : undefined);
+    return {
+      id: registerSpan(nextNodeId(), ctx),
+      text: ctx.getText(),
+      tag: "const-decl",
+      nameOrPattern: nameOrPattern,
+      init: init,
+      typeAnnotation: typeAnnotation,
+      meta: meta
+    };
   }
 };
 const astTypeAlias  = (ctx) => {
@@ -1565,7 +1555,23 @@ const astObjectExpr  = (ctx) => {
 };
 const astArrayExpr  = (ctx) => {
   {
-    let elements  = ctx.expression().map(astExpression);
+    let elements  = ctx.arrayElem().map((elem) => {
+      if ((elem.DOT().length > 0)) {
+        {
+          let node  = {
+            id: registerSpan(nextNodeId(), elem),
+            text: elem.getText(),
+            tag: "spread",
+            expr: astExpression(elem.expression())
+          };
+          assertAstTag(node.tag, elem);
+          return node;
+        }
+      }
+      else {
+        return astExpression(elem.expression());
+      }
+    });
     return {
       id: registerSpan(nextNodeId(), ctx),
       text: ctx.getText(),
@@ -1905,6 +1911,14 @@ const astExpression  = (ctx) => {
       };
     }
   }
+  if (ctx.REST()) {
+    return {
+      id: registerSpan(nextNodeId(), ctx),
+      text: "rest",
+      tag: "identifier",
+      name: "rest"
+    };
+  }
   if (ctx.MACRO_ERROR()) {
     return {
       id: registerSpan(nextNodeId(), ctx),
@@ -2144,13 +2158,15 @@ const astPropAccess  = (ctx) => {
     let obj  = astExpression(ctx.expression(0));
     let rawKey  = ctx.propKey().getText();
     let key  = ((rawKey.startsWith("\"") || (rawKey.startsWith("'") || rawKey.startsWith("`"))) ? parseString(rawKey) : rawKey);
-    return {
+    let node  = {
       id: registerSpan(nextNodeId(), ctx),
       text: ctx.getText(),
       tag: "prop-access",
       object: obj,
       key: key
     };
+    assertAstTag(node.tag, ctx);
+    return node;
   }
 };
 const astIndexAccess  = (ctx) => {
@@ -2671,13 +2687,11 @@ const astAssign  = (ctx) => {
 };
 const astCompoundAssign  = (ctx) => {
   {
-    let rawName  = ctx.IDENTIFIER().getText();
-    let op  = ctx.getText();
     let opStr  = (ctx.PLUS_ASSIGN() ? "+=" : (ctx.MINUS_ASSIGN() ? "-=" : (ctx.TIMES_ASSIGN() ? "*=" : (ctx.DIV_ASSIGN() ? "/=" : "%="))));
     let value  = astExpression(ctx.expression());
-    if ((rawName.includes(".") && (!rawName.startsWith("...")))) {
+    if (ctx.propAccess()) {
       {
-        let target  = desugarDottedIdentifier(rawName, ctx);
+        let target  = astPropAccess(ctx.propAccess());
         return {
           id: registerSpan(nextNodeId(), ctx),
           text: ctx.getText(),
@@ -2688,14 +2702,30 @@ const astCompoundAssign  = (ctx) => {
         };
       }
     }
-    return {
-      id: registerSpan(nextNodeId(), ctx),
-      text: ctx.getText(),
-      tag: "compound-assign",
-      op: opStr,
-      name: rawName,
-      value: value
-    };
+    {
+      let rawName  = ctx.IDENTIFIER().getText();
+      if ((rawName.includes(".") && (!rawName.startsWith("...")))) {
+        {
+          let target  = desugarDottedIdentifier(rawName, ctx);
+          return {
+            id: registerSpan(nextNodeId(), ctx),
+            text: ctx.getText(),
+            tag: "compound-assign",
+            op: opStr,
+            target: target,
+            value: value
+          };
+        }
+      }
+      return {
+        id: registerSpan(nextNodeId(), ctx),
+        text: ctx.getText(),
+        tag: "compound-assign",
+        op: opStr,
+        name: rawName,
+        value: value
+      };
+    }
   }
 };
 const astSubscriptAssign  = (ctx) => {
@@ -3166,6 +3196,9 @@ const astInfixAtom  = (ctx) => {
   }
   if (ctx.LBRACE()) {
     return astInfixBody(ctx.infixBody());
+  }
+  if ((ctx.propAccess() && (!ctx.infixAtom()))) {
+    return astPropAccess(ctx.propAccess());
   }
   {
     let argsFromCtx  = (c) => {

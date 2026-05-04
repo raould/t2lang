@@ -253,10 +253,10 @@ describe('mixed object and array destructuring', () => {
 describe('type annotations with destructuring', () => {
   it('object destructuring with type annotation', () => {
     const r = compile(`(program
-      (const (({x} : (object (x number)) obj)))
+      (const (({x} : (obj (x number)) obj)))
     )`);
     expect(r.status).toBe(0);
-    expect(r.stdout).toContain(': {x: number}');
+    expect(r.stdout).toContain(': { x: number }');
   });
 
   it('array destructuring with type annotation', () => {
@@ -374,8 +374,8 @@ describe('object destructuring with rest element', () => {
       (import {asrt} "./helpers")
       (const (({x ...rest} (object (x 1) (y 2) (z 3))))
         (asrt x 1)
-        (asrt ((. rest y)) 2)
-        (asrt ((. rest z)) 3))
+        (asrt (. rest y) 2)
+        (asrt (. rest z) 3))
     )`);
   });
 
@@ -385,8 +385,8 @@ describe('object destructuring with rest element', () => {
       (const (({x y ...rest} (object (x 1) (y 2) (a 10) (b 20))))
         (asrt x 1)
         (asrt y 2)
-        (asrt ((. rest a)) 10)
-        (asrt ((. rest b)) 20))
+        (asrt (. rest a) 10)
+        (asrt (. rest b) 20))
     )`);
   });
 
@@ -394,7 +394,7 @@ describe('object destructuring with rest element', () => {
     fromSourceEndToEnd(`(program
       (import {asrt} "./helpers")
       (const (({x y ...rest} (object (x 1) (y 2))))
-        (asrt ((. (object-keys rest)) length) 0))
+        (asrt (. ((. Object keys) rest) length) 0))
     )`);
   });
 
@@ -403,7 +403,7 @@ describe('object destructuring with rest element', () => {
       (import {asrt} "./helpers")
       (let (({name ...rest} (object (name "Alice") (age 30) (city "NYC"))))
         (asrt name "Alice")
-        (asrt ((. rest age)) 30))
+        (asrt (. rest age) 30))
     )`);
   });
 
@@ -412,7 +412,7 @@ describe('object destructuring with rest element', () => {
       (import {asrt} "./helpers")
       (var (({x ...rest} (object (x 5) (y 10))))
         (asrt x 5)
-        (asrt ((. rest y)) 10))
+        (asrt (. rest y) 10))
     )`);
   });
 
@@ -443,7 +443,7 @@ describe('object destructuring with rest element', () => {
         (asrt a 1)
         (asrt x 2)
         (asrt b 3)
-        (asrt ((. rest y)) 3))
+        (asrt (. rest y) 3))
     )`);
   });
 });
@@ -454,8 +454,8 @@ describe('array destructuring with rest element', () => {
       (import {asrt} "./helpers")
       (const (([x ...rest] (array 1 2 3)))
         (asrt x 1)
-        (asrt ((. rest 0)) 2)
-        (asrt ((. rest 1)) 3))
+        (asrt (. rest 0) 2)
+        (asrt (. rest 1) 3))
     )`);
   });
 
@@ -465,9 +465,9 @@ describe('array destructuring with rest element', () => {
       (const (([a b ...rest] (array 10 20 30 40 50)))
         (asrt a 10)
         (asrt b 20)
-        (asrt ((. rest 0)) 30)
-        (asrt ((. rest 1)) 40)
-        (asrt ((. rest 2)) 50))
+        (asrt (. rest 0) 30)
+        (asrt (. rest 1) 40)
+        (asrt (. rest 2) 50))
     )`);
   });
 
@@ -477,7 +477,7 @@ describe('array destructuring with rest element', () => {
       (const (([a b ...rest] (array 1 2)))
         (asrt a 1)
         (asrt b 2)
-        (asrt ((. rest length)) 0))
+        (asrt (. rest length) 0))
     )`);
   });
 
@@ -486,7 +486,7 @@ describe('array destructuring with rest element', () => {
       (import {asrt} "./helpers")
       (let (([first ...rest] (array 100 200 300)))
         (asrt first 100)
-        (asrt ((. rest 0)) 200))
+        (asrt (. rest 0) 200))
     )`);
   });
 
@@ -495,7 +495,7 @@ describe('array destructuring with rest element', () => {
       (import {asrt} "./helpers")
       (var (([x ...rest] (array 1 2 3)))
         (asrt x 1)
-        (asrt ((. rest length)) 2))
+        (asrt (. rest length) 2))
     )`);
   });
 
@@ -526,7 +526,7 @@ describe('array destructuring with rest element', () => {
         (asrt x 10)
         (asrt a 1)
         (asrt sum 11)
-        (asrt ((. rest 0)) 2))
+        (asrt (. rest 0) 2))
     )`);
   });
 });
@@ -538,9 +538,9 @@ describe('mixed object and array destructuring with rest', () => {
       (const (({x ...xrest} (object (x 1) (y 2)))
               ([a ...arest] (array 10 20)))
         (asrt x 1)
-        (asrt ((. xrest y)) 2)
+        (asrt (. xrest y) 2)
         (asrt a 10)
-        (asrt ((. arest 0)) 20))
+        (asrt (. arest 0) 20))
     )`);
   });
 
@@ -549,9 +549,9 @@ describe('mixed object and array destructuring with rest', () => {
       (import {asrt} "./helpers")
       (const (({...props} (object (a 5) (b 10)))
               ([first ...rest] (array 100 200)))
-        (asrt ((. props a)) 5)
+        (asrt (. props a) 5)
         (asrt first 100)
-        (asrt ((. rest 0)) 200))
+        (asrt (. rest 0) 200))
     )`);
   });
 });
@@ -562,7 +562,7 @@ describe('rest element in different binding positions', () => {
       (import {asrt} "./helpers")
       (const (({x ...rest} (object (x 1) (extra 99))))
         ((. console log) rest)
-        (asrt ((. rest extra)) 99))
+        (asrt (. rest extra) 99))
     )`);
   });
 
@@ -570,9 +570,9 @@ describe('rest element in different binding positions', () => {
     fromSourceEndToEnd(`(program
       (import {asrt} "./helpers")
       (const (({a ...rest} (object (a 10) (b 20)))
-              (merged (object-assign (object) rest (object (a a)))))
-        (asrt ((. merged a)) 10)
-        (asrt ((. merged b)) 20))
+              (merged ((. Object assign) (object) rest (object (a a)))))
+        (asrt (. merged a) 10)
+        (asrt (. merged b) 20))
     )`);
   });
 });

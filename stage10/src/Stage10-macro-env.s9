@@ -84,10 +84,12 @@
                 (body (. (. node init) body))))))
           ;; register var metadata for all top-level bindings
           (if (|| (=== (. node tag) 'let-decl') (=== (. node tag) 'const-decl'))
-            (then ((. (. env varRegistry) set) (. node name)
-              (object
-                (name (. node name))
-                (meta (. node meta))))))))
+            (then (let ((nop (. node nameOrPattern)))
+              (if (&& nop (=== (. nop tag) 'plain'))
+                (then ((. (. env varRegistry) set) (. nop name)
+                  (object
+                    (name (. nop name))
+                    (meta (. node meta)))))))))))
       (return env)))
 
   ;; registerTopLevelNode: register a single top-level node into env.
@@ -110,10 +112,12 @@
             (rest (. (. node init) rest))
             (body (. (. node init) body))))))
       (if (|| (=== (. node tag) 'let-decl') (=== (. node tag) 'const-decl'))
-        (then ((. (. env varRegistry) set) (. node name)
-          (object
-            (name (. node name))
-            (meta (. node meta))))))))
+        (then (let ((nop (. node nameOrPattern)))
+          (if (&& nop (=== (. nop tag) 'plain'))
+            (then ((. (. env varRegistry) set) (. nop name)
+              (object
+                (name (. nop name))
+                (meta (. node meta)))))))))))
 
   (export-named (makeMacroEnv) (gensym) (freshScope) (collectMacros) (registerTopLevelNode))
 )

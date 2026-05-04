@@ -57,10 +57,15 @@ const collectMacros  = (programNode, env) => {
       });
     }
     if (((node.tag === "let-decl") || (node.tag === "const-decl"))) {
-      env.varRegistry.set(node.name, {
-        name: node.name,
-        meta: node.meta
-      });
+      {
+        let nop  = node.nameOrPattern;
+        if ((nop && (nop.tag === "plain"))) {
+          env.varRegistry.set(nop.name, {
+            name: nop.name,
+            meta: node.meta
+          });
+        }
+      }
     }
   });
   return env;
@@ -84,10 +89,15 @@ const registerTopLevelNode  = (node, env) => {
     });
   }
   if (((node.tag === "let-decl") || (node.tag === "const-decl"))) {
-    env.varRegistry.set(node.name, {
-      name: node.name,
-      meta: node.meta
-    });
+    {
+      let nop  = node.nameOrPattern;
+      if ((nop && (nop.tag === "plain"))) {
+        env.varRegistry.set(nop.name, {
+          name: nop.name,
+          meta: node.meta
+        });
+      }
+    }
   }
 };
 export { makeMacroEnv, gensym, freshScope, collectMacros, registerTopLevelNode };

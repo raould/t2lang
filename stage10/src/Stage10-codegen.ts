@@ -184,7 +184,7 @@ const emitStmt  = (stmt) => {
     {
       let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : "");
       let nop  = stmt.nameOrPattern;
-      let nameStr  = (nop ? ((nop.tag === "plain") ? checkId(nop.name, stmt.id) : emitDestructPattern(nop)) : "");
+      let nameStr  = (nop ? ((nop.tag === "plain") ? checkId(nop.name, stmt.id) : emitDestructPattern(nop)) : (stmt.name ? checkId(stmt.name, stmt.id) : ""));
       if (isDefined(stmt.init)) {
         return ((((("let " + nameStr) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
       }
@@ -197,7 +197,7 @@ const emitStmt  = (stmt) => {
     {
       let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : "");
       let nop  = stmt.nameOrPattern;
-      let nameStr  = (nop ? ((nop.tag === "plain") ? checkId(nop.name, stmt.id) : emitDestructPattern(nop)) : "");
+      let nameStr  = (nop ? ((nop.tag === "plain") ? checkId(nop.name, stmt.id) : emitDestructPattern(nop)) : (stmt.name ? checkId(stmt.name, stmt.id) : ""));
       if (isDefined(stmt.init)) {
         return ((((("var " + nameStr) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
       }
@@ -210,7 +210,7 @@ const emitStmt  = (stmt) => {
     {
       let typeStr  = (stmt.typeAnnotation ? (": " + emitTypeExpr(stmt.typeAnnotation)) : "");
       let nop  = stmt.nameOrPattern;
-      let nameStr  = (nop ? ((nop.tag === "plain") ? checkId(nop.name, stmt.id) : emitDestructPattern(nop)) : "");
+      let nameStr  = (nop ? ((nop.tag === "plain") ? checkId(nop.name, stmt.id) : emitDestructPattern(nop)) : (stmt.name ? checkId(stmt.name, stmt.id) : ""));
       if (isDefined(stmt.init)) {
         return ((((("const " + nameStr) + typeStr) + " = ") + emitExpr(stmt.init)) + ";");
       }
@@ -612,6 +612,9 @@ const emitExpr  = (expr) => {
   }
   if ((expr.tag === "array-expr")) {
     return (("[" + expr.elements.map(emitExpr).join(", ")) + "]");
+  }
+  if ((expr.tag === "spread-expr")) {
+    return ("..." + emitExpr(expr.expr));
   }
   if ((expr.tag === "quasi-expr")) {
     return ("/* quasiquote */ " + emitExpr(expr.expr));

@@ -18,7 +18,7 @@ function makeProgram(...body: any[]) {
 function makeLet(bindings: { name: string; init: any }[], ...body: any[]) {
   return {
     tag: 'let',
-    bindings: bindings.map(b => ({ name: b.name, init: b.init, typeAnnotation: null })),
+    bindings: bindings.map(b => ({ nameOrPattern: { tag: 'plain', name: b.name }, name: b.name, init: b.init, typeAnnotation: null })),
     body,
     text: '',
   };

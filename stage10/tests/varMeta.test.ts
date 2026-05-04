@@ -14,10 +14,10 @@ function makeCall(name: string, ...args: any[]) {
   return { tag: 'call', fn: makeIdent(name), args, typeArgs: [], text: '' };
 }
 function makeLetDecl(name: string, init: any, meta?: any) {
-  return { tag: 'let-decl', name, init, meta, text: '' };
+  return { tag: 'let-decl', nameOrPattern: { tag: 'plain', name }, name, init, meta, text: '' };
 }
 function makeConstDecl(name: string, init: any, meta?: any) {
-  return { tag: 'const-decl', name, init, meta, text: '' };
+  return { tag: 'const-decl', nameOrPattern: { tag: 'plain', name }, name, init, meta, text: '' };
 }
 function makeLambda(params: string[], ...body: any[]) {
   return { tag: 'lambda', params, rest: undefined, body, text: '' };

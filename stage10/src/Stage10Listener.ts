@@ -153,6 +153,7 @@ import { ObjectExprContext } from "./Stage10Parser.js";
 import { ObjectFieldContext } from "./Stage10Parser.js";
 import { MethodDefContext } from "./Stage10Parser.js";
 import { ArrayExprContext } from "./Stage10Parser.js";
+import { ArrayElemContext } from "./Stage10Parser.js";
 import { BracketArrayExprContext } from "./Stage10Parser.js";
 import { BraceObjectExprContext } from "./Stage10Parser.js";
 import { BraceObjectFieldContext } from "./Stage10Parser.js";
@@ -1703,6 +1704,16 @@ export class Stage10Listener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitArrayExpr?: (ctx: ArrayExprContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage10Parser.arrayElem`.
+     * @param ctx the parse tree
+     */
+    enterArrayElem?: (ctx: ArrayElemContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage10Parser.arrayElem`.
+     * @param ctx the parse tree
+     */
+    exitArrayElem?: (ctx: ArrayElemContext) => void;
     /**
      * Enter a parse tree produced by `Stage10Parser.bracketArrayExpr`.
      * @param ctx the parse tree

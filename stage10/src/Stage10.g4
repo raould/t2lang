@@ -396,14 +396,15 @@ singleBinding
 
 // ──── destructuring patterns ────
 
-// { x  y  z }  or  { x  y  ...rest }
+// { x  y  z }  or  { x  y  ...rest }  (using either 'rest' keyword or '...' syntax)
+// Note: REST keyword used as variable name after ... (e.g. ...rest where 'rest' tokenizes as REST)
 objectDestructPat
-    : LBRACE IDENTIFIER* (REST IDENTIFIER)? RBRACE
+    : LBRACE IDENTIFIER* (REST IDENTIFIER | DOT DOT DOT (IDENTIFIER | REST))? RBRACE
     ;
 
-// [ a  b  c ]  or  [ a  b  ...rest ]
+// [ a  b  c ]  or  [ a  b  ...rest ]  (using either 'rest' keyword or '...' syntax)
 arrayDestructPat
-    : LBRACK IDENTIFIER* (REST IDENTIFIER)? RBRACK
+    : LBRACK IDENTIFIER* (REST IDENTIFIER | DOT DOT DOT (IDENTIFIER | REST))? RBRACK
     ;
 
 // ─── type expressions ────────────────────────
@@ -550,6 +551,11 @@ compoundAssign
     | LPAREN TIMES_ASSIGN IDENTIFIER expression RPAREN
     | LPAREN DIV_ASSIGN   IDENTIFIER expression RPAREN
     | LPAREN MOD_ASSIGN   IDENTIFIER expression RPAREN
+    | LPAREN PLUS_ASSIGN  propAccess expression RPAREN
+    | LPAREN MINUS_ASSIGN propAccess expression RPAREN
+    | LPAREN TIMES_ASSIGN propAccess expression RPAREN
+    | LPAREN DIV_ASSIGN   propAccess expression RPAREN
+    | LPAREN MOD_ASSIGN   propAccess expression RPAREN
     ;
 
 subscriptAssign
@@ -606,6 +612,7 @@ finallyClause
 expression
     : literal
     | IDENTIFIER
+    | REST          // allow 'rest' as a variable name in expression position
     | MACRO_ERROR
     | MINUS
     | lambda
@@ -821,7 +828,12 @@ methodDef
     ;
 
 arrayExpr
-    : LPAREN ARRAY expression* RPAREN
+    : LPAREN ARRAY arrayElem* RPAREN
+    ;
+
+arrayElem
+    : expression
+    | DOT DOT DOT expression  // spread element: ...expr
     ;
 
 bracketArrayExpr
@@ -965,11 +977,12 @@ infixBody
 
 infixAtom
     : IDENTIFIER LPAREN infixArgs? RPAREN   // neoteric call: f(x, y), Math.abs(x)
-    | infixAtom LPAREN infixArgs? RPAREN    // chained call: f(x)(y)
+    | infixAtom LPAREN infixArgs? RPAREN    // chained call: f(x)(y) or (. obj m)(x)
     | LBRACE infixBody RBRACE               // sub-group: {a * b}
     | infixUnaryOp infixAtom                // unary: -x  !done  ~mask
+    | propAccess                            // (. obj key): reader-desugared a.b
     | literal
-    | IDENTIFIER                            // simple or dotted: x, arr.length, a.b.c
+    | IDENTIFIER                            // simple identifier: x, arr, etc.
     ;
 
 infixArgs
@@ -1031,6 +1044,7 @@ param
 
 restParam
     : LPAREN REST IDENTIFIER (COLON typeExpr)? RPAREN
+    | LPAREN DOT DOT DOT IDENTIFIER (COLON typeExpr)? RPAREN
     ;
 
 literal
@@ -1269,8 +1283,9 @@ TILDE       : '~' ;
 // Note: '/' is intentionally NOT excluded — it is used as a namespace separator
 // in macro calls (e.g. m/identity). Division in infix requires spaces: #{a / b}.
 // Standalone '/' (preceded/followed by whitespace) tokenizes as SLASH via rule priority.
+// '.' is excluded so that ... tokenizes as three DOT tokens instead of a single identifier
 IDENTIFIER
-    : ~[() \n\t\r:;\-~\u005B\u005D\u007B\u007D,\u0060?=+*%<>!&|^]+
+    : ~[() \n\t\r:;\-~.\u005B\u005D\u007B\u007D,\u0060?=+*%<>!&|^]+
     ;
 
 WS

@@ -100,6 +100,7 @@ export const AST_TAGS = [ /*warning: this must also be successfully parsed by bi
   "sf-hole",
   "sf-list",
   "sf-splice",
+  "spread",
   "str",
   "subscript-access",
   "super-constructor-call",

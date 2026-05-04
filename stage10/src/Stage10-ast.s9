@@ -85,25 +85,40 @@
   ;; ========== Destructuring pattern parsing ==========
   (const astObjectDestructPattern
     (lambda ((ctx))
-      ;; Parse {x y z ...rest} or just {x y z}
+      ;; Parse {x y z ...rest} or {x y z rest varName} or just {x y z}
+      ;; Three cases:
+      ;;   1. DOT DOT DOT REST: rest name = "rest", names = all IDENTIFIERs
+      ;;   2. DOT DOT DOT IDENTIFIER: rest name = last IDENTIFIER, names = all others
+      ;;   3. REST IDENTIFIER (old keyword syntax): rest name = last IDENTIFIER, names = all others
       ;; Returns: { tag: 'object-destruct', names: [...], rest: undefined|string }
       (let ((ids ((. ((. ctx IDENTIFIER)) map) (lambda ((id)) (return ((. id getText))))))
              (hasRest ((. ctx REST)))
-             (names (ternary hasRest ((. ids slice) 0 -1) ids))
-             (lastIdx (- (. ids length) 1))
-             (restElem (ternary hasRest (index ids lastIdx) undefined)))
-        (return (object (tag 'object-destruct') (names names) (rest restElem))))))
+             (dotTokens ((. ctx DOT)))
+             (hasDots (&& dotTokens (> (. dotTokens length) 0)))
+             (restName (ternary (&& hasDots hasRest)
+               'rest'
+               (ternary (|| hasDots hasRest) (index ids (- (. ids length) 1)) undefined)))
+             (names (ternary (&& hasDots hasRest)
+               ids
+               (ternary (|| hasDots hasRest) ((. ids slice) 0 -1) ids))))
+        (return (object (tag 'object-destruct') (names names) (rest restName))))))
 
   (const astArrayDestructPattern
     (lambda ((ctx))
-      ;; Parse [x y z ...rest] or just [x y z]
+      ;; Parse [x y z ...rest] or [x y z rest varName] or just [x y z]
+      ;; Same three cases as object pattern.
       ;; Returns: { tag: 'array-destruct', names: [...], rest: undefined|string }
       (let ((ids ((. ((. ctx IDENTIFIER)) map) (lambda ((id)) (return ((. id getText))))))
              (hasRest ((. ctx REST)))
-             (names (ternary hasRest ((. ids slice) 0 -1) ids))
-             (lastIdx (- (. ids length) 1))
-             (restElem (ternary hasRest (index ids lastIdx) undefined)))
-        (return (object (tag 'array-destruct') (names names) (rest restElem))))))
+             (dotTokens ((. ctx DOT)))
+             (hasDots (&& dotTokens (> (. dotTokens length) 0)))
+             (restName (ternary (&& hasDots hasRest)
+               'rest'
+               (ternary (|| hasDots hasRest) (index ids (- (. ids length) 1)) undefined)))
+             (names (ternary (&& hasDots hasRest)
+               ids
+               (ternary (|| hasDots hasRest) ((. ids slice) 0 -1) ids))))
+        (return (object (tag 'array-destruct') (names names) (rest restName))))))
 
   ;; ========== Scope ID counter (KFFD: assigned at parse time) ==========
   (let ((macroScopeCounter_ 0)))
@@ -215,7 +230,7 @@
       (let ((inner (ternary ((. ctx topLevelLet))
                      (astTopLevelLet ((. ctx topLevelLet)))
                      (astTopLevelConst ((. ctx topLevelConst))))))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'macro-time-fn-def') (name (. inner name)) (init (. inner init)))))))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'macro-time-fn-def') (name (. (. inner nameOrPattern) name)) (init (. inner init)))))))
 
   (const astTopLevelLet
     (lambda ((ctx))
@@ -223,13 +238,15 @@
              (meta (astParseMeta ctx))
              (idToken ((. b IDENTIFIER)))
              (destructObj ((. b objectDestructPat)))
-             (destructArr ((. b arrayDestructPat))))
-        (if idToken
-          (then (let ((name ((. idToken getText)))
-                      (init (astExpression ((. b expression))))
-                      (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
-                 (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'let-decl') (name name) (init init) (typeAnnotation typeAnnotation) (meta meta)))))
-          (else (throw (new Error "Top-level let declarations do not support destructuring patterns")))))))
+             (destructArr ((. b arrayDestructPat)))
+             (nameOrPattern (ternary destructObj
+               (astObjectDestructPattern destructObj)
+               (ternary destructArr
+                 (astArrayDestructPattern destructArr)
+                 (object (tag 'plain') (name ((. idToken getText)))))))
+             (init (astExpression ((. b expression))))
+             (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'let-decl') (nameOrPattern nameOrPattern) (init init) (typeAnnotation typeAnnotation) (meta meta))))))
 
   (const astTopLevelVar
     (lambda ((ctx))
@@ -237,13 +254,15 @@
              (meta (astParseMeta ctx))
              (idToken ((. b IDENTIFIER)))
              (destructObj ((. b objectDestructPat)))
-             (destructArr ((. b arrayDestructPat))))
-        (if idToken
-          (then (let ((name ((. idToken getText)))
-                      (init (astExpression ((. b expression))))
-                      (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
-                 (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'var-decl') (name name) (init init) (typeAnnotation typeAnnotation) (meta meta)))))
-          (else (throw (new Error "Top-level var declarations do not support destructuring patterns")))))))
+             (destructArr ((. b arrayDestructPat)))
+             (nameOrPattern (ternary destructObj
+               (astObjectDestructPattern destructObj)
+               (ternary destructArr
+                 (astArrayDestructPattern destructArr)
+                 (object (tag 'plain') (name ((. idToken getText)))))))
+             (init (astExpression ((. b expression))))
+             (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'var-decl') (nameOrPattern nameOrPattern) (init init) (typeAnnotation typeAnnotation) (meta meta))))))
 
   (const astTopLevelConst
     (lambda ((ctx))
@@ -251,13 +270,15 @@
              (meta (astParseMeta ctx))
              (idToken ((. b IDENTIFIER)))
              (destructObj ((. b objectDestructPat)))
-             (destructArr ((. b arrayDestructPat))))
-        (if idToken
-          (then (let ((name ((. idToken getText)))
-                      (init (astExpression ((. b expression))))
-                      (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
-                 (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const-decl') (name name) (init init) (typeAnnotation typeAnnotation) (meta meta)))))
-          (else (throw (new Error "Top-level const declarations do not support destructuring patterns")))))))
+             (destructArr ((. b arrayDestructPat)))
+             (nameOrPattern (ternary destructObj
+               (astObjectDestructPattern destructObj)
+               (ternary destructArr
+                 (astArrayDestructPattern destructArr)
+                 (object (tag 'plain') (name ((. idToken getText)))))))
+             (init (astExpression ((. b expression))))
+             (typeAnnotation (ternary ((. b typeExpr)) (astTypeExpr ((. b typeExpr))) undefined)))
+        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'const-decl') (nameOrPattern nameOrPattern) (init init) (typeAnnotation typeAnnotation) (meta meta))))))
 
 
   (const astTypeAlias
@@ -874,7 +895,13 @@
 
   (const astArrayExpr
     (lambda ((ctx))
-      (let ((elements ((. ((. ctx expression)) map) astExpression)))
+      (let ((elements ((. ((. ctx arrayElem)) map) (lambda ((elem))
+              (if (> (. ((. elem DOT)) length) 0)
+                ;; spread element: DOT DOT DOT expression
+                (then (let ((node (object (id (registerSpan (nextNodeId) elem)) (text ((. elem getText))) (tag 'spread') (expr (astExpression ((. elem expression)))))))
+                  (assertAstTag (. node tag) elem)
+                  (return node)))
+                (else (return (astExpression ((. elem expression))))))))))
         (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'array') (elements elements))))))
 
   (const astBracketArrayExpr
@@ -1037,6 +1064,8 @@
           (if (&& ((. text includes) '.') (! ((. text startsWith) '...')))
             (then (return (desugarDottedIdentifier text ctx))))
           (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'identifier') (name text))))))
+      (if ((. ctx REST))
+        (then (return (object (id (registerSpan (nextNodeId) ctx)) (text "rest") (tag 'identifier') (name "rest")))))
       (if ((. ctx MACRO_ERROR))
         (then (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'identifier') (name 'macro-error')))))
       (if ((. ctx MINUS))
@@ -1178,8 +1207,10 @@
              (rawKey ((. ((. ctx propKey)) getText)))
              (key (ternary (|| ((. rawKey startsWith) '"') (|| ((. rawKey startsWith) "'") ((. rawKey startsWith) '`')))
                     (parseString rawKey)
-                    rawKey)))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'prop-access') ("object" obj) (key key))))))
+                    rawKey))
+             (node (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'prop-access') ("object" obj) (key key))))
+        (assertAstTag (. node tag) ctx)
+        (return node))))
 
   (const astIndexAccess
     (lambda ((ctx))
@@ -1410,18 +1441,22 @@
 
   (const astCompoundAssign
     (lambda ((ctx))
-      (let ((rawName ((. ((. ctx IDENTIFIER)) getText)))
-             (op ((. ctx getText)))
-             (opStr (ternary ((. ctx PLUS_ASSIGN))  '+='
-                    (ternary ((. ctx MINUS_ASSIGN)) '-='
-                    (ternary ((. ctx TIMES_ASSIGN)) '*='
-                    (ternary ((. ctx DIV_ASSIGN))   '/='
-                    '%=')))))
+      (let ((opStr (ternary ((. ctx PLUS_ASSIGN))  '+='
+                   (ternary ((. ctx MINUS_ASSIGN)) '-='
+                   (ternary ((. ctx TIMES_ASSIGN)) '*='
+                   (ternary ((. ctx DIV_ASSIGN))   '/='
+                   '%=')))))
              (value (astExpression ((. ctx expression)))))
-        (if (&& ((. rawName includes) '.') (! ((. rawName startsWith) '...')))
-          (then (let ((target (desugarDottedIdentifier rawName ctx)))
+        ;; propAccess target: (+= (. obj prop) val)
+        (if ((. ctx propAccess))
+          (then (let ((target (astPropAccess ((. ctx propAccess)))))
             (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'compound-assign') (op opStr) (target target) (value value))))))
-        (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'compound-assign') (op opStr) (name rawName) (value value))))))
+        ;; IDENTIFIER target
+        (let ((rawName ((. ((. ctx IDENTIFIER)) getText))))
+          (if (&& ((. rawName includes) '.') (! ((. rawName startsWith) '...')))
+            (then (let ((target (desugarDottedIdentifier rawName ctx)))
+              (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'compound-assign') (op opStr) (target target) (value value))))))
+          (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'compound-assign') (op opStr) (name rawName) (value value)))))))
 
   (const astSubscriptAssign
     (lambda ((ctx))
@@ -1646,6 +1681,9 @@
         (then (return (astLiteral ((. ctx literal))))))
       (if ((. ctx LBRACE))
         (then (return (astInfixBody ((. ctx infixBody))))))
+      ;; propAccess infixAtom: (. obj key)
+      (if (&& ((. ctx propAccess)) (! ((. ctx infixAtom))))
+        (then (return (astPropAccess ((. ctx propAccess))))))
       (let ((argsFromCtx
                (lambda ((c))
                  (let ((argsCtx ((. c infixArgs))))

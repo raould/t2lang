@@ -192,6 +192,31 @@
       (let ((nonTrigger " \t\n\r([,;{#["))
         (return (=== ((. nonTrigger indexOf) ch) -1)))))
 
+  ;; ---- isIdentChar ----
+  ;; Returns true if ch is a valid t2lang identifier character (not in ANTLR exclusion set).
+  ;; Mirrors the IDENTIFIER lexer rule: ~[() \n\t\r:;\-~.\[\]{},`?=+*%<>!&|^]+
+  (const isIdentChar
+    (lambda ((ch))
+      (if (=== ch undefined) (then (return false)))
+      (let ((excluded (+ "() \t\n\r:;-~.[]{}," "`" "?=+*%<>!&|^")))
+        (return (=== ((. excluded indexOf) ch) -1)))))
+
+  ;; ---- isDigit ----
+  (const isDigit
+    (lambda ((ch))
+      (return (&& (>= ch '0') (<= ch '9')))))
+
+  ;; ---- buildDottedChain ----
+  ;; Given a preceding expression string and an array of identifier segments,
+  ;; build a nested (. ...) form: (. (. precExpr seg0) seg1) ...
+  (const buildDottedChain
+    (lambda ((precExpr) (segments))
+      (let ((result precExpr))
+        ((. segments forEach)
+          (lambda ((seg))
+            (set! result (+ '(. ' result ' ' seg ')'))))
+        (return result))))
+
   ;; ---- METHOD_MODIFIERS ----
   ;; Words that appear as method-declaration modifiers; they must never be
   ;; treated as the subscripted object when followed by whitespace + '['.
@@ -312,12 +337,6 @@
   ;; Skips over quoted strings and ;; comments verbatim.
   (const readerTransform
     (lambda ((src))
-      ;; Preprocess: Replace ...identifier with rest identifier (no parens)
-      ;; This handles spread syntax in destructuring patterns like [a ...rest] → [a rest rest]
-      ;; Use a function-based replacement to avoid issues with $1 backreferences
-      (set! src ((. src replace) (new RegExp "\\.\\.\\.(\\w+)" "g")
-        (lambda ((match) (identifier))
-          (return (+ "rest " identifier)))))
       (let ((out "")
              (i 0)
              (n (. src length))
@@ -422,10 +441,56 @@
                             (set! out (+ out ']'))
                             (set! bracketDepth (- bracketDepth 1))
                             (set! i (+ i 1)))
-                          ;; Regular character
-                          (else
-                            (set! out (+ out ch))
-                            (set! i (+ i 1))))))))))))))))))
+                          ;; Dotted sugar: word.word → (. word word) chain
+                          ;; Triggered when prev and next are identifier chars (not both digits)
+                          (else (if (=== ch '.')
+                            (then
+                              (let ((prevChar (ternary (> i 0) ((. src charAt) (- i 1)) undefined))
+                                     (nextCh ((. src charAt) (+ i 1))))
+                                (if (&& (isIdentChar prevChar)
+                                        (&& (isIdentChar nextCh)
+                                            (! (&& (isDigit prevChar) (isDigit nextCh)))))
+                                  ;; Dotted sugar! Extract preceding expr and scan full chain.
+                                  (then
+                                    (let ((start (findPrecedingExprStart out))
+                                           (precExpr (ternary (>= start 0) ((. out slice) start) out))
+                                           (prefix (ternary (>= start 0) ((. out slice) 0 start) "")))
+                                      (let ((segments (array))
+                                             (j (+ i 1))
+                                             (done false))
+                                        ;; Scan forward: collect identifier segments separated by dots
+                                        (while (&& (< j (. src length)) (! done))
+                                          (let ((segStart j))
+                                            ;; Scan one identifier segment
+                                            (while (&& (< j (. src length)) (isIdentChar ((. src charAt) j)))
+                                              (set! j (+ j 1)))
+                                            (let ((seg ((. src slice) segStart j)))
+                                              (if (=== (. seg length) 0)
+                                                ;; Empty segment (trailing dot like foo.): error
+                                                (then (throw (new Error 'Invalid dotted identifier: empty segment')))
+                                                (else ((. segments push) seg)))
+                                              ;; Check for continuation: another dot followed by ident char
+                                              (if (&& (< j (. src length))
+                                                      (&& (=== ((. src charAt) j) '.')
+                                                          (&& (< (+ j 1) (. src length))
+                                                              (isIdentChar ((. src charAt) (+ j 1))))))
+                                                ;; Continue: skip the dot, loop for next segment
+                                                (then (set! j (+ j 1)))
+                                                ;; Stop
+                                                (else (set! done true))))))
+                                        (set! out (+ prefix (buildDottedChain precExpr segments)))
+                                        (set! i j))))
+                                  ;; Not a trigger: pass through the dot, unless trailing dot error
+                                  (else
+                                    (if (&& (isIdentChar prevChar) (! (isIdentChar nextCh)))
+                                      (then (throw (new Error 'Invalid dotted identifier: empty segment')))
+                                      (else
+                                        (set! out (+ out '.'))
+                                        (set! i (+ i 1))))))
+                            ;; Regular character
+                            (else
+                              (set! out (+ out ch))
+                              (set! i (+ i 1))))))))))))))))))))
         (return out))))
 
   (export-named (readerTransform))
