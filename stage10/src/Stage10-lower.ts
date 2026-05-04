@@ -1012,21 +1012,13 @@ const lowerLetStar  = (node) => {
   {
     let stmts  = [];
     node.bindings.forEach((b) => {
-      {
-        let nop  = (b.nameOrPattern ? b.nameOrPattern : (b.name ? {
-          tag: "plain",
-          name: b.name
-        } : undefined));
-        if (nop) {
-          stmts.push({
-            node: node,
-            tag: "let-stmt",
-            nameOrPattern: nop,
-            typeAnnotation: (b.typeAnnotation ? lowerTypeExpr(b.typeAnnotation) : undefined),
-            init: (b.init ? lowerExpr(b.init) : undefined)
-          });
-        }
-      }
+      stmts.push({
+        node: node,
+        tag: "let-stmt",
+        nameOrPattern: b.nameOrPattern,
+        typeAnnotation: (b.typeAnnotation ? lowerTypeExpr(b.typeAnnotation) : undefined),
+        init: (b.init ? lowerExpr(b.init) : undefined)
+      });
     });
     node.body.forEach((s) => {
       stmts.push(lowerStmt(s));
@@ -1055,21 +1047,13 @@ const lowerVarStar  = (node) => {
   {
     let stmts  = [];
     node.bindings.forEach((b) => {
-      {
-        let nop  = (b.nameOrPattern ? b.nameOrPattern : (b.name ? {
-          tag: "plain",
-          name: b.name
-        } : undefined));
-        if (nop) {
-          stmts.push({
-            node: node,
-            tag: "var-stmt",
-            nameOrPattern: nop,
-            typeAnnotation: (b.typeAnnotation ? lowerTypeExpr(b.typeAnnotation) : undefined),
-            init: (b.init ? lowerExpr(b.init) : undefined)
-          });
-        }
-      }
+      stmts.push({
+        node: node,
+        tag: "var-stmt",
+        nameOrPattern: b.nameOrPattern,
+        typeAnnotation: (b.typeAnnotation ? lowerTypeExpr(b.typeAnnotation) : undefined),
+        init: (b.init ? lowerExpr(b.init) : undefined)
+      });
     });
     node.body.forEach((s) => {
       stmts.push(lowerStmt(s));
@@ -1098,21 +1082,13 @@ const lowerConstStar  = (node) => {
   {
     let stmts  = [];
     node.bindings.forEach((b) => {
-      {
-        let nop  = (b.nameOrPattern ? b.nameOrPattern : (b.name ? {
-          tag: "plain",
-          name: b.name
-        } : undefined));
-        if (nop) {
-          stmts.push({
-            node: node,
-            tag: "const-stmt",
-            nameOrPattern: nop,
-            typeAnnotation: (b.typeAnnotation ? lowerTypeExpr(b.typeAnnotation) : undefined),
-            init: (b.init ? lowerExpr(b.init) : undefined)
-          });
-        }
-      }
+      stmts.push({
+        node: node,
+        tag: "const-stmt",
+        nameOrPattern: b.nameOrPattern,
+        typeAnnotation: (b.typeAnnotation ? lowerTypeExpr(b.typeAnnotation) : undefined),
+        init: (b.init ? lowerExpr(b.init) : undefined)
+      });
     });
     node.body.forEach((s) => {
       stmts.push(lowerStmt(s));

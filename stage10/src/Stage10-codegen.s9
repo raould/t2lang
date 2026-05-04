@@ -203,7 +203,9 @@
         (then (let ((typeStr (ternary (. stmt typeAnnotation) (+ ': ' (emitTypeExpr (. stmt typeAnnotation))) ''))
                     (nop (. stmt nameOrPattern))
                     (nameStr (ternary nop
-                      (ternary (=== (. nop tag) 'plain') (checkId (. nop name) (. stmt id)) (emitDestructPattern nop))
+                      (ternary (=== (. nop tag) 'plain')
+                        (checkId (. nop name) (. stmt id))
+                        (emitDestructPattern nop))
                       '')))
           (if (isDefined (. stmt init))
             (then (return (+ 'let ' nameStr typeStr ' = ' (emitExpr (. stmt init)) ';')))
@@ -212,7 +214,9 @@
         (then (let ((typeStr (ternary (. stmt typeAnnotation) (+ ': ' (emitTypeExpr (. stmt typeAnnotation))) ''))
                     (nop (. stmt nameOrPattern))
                     (nameStr (ternary nop
-                      (ternary (=== (. nop tag) 'plain') (checkId (. nop name) (. stmt id)) (emitDestructPattern nop))
+                      (ternary (=== (. nop tag) 'plain')
+                        (checkId (. nop name) (. stmt id))
+                        (emitDestructPattern nop))
                       '')))
           (if (isDefined (. stmt init))
             (then (return (+ 'var ' nameStr typeStr ' = ' (emitExpr (. stmt init)) ';')))
@@ -221,7 +225,9 @@
         (then (let ((typeStr (ternary (. stmt typeAnnotation) (+ ': ' (emitTypeExpr (. stmt typeAnnotation))) ''))
                     (nop (. stmt nameOrPattern))
                     (nameStr (ternary nop
-                      (ternary (=== (. nop tag) 'plain') (checkId (. nop name) (. stmt id)) (emitDestructPattern nop))
+                      (ternary (=== (. nop tag) 'plain')
+                        (checkId (. nop name) (. stmt id))
+                        (emitDestructPattern nop))
                       '')))
           (if (isDefined (. stmt init))
             (then (return (+ 'const ' nameStr typeStr ' = ' (emitExpr (. stmt init)) ';')))

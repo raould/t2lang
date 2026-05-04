@@ -529,9 +529,7 @@
     (lambda ((node))
       (let ((stmts (array)))
         ((. (. node bindings) forEach) (lambda ((b))
-          (let ((nop (ternary (. b nameOrPattern) (. b nameOrPattern) (ternary (. b name) (object (tag 'plain') (name (. b name))) undefined))))
-            (if nop
-              (then ((. stmts push) (object (node node) (tag 'let-stmt') (nameOrPattern nop) (typeAnnotation (ternary (. b typeAnnotation) (lowerTypeExpr (. b typeAnnotation)) undefined)) (init (ternary (. b init) (lowerExpr (. b init)) undefined)))))))))
+          ((. stmts push) (object (node node) (tag 'let-stmt') (nameOrPattern (. b nameOrPattern)) (typeAnnotation (ternary (. b typeAnnotation) (lowerTypeExpr (. b typeAnnotation)) undefined)) (init (ternary (. b init) (lowerExpr (. b init)) undefined))))))
         ((. (. node body) forEach) (lambda ((s))
           ((. stmts push) (lowerStmt s))))
         (if (&& (=== (. (. node body) length) 0) (=== (. stmts length) 1))
@@ -544,9 +542,7 @@
     (lambda ((node))
       (let ((stmts (array)))
         ((. (. node bindings) forEach) (lambda ((b))
-          (let ((nop (ternary (. b nameOrPattern) (. b nameOrPattern) (ternary (. b name) (object (tag 'plain') (name (. b name))) undefined))))
-            (if nop
-              (then ((. stmts push) (object (node node) (tag 'var-stmt') (nameOrPattern nop) (typeAnnotation (ternary (. b typeAnnotation) (lowerTypeExpr (. b typeAnnotation)) undefined)) (init (ternary (. b init) (lowerExpr (. b init)) undefined)))))))))
+          ((. stmts push) (object (node node) (tag 'var-stmt') (nameOrPattern (. b nameOrPattern)) (typeAnnotation (ternary (. b typeAnnotation) (lowerTypeExpr (. b typeAnnotation)) undefined)) (init (ternary (. b init) (lowerExpr (. b init)) undefined))))))
         ((. (. node body) forEach) (lambda ((s))
           ((. stmts push) (lowerStmt s))))
         (if (&& (=== (. (. node body) length) 0) (=== (. stmts length) 1))
@@ -559,9 +555,7 @@
     (lambda ((node))
       (let ((stmts (array)))
         ((. (. node bindings) forEach) (lambda ((b))
-          (let ((nop (ternary (. b nameOrPattern) (. b nameOrPattern) (ternary (. b name) (object (tag 'plain') (name (. b name))) undefined))))
-            (if nop
-              (then ((. stmts push) (object (node node) (tag 'const-stmt') (nameOrPattern nop) (typeAnnotation (ternary (. b typeAnnotation) (lowerTypeExpr (. b typeAnnotation)) undefined)) (init (ternary (. b init) (lowerExpr (. b init)) undefined)))))))))
+          ((. stmts push) (object (node node) (tag 'const-stmt') (nameOrPattern (. b nameOrPattern)) (typeAnnotation (ternary (. b typeAnnotation) (lowerTypeExpr (. b typeAnnotation)) undefined)) (init (ternary (. b init) (lowerExpr (. b init)) undefined))))))
         ((. (. node body) forEach) (lambda ((s))
           ((. stmts push) (lowerStmt s))))
         (if (=== (. (. node body) length) 0)
