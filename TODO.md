@@ -1,8 +1,8 @@
-- [ ] fix topLevelConst
+- [x] fix topLevelConst
     - and all related const/var/let.
     - [x] constStmt.
     - [x] re-support multi-pair forms.
-    - destructuring support, and ...rest.
+    - [x] destructuring support, and ...rest.
 - [ ] require infix spacing (see aborted commit).
 - [ ] stageN/src/** duh.
     - [ ] also t2src -> src ? -> dist
