@@ -9,24 +9,24 @@
     ;; Rule 1: ANTLR grammar → TypeScript lexer/parser
     ((. shk rule) {
       name: "build-grammar"
-      output: "stage9/Stage9Lexer.ts"
-      deps: [{ kind: "file" path: "stage9/Stage9.g4" }]
+      output: "stage10/Stage9Lexer.ts"
+      deps: [{ kind: "file" path: "stage10/Stage9.g4" }]
       action: (async-fn ((ctx : any))
-        (const (antlrBin : string) ((. path join) (. ctx projectRoot) "stage9" "node_modules" ".bin" "antlr-ng"))
+        (const (antlrBin : string) ((. path join) (. ctx projectRoot) "stage10" "node_modules" ".bin" "antlr-ng"))
         (await ((. ctx run) antlrBin
-          ["-Dlanguage=TypeScript" ((. path join) (. ctx projectRoot) "stage9" "Stage9.g4")])))})
+          ["-Dlanguage=TypeScript" ((. path join) (. ctx projectRoot) "stage10" "Stage9.g4")])))})
 
     ;; Rule 2: .s8 sources → compiled .ts via stage8 compiler
     ((. shk rule) {
       name: "build-compiler"
-      output: "stage9/index.ts"
+      output: "stage10/index.ts"
       deps: [{ kind: "rule" name: "build-grammar" }
-             { kind: "glob" pattern: "stage9/Stage9*.s8" }
-             { kind: "file" path: "stage9/Stage9-tags.ts" }
-             { kind: "file" path: "stage9/Stage9-debug.ts" }
-             { kind: "file" path: "stage9/Stage9-parse-form.ts" }]
+             { kind: "glob" pattern: "stage10/Stage9*.s8" }
+             { kind: "file" path: "stage10/Stage9-tags.ts" }
+             { kind: "file" path: "stage10/Stage9-debug.ts" }
+             { kind: "file" path: "stage10/Stage9-parse-form.ts" }]
       action: (async-fn ((ctx : any))
-        (const (stage9Dir : string) ((. path join) (. ctx projectRoot) "stage9"))
+        (const (stage9Dir : string) ((. path join) (. ctx projectRoot) "stage10"))
         (const (tsxBin : string) ((. path join) stage9Dir "node_modules" ".bin" "tsx"))
         (const (compilerPath : string) ((. path join) (. ctx projectRoot) "stage8" "index.ts"))
         (const (s8Files : (type-array string))

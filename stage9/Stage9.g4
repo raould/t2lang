@@ -53,7 +53,7 @@ defmacro
     ;
 
 macroSignature
-    : LPAREN (IDENTIFIER* (REST IDENTIFIER)?)? RPAREN
+    : LPAREN (IDENTIFIER* (REST IDENTIFIER)?) RPAREN
     ;
 
 macroTimeFnDef

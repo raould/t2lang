@@ -19,10 +19,10 @@
   },
   "scripts": {
     "modules": "for ME in `find . -maxdepth 1 -type d -name stage\\* | grep -v crazy`; do (cd $ME; npm i); done",
-    "build": "npm --prefix stage9 run build",
+    "build": "npm --prefix stage10 run build",
     "build-lsp": "npx tsx bin/t2tc.js lsp.t2",
-    "test": "npm run modules && npm --prefix stage9 test",
-    "testnow": "npm --prefix stage9 run testnow",
+    "test": "npm run modules && npm --prefix stage10 test",
+    "testnow": "npm --prefix stage10 run testnow",
     "vscode:build": "npm --prefix vscode-t2-formatter run build",
     "vscode:package": "npm --prefix vscode-t2-formatter run package",
     "vscode:build-and-package": "npm run vscode:build && npm run vscode:package"

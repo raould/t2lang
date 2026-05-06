@@ -1,0 +1,40 @@
+(program
+  ;; ========== Sugar pass: desugar tilde reader macros ==========
+  ;;
+  ;; Converts:
+  ;;   tilde-unquote   { tag, id, text, expr } → unquote   { tag, id, text, expr }
+  ;;   tilde-splice    { tag, id, text, expr } → unquote-splicing { tag, id, text, expr }
+  ;;
+  ;; Pipeline slot: astTopLevel → sugarTopLevel → expandTopLevel → ...
+
+  ;; ---- sugarNode: recursive tree walker ----
+  (const sugarNode
+    (lambda ((node))
+      ;; primitives and null: return as-is
+      (if (|| (=== node null) (!== (typeof node) 'object'))
+        (then (return node)))
+      ;; arrays: walk each element
+      (if ((. Array isArray) node)
+        (then (return ((. node map) sugarNode))))
+      ;; tilde-unquote: desugar to unquote
+      (if (=== (. node tag) 'tilde-unquote')
+        (then (return (object (tag 'unquote') (id (. node id)) (text (. node text)) (expr (sugarNode (. node expr)))))))
+      ;; tilde-splice: desugar to unquote-splicing
+      (if (=== (. node tag) 'tilde-splice')
+        (then (return (object (tag 'unquote-splicing') (id (. node id)) (text (. node text)) (expr (sugarNode (. node expr)))))))
+      ;; generic node: recurse into all values
+      (return ((. Object fromEntries) ((. ((. Object entries) node) map) sugarEntry)))))
+
+  ;; ---- sugarEntry: per-entry helper for the generic walk ----
+  ;; Processes one [key, value] pair from Object.entries, recursing into value.
+  (const sugarEntry
+    (lambda ((entry))
+      (return (array (index entry 0) (sugarNode (index entry 1))))))
+
+  ;; ---- sugarTopLevel: entry point for pipeline ----
+  (const sugarTopLevel
+    (lambda ((node))
+      (return (sugarNode node))))
+
+  (export-named (sugarTopLevel))
+)

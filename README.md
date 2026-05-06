@@ -4,7 +4,7 @@ Trying to save TypeScript from itself, one parenthasis at a time.
 
 ## quick start
 
-- look at stage9/
+- look at stage10/
 
 ## description
 

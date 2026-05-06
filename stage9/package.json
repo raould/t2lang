@@ -1,35 +1,41 @@
 {
-    "name": "stage9",
-    "version": "0.0.1",
-    "description": "",
-    "license": "CC0-1.0",
-    "author": "",
-    "type": "commonjs",
-    "main": "index.js",
-    "scripts": {
-        "clean-compiled": "find . -maxdepth 1 -name Stage9-\\*.s8 | sed 's/.s8$/.ts/' | xargs rm",
-        "clean-grammar": "rm $(ls -1 Stage9[A-Z]*.ts)",
-        "clean": "npm run clean-grammar; npm run clean-compiled",
-        "build": "npm run build-grammar && npm run build-compiler",
-        "build-compiler": "npx tsx ../stage8/index.ts Stage9-spans.s8 > /tmp/_s9_spans.ts && mv /tmp/_s9_spans.ts Stage9-spans.ts && npx tsx ../stage8/index.ts Stage9-ast.s8 > /tmp/_s9_ast.ts && mv /tmp/_s9_ast.ts Stage9-ast.ts && npx tsx ../stage8/index.ts Stage9-sugar.s8 > /tmp/_s9_sugar.ts && mv /tmp/_s9_sugar.ts Stage9-sugar.ts && npx tsx ../stage8/index.ts Stage9-lower.s8 > /tmp/_s9_lower.ts && mv /tmp/_s9_lower.ts Stage9-lower.ts && npx tsx ../stage8/index.ts Stage9-codegen.s8 > /tmp/_s9_codegen.ts && mv /tmp/_s9_codegen.ts Stage9-codegen.ts && npx tsx ../stage8/index.ts Stage9-macro-env.s8 > /tmp/_s9_macro_env.ts && mv /tmp/_s9_macro_env.ts Stage9-macro-env.ts && npx tsx ../stage8/index.ts Stage9-macro-expand.s8 > /tmp/_s9_macro_expand.ts && mv /tmp/_s9_macro_expand.ts Stage9-macro-expand.ts && npx tsx ../stage8/index.ts Stage9-scope-resolve.s8 > /tmp/_s9_scope_resolve.ts && mv /tmp/_s9_scope_resolve.ts Stage9-scope-resolve.ts && npx tsx ../stage8/index.ts Stage9-reader.s8 > /tmp/_s9_reader.ts && mv /tmp/_s9_reader.ts Stage9-reader.ts && npx tsx ../stage8/index.ts Stage9.s8 > /tmp/_s9_main.ts && mv /tmp/_s9_main.ts ./index.ts",
-"build-grammar": "antlr-ng -Dlanguage=TypeScript Stage9.g4",
-        "test": "npm run build && npm exec --prefix stage9 vitest -- --typecheck run",
-        "testnow": "npm exec --prefix stage9 vitest -- --typecheck run",
-        "lint": "echo 'disabled on purpose'"
-    },
-    "dependencies": {
-        "antlr-ng": "^1.0.10"
-    },
-    "devDependencies": {
-        "@types/node": "^20.19.33",
-        "@vitest/ui": "^4.0.18",
-        "antlr4ng": "^3.0.16",
-        "deep-object-diff": "^1.1.9",
-        "eslint": "^10.0.1",
-        "lodash": "^4.17.23",
-        "tsx": "^4.21.0",
-        "typescript": "^5.9.3",
-        "vitest": "^4.0.18",
-        "vitest-fail-on-console": "^0.10.1"
-    }
+  "name": "stage9",
+  "version": "0.0.1",
+  "description": "",
+  "license": "CC0-1.0",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "clean-compiled-ts": "find . -maxdepth 1 -name Stage9-\\*.s8 | sed 's/.s8$/.ts/' | xargs rm",
+    "clean-compiled-js": "find . -maxdepth 1 -name Stage9-\\*.s8 | sed 's/.s8$/.js/' | xargs rm",
+    "clean-grammar": "rm $(ls -1 Stage9[A-Z]*.ts)",
+    "clean": "npm run clean-grammar; npm run clean-compiled-js; npm run clean-compiled-ts",
+    "build": "npm run build-grammar && npm run build-compiler",
+    "build-compiler": "npx tsx ../stage8/index.ts Stage9-spans.s8 > /tmp/_s9_spans.ts && mv /tmp/_s9_spans.ts Stage9-spans.ts && npx tsx ../stage8/index.ts Stage9-ast.s8 > /tmp/_s9_ast.ts && mv /tmp/_s9_ast.ts Stage9-ast.ts && npx tsx ../stage8/index.ts Stage9-sugar.s8 > /tmp/_s9_sugar.ts && mv /tmp/_s9_sugar.ts Stage9-sugar.ts && npx tsx ../stage8/index.ts Stage9-lower.s8 > /tmp/_s9_lower.ts && mv /tmp/_s9_lower.ts Stage9-lower.ts && npx tsx ../stage8/index.ts Stage9-codegen.s8 > /tmp/_s9_codegen.ts && mv /tmp/_s9_codegen.ts Stage9-codegen.ts && npx tsx ../stage8/index.ts Stage9-macro-env.s8 > /tmp/_s9_macro_env.ts && mv /tmp/_s9_macro_env.ts Stage9-macro-env.ts && npx tsx ../stage8/index.ts Stage9-macro-expand.s8 > /tmp/_s9_macro_expand.ts && mv /tmp/_s9_macro_expand.ts Stage9-macro-expand.ts && npx tsx ../stage8/index.ts Stage9-scope-resolve.s8 > /tmp/_s9_scope_resolve.ts && mv /tmp/_s9_scope_resolve.ts Stage9-scope-resolve.ts && npx tsx ../stage8/index.ts Stage9-reader.s8 > /tmp/_s9_reader.ts && mv /tmp/_s9_reader.ts Stage9-reader.ts && npx tsx ../stage8/index.ts Stage9.s8 > /tmp/_s9_main.ts && mv /tmp/_s9_main.ts ./index.ts",
+    "build-grammar": "antlr-ng -Dlanguage=TypeScript Stage9.g4",
+    "test": "npm run build && npm exec vitest -- --typecheck run",
+    "testnow": "npm exec vitest -- --typecheck run",
+    "lint": "echo 'disabled on purpose'",
+    "t2tc": "npx tsx bin/t2tc.js",
+    "t2jc": "npx tsx bin/t2jc.js",
+    "t2run": "npx tsx bin/t2run.js",
+    "noop": ""
+  },
+  "dependencies": {
+    "antlr-ng": "^1.0.10",
+    "commander": "^14.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.33",
+    "@vitest/ui": "^4.0.18",
+    "antlr4ng": "^3.0.16",
+    "deep-object-diff": "^1.1.9",
+    "eslint": "^10.0.1",
+    "lodash": "^4.17.23",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18",
+    "vitest-fail-on-console": "^0.10.1"
+  }
 }

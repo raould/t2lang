@@ -1,6 +1,11 @@
-- [ ] fix topLevelConst.
-- [ ] require infix spacing.
+- [x] fix topLevelConst
+    - and all related const/var/let.
+    - [x] constStmt.
+    - [x] re-support multi-pair forms.
+    - [x] destructuring support, and ...rest.
+- [ ] require infix spacing (see aborted commit).
 - [ ] stageN/src/** duh.
+    - [ ] also t2src -> src ? -> dist
 - [ ] keep updating the style guide.
 - [ ] omfg version numbers.
 - [ ] error reporting unification, and the error glossary.
