@@ -430,6 +430,17 @@ typeExpr
     | typeMapped
     | typeTemplateLiteral
     | typeApplication
+    | qualifiedName     // dotted type names: Phaser.GameObjects.Sprite (reader-desugared)
+    ;
+
+// Reader pre-transforms `Phaser.GameObjects.Sprite` to
+// `(. (. Phaser GameObjects) Sprite)`.  This rule accepts that s-form chain
+// of pure-identifier dotted names — used in type positions and after `new`.
+// The AST builder flattens it back to a dotted string.  This is a strict
+// subset of `propAccess` (which allows arbitrary expressions in the
+// position).
+qualifiedName
+    : LPAREN DOT (IDENTIFIER | qualifiedName) IDENTIFIER RPAREN
     ;
 
 typeUnion
@@ -806,7 +817,7 @@ condElseClause
     ;
 
 newForm
-    : LPAREN NEW IDENTIFIER typeArgs? expression* RPAREN
+    : LPAREN NEW (IDENTIFIER | qualifiedName) typeArgs? expression* RPAREN
     ;
 
 // ─── data literals ───────────────────────────
@@ -966,39 +977,24 @@ nullCoalesce
     ;
 
 // ─── infix expressions ───────────────────────
+//
+// The grammar is purely structural — it just balances braces and collects
+// any tokens inside #{...}.  All semantic parsing (precedence, neoteric
+// calls, sub-forms, '/' whitespace enforcement) happens in
+// Stage10-infix-parser.s9 (parsePrattInfix), which re-tokenises the raw
+// post-reader text from the input stream.
 
 infixExpr
-    : HASH_LBRACE infixBody RBRACE
+    : HASH_LBRACE infixContent RBRACE
     ;
 
-infixBody
-    : infixAtom (infixBinOp infixAtom)*
+infixContent
+    : infixPart*
     ;
 
-infixAtom
-    : IDENTIFIER LPAREN infixArgs? RPAREN   // neoteric call: f(x, y), Math.abs(x)
-    | infixAtom LPAREN infixArgs? RPAREN    // chained call: f(x)(y) or (. obj m)(x)
-    | LBRACE infixBody RBRACE               // sub-group: {a * b}
-    | infixUnaryOp infixAtom                // unary: -x  !done  ~mask
-    | propAccess                            // (. obj key): reader-desugared a.b
-    | literal
-    | IDENTIFIER                            // simple identifier: x, arr, etc.
-    ;
-
-infixArgs
-    : infixBody (COMMA infixBody)*
-    ;
-
-infixUnaryOp
-    : MINUS | BANG | TILDE
-    ;
-
-infixBinOp
-    : PLUS | MINUS | STAR | SLASH | PERCENT | STARSTAR
-    | LT | GT | LTE_OP | GTE_OP
-    | STRICT_EQ | STRICT_NEQ | EQ_OP | NEQ_OP
-    | AMPAMP | PIPEPIPE | NULLCOAL
-    | AMP | PIPE | CARET
+infixPart
+    : LBRACE infixContent RBRACE
+    | ~(LBRACE | RBRACE)
     ;
 
 // ─── macro block call forms ───────────────────

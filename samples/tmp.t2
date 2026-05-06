@@ -1,17 +1,50 @@
 (program
-  (let (shk { rule: (lambda ((args: any)) (console.log args)) }))
-;   (shk.rule { name: "build-compiler",
-;     output: "stage9/index.ts",
-;     deps: [{ kind: "rule", name: "build-grammar" },
-;           { kind: "glob", pattern: "stage9/Stage9*.s8" },
-;           { kind: "file", path: "stage9/Stage9-tags.ts" }],
-;     action: (async-fn ((ctx: any))
-;       (const (stage9Dir: string) (path.join ctx.projectRoot "stage9"))
-;       (const (files: (type-array string))
-;         ((readdirSync stage9Dir).filter (fn ((f: string)) (return (f.endsWith ".s8")))))
-;       (for-of f files
-;         (const (result: any) (await (ctx.run tsxBin [compilerPath srcPath])))
-;         (writeFileSync tmpPath result.stdout)))
-;     }
-;   )
+    (import * as Phaser "phaser")
+    (const ((gWidth 480) (gHeight 640)))
+    (class Player (extends Phaser.GameObjects.Sprite)
+        (class-body
+            (constructor ((scene: Phaser.Scene) (x: number) (y: number) (texture: string))
+                (super scene x y texture)
+                (scene.add.existing this)
+                (scene.time.addEvent {
+                    delay: 100,
+                    callback: (lambda () (this.randomColorize)),
+                    loop: true
+                })
+            )
+            (method randomColorize ()
+                (this.setTint (* (Math.random) 16777215))
+            )
+        )
+    )
+    (class Scene1 (extends Phaser.Scene)
+        (class-body
+            (field private (gem: Phaser.GameObjects.Sprite))
+            (constructor () (super "Scene1"))
+            (method preload ()
+                (console.log "preload")
+                (this.load.image "g1" "images/g1.png")
+            )
+            (method create ()
+                (console.log "create")
+                (set! this.gem (this.add.sprite #{gWidth / 2} #{gHeight / 2} "g1"))
+                (set! this.gem.scaleX 2)
+                (set! this.gem.scaleY 2)
+            )
+        )
+    )
+    (const (
+        (config {
+            type: Phaser.AUTO,
+            width: gWidth,
+            height: gHeight,
+            scene: (new Scene1),
+            scale: {
+                mode: Phaser.Scale.FIT,
+                autoCenter: Phaser.Scale.CENTER_BOTH,
+                min: { width: gWidth, height: gHeight },
+            }
+        })
+        (game (new Phaser.Game config))
+    ))
 )

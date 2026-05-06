@@ -362,63 +362,85 @@ const findPrecedingExprStart  = (text) => {
     if ((j < 0)) {
       return -1;
     }
-    {
-      let last  = text.charAt(j);
-      if ((last === ")")) {
-        {
-          let depth  = 1;
-          j = (j - 1);
-          while (((j >= 0) && (depth > 0))) {
-            {
-              let c  = text.charAt(j);
-              if ((c === ")")) {
-                depth = (depth + 1);
+    while ((j >= 0)) {
+      {
+        let c  = text.charAt(j);
+        if ((c === ")")) {
+          {
+            let depth  = 1;
+            j = (j - 1);
+            while (((j >= 0) && (depth > 0))) {
+              {
+                let cc  = text.charAt(j);
+                if ((cc === ")")) {
+                  depth = (depth + 1);
+                }
+                if ((cc === "(")) {
+                  depth = (depth - 1);
+                }
               }
-              if ((c === "(")) {
-                depth = (depth - 1);
-              }
-            }
-            if ((depth > 0)) {
-              j = (j - 1);
-            }
-          }
-          return j;
-        }
-      }
-      if ((last === "]")) {
-        {
-          let depth  = 1;
-          j = (j - 1);
-          while (((j >= 0) && (depth > 0))) {
-            {
-              let c  = text.charAt(j);
-              if ((c === "]")) {
-                depth = (depth + 1);
-              }
-              if ((c === "[")) {
-                depth = (depth - 1);
+              if ((depth > 0)) {
+                j = (j - 1);
               }
             }
-            if ((depth > 0)) {
-              j = (j - 1);
-            }
-          }
-          return j;
-        }
-      }
-      while ((j >= 0)) {
-        {
-          let c  = text.charAt(j);
-          if (((((((((((((c !== " ") && (c !== "\t")) && (c !== "\n")) && (c !== "\r")) && (c !== "(")) && (c !== ")")) && (c !== "[")) && (c !== "]")) && (c !== "{")) && (c !== "}")) && (c !== ",")) && (c !== ";"))) {
             j = (j - 1);
           }
+        }
+        else {
+          if ((c === "]")) {
+            {
+              let depth  = 1;
+              j = (j - 1);
+              while (((j >= 0) && (depth > 0))) {
+                {
+                  let cc  = text.charAt(j);
+                  if ((cc === "]")) {
+                    depth = (depth + 1);
+                  }
+                  if ((cc === "[")) {
+                    depth = (depth - 1);
+                  }
+                }
+                if ((depth > 0)) {
+                  j = (j - 1);
+                }
+              }
+              j = (j - 1);
+            }
+          }
           else {
-            return (j + 1);
+            if ((c === "}")) {
+              {
+                let depth  = 1;
+                j = (j - 1);
+                while (((j >= 0) && (depth > 0))) {
+                  {
+                    let cc  = text.charAt(j);
+                    if ((cc === "}")) {
+                      depth = (depth + 1);
+                    }
+                    if ((cc === "{")) {
+                      depth = (depth - 1);
+                    }
+                  }
+                  if ((depth > 0)) {
+                    j = (j - 1);
+                  }
+                }
+                j = (j - 1);
+              }
+            }
+            else {
+              if (((c === " ") || ((c === "\t") || ((c === "\n") || ((c === "\r") || ((c === "(") || ((c === "[") || ((c === "{") || ((c === ",") || (c === ";")))))))))) {
+                return (j + 1);
+              }
+              j = (j - 1);
+            }
           }
         }
       }
-      return (j + 1);
     }
+    return (j + 1);
   }
 };
 const readerTransform  = (src) => {
@@ -560,7 +582,7 @@ const readerTransform  = (src) => {
                         {
                           let prevChar  = ((i > 0) ? src.charAt((i - 1)) : undefined);
                           let nextCh  = src.charAt((i + 1));
-                          if ((isIdentChar(prevChar) && (isIdentChar(nextCh) && (!(isDigit(prevChar) && isDigit(nextCh)))))) {
+                          if (((isIdentChar(prevChar) || ((prevChar === ")") || ((prevChar === "]") || (prevChar === "}")))) && (isIdentChar(nextCh) && (!(isDigit(prevChar) && isDigit(nextCh)))))) {
                             {
                               let start  = findPrecedingExprStart(out);
                               let precExpr  = ((start >= 0) ? out.slice(start) : out);
@@ -598,7 +620,7 @@ const readerTransform  = (src) => {
                             }
                           }
                           else {
-                            if ((isIdentChar(prevChar) && !(isIdentChar(nextCh)))) {
+                            if ((isIdentChar(prevChar) && (!isIdentChar(nextCh)))) {
                               throw new Error("Invalid dotted identifier: empty segment");
                             }
                             else {

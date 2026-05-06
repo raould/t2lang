@@ -72,6 +72,7 @@ import { SingleBindingContext } from "./Stage10Parser.js";
 import { ObjectDestructPatContext } from "./Stage10Parser.js";
 import { ArrayDestructPatContext } from "./Stage10Parser.js";
 import { TypeExprContext } from "./Stage10Parser.js";
+import { QualifiedNameContext } from "./Stage10Parser.js";
 import { TypeUnionContext } from "./Stage10Parser.js";
 import { TypeIntersectionContext } from "./Stage10Parser.js";
 import { TypeArrayContext } from "./Stage10Parser.js";
@@ -174,11 +175,8 @@ import { OptChainContext } from "./Stage10Parser.js";
 import { OptChainIndexContext } from "./Stage10Parser.js";
 import { NullCoalesceContext } from "./Stage10Parser.js";
 import { InfixExprContext } from "./Stage10Parser.js";
-import { InfixBodyContext } from "./Stage10Parser.js";
-import { InfixAtomContext } from "./Stage10Parser.js";
-import { InfixArgsContext } from "./Stage10Parser.js";
-import { InfixUnaryOpContext } from "./Stage10Parser.js";
-import { InfixBinOpContext } from "./Stage10Parser.js";
+import { InfixContentContext } from "./Stage10Parser.js";
+import { InfixPartContext } from "./Stage10Parser.js";
 import { MacroExprCallContext } from "./Stage10Parser.js";
 import { MacroBodyCallContext } from "./Stage10Parser.js";
 import { CallContext } from "./Stage10Parser.js";
@@ -894,6 +892,16 @@ export class Stage10Listener implements ParseTreeListener {
      * @param ctx the parse tree
      */
     exitTypeExpr?: (ctx: TypeExprContext) => void;
+    /**
+     * Enter a parse tree produced by `Stage10Parser.qualifiedName`.
+     * @param ctx the parse tree
+     */
+    enterQualifiedName?: (ctx: QualifiedNameContext) => void;
+    /**
+     * Exit a parse tree produced by `Stage10Parser.qualifiedName`.
+     * @param ctx the parse tree
+     */
+    exitQualifiedName?: (ctx: QualifiedNameContext) => void;
     /**
      * Enter a parse tree produced by `Stage10Parser.typeUnion`.
      * @param ctx the parse tree
@@ -1915,55 +1923,25 @@ export class Stage10Listener implements ParseTreeListener {
      */
     exitInfixExpr?: (ctx: InfixExprContext) => void;
     /**
-     * Enter a parse tree produced by `Stage10Parser.infixBody`.
+     * Enter a parse tree produced by `Stage10Parser.infixContent`.
      * @param ctx the parse tree
      */
-    enterInfixBody?: (ctx: InfixBodyContext) => void;
+    enterInfixContent?: (ctx: InfixContentContext) => void;
     /**
-     * Exit a parse tree produced by `Stage10Parser.infixBody`.
+     * Exit a parse tree produced by `Stage10Parser.infixContent`.
      * @param ctx the parse tree
      */
-    exitInfixBody?: (ctx: InfixBodyContext) => void;
+    exitInfixContent?: (ctx: InfixContentContext) => void;
     /**
-     * Enter a parse tree produced by `Stage10Parser.infixAtom`.
+     * Enter a parse tree produced by `Stage10Parser.infixPart`.
      * @param ctx the parse tree
      */
-    enterInfixAtom?: (ctx: InfixAtomContext) => void;
+    enterInfixPart?: (ctx: InfixPartContext) => void;
     /**
-     * Exit a parse tree produced by `Stage10Parser.infixAtom`.
+     * Exit a parse tree produced by `Stage10Parser.infixPart`.
      * @param ctx the parse tree
      */
-    exitInfixAtom?: (ctx: InfixAtomContext) => void;
-    /**
-     * Enter a parse tree produced by `Stage10Parser.infixArgs`.
-     * @param ctx the parse tree
-     */
-    enterInfixArgs?: (ctx: InfixArgsContext) => void;
-    /**
-     * Exit a parse tree produced by `Stage10Parser.infixArgs`.
-     * @param ctx the parse tree
-     */
-    exitInfixArgs?: (ctx: InfixArgsContext) => void;
-    /**
-     * Enter a parse tree produced by `Stage10Parser.infixUnaryOp`.
-     * @param ctx the parse tree
-     */
-    enterInfixUnaryOp?: (ctx: InfixUnaryOpContext) => void;
-    /**
-     * Exit a parse tree produced by `Stage10Parser.infixUnaryOp`.
-     * @param ctx the parse tree
-     */
-    exitInfixUnaryOp?: (ctx: InfixUnaryOpContext) => void;
-    /**
-     * Enter a parse tree produced by `Stage10Parser.infixBinOp`.
-     * @param ctx the parse tree
-     */
-    enterInfixBinOp?: (ctx: InfixBinOpContext) => void;
-    /**
-     * Exit a parse tree produced by `Stage10Parser.infixBinOp`.
-     * @param ctx the parse tree
-     */
-    exitInfixBinOp?: (ctx: InfixBinOpContext) => void;
+    exitInfixPart?: (ctx: InfixPartContext) => void;
     /**
      * Enter a parse tree produced by `Stage10Parser.macroExprCall`.
      * @param ctx the parse tree

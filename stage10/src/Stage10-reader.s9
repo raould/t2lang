@@ -290,45 +290,63 @@
         (return false))))
 
   ;; ---- findPrecedingExprStart ----
-  ;; Scan backward in `text` to find the start index of the last complete expression:
-  ;;   - ')' ending: scan to matching '('
-  ;;   - ']' ending: scan to matching '['
-  ;;   - word char ending: scan back while not a delimiter
+  ;; Scan backward in `text` to find the start index of the last complete
+  ;; expression.  Walks through chained postfix forms — `f(x)`, `arr[0]`,
+  ;; `obj.method(x)`, `f(x).a.b`, etc. — by alternating between
+  ;; paren-balanced groups, bracket-balanced groups, and ident-like chars
+  ;; (including '.').  Stops at whitespace, opening delimiters, '{', '}',
+  ;; ',', ';'.
+  ;;
   ;; Returns the start index, or -1 if text is empty.
   (const findPrecedingExprStart
     (lambda ((text))
       (let ((j (- (. text length) 1)))
         (if (< j 0) (then (return -1)))
-        (let ((last ((. text charAt) j)))
-          ;; Paren group: scan back to matching '('
-          (if (=== last ')')
-            (then (let ((depth 1))
-              (set! j (- j 1))
-              (while (&& (>= j 0) (> depth 0))
-                (let ((c ((. text charAt) j)))
-                  (if (=== c ')') (then (set! depth (+ depth 1))))
-                  (if (=== c '(') (then (set! depth (- depth 1)))))
-                (if (> depth 0) (then (set! j (- j 1)))))
-              (return j))))
-          ;; Bracket group: scan back to matching '['
-          (if (=== last ']')
-            (then (let ((depth 1))
-              (set! j (- j 1))
-              (while (&& (>= j 0) (> depth 0))
-                (let ((c ((. text charAt) j)))
-                  (if (=== c ']') (then (set! depth (+ depth 1))))
-                  (if (=== c '[') (then (set! depth (- depth 1)))))
-                (if (> depth 0) (then (set! j (- j 1)))))
-              (return j))))
-          ;; Word / identifier: scan back while not a delimiter
-          (while (>= j 0)
-            (let ((c ((. text charAt) j)))
-              (if (&& (!== c ' ') (!== c '\t') (!== c '\n') (!== c '\r')
-                      (!== c '(') (!== c ')') (!== c '[') (!== c ']')
-                      (!== c '{') (!== c '}') (!== c ',') (!== c ';'))
-                (then (set! j (- j 1)))
-                (else (return (+ j 1))))))
-          (return (+ j 1))))))
+        (while (>= j 0)
+          (let ((c ((. text charAt) j)))
+            (if (=== c ')')
+              (then
+                ;; Paren group: walk back to matching '(' and step past it.
+                (let ((depth 1))
+                  (set! j (- j 1))
+                  (while (&& (>= j 0) (> depth 0))
+                    (let ((cc ((. text charAt) j)))
+                      (if (=== cc ')') (then (set! depth (+ depth 1))))
+                      (if (=== cc '(') (then (set! depth (- depth 1)))))
+                    (if (> depth 0) (then (set! j (- j 1)))))
+                  (set! j (- j 1))))
+              (else (if (=== c ']')
+                (then
+                  ;; Bracket group: walk back to matching '[' and step past it.
+                  (let ((depth 1))
+                    (set! j (- j 1))
+                    (while (&& (>= j 0) (> depth 0))
+                      (let ((cc ((. text charAt) j)))
+                        (if (=== cc ']') (then (set! depth (+ depth 1))))
+                        (if (=== cc '[') (then (set! depth (- depth 1)))))
+                      (if (> depth 0) (then (set! j (- j 1)))))
+                    (set! j (- j 1))))
+                (else (if (=== c '}')
+                  (then
+                    ;; Brace group (object literal or sub-group): walk back to
+                    ;; matching '{' and step past it.
+                    (let ((depth 1))
+                      (set! j (- j 1))
+                      (while (&& (>= j 0) (> depth 0))
+                        (let ((cc ((. text charAt) j)))
+                          (if (=== cc '}') (then (set! depth (+ depth 1))))
+                          (if (=== cc '{') (then (set! depth (- depth 1)))))
+                        (if (> depth 0) (then (set! j (- j 1)))))
+                      (set! j (- j 1))))
+                  (else
+                    ;; Stop chars: end of preceding expression.
+                    (if (|| (=== c ' ') (|| (=== c '\t') (|| (=== c '\n') (|| (=== c '\r')
+                            (|| (=== c '(') (|| (=== c '[') (|| (=== c '{')
+                            (|| (=== c ',') (=== c ';')))))))))
+                      (then (return (+ j 1))))
+                    ;; Otherwise: ident-like char (incl '.'), step back.
+                    (set! j (- j 1))))))))))
+        (return (+ j 1)))))
 
   ;; ---- readerTransform ----
   ;; Main entry point. Scans src, applying:
@@ -447,7 +465,14 @@
                             (then
                               (let ((prevChar (ternary (> i 0) ((. src charAt) (- i 1)) undefined))
                                      (nextCh ((. src charAt) (+ i 1))))
-                                (if (&& (isIdentChar prevChar)
+                                ;; Trigger when next char is ident-like and prev char is either
+                                ;; ident-like OR a closing delimiter (`)`, `]`, `}`).  The
+                                ;; closing-delimiter case covers patterns like `f(x).a`,
+                                ;; `arr[0].length`, `{...}.field` — chained property access
+                                ;; on the result of a call, subscript, or object/sub-group.
+                                (if (&& (|| (isIdentChar prevChar)
+                                            (|| (=== prevChar ')')
+                                                (|| (=== prevChar ']') (=== prevChar '}'))))
                                         (&& (isIdentChar nextCh)
                                             (! (&& (isDigit prevChar) (isDigit nextCh)))))
                                   ;; Dotted sugar! Extract preceding expr and scan full chain.
@@ -486,7 +511,7 @@
                                       (then (throw (new Error 'Invalid dotted identifier: empty segment')))
                                       (else
                                         (set! out (+ out '.'))
-                                        (set! i (+ i 1))))))
+                                        (set! i (+ i 1))))))))
                             ;; Regular character
                             (else
                               (set! out (+ out ch))

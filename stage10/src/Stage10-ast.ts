@@ -1,6 +1,7 @@
 import { nextNodeId, registerSpan } from "./Stage10-spans";
 import { assertAstTag } from "./Stage10-tags";
 import { nullDebugContext } from "./Stage10-debug";
+import { parsePrattInfix } from "./Stage10-infix-parser";
 let _astDbg  = nullDebugContext;
 const setAstDebugContext  = (dbg) => {
   _astDbg = dbg;
@@ -1830,7 +1831,8 @@ const astCondExpr  = (ctx) => {
 };
 const astNewExpr  = (ctx) => {
   {
-    let name  = ctx.IDENTIFIER().getText();
+    let qn  = ctx.qualifiedName();
+    let name  = (qn ? flattenQualifiedName(qn) : ctx.IDENTIFIER().getText());
     let raw  = ctx.typeArgs();
     let typeArgs  = (raw ? raw.typeExpr().map(astTypeExpr) : []);
     let args  = ctx.expression().map(astExpression);
@@ -2801,6 +2803,23 @@ const astLiteral  = (ctx) => {
   }
   throw new Error("Unknown literal");
 };
+const flattenQualifiedName  = (ctx) => {
+  {
+    let idents  = ctx.IDENTIFIER();
+    let nested  = ctx.qualifiedName();
+    let lastIdent  = idents[(idents.length - 1)].getText();
+    let head  = (nested ? flattenQualifiedName(nested) : idents[0].getText());
+    return ((head + ".") + lastIdent);
+  }
+};
+const astTypeQualifiedName  = (ctx) => {
+  return {
+    id: registerSpan(nextNodeId(), ctx),
+    text: ctx.getText(),
+    tag: "type-id",
+    name: flattenQualifiedName(ctx)
+  };
+};
 const astTypeExpr  = (ctx) => {
   if (ctx.typeUnion()) {
     return astTypeUnion(ctx.typeUnion());
@@ -2846,6 +2865,9 @@ const astTypeExpr  = (ctx) => {
   }
   if (ctx.typeApplication()) {
     return astTypeApplication(ctx.typeApplication());
+  }
+  if (ctx.qualifiedName()) {
+    return astTypeQualifiedName(ctx.qualifiedName());
   }
   if (ctx.NULL()) {
     return {
@@ -3174,123 +3196,16 @@ const astTypeParamDecl  = (ctx) => {
     };
   }
 };
-const astUnaryOp  = (ctx) => {
-  {
-    let id  = registerSpan(nextNodeId(), ctx);
-    let op  = ctx.infixUnaryOp().getText();
-    let operand  = astInfixAtom(ctx.infixAtom());
-    return {
-      id: id,
-      tag: "unary-op",
-      op: op,
-      operand: operand
-    };
-  }
-};
-const astInfixAtom  = (ctx) => {
-  if (ctx.infixUnaryOp()) {
-    return astUnaryOp(ctx);
-  }
-  if (ctx.literal()) {
-    return astLiteral(ctx.literal());
-  }
-  if (ctx.LBRACE()) {
-    return astInfixBody(ctx.infixBody());
-  }
-  if ((ctx.propAccess() && (!ctx.infixAtom()))) {
-    return astPropAccess(ctx.propAccess());
-  }
-  {
-    let argsFromCtx  = (c) => {
-      {
-        let argsCtx  = c.infixArgs();
-        if (argsCtx) {
-          return argsCtx.infixBody().map(astInfixBody);
-        }
-        else {
-          return [];
-        }
-      }
-    };
-    let id  = registerSpan(nextNodeId(), ctx);
-    if (ctx.infixAtom()) {
-      {
-        let callee  = astInfixAtom(ctx.infixAtom());
-        let args  = argsFromCtx(ctx);
-        return {
-          id: id,
-          tag: "call",
-          fn: callee,
-          args: args,
-          typeArgs: []
-        };
-      }
-    }
-    if (ctx.LPAREN()) {
-      {
-        let rawName  = ctx.IDENTIFIER().getText();
-        let callee  = ((rawName.includes(".") && (!rawName.startsWith("..."))) ? desugarDottedIdentifier(rawName, ctx) : {
-          id: registerSpan(nextNodeId(), ctx),
-          tag: "identifier",
-          name: rawName
-        });
-        let args  = argsFromCtx(ctx);
-        return {
-          id: id,
-          tag: "call",
-          fn: callee,
-          args: args,
-          typeArgs: []
-        };
-      }
-    }
-    {
-      let rawName  = ctx.IDENTIFIER().getText();
-      if ((rawName.includes(".") && (!rawName.startsWith("...")))) {
-        return desugarDottedIdentifier(rawName, ctx);
-      }
-      return {
-        id: id,
-        tag: "identifier",
-        name: rawName
-      };
-    }
-  }
-};
-const astInfixBody  = (ctx) => {
-  {
-    let atoms  = ctx.infixAtom().map(astInfixAtom);
-    let ops  = ctx.infixBinOp().map((op) => {
-      return op.getText();
-    });
-    if ((atoms.length === 1)) {
-      return atoms[0];
-    }
-    {
-      let firstOp  = ops[0];
-      ops.forEach((op) => {
-        if ((op !== firstOp)) {
-          throw new Error(((((("mixed operators in #{}: '" + firstOp) + "' and '") + op) + "' at ") + ctx.getText()));
-        }
-      });
-      return atoms.reduce((acc, cur, i) => {
-        {
-          let id  = registerSpan(nextNodeId(), ctx);
-          return {
-            id: id,
-            tag: "binary-op",
-            op: ops[(i - 1)],
-            left: acc,
-            right: cur
-          };
-        }
-      });
-    }
-  }
-};
 const astInfixExpr  = (ctx) => {
   _astDbg.log_msg("ast", ("desugar infix: " + ctx.getText().slice(0, 60)));
-  return astInfixBody(ctx.infixBody());
+  {
+    let startTok  = ctx.start;
+    let stopTok  = ctx.stop;
+    let innerStart  = (startTok.stop + 1);
+    let innerStop  = (stopTok.start - 1);
+    let inner  = ((innerStart <= innerStop) ? startTok.inputStream.getTextFromRange(innerStart, innerStop) : "");
+    return parsePrattInfix(inner, ctx);
+  }
 };
 const astMacroBlockCallHelper  = (ctx, tag) => {
   _astDbg.log_msg("ast", ((("desugar " + tag) + ": ") + ctx.IDENTIFIER().getText()));

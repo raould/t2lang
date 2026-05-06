@@ -2,6 +2,7 @@
   (import (object (named (array (object (name "nextNodeId")) (object (name "registerSpan"))))) "./Stage10-spans")
   (import (object (named (array (object (name "assertAstTag"))))) "./Stage10-tags")
   (import (object (named (array (object (name "nullDebugContext"))))) "./Stage10-debug")
+  (import (object (named (array (object (name "parsePrattInfix"))))) "./Stage10-infix-parser")
 
   (let ((_astDbg nullDebugContext)))
   (const setAstDebugContext (lambda ((dbg)) (set! _astDbg dbg)))
@@ -1023,7 +1024,10 @@
 
   (const astNewExpr
     (lambda ((ctx))
-      (let ((name ((. ((. ctx IDENTIFIER)) getText)))
+      (let ((qn ((. ctx qualifiedName)))
+             (name (ternary qn
+                     (flattenQualifiedName qn)
+                     ((. ((. ctx IDENTIFIER)) getText))))
              (raw ((. ctx typeArgs)))
              (typeArgs (ternary raw
                            ((. ((. raw typeExpr)) map) astTypeExpr)
@@ -1484,6 +1488,28 @@
       (throw (new Error 'Unknown literal'))))
 
   ;; ========== Phase A: Type Expressions ==========
+
+  ;; Flatten a (. (. NS A) B) chain — the reader's expansion of NS.A.B —
+  ;; back into a dotted string like "NS.A.B".  Used by type and `new` AST
+  ;; builders to produce a `name` string for codegen.
+  (const flattenQualifiedName
+    (lambda ((ctx))
+      (let ((idents ((. ctx IDENTIFIER)))
+             (nested ((. ctx qualifiedName)))
+             (lastIdent ((. (index idents (- (. idents length) 1)) getText)))
+             (head (ternary nested
+                     (flattenQualifiedName nested)
+                     ((. (index idents 0) getText)))))
+        (return (+ head '.' lastIdent)))))
+
+  ;; Wrap a flattened qualifiedName in a type-id node for type contexts.
+  (const astTypeQualifiedName
+    (lambda ((ctx))
+      (return (object (id (registerSpan (nextNodeId) ctx))
+                      (text ((. ctx getText)))
+                      (tag 'type-id')
+                      (name (flattenQualifiedName ctx))))))
+
   (const astTypeExpr
     (lambda ((ctx))
       (if ((. ctx typeUnion))
@@ -1516,6 +1542,8 @@
         (then (return (astTypeTemplateLiteral ((. ctx typeTemplateLiteral))))))
       (if ((. ctx typeApplication))
         (then (return (astTypeApplication ((. ctx typeApplication))))))
+      (if ((. ctx qualifiedName))
+        (then (return (astTypeQualifiedName ((. ctx qualifiedName))))))
       ;; null / undefined / object keyword types, and {} empty object type
       (if ((. ctx NULL))
         (then (return (object (id (registerSpan (nextNodeId) ctx)) (text ((. ctx getText))) (tag 'type-id') (name 'null')))))
@@ -1664,67 +1692,23 @@
                undefined)))
         (return (object (name name) (constraint constraint) ("default" defaultType))))))
 
-  ;; ========== Infix expression AST builders ==========
-
-  (const astUnaryOp
-    (lambda ((ctx))
-      (let ((id (registerSpan (nextNodeId) ctx))
-             (op ((. ((. ctx infixUnaryOp)) getText)))
-             (operand (astInfixAtom ((. ctx infixAtom)))))
-        (return (object (id id) (tag 'unary-op') (op op) (operand operand))))))
-
-  (const astInfixAtom
-    (lambda ((ctx))
-      (if ((. ctx infixUnaryOp))
-        (then (return (astUnaryOp ctx))))
-      (if ((. ctx literal))
-        (then (return (astLiteral ((. ctx literal))))))
-      (if ((. ctx LBRACE))
-        (then (return (astInfixBody ((. ctx infixBody))))))
-      ;; propAccess infixAtom: (. obj key)
-      (if (&& ((. ctx propAccess)) (! ((. ctx infixAtom))))
-        (then (return (astPropAccess ((. ctx propAccess))))))
-      (let ((argsFromCtx
-               (lambda ((c))
-                 (let ((argsCtx ((. c infixArgs))))
-                   (if argsCtx
-                     (then (return ((. ((. argsCtx infixBody)) map) astInfixBody)))
-                     (else (return (array)))))))
-             (id (registerSpan (nextNodeId) ctx)))
-        (if ((. ctx infixAtom))
-          (then (let ((callee (astInfixAtom ((. ctx infixAtom))))
-                 (args (argsFromCtx ctx)))
-            (return (object (id id) (tag 'call') (fn callee) (args args) (typeArgs (array)))))))
-        (if ((. ctx LPAREN))
-          (then (let ((rawName ((. ((. ctx IDENTIFIER)) getText)))
-                 (callee (ternary (&& ((. rawName includes) '.') (! ((. rawName startsWith) '...')))
-                           (desugarDottedIdentifier rawName ctx)
-                           (object (id (registerSpan (nextNodeId) ctx)) (tag 'identifier') (name rawName))))
-                 (args (argsFromCtx ctx)))
-            (return (object (id id) (tag 'call') (fn callee) (args args) (typeArgs (array)))))))
-        (let ((rawName ((. ((. ctx IDENTIFIER)) getText))))
-          (if (&& ((. rawName includes) '.') (! ((. rawName startsWith) '...')))
-            (then (return (desugarDottedIdentifier rawName ctx))))
-          (return (object (id id) (tag 'identifier') (name rawName)))))))
-
-  (const astInfixBody
-    (lambda ((ctx))
-      (let ((atoms ((. ((. ctx infixAtom)) map) astInfixAtom))
-             (ops ((. ((. ctx infixBinOp)) map) (lambda ((op)) (return ((. op getText)))))))
-        (if (=== (. atoms length) 1)
-          (then (return (index atoms 0))))
-        (let ((firstOp (index ops 0)))
-          ((. ops forEach) (lambda ((op))
-            (if (!== op firstOp)
-              (then (throw (new Error (+ "mixed operators in #{}: '" firstOp "' and '" op "' at " ((. ctx getText)))))))))
-          (return ((. atoms reduce) (lambda ((acc) (cur) (i))
-            (let ((id (registerSpan (nextNodeId) ctx)))
-              (return (object (id id) (tag 'binary-op') (op (index ops (- i 1))) (left acc) (right cur)))))))))))
+  ;; ========== Infix expression: delegate to Pratt parser ==========
+  ;;
+  ;; Grammar gives us only the brace-balanced blob (infixContent).  Pull the
+  ;; raw post-reader text from the input stream (whitespace preserved) and
+  ;; hand it to the Pratt parser.  See PRATT.md for the design rationale.
 
   (const astInfixExpr
     (lambda ((ctx))
       ((. _astDbg log_msg) "ast" (+ "desugar infix: " ((. ((. ctx getText)) slice) 0 60)))
-      (return (astInfixBody ((. ctx infixBody))))))
+      (let ((startTok (. ctx start))
+             (stopTok  (. ctx stop))
+             (innerStart (+ (. startTok stop) 1))
+             (innerStop  (- (. stopTok start) 1))
+             (inner (ternary (<= innerStart innerStop)
+                       ((. (. startTok inputStream) getTextFromRange) innerStart innerStop)
+                       "")))
+        (return (parsePrattInfix inner ctx)))))
 
   ;; ========== Macro block call AST builders ==========
 
