@@ -137,7 +137,7 @@ After lowering the tag becomes `'mixin-stmt'` (identical fields — lowering is 
 
 ---
 
-## Step 1 — Grammar (`Stage9.g4`)
+## Step 1 — Grammar (`Stage10.g4`)
 
 **1a. New tokens**
 
@@ -180,12 +180,12 @@ Add `| mixinForm` as a new alternative in the `topLevel` rule.
 **Rebuild grammar after this step:**
 
 ```sh
-npm run build-grammar   # in stage9/
+npm run build-grammar   # in stage10/
 ```
 
 ---
 
-## Step 2 — AST (`Stage9-ast.s8`)
+## Step 2 — AST (`Stage10-ast.s9`)
 
 **2a. Add `astMixinForm`**
 
@@ -225,7 +225,7 @@ Add before the `exportDeclForm` check:
 
 ---
 
-## Step 3 — Macro-expand (`Stage9-macro-expand.s8`)
+## Step 3 — Macro-expand (`Stage10-macro-expand.s9`)
 
 `mixin-form` carries no expressions that need expansion. Add a pass-through in `expandTopLevel` before the fall-through to `expandStmt`:
 
@@ -236,7 +236,7 @@ Add before the `exportDeclForm` check:
 
 ---
 
-## Step 4 — Scope-resolve (`Stage9-scope-resolve.s8`)
+## Step 4 — Scope-resolve (`Stage10-scope-resolve.s9`)
 
 Same: no variable references to resolve. Add a pass-through in `resolveTopLevel` before the fall-through to `resolveStmt`:
 
@@ -247,7 +247,7 @@ Same: no variable references to resolve. Add a pass-through in `resolveTopLevel`
 
 ---
 
-## Step 5 — Lower (`Stage9-lower.s8`)
+## Step 5 — Lower (`Stage10-lower.s9`)
 
 **5a. Lower `mixin-form` → `mixin-stmt`**
 
@@ -283,7 +283,7 @@ This enforces the convention mechanically: if you write `(extends MixinBase)`, e
 
 ---
 
-## Step 6 — Codegen (`Stage9-codegen.s8`)
+## Step 6 — Codegen (`Stage10-codegen.s9`)
 
 ### MixinBase contract
 
@@ -411,7 +411,7 @@ Add before the fall-through to the generic statement handler:
 
 ---
 
-## Step 7 — Tests (`stage9/tests/mixin.test.ts`)
+## Step 7 — Tests (`stage10/tests/mixin.test.ts`)
 
 Six test cases:
 
@@ -460,9 +460,9 @@ Six test cases:
 ## Step 8 — Build and verify
 
 ```sh
-cd stage9
+cd stage10
 npm run build-grammar    # regenerate lexer/parser from .g4
-npm run build-compiler   # recompile .s8 → .ts
+npm run build-compiler   # recompile .s9 → .ts
 npx vitest --typecheck run # Do not run "vitest --typecheck" from any other directory.
 ```
 
@@ -474,10 +474,10 @@ All 124+ existing tests must continue to pass.
 
 | File | Change |
 |---|---|
-| `Stage9.g4` | Add `MIXIN` + `DECLARE` tokens; add `DECLARE` to `modifier` rule; add `mixinForm` + `mixinFilter` rules; wire `mixinForm` into `topLevel`; add `MIXIN`, `DECLARE` to `propKey` |
-| `Stage9-ast.s8` | Add `astMixinForm`; wire into `astTopLevel` |
-| `Stage9-macro-expand.s8` | Pass-through for `mixin-form` in `expandTopLevel` |
-| `Stage9-scope-resolve.s8` | Pass-through for `mixin-form` in `resolveTopLevel` |
-| `Stage9-lower.s8` | Lower `mixin-form` → `mixin-stmt` in `lowerTopLevel`; validate field discipline in `lowerClassDef` |
-| `Stage9-codegen.s8` | Add `emitMixinStmt`; wire into `emitStmt` |
-| `stage9/tests/mixin.test.ts` | New test file (3 tests) |
+| `Stage10.g4` | Add `MIXIN` + `DECLARE` tokens; add `DECLARE` to `modifier` rule; add `mixinForm` + `mixinFilter` rules; wire `mixinForm` into `topLevel`; add `MIXIN`, `DECLARE` to `propKey` |
+| `Stage10-ast.s9` | Add `astMixinForm`; wire into `astTopLevel` |
+| `Stage10-macro-expand.s9` | Pass-through for `mixin-form` in `expandTopLevel` |
+| `Stage10-scope-resolve.s9` | Pass-through for `mixin-form` in `resolveTopLevel` |
+| `Stage10-lower.s9` | Lower `mixin-form` → `mixin-stmt` in `lowerTopLevel`; validate field discipline in `lowerClassDef` |
+| `Stage10-codegen.s9` | Add `emitMixinStmt`; wire into `emitStmt` |
+| `stage10/tests/mixin.test.ts` | New test file (3 tests) |

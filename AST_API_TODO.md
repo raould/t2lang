@@ -110,7 +110,7 @@ This gives humans full editing power without compromising the structural guarant
 
 ## Application to t2lang
 
-T2lang is an S-expression language that transpiles to TypeScript. It already has a detailed grammar (ANTLR4 `Stage9.g4`) that defines every node type and its children. This grammar is the complete specification of the AST API — it just needs to be surfaced as a library rather than a parser.
+T2lang is an S-expression language that transpiles to TypeScript. It already has a detailed grammar (ANTLR4 `Stage10.g4`) that defines every node type and its children. This grammar is the complete specification of the AST API — it just needs to be surfaced as a library rather than a parser.
 
 ### The Grammar as API Specification
 

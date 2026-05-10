@@ -44,13 +44,13 @@ Or from the VS Code UI: **Extensions → ⋯ → Install from VSIX…**
 
 ### 5. Connect: how the extension finds the server
 
-When a `.t2` or `.s8` file is opened, VS Code activates the extension (`onLanguage:t2`). The extension spawns `t2lang-lsp` (the bin entry from `npm install t2lang`) over stdio. The LSP handshake runs automatically — no manual connection step is needed.
+When a `.t2` or `.s9` file is opened, VS Code activates the extension (`onLanguage:t2`). The extension spawns `t2lang-lsp` (the bin entry from `npm install t2lang`) over stdio. The LSP handshake runs automatically — no manual connection step is needed.
 
-**In-repo development:** the server runs directly from source via `tsx`, so no separate compilation step is required before testing changes to `Stage9-lsp.ts`. Just rebuild with `npm run build-lsp` and reload the extension host (`Ctrl+Shift+P` → *Developer: Restart Extension Host*).
+**In-repo development:** the server runs directly from source via `tsx`, so no separate compilation step is required before testing changes to `Stage10-lsp.ts`. Just rebuild with `npm run build-lsp` and reload the extension host (`Ctrl+Shift+P` → *Developer: Restart Extension Host*).
 
 ### 6. Evaluate a snippet
 
-1. Open a `.t2` or `.s8` file.
+1. Open a `.t2` or `.s9` file.
 2. Select some code (any valid t2 expression or `(program ...)` block).
 3. Press `Ctrl+Enter` (Mac: `Cmd+Enter`).
 4. Results appear in the **t2 eval** output panel (stdout, stderr, or compile errors).
@@ -93,8 +93,8 @@ See also: `vscode-t2-formatter`.
 > - [x] Add `vscode-languageserver` and `vscode-languageserver-textdocument` to root `package.json` dependencies
 > - [x] Add `"t2lang-lsp": "bin/t2lang-lsp.js"` to `package.json` bin entries
 > - [x] Create `bin/t2lang-lsp.js` (server entry point — hand-authored, like other bin files)
-> - [x] Create `stage9/Stage9-lsp.s8` → `stage9/Stage9-lsp.ts` (`createEvalService`, `handleT2Eval`, helpers)
-> - [x] `Stage9-lsp.s8` compiled by stage9 via `npm run build-lsp` (not stage8 build-compiler)
+> - [x] Create `stage10/Stage10-lsp.s9` → `stage10/Stage10-lsp.ts` (`createEvalService`, `handleT2Eval`, helpers)
+> - [x] `Stage10-lsp.s9` compiled by stage10 via `npm run build-lsp` (not stage8 build-compiler)
 > - [x] Smoke-tested: `handleT2Eval` compiles, type-checks, runs JS, returns `{ stdout, ts, js, finalT2 }`
 
 ### Capabilities
@@ -219,8 +219,8 @@ Add to root `package.json`:
 
 #### New files
 
-- `bin/t2lang-lsp.s8` — server entry point (compiled to `bin/t2lang-lsp.js`)
-- `stage9/lsp.s8` — `t2/eval` handler and helpers
+- `bin/t2lang-lsp.s9` — server entry point (compiled to `bin/t2lang-lsp.js`)
+- `stage10/lsp.s9` — `t2/eval` handler and helpers
 
 #### New bin entry in `package.json`
 
@@ -230,14 +230,14 @@ Add to root `package.json`:
 }
 ```
 
-#### Server initialization (`bin/t2lang-lsp.s8`)
+#### Server initialization (`bin/t2lang-lsp.s9`)
 
 ```lisp
 (program
   (import {createConnection ProposedFeatures TextDocumentSyncKind} "vscode-languageserver/node")
   (import {TextDocuments} "vscode-languageserver")
   (import {TextDocument} "vscode-languageserver-textdocument")
-  (import {createEvalService handleT2Eval} "../stage9/lsp")
+  (import {createEvalService handleT2Eval} "../stage10/lsp")
 
   (const connection (createConnection ProposedFeatures.all))
   (const documents (new TextDocuments TextDocument))
@@ -264,7 +264,7 @@ Add to root `package.json`:
   (connection.listen))
 ```
 
-#### `t2/eval` handler (`stage9/lsp.s8`)
+#### `t2/eval` handler (`stage10/lsp.s9`)
 
 **`createEvalService`** — called once at server startup. Creates and returns the persistent TypeScript `LanguageService` with an in-memory virtual host. The virtual file `__eval__.ts` is the only script file; its content and version are updated per eval. All other file access (lib files, node_modules types) delegates to `ts.sys`.
 
@@ -424,7 +424,7 @@ Step 6: write JS to a temp file and execute. Temp file always cleaned up in `fin
         (catch _ undefined)))))) ;; end handleT2Eval
 ```
 
-**Full module structure (`stage9/lsp.s8`)**
+**Full module structure (`stage10/lsp.s9`)**
 
 ```lisp
 (program
@@ -434,7 +434,7 @@ Step 6: write JS to a temp file and execute. Temp file always cleaned up in `fin
   (import {spawn} "node:child_process")
   (import * as ts "typescript")
   (import {compileSource} "./index")
-  ;; Stage 2 adds: (import {readerTransform} "./Stage9-reader")
+  ;; Stage 2 adds: (import {readerTransform} "./Stage10-reader")
 
   (const MAX_OUTPUT #{1024 * 1024})
 
@@ -462,7 +462,7 @@ Step 6: write JS to a temp file and execute. Temp file always cleaned up in `fin
 > - [x] `extractModuleSpecifier` — extracts the last string token (module path) from an import form
 > - [x] `injectImports` — inserts deduplicated imports after `(program` opener, skipping any whose specifier is already in the snippet
 > - [x] `handleT2Eval` updated — Step 3 extracts file imports and injects them before compiling
-> - [x] Import of `readerTransform` from `./Stage9-reader` added
+> - [x] Import of `readerTransform` from `./Stage10-reader` added
 > - [x] Smoke-tested: snippet with no imports compiles/runs correctly; imports from file are injected into `finalT2`
 
 ### New Capabilities
@@ -678,7 +678,7 @@ interface T2EvalResult {
 - Provide: document identifier, selection range, optional state name
 - Display: stdout, stderr, verbose artifacts, diagnostics
 - Spawn the server via the `t2lang-lsp` bin command
-- **Associate files with the t2lang LSP** — file extension mapping (`.t2`, `.s8`, or any other) is entirely the client's responsibility
+- **Associate files with the t2lang LSP** — file extension mapping (`.t2`, `.s9`, or any other) is entirely the client's responsibility
 
 ### Client must not:
 
@@ -737,7 +737,7 @@ Add to `vscode-t2-formatter/package.json`:
       {
         "id": "t2",
         "aliases": ["t2"],
-        "extensions": [".t2", ".s8"],
+        "extensions": [".t2", ".s9"],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -759,7 +759,7 @@ Add to `vscode-t2-formatter/package.json`:
 }
 ```
 
-Note: `.s8` is added to `extensions` so compiler source files get t2 highlighting and LSP support automatically.
+Note: `.s9` is added to `extensions` so compiler source files get t2 highlighting and LSP support automatically.
 
 ### Extension entry point (`src/extension.ts`)
 
@@ -818,7 +818,7 @@ export function deactivate() {
 
 ### How it works
 
-1. VS Code activates the extension when a `.t2` or `.s8` file is opened (`onLanguage:t2`).
+1. VS Code activates the extension when a `.t2` or `.s9` file is opened (`onLanguage:t2`).
 2. `LanguageClient` spawns `t2lang-lsp` via stdio and handles the LSP handshake.
 3. Document sync (`didOpen`, `didChange`) is handled automatically by the client library — the server's document store stays current.
 4. When the user presses `Ctrl+Enter` (or `Cmd+Enter` on Mac) with a selection, the `t2lang.eval` command fires, sends the `t2/eval` request, and displays the result in the **t2 eval** output panel.

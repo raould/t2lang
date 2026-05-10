@@ -431,7 +431,7 @@ Discovered during the actual Phase A and Phase B build. Capture here so the next
 
 ```bash
 # From stage10/src/ — compile a single .s9 file:
-npm --silent --prefix ../../stage9 run t2tc -- $PWD/Stage10-infix-parser.s9
+npm --silent --prefix ../../stage10 run t2tc -- $PWD/Stage10-infix-parser.s9
 
 # From stage10/ — regenerate ANTLR parser/lexer after grammar edits:
 npm run build-grammar

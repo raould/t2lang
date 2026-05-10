@@ -1,6 +1,6 @@
-# Infix Math Notation — Stage9 Design
+# Infix Math Notation — Stage10 Design
 
-This document describes the full plan for adding `#{}` infix expression sugar to t2lang stage9.
+This document describes the full plan for adding `#{}` infix expression sugar to t2lang stage10.
 
 ---
 
@@ -343,9 +343,9 @@ Then:
 
 ### Phase 1 — AST
 
-Add `binary-op` and `unary-op` to `Stage9-tags.ts`.
+Add `binary-op` and `unary-op` to `Stage10-tags.ts`.
 
-Add to `Stage9-ast.s8` — four functions with the following call tree:
+Add to `Stage10-ast.s9` — four functions with the following call tree:
 
 ```
 astInfixExpr
@@ -371,9 +371,9 @@ Inspect output to confirm a `binary-op` node with `op: "+"`, `left: 1`, `right: 
 
 Add two tag branches to each stage's expression dispatcher. The `binary-op` and `unary-op` tags are **unchanged through lower** — no `-expr` suffix rename, since there is no structural transformation. Codegen dispatches on `binary-op` / `unary-op` directly.
 
-- `expandExpr` (`Stage9-macro-expand.s8`): `binary-op` → recurse `left`, `right`; `unary-op` → recurse `operand`
-- `resolveExpr` (`Stage9-scope-resolve.s8`): same; `op` string is passed through unchanged, never resolved as a binding
-- `lowerExpr` (`Stage9-lower.s8`): same; lower children, rebuild node with same tag
+- `expandExpr` (`Stage10-macro-expand.s9`): `binary-op` → recurse `left`, `right`; `unary-op` → recurse `operand`
+- `resolveExpr` (`Stage10-scope-resolve.s9`): same; `op` string is passed through unchanged, never resolved as a binding
+- `lowerExpr` (`Stage10-lower.s9`): same; lower children, rebuild node with same tag
 
 **Verification checkpoint:** `(program (const x #{1 + 2}))` should now compile end-to-end to `const x = 1 + 2;`.
 

@@ -82,7 +82,7 @@ also be valid and preferred:
 
 Phases 1–6 below. Goal 2 (reader transform) is deferred and tracked separately.
 
-### Phase 1 — Grammar (`Stage9.g4`)
+### Phase 1 — Grammar (`Stage10.g4`)
 
 **Add lexer token:**
 ```antlr
@@ -117,7 +117,7 @@ Remove `tryForm` from the `statement` rule. Add `exceptForm` in its place.
 
 Run `npm run build-grammar`.
 
-### Phase 2 — AST (`Stage9-ast.s8`)
+### Phase 2 — AST (`Stage10-ast.s9`)
 
 Rename `astTryForm` → `astExceptForm`. Source fields from the new clause
 structure:
@@ -129,7 +129,7 @@ structure:
 Tag remains `try-form` (or rename to `except-form` — codegen is unchanged
 either way; choose `except-form` for clarity).
 
-### Phase 3 — Codegen (`Stage9-codegen.s8`)
+### Phase 3 — Codegen (`Stage10-codegen.s9`)
 
 Rename `emitTryForm` → `emitExceptForm`, update tag dispatch. The emitted
 TypeScript is identical:
@@ -144,13 +144,13 @@ try {
 }
 ```
 
-### Phase 4 — Reader transform (`Stage9-reader.s8`) — FUTURE (Goal 2)
+### Phase 4 — Reader transform (`Stage10-reader.s9`) — FUTURE (Goal 2)
 
 See Edge Cases section for full spec. Deferred until Goal 1 is complete.
 
 ### Phase 5 — Tests
 
-**Update existing tests** in `stage9/tests/tryCatchFinally.test.ts`: replace
+**Update existing tests** in `stage10/tests/tryCatchFinally.test.ts`: replace
 all `(try ... (catch ...) (finally ...))` with `(except (try ...) (catch ...) (finally ...))`.
 Reader transform tests (EC-1 through EC-12) are added when Goal 2 is implemented.
 

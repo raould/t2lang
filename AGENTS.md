@@ -1,22 +1,22 @@
 # t2lang
 
-A bootstrapping compiler chain (stage3 → ... → stage100) that compiles s-expression source files (`.s8`, `.s7`, `.s6`, `.s5`) to TypeScript.
+A bootstrapping compiler chain (stage3 → ... → stage10) that compiles s-expression source files (`.s9`, `.s7`, `.s6`, `.s5`) to TypeScript.
 
 ## Code Style & Conventions
 
 - Read STYLE_GUIDE.md.
-- use Stage9/Stage9/g4 syntax.
+- use Stage10/Stage10/g4 syntax.
 
 ## Project Structure
 
-- `stage100/` — current compiler stage (`.s8` sources → `.ts` outputs)
-- `stage8/` — previous stage compiler (used to build stage100)
-- `stage100/Stage9*.s8` — compiler source files (edit these, not the `.ts` outputs)
-- `stage100/Stage9-tags.ts`, `Stage9-debug.ts`, `Stage9-parse-form.ts` — hand-authored TypeScript (not compiled)
-- `stage100/index.ts` — compiled from `Stage9.s8` (main entry point)
-- `stage100/tests/` — test suite (Vitest)
+- `stage10/` — current compiler stage (`.s9` sources → `.ts` outputs)
+- `stage10/` — previous stage compiler (used to build stage10)
+- `stage10/Stage10*.s9` — compiler source files (edit these, not the `.ts` outputs)
+- `stage10/Stage10-tags.ts`, `Stage10-debug.ts`, `Stage10-parse-form.ts` — hand-authored TypeScript (not compiled)
+- `stage10/index.ts` — compiled from `Stage10.s9` (main entry point)
+- `stage10/tests/` — test suite (Vitest)
 - `bin/t2tc.js`, `bin/t2jc.js`, `bin/t2run.js` — CLI wrappers
-- `index.ts` — root re-export: `export { compile } from "./stage100/index.ts"`
+- `index.ts` — root re-export: `export { compile } from "./stage10/index.ts"`
 - `build.shk` — MiniShake build file
 
 ## Build & Commands
@@ -25,7 +25,7 @@ A bootstrapping compiler chain (stage3 → ... → stage100) that compiles s-exp
 # Install all stage dependencies
 npm run modules
 
-# Build the compiler (compile all .s8 → .ts)
+# Build the compiler (compile all .s9 → .ts)
 npm run build            # or: shk build build-compiler
 
 # Run tests (includes build)
@@ -36,7 +36,7 @@ npm run testnow
 
 # Run tests directly
 # Do not run "vitest --typecheck" from any other directory.
-cd stage100 && npx vitest --typecheck run
+cd stage10 && npx vitest --typecheck run
 ```
 
 Always run vitest as `npx vitest --typecheck run` — never bare `vitest run`.
@@ -46,13 +46,13 @@ Always run vitest as `npx vitest --typecheck run` — never bare `vitest run`.
 - **Programmatic API only:** `compile()` is the sole public API — never process `argv` in compiler source
 - **CLI wrappers** (`bin/t2*.js`) are the only place that parses command-line arguments; they convert flags to `compile()` config
 - **Import:** `import { compile } from "t2lang"`
-- **Source → output mapping:** `Stage9-foo.s8` → `Stage9-foo.ts`; exception: `Stage9.s8` → `index.ts`
-- **Never edit `.ts` files** that are compiled from `.s8` sources — they get overwritten on build
+- **Source → output mapping:** `Stage10-foo.s9` → `Stage10-foo.ts`; exception: `Stage10.s9` → `index.ts`
+- **Never edit `.ts` files** that are compiled from `.s9` sources — they get overwritten on build
 
 ## Testing
 
 - Framework: Vitest (with `--typecheck`)
-- Tests live in `stage100/tests/`
+- Tests live in `stage10/tests/`
 - Tests call `compile()` programmatically — no subprocess spawning
 - Helper pattern:
   ```typescript

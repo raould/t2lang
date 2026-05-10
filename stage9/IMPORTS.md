@@ -168,7 +168,7 @@ Any relative import ending in `.t2` has its extension replaced with `.js`.
 
 **Changes:**
 
-- **`Stage9-codegen.s8` (`emitImport`)**
+- **`Stage10-codegen.s9` (`emitImport`)**
   - If `node.source` ends with `".t2"`, replace the suffix with `".js"` before emitting.
   - `.t2m` imports are already emitted as `// macro-import: …` comments; no change needed.
   - All other paths pass through unchanged.
@@ -188,19 +188,19 @@ emission layer, without changing emission behaviour yet (that comes in Phase 2).
 
 **Changes:**
 
-- **`Stage9.s8` (`main`)**
+- **`Stage10.s9` (`main`)**
   - Parse `--root-dir <dir>` and `--out-dir <dir>` from `argv`.
   - Default `rootDir` to `path.dirname(path.resolve(filePath))`.
   - Default `outDir` to `rootDir`.
   - Both values are resolved to absolute paths via `path.resolve`.
   - Error if `--out-dir` is given without `--root-dir` (avoids ambiguous inference).
 
-- **`Stage9-codegen.s8`**
+- **`Stage10-codegen.s9`**
   - Export a `setImportContext(inputFile, rootDir, outDir)` function that stores the
     three values in module-level variables.
   - `emitImport` reads these variables when deciding how to rewrite a path.
 
-- **`Stage9.s8`** — call `setImportContext` once per file, after parsing the flags and
+- **`Stage10.s9`** — call `setImportContext` once per file, after parsing the flags and
   before starting the emit loop.
 
 ---
@@ -251,7 +251,7 @@ error: import "../../../outside.t2" escapes root-dir <dir>
 
 ### Phase 3 — Tests
 
-New test file: `stage9/tests/importPathRewrite.test.ts`
+New test file: `stage10/tests/importPathRewrite.test.ts`
 
 | # | Description | Input path | Flags | Expected output |
 |---|---|---|---|---|
@@ -272,5 +272,5 @@ New test file: `stage9/tests/importPathRewrite.test.ts`
 - Relative paths that do not end in `.t2` / `.t2m` — always verbatim.
 - `macro-import` forms — these are already compiled away to `// macro-import: …`
   comments; they never appear in the final JS runtime output regardless of flags.
-- Internal stage compiler files (Stage9-*.s8) use `"./Stage9-foo"` with no extension
+- Internal stage compiler files (Stage10-*.s9) use `"./Stage10-foo"` with no extension
   and are not affected.

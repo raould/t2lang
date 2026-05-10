@@ -1,6 +1,6 @@
-# Destructuring Implementation Plan — Stage9
+# Destructuring Implementation Plan — Stage10
 
-This document describes the full plan for adding destructuring support to t2lang stage9 across all four binding-pattern use cases.
+This document describes the full plan for adding destructuring support to t2lang stage10 across all four binding-pattern use cases.
 
 ---
 
@@ -62,7 +62,7 @@ The rest of this document covers Phase 1–3 together but notes which phase each
 
 ---
 
-## 1. Grammar (`Stage9.g4`)
+## 1. Grammar (`Stage10.g4`)
 
 ### New rules
 
@@ -141,7 +141,7 @@ forOfForm
 
 ---
 
-## 2. AST Builder (`Stage9-ast.s8`)
+## 2. AST Builder (`Stage10-ast.s9`)
 
 ### New helper: `astDestructPattern`
 
@@ -264,7 +264,7 @@ In the `starBinding` map lambda, check for `destructPattern` on `b`:
 
 ---
 
-## 3. Macro Expand (`Stage9-macro-expand.s8`)
+## 3. Macro Expand (`Stage10-macro-expand.s9`)
 
 All three sites need to handle nodes that may have either `name` (plain) or `pattern` (destructuring).
 
@@ -360,7 +360,7 @@ Same treatment for `const`, `for-of`, `for-in`, `for-await`, and the `const*` bi
 
 ---
 
-## 4. Scope Resolution (`Stage9-scope-resolve.s8`)
+## 4. Scope Resolution (`Stage10-scope-resolve.s9`)
 
 Scope resolution must register all names introduced by a pattern into the binding chain.
 
@@ -452,7 +452,7 @@ Currently not in `resolveStmt` (falls through as-is). Add handling:
 
 ---
 
-## 5. Lowering (`Stage9-lower.s8`)
+## 5. Lowering (`Stage10-lower.s9`)
 
 Lowering passes the pattern through unchanged — it's already in its final shape. Only `init` / `iterable` need lowering.
 
@@ -496,7 +496,7 @@ Thread `pattern` through each binding instead of `name`.
 
 ---
 
-## 6. Codegen (`Stage9-codegen.s8`)
+## 6. Codegen (`Stage10-codegen.s9`)
 
 ### New helper: `emitDestructPattern`
 
@@ -560,7 +560,7 @@ Same change to `const-stmt` (line 168).
 
 ---
 
-## 7. Tags (`Stage9-tags.ts`)
+## 7. Tags (`Stage10-tags.ts`)
 
 No new tags required for Phase 1 — `'let'`, `'const'`, `'const*'`, `'for-of'`, `'for-in'`, `'for-await'` already exist and the pattern is carried as a field. The `destruct-object` and `destruct-array` values live in `.pattern` fields and are not top-level statement tags.
 
@@ -568,7 +568,7 @@ No new tags required for Phase 1 — `'let'`, `'const'`, `'const*'`, `'for-of'`,
 
 ## 8. Tests
 
-New test file: `stage9/tests/destructure.test.ts`
+New test file: `stage10/tests/destructure.test.ts`
 
 ```typescript
 // Phase 1

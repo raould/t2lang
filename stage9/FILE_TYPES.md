@@ -1,4 +1,4 @@
-# File Type Constraints — Stage9 Design
+# File Type Constraints — Stage10 Design
 
 This document describes the validation rules that enforce the distinction between
 `.t2` source files and `.t2m` macro-only files.
@@ -100,7 +100,7 @@ to a future phase if needed.
 ### Implementation location
 
 A single function `validateFileTypeConstraints(programNode, isMacroCompilation)`
-in `Stage9.s8`, called from `main()` immediately after `parseFile`. No new
+in `Stage10.s9`, called from `main()` immediately after `parseFile`. No new
 files needed.
 
 ```

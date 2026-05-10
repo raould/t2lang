@@ -1,4 +1,4 @@
-please make a plan (no code edits yet) for stage9 to support:
+please make a plan (no code edits yet) for stage10 to support:
 (1) "#foo" private class field naming convention using leading "#", passed through directly.
 (2) class constructors supporting field shorthand; With the constructor shorthand, you can simplify the code by declaring and initializing the properties directly in the constructor parameters, with access modifier support.
 (3) computed object keys something like this in t2 `{[foo]: 42}` in literals and `(object ([foo] 42))` in sexpr.
@@ -22,7 +22,7 @@ field, emitting `#count: number = 0;`. Also allow `(. this #count)` in expressio
 
 ### Plan
 
-**Stage9.g4**
+**Stage10.g4**
 - Add a new lexer token `PRIVATE_NAME : '#' IDENTIFIER_CHARS ;` (where `IDENTIFIER_CHARS`
   is the same character class used by `IDENTIFIER`, minus leading digit).
   Place it *before* `IDENTIFIER` so `#foo` is tokenised as `PRIVATE_NAME`, not a parse error.
@@ -35,16 +35,16 @@ field, emitting `#count: number = 0;`. Also allow `(. this #count)` in expressio
 - Update `propKey` similarly so `(. this #count)` in member-access continues to work
   (it already works via dot-access; verify no regression).
 
-**Stage9-ast.s8 (`astFieldDef`)**
+**Stage10-ast.s9 (`astFieldDef`)**
 - When extracting the field name, check whether the name child is `PRIVATE_NAME` or
   `IDENTIFIER` and take `.getText()` in both cases — the `#` prefix is already part of
   the token text, so no transformation is needed.
 - The returned AST node (`field-def`) is unchanged; the name string simply starts with `#`.
 
-**Stage9-lower.s8**
+**Stage10-lower.s9**
 - No changes required — `lowerFieldDef` passes the name through unchanged.
 
-**Stage9-codegen.s8**
+**Stage10-codegen.s9**
 - `emitFieldDef` already emits `name` as-is, so no code change needed.
 - Verify `checkId` is NOT called on field names (private names must not pass through
   the normal identifier-safety check since `#foo` deliberately bypasses `isValidBindingId`).
@@ -95,7 +95,7 @@ A typed constructor parameter prefixed with an access modifier (`public`, `priva
 
 ### Plan
 
-**Stage9.g4**
+**Stage10.g4**
 - Add a new rule `constructorParam` that wraps `typedParam` with optional leading
   modifiers:
   ```
@@ -114,7 +114,7 @@ A typed constructor parameter prefixed with an access modifier (`public`, `priva
   (The `fnSignatureTyped` wrapper may need splitting so the constructor can share the
   return-type optional without sharing the param rule.)
 
-**Stage9-ast.s8**
+**Stage10-ast.s9**
 - Add `astConstructorParam` that reads `modifiers` + the name/type/default from each
   `constructorParam` context.  Returns a new AST node shape:
   ```
@@ -125,12 +125,12 @@ A typed constructor parameter prefixed with an access modifier (`public`, `priva
 - `constructorDef` AST node gains a `params` field of `constructor-param` nodes instead
   of plain `typed-param` nodes.
 
-**Stage9-lower.s8**
+**Stage10-lower.s9**
 - Add `lowerConstructorParam` that passes through `modifiers`, `name`, `typeAnnotation`,
   and `defaultValue`.
 - Update `lowerConstructorDef` to call `lowerConstructorParam` per parameter.
 
-**Stage9-codegen.s8**
+**Stage10-codegen.s9**
 - Add `emitConstructorParam(param)`:
   - If `param.modifiers` is non-empty, prefix with `modifiers.join(' ') + ' '`.
   - Then emit `name`, optional `: type`, optional `= default` — same as a regular
@@ -177,7 +177,7 @@ Support runtime-computed keys in object literals:
 
 ### Plan
 
-**Stage9.g4**
+**Stage10.g4**
 - Add a `computedKey` rule (mirrors the one already used for class `methodKey`):
   ```
   computedKey : LBRACK expression RBRACK ;
@@ -193,7 +193,7 @@ Support runtime-computed keys in object literals:
       ;
   ```
 
-**Stage9-ast.s8 (`astObjectField`)**
+**Stage10-ast.s9 (`astObjectField`)**
 - Detect whether the field uses `computedKey` or `propKey`.
 - Add `computed: boolean` and `keyExpr: exprNode | undefined` to the returned object-field
   AST node:
@@ -210,10 +210,10 @@ Support runtime-computed keys in object literals:
 - When `computed` is true, call `astExpression` on the expression inside `[...]` and
   store in `keyExpr`; `key` is `undefined`.
 
-**Stage9-lower.s8**
+**Stage10-lower.s9**
 - Update `lowerObjectField` to lower `keyExpr` when `computed` is true.
 
-**Stage9-codegen.s8 (`emitObjectField`)**
+**Stage10-codegen.s9 (`emitObjectField`)**
 - When `field.computed` is true, emit `[${emitExpr(field.keyExpr)}]: ${emitExpr(field.value)}`
   (or the method form `[expr](params) { body }`).
 - When `field.computed` is false, existing path is unchanged.

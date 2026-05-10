@@ -1,4 +1,4 @@
-# Macro Block Call Syntax — Stage9 Design
+# Macro Block Call Syntax — Stage10 Design
 
 This document describes the design for macro calls that accept statement bodies.
 
@@ -172,7 +172,7 @@ body:       StatementNode[]      // statement arguments after =&
 id:         SpanId
 ```
 
-Both tags must be added to `Stage9-tags.ts`.
+Both tags must be added to `Stage10-tags.ts`.
 
 ### AST builders
 
@@ -354,8 +354,8 @@ Then:
 
 ### Phase 1 — AST
 
-1. Add `'macro-expr-call'` and `'macro-body-call'` to `Stage9-tags.ts`
-2. Implement `astMacroExprCall` and `astMacroBodyCall` in `Stage9-ast.s8`
+1. Add `'macro-expr-call'` and `'macro-body-call'` to `Stage10-tags.ts`
+2. Implement `astMacroExprCall` and `astMacroBodyCall` in `Stage10-ast.s9`
 3. Add dispatch in `astExpression` and `astStatement`
 
 Verification: `(program (const x (identity => (return 42))))` should produce an AST node with `tag: 'macro-expr-call'`, `fn.name: 'identity'`, `body` containing a `return` node.

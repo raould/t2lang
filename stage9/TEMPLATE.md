@@ -22,14 +22,14 @@ sees it:
 ```
 
 This is a string-to-string pass over the raw source.  It runs in the entry
-point (`Stage9.s8` / `index.ts`) right before the ANTLR parse call.  The rest
+point (`Stage10.s9` / `index.ts`) right before the ANTLR parse call.  The rest
 of the pipeline is unchanged.
 
 ---
 
-## Phase 0 — Reader module (`Stage9-reader.s8`)
+## Phase 0 — Reader module (`Stage10-reader.s9`)
 
-New source file; compiled to `Stage9-reader.ts` by `npm run build-compiler`.
+New source file; compiled to `Stage10-reader.ts` by `npm run build-compiler`.
 
 ### Algorithm
 
@@ -94,12 +94,12 @@ Examples:
 
 ---
 
-## Phase 1 — Entry point integration (`Stage9.s8`)
+## Phase 1 — Entry point integration (`Stage10.s9`)
 
 Import `readerTransform` and call it on the raw source before parsing:
 
 ```s8
-(import (object (named (array (object (name "readerTransform"))))) "./Stage9-reader")
+(import (object (named (array (object (name "readerTransform"))))) "./Stage10-reader")
 
 ;; in the main streaming loop, before astTopLevel:
 (const rawSource (readStdin))
@@ -168,11 +168,11 @@ End-to-end tests via `fromSourceEndToEnd`:
 
 | Component | Status |
 |---|---|
-| `Stage9-ast.s8` | Unchanged — `astTemplateExpr` already handles `template-expr` |
-| `Stage9-codegen.s8` | Unchanged — `emitTemplateExpr` already emits `` `...${...}...` `` |
-| `Stage9-lower.s8` | Unchanged |
-| `Stage9-scope-resolve.s8` | Unchanged |
-| `Stage9-macro-expand.s8` | Unchanged |
+| `Stage10-ast.s9` | Unchanged — `astTemplateExpr` already handles `template-expr` |
+| `Stage10-codegen.s9` | Unchanged — `emitTemplateExpr` already emits `` `...${...}...` `` |
+| `Stage10-lower.s9` | Unchanged |
+| `Stage10-scope-resolve.s9` | Unchanged |
+| `Stage10-macro-expand.s9` | Unchanged |
 | Grammar `templateExpr` rule | Unchanged |
 
 ---

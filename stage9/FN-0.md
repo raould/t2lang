@@ -49,7 +49,7 @@ Expressing this in T2Lang's positional `fn` form is awkward. `fn-o` gives it a n
 (foo { arg1: "bar", arg2: 99 })
 ```
 
-Call sites use `braceObjectExpr` — already valid in Stage9, no grammar changes needed at the call site.
+Call sites use `braceObjectExpr` — already valid in Stage10, no grammar changes needed at the call site.
 
 ---
 
@@ -57,7 +57,7 @@ Call sites use `braceObjectExpr` — already valid in Stage9, no grammar changes
 
 ### New lexer tokens
 
-One token per callable variant. All must be added to the `propKey` rule per the existing Stage9 maintenance note. Longer tokens are listed before shorter prefix matches per ANTLR convention.
+One token per callable variant. All must be added to the `propKey` rule per the existing Stage10 maintenance note. Longer tokens are listed before shorter prefix matches per ANTLR convention.
 
 ```antlr
 ASYNC_GENERATOR_FN_O : 'async-generator-fn-o' ;
@@ -125,7 +125,7 @@ fnoRestParam
     ;
 ```
 
-`OPTIONAL` (`?`), `REST`, `DEFAULT`, `COLON`, `modifier`, and `methodKey` are all existing Stage9 rules and tokens — no further lexer additions required.
+`OPTIONAL` (`?`), `REST`, `DEFAULT`, `COLON`, `modifier`, and `methodKey` are all existing Stage10 rules and tokens — no further lexer additions required.
 
 > **`DEFAULT` note:** `DEFAULT : 'default'` is already defined for `switchForm`. It can be safely reused here — `(default expr)` inside `fnoParam` is unambiguous by parser context and ANTLR will not misfire.
 

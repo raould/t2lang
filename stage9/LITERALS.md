@@ -38,7 +38,7 @@ Add `| bracketArrayExpr` to the `expression` rule (alongside `arrayExpr`).
 Commas are optional (matching the style of parameter lists / `(array ...)`), so
 `[1 2 3]`, `[1, 2, 3]`, and `[1,2,3]` all parse.
 
-**Phase A2 — AST (`Stage9-ast.s8`)**
+**Phase A2 — AST (`Stage10-ast.s9`)**
 
 Add `astBracketArrayExpr(ctx)` that calls `astBracketArrayExpr` alternatives
 and returns exactly:
@@ -52,7 +52,7 @@ pipeline is unchanged.
 
 **Phase A3 — Tests**
 
-`stage9/tests/bracketArrayLiteral.test.ts` — end-to-end tests:
+`stage10/tests/bracketArrayLiteral.test.ts` — end-to-end tests:
 
 ```scheme
 (let ((a [1, 2, 3]))
@@ -143,7 +143,7 @@ Methods (`{ foo() {...} }`) are **out of scope** for this plan; use
 `(object (foo (lambda ...)))` or the existing `(method ...)` form inside class
 bodies.
 
-**Phase B3 — AST (`Stage9-ast.s8`)**
+**Phase B3 — AST (`Stage10-ast.s9`)**
 
 Add `astBraceObjectField(ctx)` returning the same shape as `astObjectField`:
 
@@ -170,7 +170,7 @@ Again the same shape as `astObjectExpr`, so no downstream changes.
 
 **Phase B4 — Tests**
 
-`stage9/tests/braceObjectLiteral.test.ts` — end-to-end tests:
+`stage10/tests/braceObjectLiteral.test.ts` — end-to-end tests:
 
 ```scheme
 ;; string keys

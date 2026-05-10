@@ -4,7 +4,7 @@
 
 This document describes the user-facing semantics. For the implementation plan and design rationale, see [PRATT.md](PRATT.md).
 
-> **History.** Stage9 used a "uniformity check" — all binary operators at the same `{}` level had to be identical (`#{a + b * c}` was a compile error). Stage10 replaced this with a real precedence table. Stage9's [INFIX.md](../stage9/INFIX.md) remains accurate for that earlier design.
+> **History.** Stage10 used a "uniformity check" — all binary operators at the same `{}` level had to be identical (`#{a + b * c}` was a compile error). Stage10 replaced this with a real precedence table. Stage10's INFIX.md remains accurate for that earlier design.
 
 ---
 
