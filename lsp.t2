@@ -7,7 +7,7 @@
   (import {createRequire} "node:module")
   (const _require (createRequire (. import.meta url)))
   (const {compileSource} (_require "./stage10/index"))
-  (const {readerTransform} (_require "./stage10/Stage9-reader"))
+  (const {readerTransform} (_require "./stage10/Stage10-reader"))
 
   ;; ---- constants ----
 
