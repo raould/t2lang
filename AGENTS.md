@@ -15,7 +15,7 @@ A bootstrapping compiler chain (stage3 → ... → stage10) that compiles s-expr
 - `stage10/Stage10-tags.ts`, `Stage10-debug.ts`, `Stage10-parse-form.ts` — hand-authored TypeScript (not compiled)
 - `stage10/index.ts` — compiled from `Stage10.s9` (main entry point)
 - `stage10/tests/` — test suite (Vitest)
-- `bin/t2tc.js`, `bin/t2jc.js`, `bin/t2run.js` — CLI wrappers
+- `stage10/bin/t2tc.js`, `stage10/bin/t2jc.js`, `stage10/bin/t2run.js` — CLI wrappers
 - `index.ts` — root re-export: `export { compile } from "./stage10/index.ts"`
 - `build.shk` — MiniShake build file
 
