@@ -8,8 +8,8 @@ This example shows two separate `.t2` files compiled into `A.ts` and `B.ts`, whe
 
 ## Build (from repo root)
 - Compile each file:
-  - `node bin/t2tc.cjs samples/AB/A.t2`
-  - `node bin/t2tc.cjs samples/AB/B.t2`
+  - `npx tsx stage10/bin/t2tc.js samples/AB/A.t2`
+  - `npx tsx stage10/bin/t2tc.js samples/AB/B.t2`
 
 ## Output
 The generated `B.ts` will include a standard import:

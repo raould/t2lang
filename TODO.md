@@ -1,6 +1,11 @@
-- [ ] fix topLevelConst.
-- [ ] require infix spacing.
+- [x] fix topLevelConst
+    - and all related const/var/let.
+    - [x] constStmt.
+    - [x] re-support multi-pair forms.
+    - [x] destructuring support, and ...rest.
+- [ ] require infix spacing (see aborted commit).
 - [ ] stageN/src/** duh.
+    - [ ] also t2src -> src ? -> dist
 - [ ] keep updating the style guide.
 - [ ] omfg version numbers.
 - [ ] error reporting unification, and the error glossary.
@@ -34,7 +39,7 @@ The pipeline model wins on local reasoning — you can read lowerClassDef and un
 The pipeline approach starts winning the code complexity competition around phase 3. The database approach starts winning around the point where you have enough cross-cutting rules that your pipeline passes are mostly just collecting and forwarding metadata for other passes to consume — at which point you've accidentally reinvented a bad database.
 
 ## What t2 actually is now
-The current stage9 pipeline is already implicitly building a database — the chain threading through scope-resolve, the env in macro-expand, the span registry. Each of those is a partial query index. The mixin field/declare check is the first rule that would naturally be expressed as a join rather than a nested conditional. It might not be the last.
+The current stage10 pipeline is already implicitly building a database — the chain threading through scope-resolve, the env in macro-expand, the span registry. Each of those is a partial query index. The mixin field/declare check is the first rule that would naturally be expressed as a join rather than a nested conditional. It might not be the last.
 
 ## topLevelConst
 Here's the precise map of what exists:
@@ -60,6 +65,6 @@ topLevelConst
     ;
 singleBinding is (IDENTIFIER (COLON typeExpr)?) — so (const (x) 1) and (const (x: number) 1) both work. It also allows destructuring patterns, which is a bonus.
 
-The catch: every existing (const x expr) at top level in the .s8 sources breaks — and there are likely hundreds of them, including throughout the compiler source files themselves. The AST handler for topLevelConst would also need updating (from reading ctx.IDENTIFIER() to reading ctx.singleBinding()).
+The catch: every existing (const x expr) at top level in the .s9 sources breaks — and there are likely hundreds of them, including throughout the compiler source files themselves. The AST handler for topLevelConst would also need updating (from reading ctx.IDENTIFIER() to reading ctx.singleBinding()).
 
-Do you want to proceed? If so, I'd suggest doing it in two phases: grammar + AST change first, then a mechanical search-and-replace over all .s8 files to add parens.
+Do you want to proceed? If so, I'd suggest doing it in two phases: grammar + AST change first, then a mechanical search-and-replace over all .s9 files to add parens.

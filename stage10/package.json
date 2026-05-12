@@ -1,0 +1,44 @@
+{
+  "name": "stage10",
+  "version": "0.0.1",
+  "description": "",
+  "license": "CC0-1.0",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "imports": {
+    "#stage10": "./index.ts",
+    "#src/*": "./src/*.ts"
+  },
+  "scripts": {
+    "clean-compiled": "find src -maxdepth 1 -name Stage10-\\*.s9 | sed 's/.s9$/.ts/' | xargs rm",
+    "clean-grammar": "rm $(ls -1 src/Stage10[A-Z]*.ts)",
+    "clean": "npm run clean-grammar; npm run clean-compiled",
+    "build": "npm run build-grammar && npm run build-ts-files && npm run build-main",
+    "build-grammar": "cd src && antlr-ng -Dlanguage=TypeScript Stage10.g4",
+    "build-ts-files": "cd src && for INPUT in Stage10-*.s9; do echo ${INPUT}; npm --silent --prefix ../../stage9 run t2tc -- ${PWD}/${INPUT}; done",
+    "build-main": "cd src && npm --silent --prefix ../../stage9 run t2tc -- ${PWD}/Stage10.s9",
+    "test": "npm run build && npm exec vitest -- --typecheck run",
+    "testnow": "npm exec vitest -- --typecheck run",
+    "lint": "echo 'disabled on purpose'",
+    "t2tc": "npx tsx bin/t2tc.js",
+    "t2jc": "npx tsx bin/t2jc.js",
+    "t2run": "npx tsx bin/t2run.js"
+  },
+  "dependencies": {
+    "antlr-ng": "^1.0.10",
+    "commander": "^14.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.33",
+    "@vitest/ui": "^4.0.18",
+    "antlr4ng": "^3.0.16",
+    "deep-object-diff": "^1.1.9",
+    "eslint": "^10.0.1",
+    "lodash": "^4.17.23",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18",
+    "vitest-fail-on-console": "^0.10.1"
+  }
+}

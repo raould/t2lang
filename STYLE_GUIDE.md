@@ -1,4 +1,4 @@
-# t2lang Stage9 Syntax Style Guide
+# t2lang Stage10 Syntax Style Guide
 
 This guide documents preferred syntax forms and available sugar. It is primarily aimed at AI agents and contributors who need to write t2 source without building up bad habits from the raw ANTLR grammar.
 
@@ -508,7 +508,7 @@ Use backtick template literals directly — the reader transforms them to `(temp
 
 A plain backtick string with no interpolations becomes a regular string literal: `` `hello` `` → `"hello"`.
 
-The `(template ...)` form is still valid and may appear in compiler source files (`.s8`) compiled by earlier stages that predate the reader.
+The `(template ...)` form is still valid and may appear in compiler source files (`.s9`) compiled by earlier stages that predate the reader.
 
 ---
 
@@ -564,13 +564,13 @@ Key rules for class bodies:
 
 ```lisp
 ;; AVOID — verbose; only needed when compiler sources cannot use sugar
-;; (compiler .s8 files are compiled by stage8 which predates the sugar)
+;; (compiler .s9 files are compiled by stage8 which predates the sugar)
 (import (object (named (array (object (name "readFile")) (object (name "writeFile"))))) "fs/promises")
 (import (object (default myLib)) "./myLib")
 (import (object (namespace utils)) "./utils")
 ```
 
-**Note:** The concise forms produce identical output to the verbose forms. Use them everywhere except in `.s8` compiler source files, which are compiled by an earlier stage that does not support this sugar.
+**Note:** The concise forms produce identical output to the verbose forms. Use them everywhere except in `.s9` compiler source files, which are compiled by an earlier stage that does not support this sugar.
 
 ---
 
