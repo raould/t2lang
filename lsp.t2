@@ -4,10 +4,8 @@
   (import {join} "node:path")
   (import {spawn} "node:child_process")
   (import * as ts "typescript")
-  (import stage10mod "./stage10/index.ts")
-  (import stage10reader "./stage10/src/Stage10-reader.ts")
-  (const (({compileSource} stage10mod)))
-  (const (({readerTransform} stage10reader)))
+  (import {compileSource} "./stage10/index.ts")
+  (import {readerTransform} "./stage10/src/Stage10-reader.ts")
 
   ;; ---- constants ----
 

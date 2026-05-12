@@ -3,10 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import * as ts from "typescript";
-import stage10mod from "./stage10/index.ts";
-import stage10reader from "./stage10/src/Stage10-reader.ts";
-const {compileSource} = stage10mod;
-const {readerTransform} = stage10reader;
+import { compileSource } from "./stage10/index.ts";
+import { readerTransform } from "./stage10/src/Stage10-reader.ts";
 const EVAL_FILE = "__eval__.ts";
 const MAX_OUTPUT = 1024 * 1024;
 const createEvalService = function() {
