@@ -34,6 +34,7 @@
     "t2lang-lsp": "stage10/bin/t2lang-lsp.js"
   },
   "dependencies": {
+    "antlr-ng": "^1.0.10",
     "commander": "^14.0.3",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",

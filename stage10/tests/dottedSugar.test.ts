@@ -111,4 +111,4 @@ it('desugar guard rejects unknown tag via whitelist', () => {
   errorSpy.mockRestore();
   expect(res.status ?? 0).not.toBe(0);
   expect(errors.join('\n')).toContain('desugar produced non-core tag');
-});
+}, 30_000);

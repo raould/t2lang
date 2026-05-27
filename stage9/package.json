@@ -15,10 +15,7 @@
     "build-grammar": "antlr-ng -Dlanguage=TypeScript Stage9.g4",
     "test": "npm run build && npm exec --prefix stage9 vitest -- --typecheck run",
     "testnow": "npm exec --prefix stage9 vitest -- --typecheck run",
-    "lint": "echo 'disabled on purpose'",
-    "t2tc": "npx tsx bin/t2tc.js",
-    "t2jc": "npx tsx bin/t2jc.js",
-    "t2run": "npx tsx bin/t2run.js"
+    "lint": "echo 'disabled on purpose'"
   },
   "dependencies": {
     "antlr-ng": "^1.0.10"

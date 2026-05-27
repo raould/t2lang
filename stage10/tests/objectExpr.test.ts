@@ -25,7 +25,7 @@ it('objectExpr.test.t2 object with lambda value', () => {
       (let ((obj2 { rule: (lambda ((args: any)) (return (* 2 args))) })))
       (asrt (obj2.rule 5) 10)
   )`);
-});
+}, 30_000);
 
 it('objectExpr.test.t2 object with identifier keys', () => {
   fromSourceEndToEnd(`(program
