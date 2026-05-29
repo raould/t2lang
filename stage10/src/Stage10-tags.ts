@@ -1,4 +1,4 @@
-export const AST_TAGS = [ /*warning: this must also be successfully parsed by bin/t2helpers.js*/
+export const AST_TAGS = [ /*warning: this must also be successfully parsed by bin/t2helpers.ts*/
   "abstract-method-def",
   "abstract-method-o-def",
   "anon-class-def",

@@ -27,8 +27,7 @@
   },
   "dependencies": {
     "antlr-ng": "^1.0.10",
-    "chokidar": "^4.0.3",
-    "commander": "^14.0.3"
+    "chokidar": "^4.0.3"
   },
   "devDependencies": {
     "@types/node": "^20.19.33",
