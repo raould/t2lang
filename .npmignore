@@ -1,0 +1,16 @@
+stage0/
+stage1/
+stage2/
+stage3/
+stage4/
+stage5/
+stage6/
+stage7/
+stage8/
+stage9/
+stage_crazy_future/
+
+!stage10/
+!stage10/**
+stage10/tests/
+stage10/node_modules/

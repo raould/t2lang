@@ -122,9 +122,28 @@ const tokenizeInfix  = (src) => {
     const fail  = (msg) => {
       throw new Error(((("infix tokenizer at offset " + i) + ": ") + msg));
     };
+    const isHexDigit  = (ch) => {
+      return (isDigit(ch) || (((ch >= "a") && (ch <= "f")) || ((ch >= "A") && (ch <= "F"))));
+    };
     const scanNumber  = () => {
       {
         let start  = i;
+        if (((chAt(0) === "0") && ((chAt(1) === "x") || (chAt(1) === "X")))) {
+          i = (i + 2);
+          while (((i < len) && isHexDigit(chAt(0)))) {
+            i = (i + 1);
+          }
+          emit("NUM", src.slice(start, i), start);
+          return;
+        }
+        if (((chAt(0) === "0") && ((chAt(1) === "o") || (chAt(1) === "O")))) {
+          i = (i + 2);
+          while (((i < len) && ((chAt(0) >= "0") && (chAt(0) <= "7")))) {
+            i = (i + 1);
+          }
+          emit("NUM", src.slice(start, i), start);
+          return;
+        }
         while (((i < len) && isDigit(chAt(0)))) {
           i = (i + 1);
         }

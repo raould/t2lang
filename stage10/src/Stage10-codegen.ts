@@ -573,7 +573,7 @@ const emitExpr  = (expr) => {
     return emitTemplateExpr(expr);
   }
   if ((expr.tag === "literal")) {
-    return ((expr.value === undefined) ? "undefined" : JSON.stringify(expr.value));
+    return ((expr.value === undefined) ? "undefined" : ((typeof expr.value === "number") ? (expr.text || ("" + expr.value)) : JSON.stringify(expr.value)));
   }
   if ((expr.tag === "identifier")) {
     return (expr.name.startsWith("...") ? expr.name : checkDottedId(expr.name, expr.id));

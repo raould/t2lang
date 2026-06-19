@@ -1,8 +1,9 @@
 {
   "name": "t2lang",
-  "version": "0.0.1",
+  "version": "0.0.7",
   "description": "sexprs4typescript",
   "homepage": "https://github.com/raould/t2lang#readme",
+  "publishConfig": { "registry": "http://localhost:4873" },
   "bugs": {
     "url": "https://github.com/raould/t2lang/issues"
   },
@@ -18,29 +19,26 @@
     ".": "./index.ts"
   },
   "scripts": {
-    "modules": "for ME in `find . -maxdepth 1 -type d -name stage\\* | grep -v crazy`; do (cd $ME; npm i); done",
-    "build": "npm --prefix stage10 run build",
-    "build-lsp": "npx tsx stage10/bin/t2tc.js lsp.t2",
-    "test": "npm run modules && npm --prefix stage10 test",
-    "testnow": "npm --prefix stage10 run testnow",
-    "vscode:build": "npm --prefix vscode-t2-formatter run build",
-    "vscode:package": "npm --prefix vscode-t2-formatter run package",
-    "vscode:build-and-package": "npm run vscode:build && npm run vscode:package"
+    "modules": "for ME in `find . -maxdepth 1 -type d -name stage\\* | grep -v crazy`; do (cd $ME; pnpm i); done",
+    "build": "pnpm --prefix stage10 run build",
+    "test": "pnpm run modules && pnpm --prefix stage10 test",
+    "testnow": "pnpm --prefix stage10 run testnow",
+    "vscode:build": "pnpm --prefix vscode-t2-formatter run build",
+    "vscode:package": "pnpm --prefix vscode-t2-formatter run package",
+    "vscode:build-and-package": "pnpm run vscode:build && pnpm run vscode:package"
   },
   "bin": {
     "t2tc": "stage10/bin/t2tc.js",
     "t2jc": "stage10/bin/t2jc.js",
     "t2run": "stage10/bin/t2run.js",
-    "t2lang-lsp": "stage10/bin/t2lang-lsp.js"
+    "t2lang-lsp": "bin/t2lang-lsp.js"
   },
   "dependencies": {
+    "antlr-ng": "^1.0.10",
     "commander": "13.1.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.12"
-  },
-  "devDependencies": {
-    "antlr-ng": "^1.0.10"
   }
 }

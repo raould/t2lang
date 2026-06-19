@@ -7,10 +7,10 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "build": "npm run build-grammar && npm run build-compiler",
+    "build": "pnpm run build-grammar && pnpm run build-compiler",
     "build-compiler": "npx tsx ../3E/index.ts Stage3F-ast.s3e > /tmp/_s3f_ast.ts && mv /tmp/_s3f_ast.ts Stage3F-ast.ts && npx tsx ../3E/index.ts Stage3F-lower.s3e > /tmp/_s3f_lower.ts && mv /tmp/_s3f_lower.ts Stage3F-lower.ts && npx tsx ../3E/index.ts Stage3F-codegen.s3e > /tmp/_s3f_codegen.ts && mv /tmp/_s3f_codegen.ts Stage3F-codegen.ts && npx tsx ../3E/index.ts Stage3F.s3e > /tmp/_s3f_main.ts && mv /tmp/_s3f_main.ts ./index.ts",
     "build-grammar": "antlr-ng -Dlanguage=TypeScript Stage3F.g4",
-    "test": "npm run build && npx vitest run",
+    "test": "pnpm run build && npx vitest run",
     "lint": "echo 'disabled on purpose'"
   },
   "dependencies": {

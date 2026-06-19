@@ -3,6 +3,7 @@
     - [x] constStmt.
     - [x] re-support multi-pair forms.
     - [x] destructuring support, and ...rest.
+- [ ] number literals: scientific notation.
 - [ ] require infix spacing (see aborted commit).
 - [ ] stageN/src/** duh.
     - [ ] also t2src -> src ? -> dist

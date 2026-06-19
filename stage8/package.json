@@ -9,11 +9,11 @@
     "scripts": {
         "clean-compiled": "find . -maxdepth 1 -name Stage8-\\*.s7 | sed 's/.s7$/.ts/' | xargs rm",
         "clean-grammar": "rm $(ls -1 Stage8[A-Z]*.ts)",
-        "clean": "npm run clean-grammar; npm run clean-compiled",
-        "build": "npm run build-grammar && npm run build-compiler",
+        "clean": "pnpm run clean-grammar; pnpm run clean-compiled",
+        "build": "pnpm run build-grammar && pnpm run build-compiler",
         "build-compiler": "npx tsx ../stage7/index.ts Stage8-spans.s7 > /tmp/_s8_spans.ts && mv /tmp/_s8_spans.ts Stage8-spans.ts && npx tsx ../stage7/index.ts Stage8-ast.s7 > /tmp/_s8_ast.ts && mv /tmp/_s8_ast.ts Stage8-ast.ts && npx tsx ../stage7/index.ts Stage8-lower.s7 > /tmp/_s8_lower.ts && mv /tmp/_s8_lower.ts Stage8-lower.ts && npx tsx ../stage7/index.ts Stage8-codegen.s7 > /tmp/_s8_codegen.ts && mv /tmp/_s8_codegen.ts Stage8-codegen.ts && npx tsx ../stage7/index.ts Stage8-macro-env.s7 > /tmp/_s8_macro_env.ts && mv /tmp/_s8_macro_env.ts Stage8-macro-env.ts && npx tsx ../stage7/index.ts Stage8-macro-expand.s7 > /tmp/_s8_macro_expand.ts && mv /tmp/_s8_macro_expand.ts Stage8-macro-expand.ts && npx tsx ../stage7/index.ts Stage8-scope-resolve.s7 > /tmp/_s8_scope_resolve.ts && mv /tmp/_s8_scope_resolve.ts Stage8-scope-resolve.ts && npx tsx ../stage7/index.ts Stage8.s7 > /tmp/_s8_main.ts && mv /tmp/_s8_main.ts ./index.ts",
         "build-grammar": "antlr-ng -Dlanguage=TypeScript Stage8.g4",
-        "test": "npm run build && npx vitest run",
+        "test": "pnpm run build && npx vitest run",
         "testnow": "npx vitest run",
         "lint": "echo 'disabled on purpose'"
     },

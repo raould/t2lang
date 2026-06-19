@@ -1,17 +1,38 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
 import { LanguageClient, TransportKind } from 'vscode-languageclient/node';
 
 let client: LanguageClient;
 
+function resolveServerCommand(): { command: string; args: string[] } {
+  const folders = vscode.workspace.workspaceFolders;
+  if (folders) {
+    for (const folder of folders) {
+      // Consumer project: t2lang installed as a devDependency
+      const fromDep = path.join(folder.uri.fsPath, 'node_modules', '.bin', 't2lang-lsp');
+      if (fs.existsSync(fromDep)) return { command: fromDep, args: [] };
+      // t2lang dev repo: invoke the live script via tsx
+      const lspScript = path.join(folder.uri.fsPath, 'bin', 't2lang-lsp.js');
+      if (fs.existsSync(lspScript)) {
+        const tsxBin = path.join(folder.uri.fsPath, 'node_modules', '.bin', 'tsx');
+        return { command: fs.existsSync(tsxBin) ? tsxBin : 'tsx', args: [lspScript] };
+      }
+    }
+  }
+  return { command: 't2lang-lsp', args: [] }; // fallback: global install
+}
+
 export function activate(context: vscode.ExtensionContext) {
   const outputChannel = vscode.window.createOutputChannel('t2 eval');
+  const { command, args } = resolveServerCommand();
 
   client = new LanguageClient(
     't2lang',
     'T2 Language Server',
     {
-      run:   { command: 't2lang-lsp', transport: TransportKind.stdio },
-      debug: { command: 't2lang-lsp', transport: TransportKind.stdio }
+      run:   { command, args, transport: TransportKind.stdio },
+      debug: { command, args, transport: TransportKind.stdio }
     },
     {
       documentSelector: [{ scheme: 'file', language: 't2' }]

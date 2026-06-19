@@ -99,9 +99,32 @@
           (lambda ((msg))
             (throw (new Error (+ "infix tokenizer at offset " i ": " msg)))))
 
+        (const (isHexDigit)
+          (lambda ((ch))
+            (return (|| (isDigit ch)
+                        (|| (&& (>= ch "a") (<= ch "f"))
+                            (&& (>= ch "A") (<= ch "F")))))))
+
         (const (scanNumber)
           (lambda ()
             (let ((start i))
+              ;; hex: 0x... or 0X...
+              (if (&& (=== (chAt 0) "0") (|| (=== (chAt 1) "x") (=== (chAt 1) "X")))
+                (then
+                  (set! i (+ i 2))
+                  (while (&& (< i len) (isHexDigit (chAt 0)))
+                    (set! i (+ i 1)))
+                  (emit "NUM" ((. src slice) start i) start)
+                  (return)))
+              ;; octal: 0o... or 0O...
+              (if (&& (=== (chAt 0) "0") (|| (=== (chAt 1) "o") (=== (chAt 1) "O")))
+                (then
+                  (set! i (+ i 2))
+                  (while (&& (< i len) (&& (>= (chAt 0) "0") (<= (chAt 0) "7")))
+                    (set! i (+ i 1)))
+                  (emit "NUM" ((. src slice) start i) start)
+                  (return)))
+              ;; decimal (with optional fraction and exponent)
               (while (&& (< i len) (isDigit (chAt 0)))
                 (set! i (+ i 1)))
               (if (&& (=== (chAt 0) ".") (isDigit (chAt 1)))

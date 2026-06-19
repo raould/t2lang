@@ -1252,7 +1252,9 @@ EXPORT_TYPE_FROM     : 'export-type-from' ;
 EXPORT_TYPE          : 'export-type' ;
 
 NUMBER
-    : [0-9]+ ('.' [0-9]+)?
+    : '0' [xX] [0-9a-fA-F]+         // hex:   0xFF  0X1A
+    | '0' [oO] [0-7]+               // octal: 0o17  0O7
+    | [0-9]+ ('.' [0-9]+)?          // decimal (with optional fraction)
     ;
 
 STRING
@@ -1266,7 +1268,9 @@ MULTILINE_STRING
     ;
 
 NEG_NUMBER
-    : '-' [0-9]+ ('.' [0-9]+)?
+    : '-' '0' [xX] [0-9a-fA-F]+      // negative hex:   -0xFF
+    | '-' '0' [oO] [0-7]+           // negative octal: -0o17
+    | '-' [0-9]+ ('.' [0-9]+)?      // negative decimal
     ;
 
 MINUS

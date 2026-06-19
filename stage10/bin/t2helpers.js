@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export function checkSource(source: string, label: string): void {
+export function checkSource(source, label) {
   const errors = findUnderscoredKeywords(source);
   if (errors.length === 0) return;
   for (const e of errors) {
@@ -21,14 +21,14 @@ export function checkSource(source: string, label: string): void {
 // We read the file as text so we don't need tsx to import it.
 const tagsSource = readFileSync(resolve(__dirname, '../src/Stage10-tags.ts'), 'utf-8');
 const HYPHENATED_KEYWORDS = [...tagsSource.matchAll(/"([a-z][a-z0-9]*(?:-[a-z0-9]+)+)"/g)]
-  .map((m) => m[1]);
+  .map(m => m[1]);
 
 // Replace the contents of strings and ;; comments with spaces, preserving
 // newlines so that line numbers stay correct.
-function stripCommentsAndStrings(source: string): string {
+function stripCommentsAndStrings(source) {
   let out = '';
   let i = 0;
-  const blank = (chunk: string) => chunk.replace(/[^\n]/g, ' ');
+  const blank = (chunk) => chunk.replace(/[^\n]/g, ' ');
   while (i < source.length) {
     // triple-quoted string  """..."""
     if (source.startsWith('"""', i)) {
@@ -69,24 +69,17 @@ function stripCommentsAndStrings(source: string): string {
   return out;
 }
 
-type KeywordError = {
-  keyword: string;
-  found: string;
-  line: number;
-  col: number;
-};
-
 // Check source for underscore variants of hyphenated keywords.
 // Returns an array of { keyword, found, line, col } objects.
-function findUnderscoredKeywords(source: string): KeywordError[] {
+function findUnderscoredKeywords(source) {
   const stripped = stripCommentsAndStrings(source);
-  const errors: KeywordError[] = [];
+  const errors = [];
   for (const kw of HYPHENATED_KEYWORDS) {
     const underscored = kw.replace(/-/g, '_');
     // Match the underscore form only when surrounded by non-identifier chars
     // (identifiers are [a-zA-Z0-9_$?] in Stage10).
     const re = new RegExp(`(?<![\\w$?])${underscored}(?![\\w$?])`, 'g');
-    let m: RegExpExecArray | null;
+    let m;
     while ((m = re.exec(stripped)) !== null) {
       // Compute line/col from offset
       const before = stripped.slice(0, m.index);

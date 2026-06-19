@@ -2,7 +2,7 @@
     "name": "vscode-t2-formatter",
     "displayName": "T2 S-expression Support",
     "publisher": "local",
-    "version": "0.0.4",
+    "version": "0.0.7",
     "engines": {
         "vscode": "^1.60.0"
     },
@@ -57,7 +57,7 @@
     "scripts": {
         "build": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node",
         "watch": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --watch",
-        "package": "npm run build && vsce package"
+        "package": "npm run build && vsce package --no-dependencies"
     },
     "dependencies": {
         "vscode-languageclient": "^9.0.1"

@@ -1,0 +1,6 @@
+packages:
+  - "vscode-t2-formatter"
+
+allowBuilds:
+  esbuild: true
+  keytar: true

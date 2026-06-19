@@ -2,6 +2,41 @@ import { it, expect } from 'vitest';
 import { compileSource as compile } from '#stage10';
 import { fromSourceEndToEnd } from './helpers';
 
+// hex and octal literals
+it('#{0xFF} tokenizes as hex and emits 0xFF', () => {
+    expect(emittedTs('(const ((x #{0xFF})))')).toContain('0xFF');
+});
+
+it('#{0o17} tokenizes as octal and emits 0o17', () => {
+    expect(emittedTs('(const ((x #{0o17})))')).toContain('0o17');
+});
+
+it('#{0xFF + 1} emits 0xFF + 1', () => {
+    expect(emittedTs('(const ((x #{0xFF + 1})))')).toContain('0xFF + 1');
+});
+
+it('#{0o17 & 0xFF} emits 0o17 & 0xFF', () => {
+    expect(emittedTs('(const ((x #{0o17 & 0xFF})))')).toContain('0o17 & 0xFF');
+});
+
+it('hex infix runtime: 0xFF === 255', () => {
+  fromSourceEndToEnd(`(program
+    (import {asrt} "./helpers")
+    (asrt #{0xFF} 255)
+    (asrt #{0xFF + 1} 256)
+  )
+`);
+}, 30_000);
+
+it('octal infix runtime: 0o17 === 15', () => {
+  fromSourceEndToEnd(`(program
+    (import {asrt} "./helpers")
+    (asrt #{0o17} 15)
+    (asrt #{0o17 + 1} 16)
+  )
+`);
+}, 30_000);
+
 it('infix spacing', () => {
   fromSourceEndToEnd(`(program
     (import {asrt} "./helpers")
