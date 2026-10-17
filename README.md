@@ -5,6 +5,8 @@ Trying to save TypeScript from itself, one parenthasis at a time.
 ## quick start
 
 - look at stage10/
+- cry a little
+- look at [todo plans](https://docs.google.com/document/d/1rzPqkx3T5Ye5aAvz-1PTz20dG0ybEIRGnMjlf2X1bcs/edit?usp=drivesdk)
 
 ## description
 
